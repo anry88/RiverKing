@@ -24,6 +24,7 @@
       const [me,setMe] = React.useState(null);
       const [loading,setLoading] = React.useState(true);
       const [casting,setCasting] = React.useState(false);
+      const castingRef = React.useRef(false);
       const [result,setResult] = React.useState(null);
       const [error,setError] = React.useState(null);
 
@@ -48,10 +49,11 @@
       async function claimDaily(){ setError(null); try{ const r=await fetch(`/api/daily`,{method:'POST',credentials:'include'}); if(!r.ok) throw 0; const d=await r.json(); setMe(p=>({...p,baits:p.baits+(d.baitsGranted||15)})); }catch{ setError('Ежедневные приманки уже забраны.'); } }
       async function selectLocation(id){ setError(null); try{ await fetch(`/api/location/`+id,{method:'POST',credentials:'include'}); setMe(p=>({...p,locationId:id})); }catch{ setError('Не удалось сменить локацию'); } }
       async function cast(){
-        if(casting) return;
+        if(castingRef.current) return;
         if(!me) return;
         if(me.baits<=0){ setError('Нет приманок. Забери ежедневные.'); return; }
         setError(null);
+        castingRef.current = true;
         setCasting(true);
         setResult(null);
         await new Promise(r=>setTimeout(r,1200));
@@ -64,6 +66,7 @@
         }catch{
           setError('Слишком часто забрасываешь. Подожди пару секунд.');
         }finally{
+          castingRef.current = false;
           setCasting(false);
         }
       }
