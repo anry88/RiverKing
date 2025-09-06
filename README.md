@@ -4,10 +4,16 @@ Full MVP codebase: Kotlin/Ktor + Exposed + SQLite, Telegram Mini App.
 
 ## Запуск
 
-1. Установи переменные окружения (минимум `BOT_TOKEN` и `PUBLIC_BASE_URL`).
+1. Укажи конфигурацию в `src/main/resources/config.properties` (минимум `BOT_TOKEN` и `PUBLIC_BASE_URL`).
    В разработке можно использовать фиктивные значения и включить `DEV_MODE=true`:
+   ```properties
+   BOT_TOKEN=TEST
+   PUBLIC_BASE_URL=http://localhost:8080
+   DEV_MODE=true
+   ```
+   Затем запусти:
    ```bash
-   BOT_TOKEN=TEST PUBLIC_BASE_URL=http://localhost:8080 DEV_MODE=true gradle run
+   gradle run
    ```
 2. Открой [http://localhost:8080/app](http://localhost:8080/app) — мини‑апп работает (в `DEV_MODE=true` можно и без Telegram).
 3. Из бота открой мини‑апп кнопкой `web_app`:

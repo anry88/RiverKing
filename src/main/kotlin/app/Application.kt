@@ -13,7 +13,7 @@ import io.ktor.server.http.content.*
 import io.ktor.server.response.*
 
 fun main() {
-    val env = Env()
+    val env = Env.fromConfig()
     embeddedServer(Netty, port = env.port) {
         install(ContentNegotiation) { json() }
         install(CORS) {
