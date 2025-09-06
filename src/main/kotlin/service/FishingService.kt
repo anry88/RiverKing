@@ -136,6 +136,197 @@ class FishingService {
             }
     }
 
+    data class ShopPackage(
+        val id: String,
+        val name: String,
+        val desc: String,
+        val price: Int,
+        val items: List<Pair<String, Int>>,
+    )
+
+    private val shopPackages = listOf(
+        ShopPackage(
+            "fresh_topup_s",
+            "Top-up S (пресные)",
+            "20 шт: 10 мирн. + 10 хищн.",
+            39,
+            listOf("Пресная мирная" to 10, "Пресная хищная" to 10)
+        ),
+        ShopPackage(
+            "fresh_stock_m",
+            "Stock M (пресные)",
+            "50 шт: 25 + 25",
+            89,
+            listOf("Пресная мирная" to 25, "Пресная хищная" to 25)
+        ),
+        ShopPackage(
+            "fresh_crate_l",
+            "Crate L (пресные)",
+            "120 шт: 60 + 60",
+            199,
+            listOf("Пресная мирная" to 60, "Пресная хищная" to 60)
+        ),
+        ShopPackage(
+            "salt_topup_s",
+            "Top-up S (морские)",
+            "20 шт: 10 мирн. + 10 хищн.",
+            55,
+            listOf("Морская мирная" to 10, "Морская хищная" to 10)
+        ),
+        ShopPackage(
+            "salt_stock_m",
+            "Stock M (морские)",
+            "50 шт: 25 + 25",
+            129,
+            listOf("Морская мирная" to 25, "Морская хищная" to 25)
+        ),
+        ShopPackage(
+            "salt_crate_l",
+            "Crate L (морские)",
+            "120 шт: 60 + 60",
+            299,
+            listOf("Морская мирная" to 60, "Морская хищная" to 60)
+        ),
+        ShopPackage(
+            "fresh_boost_s",
+            "Boost S (пресные)",
+            "10 шт: 5 мирн. + 5 хищн.",
+            69,
+            listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)
+        ),
+        ShopPackage(
+            "fresh_boost_m",
+            "Boost M (пресные)",
+            "25 шт",
+            159,
+            listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)
+        ),
+        ShopPackage(
+            "fresh_boost_l",
+            "Boost L (пресные)",
+            "60 шт",
+            349,
+            listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)
+        ),
+        ShopPackage(
+            "salt_boost_s",
+            "Boost S (морские)",
+            "10 шт: 5 + 5",
+            99,
+            listOf("Морская мирная+" to 5, "Морская хищная+" to 5)
+        ),
+        ShopPackage(
+            "salt_boost_m",
+            "Boost M (морские)",
+            "25 шт",
+            239,
+            listOf("Морская мирная+" to 12, "Морская хищная+" to 13)
+        ),
+        ShopPackage(
+            "salt_boost_l",
+            "Boost L (морские)",
+            "60 шт",
+            549,
+            listOf("Морская мирная+" to 30, "Морская хищная+" to 30)
+        ),
+        ShopPackage(
+            "bundle_starter",
+            "Starter Bundle",
+            "40 пресных + 20 морских + 5 пресных бустов",
+            129,
+            listOf(
+                "Пресная мирная" to 20,
+                "Пресная хищная" to 20,
+                "Морская мирная" to 10,
+                "Морская хищная" to 10,
+                "Пресная мирная+" to 3,
+                "Пресная хищная+" to 2,
+            )
+        ),
+        ShopPackage(
+            "bundle_pro",
+            "Pro Angler",
+            "80 пресных + 40 морских + 15 пресных бустов + 5 морских бустов",
+            319,
+            listOf(
+                "Пресная мирная" to 40,
+                "Пресная хищная" to 40,
+                "Морская мирная" to 20,
+                "Морская хищная" to 20,
+                "Пресная мирная+" to 8,
+                "Пресная хищная+" to 7,
+                "Морская мирная+" to 3,
+                "Морская хищная+" to 2,
+            )
+        ),
+        ShopPackage(
+            "bundle_whale",
+            "Whale Crate",
+            "200 пресных + 120 морских + 40 пресных бустов + 20 морских бустов",
+            869,
+            listOf(
+                "Пресная мирная" to 100,
+                "Пресная хищная" to 100,
+                "Морская мирная" to 60,
+                "Морская хищная" to 60,
+                "Пресная мирная+" to 20,
+                "Пресная хищная+" to 20,
+                "Морская мирная+" to 10,
+                "Морская хищная+" to 10,
+            )
+        ),
+        ShopPackage(
+            "micro_pred_fresh",
+            "Pred-Fresh Top-up",
+            "15 пресных хищных",
+            29,
+            listOf("Пресная хищная" to 15)
+        ),
+        ShopPackage(
+            "micro_salt_starter",
+            "Salt Starter",
+            "10 шт: 5 мирн. + 5 хищн.",
+            25,
+            listOf("Морская мирная" to 5, "Морская хищная" to 5)
+        ),
+    )
+
+    fun listShop(): List<ShopPackage> = shopPackages
+
+    fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
+        val pack = shopPackages.find { it.id == packageId } ?: error("bad package")
+        fun add(id: Long, qty: Int) {
+            val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }
+                .singleOrNull()?.get(InventoryLures.qty) ?: 0
+            if (cur == 0) InventoryLures.insert {
+                it[InventoryLures.userId] = userId
+                it[InventoryLures.lureId] = id
+                it[InventoryLures.qty] = qty
+            } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                it[InventoryLures.qty] = cur + qty
+            }
+        }
+        for ((name, qty) in pack.items) {
+            val id = Lures.select { Lures.name eq name }.single()[Lures.id].value
+            add(id, qty)
+        }
+        val current = ensureCurrentLure(userId)
+        val lures = (InventoryLures innerJoin Lures)
+            .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
+            .select { InventoryLures.userId eq userId }
+            .map {
+                LureDTO(
+                    it[Lures.id].value,
+                    it[Lures.name],
+                    it[InventoryLures.qty],
+                    it[Lures.predator],
+                    it[Lures.water],
+                    it[Lures.rarityBonus],
+                )
+            }
+        Pair(lures, current)
+    }
+
     fun setLure(userId: Long, lureId: Long) = transaction {
         val has = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
             .singleOrNull()?.get(InventoryLures.qty) ?: 0

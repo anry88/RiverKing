@@ -21,6 +21,12 @@ fun Application.apiRoutes(env: Env) {
     @Serializable
     data class CastReq(val wait: Int, val reaction: Double)
 
+    @Serializable
+    data class ShopItemDTO(val id: String, val name: String, val desc: String, val price: Int)
+
+    @Serializable
+    data class ShopBuyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+
     routing {
         // Telegram WebApp auth: client posts initData
         post("/api/auth/telegram") {
@@ -99,6 +105,35 @@ fun Application.apiRoutes(env: Env) {
             data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
 
             call.respond(DailyResp(res.first, res.second))
+        }
+
+        // Shop
+        get("/api/shop") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val items = fishing.listShop().map { ShopItemDTO(it.id, it.name, it.desc, it.price) }
+            call.respond(items)
+        }
+
+        post("/api/shop/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            if (!env.devMode) return@post call.respond(HttpStatusCode.PaymentRequired)
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
+            }
+            call.respond(ShopBuyResp(res.first, res.second))
         }
 
         // Change location
