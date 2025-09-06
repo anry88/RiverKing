@@ -93,7 +93,7 @@ fun Application.apiRoutes(env: Env) {
             val res = try { fishing.cast(uid) } catch (e: Exception) {
                 return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to (e.message ?: "rate limit")))
             }
-            call.respond(mapOf("fish" to res.fish, "weight" to res.weight, "location" to res.location))
+            call.respond(res)
         }
     }
 }

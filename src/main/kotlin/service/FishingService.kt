@@ -68,6 +68,7 @@ class FishingService {
         }
     }
 
+    @Serializable
     data class CatchDTO(val fish: String, val weight: Double, val location: String)
 
     fun cast(userId: Long): CatchDTO = transaction {
