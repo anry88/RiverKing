@@ -97,7 +97,7 @@
       );
     }
 
-    function Header({me,onClaimDaily,onOpenLocations}){
+    function Header({me,onOpenLocations}){
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       return (
         <div className="sticky top-0 z-40 -mx-4">
@@ -113,7 +113,6 @@
               <StatChip icon={'🪱'} label="Приманки" value={me.baits} />
               <StatChip icon={'🐟'} label="Всего" value={`${Number(me.totalWeight||0).toFixed(1)} кг`} />
               <StatChip icon={'📅'} label="Сегодня" value={`${Number(me.todayWeight||0).toFixed(1)} кг`} />
-              {me.dailyAvailable && <StatChip icon={'🎁'} label="Daily" value={'+15'} onClick={onClaimDaily} />}
             </div>
           </div>
         </div>
@@ -149,7 +148,7 @@
       );
     }
 
-    function FishingStage({me, casting, biting, onCast, onHook}){
+    function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -239,6 +238,16 @@
           {/* Вода */}
           <div className="absolute left-0 right-0" style={{top:`${WATER_TOP_REL*100}%`, height:`${(1-WATER_TOP_REL)*100}%`, background:'linear-gradient(to bottom, rgba(0,40,60,.35), rgba(0,0,0,.55))'}}></div>
 
+          {me.dailyAvailable && (
+            <button
+              onClick={onClaimDaily}
+              className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm"
+            >
+              <span>🎁</span>
+              <span>Подарок</span>
+            </button>
+          )}
+
           {/* Удочка (спрайт) + леска */}
           <img
             src={ROD_IMG}
@@ -289,6 +298,7 @@
       const [result,setResult] = React.useState(null);
       const [error,setError] = React.useState(null);
       const [drawerOpen, setDrawerOpen] = React.useState(false);
+      const [tab, setTab] = React.useState('fish');
 
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
@@ -338,7 +348,7 @@
 
       async function cast(){
         if(castingRef.current) return; if(!me) return;
-        if(me.baits<=0){ setError('Нет приманок. Забери ежедневные.'); return; }
+        if(me.baits<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
         setError(null);
         castingRef.current = true;
         setCasting(true);
@@ -404,60 +414,84 @@
       }
 
       return (
-        <div className="min-h-screen w-full px-4 pb-8">
-          <Header me={me} onClaimDaily={claimDaily} onOpenLocations={()=>setDrawerOpen(true)} />
+        <div className="min-h-screen w-full px-4 pb-20">
+          <Header me={me} onOpenLocations={()=>setDrawerOpen(true)} />
 
-          {/* Сцена */}
-          <div className="mt-4">
-            <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} />
-          </div>
-
-          {/* Мобильный CTA под сценой */}
-          <div className="md:hidden mt-3">
-            {!casting ? (
-              <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
-            ) : biting ? (
-              <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">Подсечь!</button>
-            ) : (
-              <div className="glass w-full py-4 rounded-2xl text-center">
-                <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-                <div className="opacity-90">Ожидаем поклёвку…</div>
+          {tab === 'fish' && (
+            <>
+              {/* Сцена */}
+              <div className="mt-4">
+                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={claimDaily} />
               </div>
-            )}
-          </div>
 
-          {/* Результат / Ошибка */}
-          {result && (
-            <div className="mt-4 p-4 rounded-xl glass">
-              <div className="text-base">Улов!</div>
-              <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
-              <div className="text-xs opacity-70">Локация: {result.location}</div>
-            </div>
-          )}
-          {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
-
-          {/* Последние уловы */}
-          <div className="mt-6">
-            <div className="text-sm opacity-80 mb-2">Последние уловы</div>
-            {(me.recent||[]).length===0 ? (
-              <div className="text-sm opacity-60">Пока пусто — сделай первый заброс!</div>
-            ) : (
-              <div className="space-y-2">
-                {me.recent.map((c,i)=> (
-                  <div key={i} className="p-3 rounded--xl border border-white/10 flex items-center justify-between">
-                    <div>
-                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                      <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
-                    </div>
-                    <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+              {/* Мобильный CTA под сценой */}
+              <div className="md:hidden mt-3">
+                {!casting ? (
+                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
+                ) : biting ? (
+                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">Подсечь!</button>
+                ) : (
+                  <div className="glass w-full py-4 rounded-2xl text-center">
+                    <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
+                    <div className="opacity-90">Ожидаем поклёвку…</div>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
+
+              {/* Результат / Ошибка */}
+              {result && (
+                <div className="mt-4 p-4 rounded-xl glass">
+                  <div className="text-base">Улов!</div>
+                  <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
+                  <div className="text-xs opacity-70">Локация: {result.location}</div>
+                </div>
+              )}
+              {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
+
+              {/* Последние уловы */}
+              <div className="mt-6">
+                <div className="text-sm opacity-80 mb-2">Последние уловы</div>
+                {(me.recent||[]).length===0 ? (
+                  <div className="text-sm opacity-60">Пока пусто — сделай первый заброс!</div>
+                ) : (
+                  <div className="space-y-2">
+                    {me.recent.map((c,i)=> (
+                      <div key={i} className="p-3 rounded--xl border border-white/10 flex items-center justify-between">
+                        <div>
+                          <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                          <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
+                        </div>
+                        <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {tab === 'tournaments' && (
+            <div className="mt-6 text-center opacity-70">Турниры в разработке</div>
+          )}
+          {tab === 'achievements' && (
+            <div className="mt-6 text-center opacity-70">Здесь будут достижения</div>
+          )}
+          {tab === 'shop' && (
+            <div className="mt-6 text-center opacity-70">Здесь будет магазин</div>
+          )}
 
           {/* Шторка локаций */}
           <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
+
+          {/* Нижние вкладки */}
+          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">
+            <div className="grid grid-cols-4 text-center">
+              <button onClick={()=>setTab('fish')} className={`py-3 ${tab==='fish'?'text-emerald-400':''}`}>Рыбалка</button>
+              <button onClick={()=>setTab('tournaments')} className={`py-3 ${tab==='tournaments'?'text-emerald-400':''}`}>Турниры</button>
+              <button onClick={()=>setTab('achievements')} className={`py-3 ${tab==='achievements'?'text-emerald-400':''}`}>Достижения</button>
+              <button onClick={()=>setTab('shop')} className={`py-3 ${tab==='shop'?'text-emerald-400':''}`}>Магазин</button>
+            </div>
+          </div>
         </div>
       );
     }
