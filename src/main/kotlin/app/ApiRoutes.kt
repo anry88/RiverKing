@@ -41,6 +41,7 @@ fun Application.apiRoutes(env: Env) {
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid)
+            val dailyAvailable = fishing.canClaimDaily(uid)
             val storedLoc = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
             }
@@ -57,8 +58,9 @@ fun Application.apiRoutes(env: Env) {
                 val locationId: Long,
                 val locations: List<LocationDTO>,
                 val recent: List<RecentDTO>,
+                val dailyAvailable: Boolean,
             )
-            call.respond(MeResp("angler", baits, totalWeight, todayWeight, currentLocId, locs, recent))
+            call.respond(MeResp("angler", baits, totalWeight, todayWeight, currentLocId, locs, recent, dailyAvailable))
         }
 
         // Daily baits
