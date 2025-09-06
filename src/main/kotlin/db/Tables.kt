@@ -239,15 +239,15 @@ object DB {
         setLFWeight(fjord, fSe,  0.4)
         setLFWeight(fjord, fHa2, 0.08)
 
-        // --- Lures ---
-        val lFreshHerb = upsertLure("Fresh Herb Bait", false, "fresh")
-        val lFreshPred = upsertLure("Fresh Predator Bait", true, "fresh")
-        val lSaltHerb = upsertLure("Salt Herb Bait", false, "salt")
-        val lSaltPred = upsertLure("Salt Predator Bait", true, "salt")
-        upsertLure("Boost Fresh Predator Bait", true, "fresh", 0.3)
+        // --- Приманки ---
+        val presnMir = upsertLure("Пресная мирная", false, "fresh")
+        val presnHish = upsertLure("Пресная хищная", true, "fresh")
+        val morsMir = upsertLure("Морская мирная", false, "salt")
+        val morsHish = upsertLure("Морская хищная", true, "salt")
+        upsertLure("Пресная хищная+", true, "fresh", 0.3)
 
         // set default current lure for existing users if null
-        Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = lFreshHerb }
+        Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }
     }
 
 }

@@ -59,8 +59,8 @@ class FishingService {
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
         if (last == today) return@transaction null
-        val freshId = Lures.select { Lures.name eq "Fresh Herb Bait" }.single()[Lures.id].value
-        val predId = Lures.select { Lures.name eq "Fresh Predator Bait" }.single()[Lures.id].value
+        val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
+        val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }
                 .singleOrNull()?.get(InventoryLures.qty) ?: 0
