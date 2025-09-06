@@ -142,6 +142,89 @@ class FishingService {
     }
 
     @Serializable
+    data class FishBriefDTO(val name: String, val rarity: String)
+
+    @Serializable
+    data class GuideLocationDTO(
+        val id: Long,
+        val name: String,
+        val fish: List<FishBriefDTO>,
+        val lures: List<String>,
+    )
+
+    @Serializable
+    data class GuideFishDTO(
+        val name: String,
+        val rarity: String,
+        val locations: List<String>,
+        val lures: List<String>,
+    )
+
+    @Serializable
+    data class GuideLureDTO(
+        val name: String,
+        val fish: List<FishBriefDTO>,
+        val locations: List<String>,
+    )
+
+    @Serializable
+    data class GuideDTO(
+        val locations: List<GuideLocationDTO>,
+        val fish: List<GuideFishDTO>,
+        val lures: List<GuideLureDTO>,
+    )
+
+    fun guide(): GuideDTO = transaction {
+        // Locations with fish and possible lures
+        val locationDtos = Locations.selectAll().map { locRow ->
+            val locId = locRow[Locations.id].value
+            val locName = locRow[Locations.name]
+            val fishRows = (LocationFishWeights innerJoin Fish)
+                .select { LocationFishWeights.locationId eq locId }
+                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+            val water = (LocationFishWeights innerJoin Fish)
+                .slice(Fish.water)
+                .select { LocationFishWeights.locationId eq locId }
+                .limit(1)
+                .singleOrNull()?.get(Fish.water) ?: "fresh"
+            val lureNames = Lures.select { Lures.water eq water }.map { it[Lures.name] }
+            GuideLocationDTO(locId, locName, fishRows, lureNames)
+        }
+
+        // Fish with locations and matching lures
+        val fishDtos = Fish.selectAll().map { fRow ->
+            val fid = fRow[Fish.id].value
+            val name = fRow[Fish.name]
+            val rarity = fRow[Fish.rarity]
+            val pred = fRow[Fish.predator]
+            val water = fRow[Fish.water]
+            val locations = (LocationFishWeights innerJoin Locations)
+                .select { LocationFishWeights.fishId eq fid }
+                .map { it[Locations.name] }
+            val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
+                .map { it[Lures.name] }
+            GuideFishDTO(name, rarity, locations, lures)
+        }
+
+        // Lures with fish and locations
+        val lureDtos = Lures.selectAll().map { lRow ->
+            val name = lRow[Lures.name]
+            val pred = lRow[Lures.predator]
+            val water = lRow[Lures.water]
+            val fishList = Fish.select { (Fish.predator eq pred) and (Fish.water eq water) }
+                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+            val locations = (LocationFishWeights innerJoin Fish innerJoin Locations)
+                .slice(Locations.name)
+                .select { (Fish.predator eq pred) and (Fish.water eq water) }
+                .map { it[Locations.name] }
+                .distinct()
+            GuideLureDTO(name, fishList, locations)
+        }
+
+        GuideDTO(locationDtos, fishDtos, lureDtos)
+    }
+
+    @Serializable
     data class ShopPackage(
         val id: String,
         val name: String,
