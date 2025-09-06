@@ -145,6 +145,19 @@ fun Application.apiRoutes(env: Env) {
             call.respond(ShopBuyResp(res.first, res.second))
         }
 
+        // Guide data
+        get("/api/guide") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val data = fishing.guide()
+            call.respond(data)
+        }
+
         // Change location
         post("/api/location/{id}") {
             val session = call.sessions.get<AppSession>()
