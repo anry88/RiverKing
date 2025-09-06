@@ -121,7 +121,7 @@
           <div className="fixed inset-x-0 bottom-0 px-4 pb-5 pt-3 bg-gradient-to-t from-black/60 to-transparent">
             <div className="w-full flex gap-3">
               <button onClick={claimDaily} className="flex-1 py-3 rounded-2xl bg-white/10 border border-white/20">Daily +15</button>
-              <button onClick={cast} className="flex-[2] py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">Забросить</button>
+              <button onClick={cast} disabled={casting} className={`flex-[2] py-3 rounded-2xl font-semibold shadow-lg ${casting? 'bg-emerald-600/50 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>Забросить</button>
             </div>
           </div>
         </div>
