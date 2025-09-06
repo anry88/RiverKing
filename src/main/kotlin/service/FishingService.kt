@@ -175,6 +175,15 @@ class FishingService {
     )
 
     fun guide(): GuideDTO = transaction {
+        fun rarityRank(r: String) = when(r) {
+            "common" -> 0
+            "uncommon" -> 1
+            "rare" -> 2
+            "epic" -> 3
+            "legendary" -> 4
+            else -> 5
+        }
+
         // Locations with fish and possible lures
         val locationDtos = Locations.selectAll().map { locRow ->
             val locId = locRow[Locations.id].value
@@ -182,6 +191,7 @@ class FishingService {
             val fishRows = (LocationFishWeights innerJoin Fish)
                 .select { LocationFishWeights.locationId eq locId }
                 .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .sortedBy { rarityRank(it.rarity) }
             val water = (LocationFishWeights innerJoin Fish)
                 .slice(Fish.water)
                 .select { LocationFishWeights.locationId eq locId }
@@ -204,7 +214,7 @@ class FishingService {
             val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
                 .map { it[Lures.name] }
             GuideFishDTO(name, rarity, locations, lures)
-        }
+        }.sortedBy { rarityRank(it.rarity) }
 
         // Lures with fish and locations
         val lureDtos = Lures.selectAll().map { lRow ->
@@ -213,6 +223,7 @@ class FishingService {
             val water = lRow[Lures.water]
             val fishList = Fish.select { (Fish.predator eq pred) and (Fish.water eq water) }
                 .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .sortedBy { rarityRank(it.rarity) }
             val locations = (LocationFishWeights innerJoin Fish innerJoin Locations)
                 .slice(Locations.name)
                 .select { (Fish.predator eq pred) and (Fish.water eq water) }

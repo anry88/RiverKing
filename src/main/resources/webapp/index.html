@@ -49,6 +49,7 @@
 
     // ====== Assets & UI constants ======
     const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
+    const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
     const LOCATION_BG = {
       1: '/app/assets/riverking_bg_pond_1600x900.png', // Пруд (локальный ассет)
       2: '/app/assets/riverking_bg_river_1600x900.png', // Река
@@ -166,7 +167,7 @@
                         className={`w-full text-left p-3 rounded-xl border ${me.currentLureId===l.id? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${l.qty<=0?'opacity-50 cursor-not-allowed':''}`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold">{l.name}</div>
+                      <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
                       <div className="text-xs opacity-70">{l.qty} шт.</div>
                     </div>
                     {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">Текущая</div>}
@@ -208,7 +209,7 @@
                   </div>
                   <div className="text-sm opacity-80">Приманки:</div>
                   <div className="flex flex-wrap gap-1 text-sm opacity-80">
-                    {loc.lures.map(l=> <span key={l}>{l}</span>)}
+                    {loc.lures.map(l=> <span key={l} className={lureColor(l)}>{l}</span>)}
                   </div>
                 </div>
               ))}
@@ -220,7 +221,7 @@
                 <div key={f.name} className="p-4 glass rounded-xl">
                   <div className={`font-semibold ${rarityColors[f.rarity]||''}`}>{f.name}</div>
                   <div className="text-xs mt-1">Локации: {f.locations.join(', ')}</div>
-                  <div className="text-xs mt-1">Приманки: {f.lures.join(', ')}</div>
+                  <div className="text-xs mt-1">Приманки: {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
                 </div>
               ))}
             </div>
@@ -229,7 +230,7 @@
             <div className="space-y-4">
               {data.lures.map(l=>(
                 <div key={l.name} className="p-4 glass rounded-xl">
-                  <div className="font-semibold">{l.name}</div>
+                  <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
                   <div className="text-xs mt-1">Рыбы:</div>
                   <div className="flex flex-wrap gap-1 text-xs mb-1">
                     {l.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
@@ -644,12 +645,12 @@
 
           {/* Нижние вкладки */}
           <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">
-            <div className="grid grid-cols-5 text-center">
-              <button onClick={()=>setTab('fish')} className={`py-3 ${tab==='fish'?'text-emerald-400':''}`}>Рыбалка</button>
-              <button onClick={()=>setTab('tournaments')} className={`py-3 ${tab==='tournaments'?'text-emerald-400':''}`}>Турниры</button>
-              <button onClick={()=>setTab('achievements')} className={`py-3 ${tab==='achievements'?'text-emerald-400':''}`}>Достижения</button>
-              <button onClick={()=>setTab('shop')} className={`py-3 ${tab==='shop'?'text-emerald-400':''}`}>Магазин</button>
-              <button onClick={()=>setTab('guide')} className={`py-3 ${tab==='guide'?'text-emerald-400':''}`}>Справочник</button>
+            <div className="flex text-center text-xs">
+              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>Рыбалка</button>
+              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>Турниры</button>
+              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>Достижения</button>
+              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>Справочник</button>
+              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>Магазин</button>
             </div>
           </div>
         </div>
