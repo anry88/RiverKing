@@ -38,21 +38,25 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val baits = fishing.getBaits(uid)
+            val totalKg = fishing.totalCaughtKg(uid)
+            val todayKg = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid)
             val currentLocId = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
-            } ?: locs.first().id
+            } ?: locs.first { it.unlocked }.id
             val recent = fishing.recent(uid)
 
             @Serializable
             data class MeResp(
                 val username: String,
                 val baits: Int,
+                val totalKg: Double,
+                val todayKg: Double,
                 val locationId: Long,
                 val locations: List<LocationDTO>,
                 val recent: List<RecentDTO>,
             )
-            call.respond(MeResp("angler", baits, currentLocId, locs, recent))
+            call.respond(MeResp("angler", baits, totalKg, todayKg, currentLocId, locs, recent))
         }
 
         // Daily baits

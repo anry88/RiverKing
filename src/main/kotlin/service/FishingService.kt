@@ -8,7 +8,13 @@ import util.Rng
 import java.time.*
 
 @Serializable
-data class LocationDTO(val id: Long, val name: String, val desc: String)
+data class LocationDTO(
+    val id: Long,
+    val name: String,
+    val desc: String,
+    val unlockKg: Double,
+    val unlocked: Boolean,
+)
 
 @Serializable
 data class RecentDTO(val fish: String, val weight: Double, val at: String)
@@ -27,10 +33,26 @@ class FishingService {
         Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
 
+    fun totalCaughtKg(userId: Long): Double = transaction { totalKg(userId) }
+
+    fun todayCaughtKg(userId: Long): Double = transaction {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        Catches.slice(Catches.weight.sum()).selectAll()
+            .where { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }
+            .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
+    }
+
     fun locations(userId: Long): List<LocationDTO> = transaction {
         val total = totalKg(userId)
-        Locations.selectAll().where { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).map {
-            LocationDTO(it[Locations.id].value, it[Locations.name], "…")
+        Locations.selectAll().orderBy(Locations.unlockKg).map {
+            val unlock = it[Locations.unlockKg]
+            LocationDTO(
+                it[Locations.id].value,
+                it[Locations.name],
+                "…",
+                unlock,
+                unlock <= total,
+            )
         }
     }
 
