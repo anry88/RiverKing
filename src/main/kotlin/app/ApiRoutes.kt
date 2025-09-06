@@ -94,7 +94,11 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val res = fishing.giveDailyBaits(uid)
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
-            call.respond(mapOf("lures" to res.first, "currentLureId" to res.second))
+
+            @Serializable
+            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+
+            call.respond(DailyResp(res.first, res.second))
         }
 
         // Change location
