@@ -47,7 +47,26 @@
 
       async function claimDaily(){ setError(null); try{ const r=await fetch(`/api/daily`,{method:'POST',credentials:'include'}); if(!r.ok) throw 0; const d=await r.json(); setMe(p=>({...p,baits:p.baits+(d.baitsGranted||15)})); }catch{ setError('Ежедневные приманки уже забраны.'); } }
       async function selectLocation(id){ setError(null); try{ await fetch(`/api/location/`+id,{method:'POST',credentials:'include'}); setMe(p=>({...p,locationId:id})); }catch{ setError('Не удалось сменить локацию'); } }
-      async function cast(){ if(!me) return; if(me.baits<=0){ setError('Нет приманок. Забери ежедневные.'); return; } setError(null); setCasting(true); setResult(null); await new Promise(r=>setTimeout(r,1200)); try{ const r=await fetch(`/api/cast`,{method:'POST',credentials:'include'}); if(!r.ok) throw 0; const d=await r.json(); setResult(d); setMe(p=>({...p,baits:Math.max(0,p.baits-1),recent:[{fish:d.fish,weight:d.weight,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)})); }catch{ setError('Слишком часто забрасываешь. Подожди пару секунд.'); } finally{ setCasting(false); } }
+      async function cast(){
+        if(casting) return;
+        if(!me) return;
+        if(me.baits<=0){ setError('Нет приманок. Забери ежедневные.'); return; }
+        setError(null);
+        setCasting(true);
+        setResult(null);
+        await new Promise(r=>setTimeout(r,1200));
+        try{
+          const r=await fetch(`/api/cast`,{method:'POST',credentials:'include'});
+          if(!r.ok) throw 0;
+          const d=await r.json();
+          setResult(d);
+          setMe(p=>({...p,baits:Math.max(0,p.baits-1),recent:[{fish:d.fish,weight:d.weight,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)}));
+        }catch{
+          setError('Слишком часто забрасываешь. Подожди пару секунд.');
+        }finally{
+          setCasting(false);
+        }
+      }
 
       if(loading || !me){ return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-center"><div className="text-2xl font-semibold">RiverKing</div><div className="opacity-70 mt-2">Загружаем…</div></div></div>; }
 
@@ -80,7 +99,7 @@
             </div>
             <div className="mt-4 flex items-center justify-center">
               {!casting ? (
-                <button onClick={cast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
+                <button onClick={cast} disabled={casting} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
               ) : (
                 <div className="flex flex-col items-center gap-3 py-6 w-full">
                   <div className="h-16 w-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center animate-bounce">🎯</div>
