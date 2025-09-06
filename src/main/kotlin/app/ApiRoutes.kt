@@ -17,6 +17,9 @@ import db.Users
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
 
+    @Serializable
+    data class CastReq(val wait: Int, val reaction: Double)
+
     routing {
         // Telegram WebApp auth: client posts initData
         post("/api/auth/telegram") {
@@ -106,7 +109,8 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val res = try { fishing.cast(uid) } catch (e: Exception) {
+            val req = call.receive<CastReq>()
+            val res = try { fishing.cast(uid, req.wait, req.reaction) } catch (e: Exception) {
                 return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to (e.message ?: "rate limit")))
             }
             call.respond(res)

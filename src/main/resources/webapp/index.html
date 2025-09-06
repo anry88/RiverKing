@@ -31,6 +31,10 @@
       const [loading,setLoading] = React.useState(true);
       const [casting,setCasting] = React.useState(false);
       const castingRef = React.useRef(false);
+      const [biting,setBiting] = React.useState(false);
+      const waitRef = React.useRef(0);
+      const biteTimeRef = React.useRef(0);
+      const hookTimeoutRef = React.useRef(null);
       const [result,setResult] = React.useState(null);
       const [error,setError] = React.useState(null);
 
@@ -95,23 +99,46 @@
         castingRef.current = true;
         setCasting(true);
         setResult(null);
-        await new Promise(r=>setTimeout(r,1200));
+        const wait = 5 + Math.floor(Math.random()*26);
+        waitRef.current = wait;
+        await new Promise(r=>setTimeout(r, wait*1000));
+        biteTimeRef.current = Date.now();
+        setBiting(true);
+        hookTimeoutRef.current = setTimeout(()=>hook(true),3000);
+      }
+
+      async function hook(auto=false){
+        if(!biting) return;
+        const reaction = (Date.now()-biteTimeRef.current)/1000;
+        clearTimeout(hookTimeoutRef.current);
+        setBiting(false);
         try{
-          const r=await fetch(`/api/cast`,{method:'POST',credentials:'include'});
+          const r=await fetch(`/api/cast`,{
+            method:'POST',
+            credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({wait:waitRef.current,reaction})
+          });
           if(!r.ok) throw 0;
           const d=await r.json();
-          setResult(d);
-          setMe(p=>{
-            const newTotal = (p.totalWeight||0)+d.weight;
-            return {
-              ...p,
-              baits:Math.max(0,p.baits-1),
-              totalWeight:newTotal,
-              todayWeight:(p.todayWeight||0)+d.weight,
-              locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
-              recent:[{fish:d.fish,weight:d.weight,location:d.location,rarity:d.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
-            };
-          });
+          if(d.caught){
+            const c=d.catch;
+            setResult(c);
+            setMe(p=>{
+              const newTotal=(p.totalWeight||0)+c.weight;
+              return {
+                ...p,
+                baits:Math.max(0,p.baits-1),
+                totalWeight:newTotal,
+                todayWeight:(p.todayWeight||0)+c.weight,
+                locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
+                recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
+              };
+            });
+          } else {
+            setError('Рыба сорвалась!');
+            setMe(p=>({...p,baits:Math.max(0,p.baits-1)}));
+          }
         }catch{
           setError('Слишком часто забрасываешь. Подожди пару секунд.');
         }finally{
@@ -156,16 +183,18 @@
               <div><div className="text-lg font-semibold">Текущая локация</div><div className="opacity-80 text-sm">{(me.locations.find(x=>x.id===me.locationId)||{}).name||'—'}</div></div>
               <div className="text-right"><div className="text-xs opacity-70">Приманка</div><div className="text-sm">Basic Bait</div></div>
             </div>
-            <div className="mt-4 flex items-center justify-center">
-              {!casting ? (
-                <button onClick={cast} disabled={casting} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
-              ) : (
-                <div className="flex flex-col items-center gap-3 py-6 w-full">
-                  <div className="h-16 w-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center animate-bounce">🎯</div>
-                  <div className="opacity-80">Ожидаем поклёвку…</div>
-                </div>
-              )}
-            </div>
+              <div className="mt-4 flex items-center justify-center">
+                {!casting ? (
+                  <button onClick={cast} disabled={casting} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
+                ) : biting ? (
+                  <button onClick={()=>hook(false)} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">Подсечь!</button>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-6 w-full">
+                    <div className="h-16 w-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center animate-bounce">🎯</div>
+                    <div className="opacity-80">Ожидаем поклёвку…</div>
+                  </div>
+                )}
+              </div>
             {result && (
               <div className="mt-4 p-4 rounded-xl bg-black/40 border border-white/10">
                 <div className="text-base">Улов!</div>
