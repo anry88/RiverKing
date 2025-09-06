@@ -32,6 +32,7 @@
       const [casting,setCasting] = React.useState(false);
       const castingRef = React.useRef(false);
       const [biting,setBiting] = React.useState(false);
+      const bitingRef = React.useRef(false);
       const waitRef = React.useRef(0);
       const biteTimeRef = React.useRef(0);
       const hookTimeoutRef = React.useRef(null);
@@ -104,14 +105,16 @@
         await new Promise(r=>setTimeout(r, wait*1000));
         biteTimeRef.current = Date.now();
         setBiting(true);
+        bitingRef.current = true;
         hookTimeoutRef.current = setTimeout(()=>hook(true),3000);
       }
 
       async function hook(auto=false){
-        if(!biting) return;
+        if(!bitingRef.current) return;
         const reaction = auto ? 3.1 : (Date.now()-biteTimeRef.current)/1000;
         clearTimeout(hookTimeoutRef.current);
         setBiting(false);
+        bitingRef.current = false;
         try{
           const r=await fetch(`/api/cast`,{
             method:'POST',
