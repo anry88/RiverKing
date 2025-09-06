@@ -91,7 +91,10 @@ class FishingService {
         val rnd = Rng.fast()
         val total = pool.sumOf { it[LocationFishWeights.weight] }
         var roll = rnd.nextDouble() * total
-        val picked = pool.first { row2 -> (roll -= row2[LocationFishWeights.weight]) <= 0.0 }
+        val picked = pool.first { row2 ->
+            roll -= row2[LocationFishWeights.weight]
+            roll <= 0.0
+        }
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
