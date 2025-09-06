@@ -205,11 +205,11 @@
           };
           setTension(0.15 + Math.random() * 0.25);
           tweenTo(target, 650);
-        } else if(!biting){
+        } else {
           setFloatRel(shorePosRel);
           setTension(0.18);
         }
-      }, [casting, biting, shorePosRel, tipX, w]);
+      }, [casting, shorePosRel, tipX, w]);
 
       const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
       const bobberAnim = biting ? 'animate-[bite_0.6s_ease-in-out_infinite]' : (casting ? 'animate-[bob_3s_ease-in-out_infinite]' : '');
