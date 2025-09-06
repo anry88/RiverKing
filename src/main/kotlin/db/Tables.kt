@@ -20,17 +20,29 @@ object DB {
     }
 
     private fun seedIfEmpty() {
-        if (Locations.selectAll().empty()) {
-            val pond = Locations.insertAndGetId {
-                it[name] = "Пруд"; it[unlockKg] = 0.0; it[sizeMultiplier] = 1.0
-            }.value
-            val river = Locations.insertAndGetId {
-                it[name] = "Река"; it[unlockKg] = 10.0; it[sizeMultiplier] = 1.5
-            }.value
-            val lake  = Locations.insertAndGetId {
-                it[name] = "Озеро"; it[unlockKg] = 50.0; it[sizeMultiplier] = 2.0
-            }.value
+        fun upsertLocation(name: String, unlock: Double, mult: Double): Long {
+            val row = Locations.select { Locations.name eq name }.singleOrNull()
+            return if (row == null) {
+                Locations.insertAndGetId {
+                    it[Locations.name] = name
+                    it[unlockKg] = unlock
+                    it[sizeMultiplier] = mult
+                }.value
+            } else {
+                val id = row[Locations.id].value
+                Locations.update({ Locations.id eq id }) {
+                    it[unlockKg] = unlock
+                    it[sizeMultiplier] = mult
+                }
+                id
+            }
+        }
 
+        val pond = upsertLocation("Пруд", 0.0, 1.0)
+        val river = upsertLocation("Река", 10.0, 1.5)
+        val lake  = upsertLocation("Озеро", 50.0, 2.0)
+
+        if (Fish.selectAll().empty()) {
             fun addFish(n: String, r: String, mean: Double, vari: Double) =
                 Fish.insertAndGetId { it[name] = n; it[rarity] = r; it[meanKg] = mean; it[varKg] = vari }.value
 
@@ -52,17 +64,8 @@ object DB {
             lw(river,fP,0.7); lw(river,fO,0.7); lw(river,fL,0.6); lw(river,fSh,0.25); lw(river,fSo,0.08)
             // Озеро
             lw(lake,fP,0.6); lw(lake,fK,0.9); lw(lake,fL,0.5); lw(lake,fSh,0.35); lw(lake,fKa,0.3); lw(lake,fOs,0.05)
-        } else {
-            fun upsertLocation(name: String, unlock: Double, mult: Double) {
-                Locations.update({ Locations.name eq name }) {
-                    it[unlockKg] = unlock
-                    it[sizeMultiplier] = mult
-                }
-            }
-            upsertLocation("Пруд", 0.0, 1.0)
-            upsertLocation("Река", 10.0, 1.5)
-            upsertLocation("Озеро", 50.0, 2.0)
         }
+
         if (Lures.selectAll().where { Lures.name eq "Basic Bait" }.empty()) {
             Lures.insert { it[name] = "Basic Bait"; it[priceStars] = null; it[modsJson] = "{\"rare\":1.0}" }
         }
