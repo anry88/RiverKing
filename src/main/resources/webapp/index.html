@@ -48,7 +48,7 @@
     };
     // Спрайт удочки (правая ориентация)
     const ROD_IMG = '/app/assets/riverking_rod_right_v2.png';
-    const ROD_TIP_ANCHOR  = { x: 0.30, y: 0.18 }; // где тюльпан внутри спрайта 1200x1200
+    const ROD_TIP_ANCHOR  = { x: 0.285, y: 0.18 }; // где тюльпан внутри спрайта 1200x1200
     const ROD_BASE_ANCHOR = { x: 0.58, y: 0.98 }; // ориентир «рукоять/основание» внутри спрайта (для выравнивания)
     // Новые пожелания:
     const ROD_SIZE_MULT = 1.5;       // УВЕЛИЧИТЬ в 1.5 раза от предыдущей логики
@@ -143,7 +143,6 @@
       const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]); // поплавок на берегу
       const [floatRel, setFloatRel] = React.useState(shorePosRel);
       const [tension, setTension] = React.useState(0.2);
-      const mounted = React.useRef(false);
 
       const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
       const floatPx = toPx(floatRel);
@@ -195,19 +194,22 @@
         requestAnimationFrame(step);
       };
 
-      React.useEffect(()=>{ if(!mounted.current){ mounted.current = true; setFloatRel(shorePosRel); } },[]);
-
       React.useEffect(()=>{
-        if(!mounted.current) return;
         if(casting){
-          const target = { x: 0.32 + Math.random()*0.38, y: WATER_TOP_REL + 0.12 + Math.random()*0.18 };
-          setTension(0.15 + Math.random()*0.25);
+          const tipRelX = tipX / w;
+          const minX = Math.max(0.05, tipRelX - 0.20);
+          const maxX = Math.max(minX, tipRelX - 0.05);
+          const target = {
+            x: minX + Math.random() * (maxX - minX),
+            y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
+          };
+          setTension(0.15 + Math.random() * 0.25);
           tweenTo(target, 650);
         } else if(!biting){
-          tweenTo(shorePosRel, 500);
+          setFloatRel(shorePosRel);
           setTension(0.18);
         }
-      },[casting, biting]);
+      }, [casting, biting, shorePosRel, tipX, w]);
 
       const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
       const bobberAnim = biting ? 'animate-[bite_0.6s_ease-in-out_infinite]' : (casting ? 'animate-[bob_3s_ease-in-out_infinite]' : '');
