@@ -94,15 +94,6 @@ class FishingService {
         Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
     }
 
-    private fun rateLimit(userId: Long) = transaction {
-        val now = Instant.now()
-        val last = Users.selectAll().where { Users.id eq userId }.single()[Users.lastCastAt]
-        if (last != null && Duration.between(last, now).seconds < 10) false else {
-            Users.update({ Users.id eq userId }) { it[lastCastAt] = now }
-            true
-        }
-    }
-
     @Serializable
     data class CatchDTO(val fish: String, val weight: Double, val location: String, val rarity: String)
 
@@ -119,7 +110,6 @@ class FishingService {
     }
 
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
-        require(rateLimit(userId)) { "Too fast" }
         // consume 1 Basic Bait
         val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
         val row = InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
