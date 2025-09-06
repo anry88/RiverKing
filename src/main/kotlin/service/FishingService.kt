@@ -29,7 +29,7 @@ class FishingService {
 
     fun locations(userId: Long): List<LocationDTO> = transaction {
         val total = totalKg(userId)
-        Locations.selectAll().where { Locations.unlockKg lessEq total }.orderBy(Locations.id).map {
+        Locations.selectAll().where { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).map {
             LocationDTO(it[Locations.id].value, it[Locations.name], "…")
         }
     }

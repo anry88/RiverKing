@@ -52,6 +52,16 @@ object DB {
             lw(river,fP,0.7); lw(river,fO,0.7); lw(river,fL,0.6); lw(river,fSh,0.25); lw(river,fSo,0.08)
             // Озеро
             lw(lake,fP,0.6); lw(lake,fK,0.9); lw(lake,fL,0.5); lw(lake,fSh,0.35); lw(lake,fKa,0.3); lw(lake,fOs,0.05)
+        } else {
+            fun upsertLocation(name: String, unlock: Double, mult: Double) {
+                Locations.update({ Locations.name eq name }) {
+                    it[unlockKg] = unlock
+                    it[sizeMultiplier] = mult
+                }
+            }
+            upsertLocation("Пруд", 0.0, 1.0)
+            upsertLocation("Река", 10.0, 1.5)
+            upsertLocation("Озеро", 50.0, 2.0)
         }
         if (Lures.selectAll().where { Lures.name eq "Basic Bait" }.empty()) {
             Lures.insert { it[name] = "Basic Bait"; it[priceStars] = null; it[modsJson] = "{\"rare\":1.0}" }
