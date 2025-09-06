@@ -109,7 +109,7 @@
 
       async function hook(auto=false){
         if(!biting) return;
-        const reaction = (Date.now()-biteTimeRef.current)/1000;
+        const reaction = auto ? 3.1 : (Date.now()-biteTimeRef.current)/1000;
         clearTimeout(hookTimeoutRef.current);
         setBiting(false);
         try{

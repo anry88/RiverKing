@@ -150,7 +150,7 @@ class FishingService {
             roll <= 0.0
         }
 
-        if (reactionTime > 3.0) return@transaction CastResultDTO(false)
+        if (reactionTime >= 3.0) return@transaction CastResultDTO(false)
         val catchChance = 1.0 - reactionTime / 3.0
         if (rnd.nextDouble() > catchChance) return@transaction CastResultDTO(false)
 
