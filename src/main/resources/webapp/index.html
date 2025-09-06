@@ -13,7 +13,15 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <!-- Preload key assets (Ktor serves under /app) -->
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_pond_1600x900.webp">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_pond_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_river_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_lake_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_swamp_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_mountain_river_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_reservoir_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_river_delta_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_sea_coast_1600x900.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bg_fjord_1600x900.png">
   <link rel="preload" as="image" href="/app/assets/riverking_rod_right_v2.png">
 
   <style>
@@ -42,9 +50,15 @@
     // ====== Assets & UI constants ======
     const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
     const LOCATION_BG = {
-      1: '/app/assets/riverking_bg_pond_1600x900.webp', // Пруд (локальный ассет)
-      2: 'https://images.unsplash.com/photo-1508182311256-e3f7d50c31b8?auto=format&fit=crop&w=1600&q=60', // Река
-      3: 'https://images.unsplash.com/photo-1496483353456-90997957cf99?auto=format&fit=crop&w=1600&q=60', // Озеро
+      1: '/app/assets/riverking_bg_pond_1600x900.png', // Пруд (локальный ассет)
+      2: '/app/assets/riverking_bg_river_1600x900.png', // Река
+      3: '/app/assets/riverking_bg_lake_1600x900.png', // Озеро
+      4: '/app/assets/riverking_bg_swamp_1600x900.png', // Болото
+      5: '/app/assets/riverking_bg_mountain_river_1600x900.png', // Горная река
+      6: '/app/assets/riverking_bg_reservoir_1600x900.png', // Водохранилище
+      7: '/app/assets/riverking_bg_river_delta_1600x900.png', // Дельта реки
+      8: '/app/assets/riverking_bg_sea_coast_1600x900.png', // Прибрежье моря
+      9: '/app/assets/riverking_bg_fjord_1600x900.png'', // Фьорд
     };
     // Спрайт удочки (правая ориентация)
     const ROD_IMG = '/app/assets/riverking_rod_right_v2.png';
@@ -279,7 +293,7 @@
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
         try{
-          new Image().src = '/app/assets/riverking_bg_pond_1600x900.webp';
+          new Image().src = '/app/assets/riverking_bg_pond_1600x900.png';
           new Image().src = ROD_IMG;
         }catch(e){}
         (async()=>{
