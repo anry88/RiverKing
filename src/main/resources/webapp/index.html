@@ -371,6 +371,7 @@
           setMe(p=>({
             ...p,
             lures: d.lures,
+            currentLureId:d.currentLureId,
             dailyAvailable:false
           }));
         }catch{ setError('Ежедневные приманки уже забраны.'); }

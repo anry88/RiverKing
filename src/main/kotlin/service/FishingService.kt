@@ -54,7 +54,24 @@ class FishingService {
         }
     }
 
-    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): List<LureDTO>? = transaction {
+    private fun ensureCurrentLure(userId: Long): Long? {
+        val current = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+        val curQty = current?.let {
+            InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq it)
+            }.singleOrNull()?.get(InventoryLures.qty) ?: 0
+        } ?: 0
+        if (curQty > 0) return current
+        val first = (InventoryLures innerJoin Lures)
+            .slice(Lures.id, InventoryLures.qty)
+            .select { (InventoryLures.userId eq userId) and (InventoryLures.qty greater 0) }
+            .orderBy(Lures.id)
+            .firstOrNull()?.get(Lures.id)?.value
+        Users.update({ Users.id eq userId }) { it[currentLureId] = first }
+        return first
+    }
+
+    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): Pair<List<LureDTO>, Long?>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
@@ -75,7 +92,8 @@ class FishingService {
         add(freshId, freshQty)
         add(predId, predQty)
         Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
-        (InventoryLures innerJoin Lures)
+        val current = ensureCurrentLure(userId)
+        val lures = (InventoryLures innerJoin Lures)
             .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
             .select { InventoryLures.userId eq userId }
             .map {
@@ -88,6 +106,7 @@ class FishingService {
                     it[Lures.rarityBonus],
                 )
             }
+        Pair(lures, current)
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
@@ -101,6 +120,7 @@ class FishingService {
     data class LureDTO(val id: Long, val name: String, val qty: Int, val predator: Boolean, val water: String, val rarityBonus: Double)
 
     fun listLures(userId: Long): List<LureDTO> = transaction {
+        ensureCurrentLure(userId)
         (InventoryLures innerJoin Lures)
             .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
             .select { InventoryLures.userId eq userId }

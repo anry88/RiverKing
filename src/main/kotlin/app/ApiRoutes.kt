@@ -92,9 +92,9 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val lures = fishing.giveDailyBaits(uid)
+            val res = fishing.giveDailyBaits(uid)
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
-            call.respond(mapOf("lures" to lures))
+            call.respond(mapOf("lures" to res.first, "currentLureId" to res.second))
         }
 
         // Change location
