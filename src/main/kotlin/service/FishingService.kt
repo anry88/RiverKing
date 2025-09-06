@@ -1,10 +1,17 @@
 package service
 
 import db.*
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
+
+@Serializable
+data class LocationDTO(val id: Long, val name: String, val desc: String)
+
+@Serializable
+data class RecentDTO(val fish: String, val weight: Double, val at: String)
 
 class FishingService {
     fun ensureUserByTgId(tgId: Long): Long = transaction {
@@ -16,9 +23,9 @@ class FishingService {
         }
     }
 
-    fun locations() = transaction {
+    fun locations(): List<LocationDTO> = transaction {
         Locations.selectAll().orderBy(Locations.id).map {
-            mapOf("id" to it[Locations.id].value, "name" to it[Locations.name], "desc" to "…")
+            LocationDTO(it[Locations.id].value, it[Locations.name], "…")
         }
     }
 
@@ -94,12 +101,12 @@ class FishingService {
         CatchDTO(fishName, weight, locName)
     }
 
-    fun recent(userId: Long, limit: Int = 5) = transaction {
+    fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
         (Catches innerJoin Fish)
             .slice(Fish.name, Catches.weight, Catches.createdAt)
             .select { Catches.userId eq userId }
             .orderBy(Catches.createdAt, SortOrder.DESC)
             .limit(limit)
-            .map { mapOf("fish" to it[Fish.name], "weight" to it[Catches.weight], "at" to it[Catches.createdAt].toString()) }
+            .map { RecentDTO(it[Fish.name], it[Catches.weight], it[Catches.createdAt].toString()) }
     }
 }

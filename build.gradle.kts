@@ -1,6 +1,9 @@
 buildscript {
     repositories { mavenCentral() }
-    dependencies { classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23") }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23")
+        classpath("org.jetbrains.kotlin:kotlin-serialization:1.9.23")
+    }
 }
 
 plugins {
@@ -35,6 +38,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")

@@ -7,9 +7,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import kotlinx.serialization.Serializable
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import service.FishingService
+import service.LocationDTO
+import service.RecentDTO
 import db.Users
 
 fun Application.apiRoutes(env: Env) {
@@ -37,7 +39,7 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val baits = fishing.getBaits(uid)
             val locs = fishing.locations()
-            val currentLocId = transaction { Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value } ?: (locs.first()["id"] as Number).toLong()
+            val currentLocId = transaction { Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value } ?: locs.first().id
             val recent = fishing.recent(uid)
 
             @Serializable
@@ -45,8 +47,8 @@ fun Application.apiRoutes(env: Env) {
                 val username: String,
                 val baits: Int,
                 val locationId: Long,
-                val locations: List<Map<String, Any?>>, 
-                val recent: List<Map<String, Any?>>, 
+                val locations: List<LocationDTO>,
+                val recent: List<RecentDTO>,
             )
             call.respond(MeResp("angler", baits, currentLocId, locs, recent))
         }
