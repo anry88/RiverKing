@@ -37,8 +37,13 @@ class FishingService {
         val basicId = Lures.select { Lures.name eq "Basic Bait" }.single()[Lures.id].value
         val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
             .singleOrNull()?.get(InventoryLures.qty) ?: 0
-        if (cur == 0) InventoryLures.insert { it[userId] = userId; it[lureId] = basicId; it[qty] = qty }
-        else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = cur + qty }
+        if (cur == 0) InventoryLures.insert {
+            it[InventoryLures.userId] = userId
+            it[InventoryLures.lureId] = basicId
+            it[InventoryLures.qty] = qty
+        } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
+            it[InventoryLures.qty] = cur + qty
+        }
         Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
         true
     }
@@ -72,7 +77,9 @@ class FishingService {
         val row = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
             .forUpdate().singleOrNull() ?: error("No baits")
         val q = row[InventoryLures.qty]; require(q > 0) { "No baits" }
-        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = q - 1 }
+        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
+            it[InventoryLures.qty] = q - 1
+        }
 
         val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value ?: Locations.selectAll().first()[Locations.id].value
         val pool = (LocationFishWeights innerJoin Fish)
