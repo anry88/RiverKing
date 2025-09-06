@@ -11,7 +11,6 @@ import java.time.*
 data class LocationDTO(
     val id: Long,
     val name: String,
-    val desc: String,
     val unlockKg: Double,
     val unlocked: Boolean,
 )
@@ -49,7 +48,6 @@ class FishingService {
             LocationDTO(
                 it[Locations.id].value,
                 it[Locations.name],
-                "…",
                 unlock,
                 unlock <= total,
             )

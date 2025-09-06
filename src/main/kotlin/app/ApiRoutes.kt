@@ -83,8 +83,14 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-            fishing.setLocation(uid, id)
-            call.respond(HttpStatusCode.NoContent)
+            try {
+                fishing.setLocation(uid, id)
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to (e.message ?: "locked")))
+            } catch (e: IllegalStateException) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "bad location")))
+            }
         }
 
         // Cast
