@@ -54,10 +54,7 @@ class FishingService {
         }
     }
 
-    @Serializable
-    data class LureQtyDTO(val id: Long, val qty: Int)
-
-    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): List<LureQtyDTO>? = transaction {
+    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): List<LureDTO>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
@@ -78,7 +75,19 @@ class FishingService {
         add(freshId, freshQty)
         add(predId, predQty)
         Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
-        listOf(LureQtyDTO(freshId, freshQty), LureQtyDTO(predId, predQty))
+        (InventoryLures innerJoin Lures)
+            .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
+            .select { InventoryLures.userId eq userId }
+            .map {
+                LureDTO(
+                    it[Lures.id].value,
+                    it[Lures.name],
+                    it[InventoryLures.qty],
+                    it[Lures.predator],
+                    it[Lures.water],
+                    it[Lures.rarityBonus],
+                )
+            }
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {

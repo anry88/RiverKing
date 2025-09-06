@@ -370,10 +370,7 @@
           const d = await r.json();
           setMe(p=>({
             ...p,
-            lures: p.lures.map(l=>{
-              const g=d.granted.find(x=>x.id===l.id);
-              return g? {...l,qty:l.qty+g.qty}:l;
-            }),
+            lures: d.lures,
             dailyAvailable:false
           }));
         }catch{ setError('Ежедневные приманки уже забраны.'); }
