@@ -19,6 +19,12 @@
 
   <script type="text/babel">
     const API_URL = ""; // same origin
+    const rarityColors = {
+      uncommon: 'text-green-400',
+      rare: 'text-blue-400',
+      epic: 'text-purple-400',
+      legendary: 'text-yellow-400',
+    };
     function App(){
       const tg = window.Telegram?.WebApp;
       const [me,setMe] = React.useState(null);
@@ -53,6 +59,7 @@
                 {id:3,name:'Озеро',unlockKg:50,unlocked:false},
               ],
               recent:[],
+              dailyAvailable:true,
             });
           }finally{ setLoading(false); }
         })();
@@ -64,7 +71,7 @@
           const r = await fetch(`/api/daily`,{method:'POST',credentials:'include'});
           if(!r.ok) throw 0;
           const d = await r.json();
-          setMe(p=>({...p,baits:p.baits+(d.baitsGranted||15)}));
+          setMe(p=>({...p,baits:p.baits+(d.baitsGranted||15),dailyAvailable:false}));
         }catch{
           setError('Ежедневные приманки уже забраны.');
         }
@@ -102,7 +109,7 @@
               totalWeight:newTotal,
               todayWeight:(p.todayWeight||0)+d.weight,
               locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
-              recent:[{fish:d.fish,weight:d.weight,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
+              recent:[{fish:d.fish,weight:d.weight,location:d.location,rarity:d.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
             };
           });
         }catch{
@@ -116,14 +123,14 @@
       if(loading || !me){ return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-center"><div className="text-2xl font-semibold">RiverKing</div><div className="opacity-70 mt-2">Загружаем…</div></div></div>; }
 
       return (
-        <div className="min-h-screen w-full px-4 pb-28">
+        <div className="min-h-screen w-full px-4 pb-8">
           <div className="sticky top-0 -mx-4 px-4 py-3 backdrop-blur bg-black/20 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-2"><span className="text-xl font-semibold">🎣 RiverKing</span><span className="text-xs opacity-70">beta</span></div>
             <div className="flex items-center gap-2">
               <div className="px-3 py-1 rounded-2xl bg-white/10">🪱 {me.baits}</div>
               <div className="px-3 py-1 rounded-2xl bg-white/10">🐟 {Number(me.totalWeight||0).toFixed(1)} кг</div>
               <div className="px-3 py-1 rounded-2xl bg-white/10">📅 {Number(me.todayWeight||0).toFixed(1)} кг</div>
-              <button onClick={claimDaily} className="px-3 py-1 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm">Daily +15</button>
+              {me.dailyAvailable && <button onClick={claimDaily} className="px-3 py-1 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm">Daily +15</button>}
             </div>
           </div>
 
@@ -162,7 +169,7 @@
             {result && (
               <div className="mt-4 p-4 rounded-xl bg-black/40 border border-white/10">
                 <div className="text-base">Улов!</div>
-                <div className="text-lg font-bold mt-1">{result.fish} — {Number(result.weight).toFixed(2)} кг</div>
+                <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
                 <div className="text-xs opacity-70">Локация: {result.location}</div>
               </div>
             )}
@@ -178,22 +185,14 @@
                 {me.recent.map((c,i)=> (
                   <div key={i} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{c.fish}</div>
-                      <div className="text-xs opacity-70">{new Date(c.at).toLocaleString()}</div>
+                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                      <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
                     </div>
                     <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="h-24" />
-          <div className="fixed inset-x-0 bottom-0 px-4 pb-5 pt-3 bg-gradient-to-t from-black/60 to-transparent">
-            <div className="w-full flex gap-3">
-              <button onClick={claimDaily} className="flex-1 py-3 rounded-2xl bg-white/10 border border-white/20">Daily +15</button>
-              <button onClick={cast} disabled={casting} className={`flex-[2] py-3 rounded-2xl font-semibold shadow-lg ${casting? 'bg-emerald-600/50 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>Забросить</button>
-            </div>
           </div>
         </div>
       );

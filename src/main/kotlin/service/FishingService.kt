@@ -16,7 +16,7 @@ data class LocationDTO(
 )
 
 @Serializable
-data class RecentDTO(val fish: String, val weight: Double, val at: String)
+data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
 
 class FishingService {
     fun ensureUserByTgId(tgId: Long): Long = transaction {
@@ -73,6 +73,13 @@ class FishingService {
         true
     }
 
+    fun canClaimDaily(userId: Long): Boolean = transaction {
+        val today = LocalDate.now()
+        val last = Users.selectAll().where { Users.id eq userId }.singleOrNull()?.get(Users.lastDailyAt)
+            ?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        last != today
+    }
+
     fun getBaits(userId: Long): Int = transaction {
         val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
         InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
@@ -97,7 +104,7 @@ class FishingService {
     }
 
     @Serializable
-    data class CatchDTO(val fish: String, val weight: Double, val location: String)
+    data class CatchDTO(val fish: String, val weight: Double, val location: String, val rarity: String)
 
     fun cast(userId: Long): CatchDTO = transaction {
         require(rateLimit(userId)) { "Too fast" }
@@ -116,7 +123,7 @@ class FishingService {
         val locRow = Locations.selectAll().where { Locations.id eq locId }.single()
         require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
-            .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, LocationFishWeights.weight)
+            .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
             .selectAll().where { LocationFishWeights.locationId eq locId }
             .toList()
         require(pool.isNotEmpty()) { "Empty location" }
@@ -131,6 +138,7 @@ class FishingService {
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
+        val rarity = picked[Fish.rarity]
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
 
         Catches.insert {
@@ -141,15 +149,23 @@ class FishingService {
             it[Catches.createdAt] = Instant.now()
         }
         val locName = locRow[Locations.name]
-        CatchDTO(fishName, weight, locName)
+        CatchDTO(fishName, weight, locName, rarity)
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
-        (Catches innerJoin Fish)
-            .slice(Fish.name, Catches.weight, Catches.createdAt)
+        (Catches innerJoin Fish innerJoin Locations)
+            .slice(Fish.name, Fish.rarity, Catches.weight, Catches.createdAt, Locations.name)
             .selectAll().where { Catches.userId eq userId }
             .orderBy(Catches.createdAt, SortOrder.DESC)
             .limit(limit)
-            .map { RecentDTO(it[Fish.name], it[Catches.weight], it[Catches.createdAt].toString()) }
+            .map {
+                RecentDTO(
+                    it[Fish.name],
+                    it[Catches.weight],
+                    it[Locations.name],
+                    it[Fish.rarity],
+                    it[Catches.createdAt].toString()
+                )
+            }
     }
 }
