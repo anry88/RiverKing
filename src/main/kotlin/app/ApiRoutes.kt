@@ -38,19 +38,27 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val baits = fishing.getBaits(uid)
-            val locs = fishing.locations()
-            val currentLocId = transaction { Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value } ?: locs.first().id
+            val totalWeight = fishing.totalCaughtKg(uid)
+            val todayWeight = fishing.todayCaughtKg(uid)
+            val locs = fishing.locations(uid)
+            val storedLoc = transaction {
+                Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
+            }
+            val currentLocId = storedLoc?.takeIf { id -> locs.any { it.id == id && it.unlocked } }
+                ?: locs.first { it.unlocked }.id
             val recent = fishing.recent(uid)
 
             @Serializable
             data class MeResp(
                 val username: String,
                 val baits: Int,
+                val totalWeight: Double,
+                val todayWeight: Double,
                 val locationId: Long,
                 val locations: List<LocationDTO>,
                 val recent: List<RecentDTO>,
             )
-            call.respond(MeResp("angler", baits, currentLocId, locs, recent))
+            call.respond(MeResp("angler", baits, totalWeight, todayWeight, currentLocId, locs, recent))
         }
 
         // Daily baits
@@ -77,8 +85,14 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-            fishing.setLocation(uid, id)
-            call.respond(HttpStatusCode.NoContent)
+            try {
+                fishing.setLocation(uid, id)
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to (e.message ?: "locked")))
+            } catch (e: IllegalStateException) {
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "bad location")))
+            }
         }
 
         // Cast

@@ -20,11 +20,29 @@ object DB {
     }
 
     private fun seedIfEmpty() {
-        if (Locations.selectAll().empty()) {
-            val pond = Locations.insertAndGetId { it[name] = "Пруд"; it[levelReq] = 1 }.value
-            val river = Locations.insertAndGetId { it[name] = "Река"; it[levelReq] = 1 }.value
-            val lake  = Locations.insertAndGetId { it[name] = "Озеро"; it[levelReq] = 2 }.value
+        fun upsertLocation(name: String, unlock: Double, mult: Double): Long {
+            val row = Locations.select { Locations.name eq name }.singleOrNull()
+            return if (row == null) {
+                Locations.insertAndGetId {
+                    it[Locations.name] = name
+                    it[unlockKg] = unlock
+                    it[sizeMultiplier] = mult
+                }.value
+            } else {
+                val id = row[Locations.id].value
+                Locations.update({ Locations.id eq id }) {
+                    it[unlockKg] = unlock
+                    it[sizeMultiplier] = mult
+                }
+                id
+            }
+        }
 
+        val pond = upsertLocation("Пруд", 0.0, 1.0)
+        val river = upsertLocation("Река", 10.0, 1.5)
+        val lake  = upsertLocation("Озеро", 50.0, 2.0)
+
+        if (Fish.selectAll().empty()) {
             fun addFish(n: String, r: String, mean: Double, vari: Double) =
                 Fish.insertAndGetId { it[name] = n; it[rarity] = r; it[meanKg] = mean; it[varKg] = vari }.value
 
@@ -45,9 +63,10 @@ object DB {
             // Река
             lw(river,fP,0.7); lw(river,fO,0.7); lw(river,fL,0.6); lw(river,fSh,0.25); lw(river,fSo,0.08)
             // Озеро
-            lw(lake,fP,0.6); lw(lake,fK,0.9); lw(lake,fL,0.5); lw(lake,fSh,0.35); lw(lake,fKa,0.3)
+            lw(lake,fP,0.6); lw(lake,fK,0.9); lw(lake,fL,0.5); lw(lake,fSh,0.35); lw(lake,fKa,0.3); lw(lake,fOs,0.05)
         }
-        if (Lures.select { Lures.name eq "Basic Bait" }.empty()) {
+
+        if (Lures.selectAll().where { Lures.name eq "Basic Bait" }.empty()) {
             Lures.insert { it[name] = "Basic Bait"; it[priceStars] = null; it[modsJson] = "{\"rare\":1.0}" }
         }
     }
@@ -67,7 +86,8 @@ object Users : LongIdTable() {
 
 object Locations : LongIdTable() {
     val name = varchar("name", 100)
-    val levelReq = integer("level_req")
+    val unlockKg = double("unlock_kg").default(0.0)
+    val sizeMultiplier = double("size_multiplier").default(1.0)
 }
 
 object Fish : LongIdTable() {
