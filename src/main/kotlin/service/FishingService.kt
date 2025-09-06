@@ -154,6 +154,7 @@ class FishingService {
 
     @Serializable
     data class GuideFishDTO(
+        val id: Long,
         val name: String,
         val rarity: String,
         val locations: List<String>,
@@ -213,7 +214,7 @@ class FishingService {
                 .map { it[Locations.name] }
             val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
                 .map { it[Lures.name] }
-            GuideFishDTO(name, rarity, locations, lures)
+            GuideFishDTO(fid, name, rarity, locations, lures)
         }.sortedBy { rarityRank(it.rarity) }
 
         // Lures with fish and locations
@@ -498,6 +499,7 @@ class FishingService {
         val location: String,
         val rarity: String,
         val userId: Long? = null,
+        val fishId: Long? = null,
     )
 
     @Serializable
@@ -565,7 +567,17 @@ class FishingService {
             it[Catches.createdAt] = Instant.now()
         }
         val locName = locRow[Locations.name]
-        CastResultDTO(true, CatchDTO(fishName, weight, locName, rarity))
+        CastResultDTO(
+            true,
+            CatchDTO(
+                fishName,
+                weight,
+                locName,
+                rarity,
+                userId = null,
+                fishId = fishId,
+            ),
+        )
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
@@ -612,6 +624,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
@@ -629,6 +642,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
@@ -649,6 +663,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
@@ -668,6 +683,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
@@ -685,6 +701,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
@@ -705,6 +722,7 @@ class FishingService {
                         it[Locations.name],
                         it[Fish.rarity],
                         it[Catches.userId].value,
+                        it[Fish.id].value,
                     )
                 }
         }
