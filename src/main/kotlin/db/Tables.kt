@@ -73,7 +73,7 @@ object Users : LongIdTable() {
 
 object Locations : LongIdTable() {
     val name = varchar("name", 100)
-    val unlockKg = double("unlock_kg")
+    val unlockKg = double("unlock_kg").default(0.0)
     val sizeMultiplier = double("size_multiplier")
 }
 
