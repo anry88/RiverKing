@@ -244,7 +244,10 @@ object DB {
         val presnHish = upsertLure("Пресная хищная", true, "fresh")
         val morsMir = upsertLure("Морская мирная", false, "salt")
         val morsHish = upsertLure("Морская хищная", true, "salt")
+        upsertLure("Пресная мирная+", false, "fresh", 0.3)
         upsertLure("Пресная хищная+", true, "fresh", 0.3)
+        upsertLure("Морская мирная+", false, "salt", 0.3)
+        upsertLure("Морская хищная+", true, "salt", 0.3)
 
         // set default current lure for existing users if null
         Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }

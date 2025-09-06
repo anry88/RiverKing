@@ -348,7 +348,16 @@
           }catch(e){
             setMe({
               username:'angler',
-              lures:[{id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0}],
+              lures:[
+                {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
+                {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
+                {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
+                {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
+                {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
+                {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
+                {id:7,name:'Морская мирная+',qty:2,predator:false,water:'salt',rarityBonus:0.3},
+                {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
+              ],
               currentLureId:1,
               totalWeight:0, todayWeight:0, locationId:1,
               locations:[
