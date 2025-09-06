@@ -1,12 +1,32 @@
 package app
 
+import java.util.Properties
+
 data class Env(
-    val botToken: String = requireNotNull(System.getenv("BOT_TOKEN")) { "BOT_TOKEN required" },
-    val webhookSecret: String = System.getenv("WEBHOOK_SECRET") ?: "dev-secret",
-    val publicBaseUrl: String = requireNotNull(System.getenv("PUBLIC_BASE_URL")) { "PUBLIC_BASE_URL required" },
-    val dbUrl: String = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/riverking",
-    val dbUser: String = System.getenv("DATABASE_USER") ?: "postgres",
-    val dbPass: String = System.getenv("DATABASE_PASSWORD") ?: "postgres",
-    val port: Int = System.getenv("PORT")?.toIntOrNull() ?: 8080,
-    val devMode: Boolean = (System.getenv("DEV_MODE") ?: "false").equals("true", ignoreCase = true)
-)
+    val botToken: String,
+    val webhookSecret: String,
+    val publicBaseUrl: String,
+    val dbUrl: String,
+    val dbUser: String,
+    val dbPass: String,
+    val port: Int,
+    val devMode: Boolean
+) {
+    companion object {
+        fun fromConfig(path: String = "config.properties"): Env {
+            val props = Properties()
+            Env::class.java.classLoader.getResourceAsStream(path)?.use { props.load(it) }
+                ?: error("config file $path not found")
+            return Env(
+                botToken = props.getProperty("BOT_TOKEN") ?: error("BOT_TOKEN required"),
+                webhookSecret = props.getProperty("WEBHOOK_SECRET") ?: "dev-secret",
+                publicBaseUrl = props.getProperty("PUBLIC_BASE_URL") ?: error("PUBLIC_BASE_URL required"),
+                dbUrl = props.getProperty("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
+                dbUser = props.getProperty("DATABASE_USER") ?: "postgres",
+                dbPass = props.getProperty("DATABASE_PASSWORD") ?: "postgres",
+                port = props.getProperty("PORT")?.toIntOrNull() ?: 8080,
+                devMode = props.getProperty("DEV_MODE")?.equals("true", ignoreCase = true) ?: false
+            )
+        }
+    }
+}

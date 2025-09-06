@@ -1,10 +1,17 @@
 package service
 
 import db.*
+import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
+
+@Serializable
+data class LocationDTO(val id: Long, val name: String, val desc: String)
+
+@Serializable
+data class RecentDTO(val fish: String, val weight: Double, val at: String)
 
 class FishingService {
     fun ensureUserByTgId(tgId: Long): Long = transaction {
@@ -16,9 +23,9 @@ class FishingService {
         }
     }
 
-    fun locations() = transaction {
+    fun locations(): List<LocationDTO> = transaction {
         Locations.selectAll().orderBy(Locations.id).map {
-            mapOf("id" to it[Locations.id].value, "name" to it[Locations.name], "desc" to "…")
+            LocationDTO(it[Locations.id].value, it[Locations.name], "…")
         }
     }
 
@@ -30,8 +37,13 @@ class FishingService {
         val basicId = Lures.select { Lures.name eq "Basic Bait" }.single()[Lures.id].value
         val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
             .singleOrNull()?.get(InventoryLures.qty) ?: 0
-        if (cur == 0) InventoryLures.insert { it[userId] = userId; it[lureId] = basicId; it[qty] = qty }
-        else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = cur + qty }
+        if (cur == 0) InventoryLures.insert {
+            it[InventoryLures.userId] = userId
+            it[InventoryLures.lureId] = basicId
+            it[InventoryLures.qty] = qty
+        } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
+            it[InventoryLures.qty] = cur + qty
+        }
         Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
         true
     }
@@ -65,7 +77,9 @@ class FishingService {
         val row = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
             .forUpdate().singleOrNull() ?: error("No baits")
         val q = row[InventoryLures.qty]; require(q > 0) { "No baits" }
-        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = q - 1 }
+        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
+            it[InventoryLures.qty] = q - 1
+        }
 
         val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value ?: Locations.selectAll().first()[Locations.id].value
         val pool = (LocationFishWeights innerJoin Fish)
@@ -77,7 +91,10 @@ class FishingService {
         val rnd = Rng.fast()
         val total = pool.sumOf { it[LocationFishWeights.weight] }
         var roll = rnd.nextDouble() * total
-        val picked = pool.first { row2 -> (roll -= row2[LocationFishWeights.weight]) <= 0.0 }
+        val picked = pool.first { row2 ->
+            roll -= row2[LocationFishWeights.weight]
+            roll <= 0.0
+        }
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
@@ -94,12 +111,12 @@ class FishingService {
         CatchDTO(fishName, weight, locName)
     }
 
-    fun recent(userId: Long, limit: Int = 5) = transaction {
+    fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
         (Catches innerJoin Fish)
             .slice(Fish.name, Catches.weight, Catches.createdAt)
             .select { Catches.userId eq userId }
             .orderBy(Catches.createdAt, SortOrder.DESC)
             .limit(limit)
-            .map { mapOf("fish" to it[Fish.name], "weight" to it[Catches.weight], "at" to it[Catches.createdAt].toString()) }
+            .map { RecentDTO(it[Fish.name], it[Catches.weight], it[Catches.createdAt].toString()) }
     }
 }

@@ -10,9 +10,10 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
+import io.ktor.server.response.*
 
 fun main() {
-    val env = Env()
+    val env = Env.fromConfig()
     embeddedServer(Netty, port = env.port) {
         install(ContentNegotiation) { json() }
         install(CORS) {
