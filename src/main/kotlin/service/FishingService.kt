@@ -1,0 +1,105 @@
+package service
+
+import db.*
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
+import util.Rng
+import java.time.*
+
+class FishingService {
+    fun ensureUserByTgId(tgId: Long): Long = transaction {
+        Users.select { Users.tgId eq tgId }.singleOrNull()?.get(Users.id)?.value ?: run {
+            Users.insertAndGetId {
+                it[Users.tgId] = tgId
+                it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
+            }.value
+        }
+    }
+
+    fun locations() = transaction {
+        Locations.selectAll().orderBy(Locations.id).map {
+            mapOf("id" to it[Locations.id].value, "name" to it[Locations.name], "desc" to "…")
+        }
+    }
+
+    fun giveDailyBaits(userId: Long, qty: Int = 15): Boolean = transaction {
+        val today = LocalDate.now()
+        val row = Users.select { Users.id eq userId }.forUpdate().single()
+        val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        if (last == today) return@transaction false
+        val basicId = Lures.select { Lures.name eq "Basic Bait" }.single()[Lures.id].value
+        val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
+            .singleOrNull()?.get(InventoryLures.qty) ?: 0
+        if (cur == 0) InventoryLures.insert { it[userId] = userId; it[lureId] = basicId; it[qty] = qty }
+        else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = cur + qty }
+        Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
+        true
+    }
+
+    fun getBaits(userId: Long): Int = transaction {
+        val basicId = Lures.select { Lures.name eq "Basic Bait" }.single()[Lures.id].value
+        InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
+            .singleOrNull()?.get(InventoryLures.qty) ?: 0
+    }
+
+    fun setLocation(userId: Long, locationId: Long) = transaction {
+        require(Locations.select { Locations.id eq locationId }.any()) { "bad location" }
+        Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
+    }
+
+    private fun rateLimit(userId: Long) = transaction {
+        val now = Instant.now()
+        val last = Users.select { Users.id eq userId }.single()[Users.lastCastAt]
+        if (last != null && Duration.between(last, now).seconds < 10) false else {
+            Users.update({ Users.id eq userId }) { it[lastCastAt] = now }
+            true
+        }
+    }
+
+    data class CatchDTO(val fish: String, val weight: Double, val location: String)
+
+    fun cast(userId: Long): CatchDTO = transaction {
+        require(rateLimit(userId)) { "Too fast" }
+        // consume 1 Basic Bait
+        val basicId = Lures.select { Lures.name eq "Basic Bait" }.single()[Lures.id].value
+        val row = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
+            .forUpdate().singleOrNull() ?: error("No baits")
+        val q = row[InventoryLures.qty]; require(q > 0) { "No baits" }
+        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) { it[qty] = q - 1 }
+
+        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value ?: Locations.selectAll().first()[Locations.id].value
+        val pool = (LocationFishWeights innerJoin Fish)
+            .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, LocationFishWeights.weight)
+            .select { LocationFishWeights.locationId eq locId }
+            .toList()
+        require(pool.isNotEmpty()) { "Empty location" }
+
+        val rnd = Rng.fast()
+        val total = pool.sumOf { it[LocationFishWeights.weight] }
+        var roll = rnd.nextDouble() * total
+        val picked = pool.first { row2 -> (roll -= row2[LocationFishWeights.weight]) <= 0.0 }
+
+        val fishId = picked[Fish.id].value
+        val fishName = picked[Fish.name]
+        val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg])
+
+        Catches.insert {
+            it[Catches.userId] = userId
+            it[Catches.fishId] = fishId
+            it[Catches.weight] = weight
+            it[Catches.locationId] = locId
+            it[Catches.createdAt] = Instant.now()
+        }
+        val locName = Locations.select { Locations.id eq locId }.single()[Locations.name]
+        CatchDTO(fishName, weight, locName)
+    }
+
+    fun recent(userId: Long, limit: Int = 5) = transaction {
+        (Catches innerJoin Fish)
+            .slice(Fish.name, Catches.weight, Catches.createdAt)
+            .select { Catches.userId eq userId }
+            .orderBy(Catches.createdAt, SortOrder.DESC)
+            .limit(limit)
+            .map { mapOf("fish" to it[Fish.name], "weight" to it[Catches.weight], "at" to it[Catches.createdAt].toString()) }
+    }
+}
