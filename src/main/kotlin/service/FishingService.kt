@@ -94,20 +94,22 @@ class FishingService {
         Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
     }
 
-    private fun rateLimit(userId: Long) = transaction {
-        val now = Instant.now()
-        val last = Users.selectAll().where { Users.id eq userId }.single()[Users.lastCastAt]
-        if (last != null && Duration.between(last, now).seconds < 10) false else {
-            Users.update({ Users.id eq userId }) { it[lastCastAt] = now }
-            true
-        }
-    }
-
     @Serializable
     data class CatchDTO(val fish: String, val weight: Double, val location: String, val rarity: String)
 
-    fun cast(userId: Long): CatchDTO = transaction {
-        require(rateLimit(userId)) { "Too fast" }
+    @Serializable
+    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
+
+    private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
+        "common" -> 1.0 - 0.8 * factor
+        "uncommon" -> 0.6 + 0.4 * factor
+        "rare" -> 0.3 + 0.7 * factor
+        "epic" -> 0.2 + 0.8 * factor
+        "legendary" -> 0.1 + 0.9 * factor
+        else -> 1.0
+    }
+
+    fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
         // consume 1 Basic Bait
         val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
         val row = InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
@@ -128,13 +130,19 @@ class FishingService {
             .toList()
         require(pool.isNotEmpty()) { "Empty location" }
 
+        val wait = waitSeconds.coerceIn(5, 30)
+        val factor = (wait - 5).toDouble() / 25.0
         val rnd = Rng.fast()
-        val totalWeight = pool.sumOf { it[LocationFishWeights.weight] }
+        val totalWeight = pool.sumOf { it[LocationFishWeights.weight] * rarityModifier(it[Fish.rarity], factor) }
         var roll = rnd.nextDouble() * totalWeight
         val picked = pool.first { row2 ->
-            roll -= row2[LocationFishWeights.weight]
+            roll -= row2[LocationFishWeights.weight] * rarityModifier(row2[Fish.rarity], factor)
             roll <= 0.0
         }
+
+        if (reactionTime >= 3.0) return@transaction CastResultDTO(false)
+        val catchChance = 1.0 - reactionTime / 3.0
+        if (rnd.nextDouble() > catchChance) return@transaction CastResultDTO(false)
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
@@ -149,7 +157,7 @@ class FishingService {
             it[Catches.createdAt] = Instant.now()
         }
         val locName = locRow[Locations.name]
-        CatchDTO(fishName, weight, locName, rarity)
+        CastResultDTO(true, CatchDTO(fishName, weight, locName, rarity))
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
