@@ -38,7 +38,7 @@ object DB {
             }
         }
 
-        fun upsertFish(n: String, r: String, mean: Double, vari: Double): Long {
+        fun upsertFish(n: String, r: String, mean: Double, vari: Double, pred: Boolean, water: String): Long {
             val row = Fish.select { Fish.name eq n }.singleOrNull()
             return if (row == null) {
                 Fish.insertAndGetId {
@@ -46,6 +46,8 @@ object DB {
                     it[rarity] = r
                     it[meanKg] = mean
                     it[varKg]  = vari
+                    it[Fish.predator] = pred
+                    it[Fish.water] = water
                 }.value
             } else {
                 val id = row[Fish.id].value
@@ -53,6 +55,8 @@ object DB {
                     it[rarity] = r
                     it[meanKg] = mean
                     it[varKg]  = vari
+                    it[Fish.predator] = pred
+                    it[Fish.water] = water
                 }
                 id
             }
@@ -75,6 +79,28 @@ object DB {
             }
         }
 
+        fun upsertLure(name: String, predator: Boolean, water: String, rarityBonus: Double = 0.0): Long {
+            val row = Lures.select { Lures.name eq name }.singleOrNull()
+            return if (row == null) {
+                Lures.insertAndGetId {
+                    it[Lures.name] = name
+                    it[priceStars] = null
+                    it[modsJson] = "{}"
+                    it[Lures.predator] = predator
+                    it[Lures.water] = water
+                    it[Lures.rarityBonus] = rarityBonus
+                }.value
+            } else {
+                val id = row[Lures.id].value
+                Lures.update({ Lures.id eq id }) {
+                    it[Lures.predator] = predator
+                    it[Lures.water] = water
+                    it[Lures.rarityBonus] = rarityBonus
+                }
+                id
+            }
+        }
+
         // --- Locations (базовые + новые) ---
         val pond  = upsertLocation("Пруд",  0.0,   1.0)
         val river = upsertLocation("Река", 10.0,   1.5)
@@ -88,41 +114,41 @@ object DB {
         val fjord      = upsertLocation("Фьорд",           900.0, 3.5)
 
         // --- Fish (существующие + новые, все через upsert) ---
-        val fP  = upsertFish("Плотва",           "common",     0.2,  0.05)
-        val fO  = upsertFish("Окунь",            "common",     0.25, 0.07)
-        val fK  = upsertFish("Карась",           "common",     0.3,  0.1)
-        val fL  = upsertFish("Лещ",              "uncommon",   0.8,  0.2)
-        val fSh = upsertFish("Щука",             "rare",       3.0,  1.2)
-        val fKa = upsertFish("Карп",             "rare",       2.5,  1.0)
-        val fSo = upsertFish("Сом",              "epic",       8.0,  4.0)
-        val fOs = upsertFish("Осётр",            "legendary", 12.0,  6.0)
+        val fP  = upsertFish("Плотва",           "common",     0.2,  0.05, false, "fresh")
+        val fO  = upsertFish("Окунь",            "common",     0.25, 0.07, true,  "fresh")
+        val fK  = upsertFish("Карась",           "common",     0.3,  0.1,  false, "fresh")
+        val fL  = upsertFish("Лещ",              "uncommon",   0.8,  0.2,  false, "fresh")
+        val fSh = upsertFish("Щука",             "rare",       3.0,  1.2,  true,  "fresh")
+        val fKa = upsertFish("Карп",             "rare",       2.5,  1.0,  false, "fresh")
+        val fSo = upsertFish("Сом",              "epic",       8.0,  4.0,  true,  "fresh")
+        val fOs = upsertFish("Осётр",            "legendary", 12.0,  6.0,  true,  "fresh")
 
         // Новые пресные виды
-        val fUk = upsertFish("Уклейка",          "common",     0.05, 0.02)
-        val fLi = upsertFish("Линь",             "uncommon",   0.7,  0.3)
-        val fRo = upsertFish("Ротан",            "common",     0.15, 0.05)
-        val fZu = upsertFish("Судак",            "rare",       2.0,  1.0)
-        val fCh = upsertFish("Чехонь",           "uncommon",   0.4,  0.15)
-        val fHa = upsertFish("Хариус",           "rare",       0.6,  0.25)
-        val fFr = upsertFish("Форель ручьевая",  "rare",       1.2,  0.6)
-        val fTa = upsertFish("Таймень",          "legendary", 15.0,  7.0)
-        val fNa = upsertFish("Налим",            "uncommon",   1.5,  0.8)
-        val fSi = upsertFish("Сиг",              "uncommon",   1.2,  0.5)
-        val fSm = upsertFish("Корюшка",          "common",     0.06, 0.02)
-        val fGo = upsertFish("Голавль",          "uncommon",   0.8,  0.4)
-        val fJe = upsertFish("Жерех",            "rare",       2.0,  1.0)
-        val fTo = upsertFish("Толстолобик",      "rare",       4.0,  2.0)
-        val fGa = upsertFish("Белый амур",       "rare",       3.5,  1.5)
+        val fUk = upsertFish("Уклейка",          "common",     0.05, 0.02, false, "fresh")
+        val fLi = upsertFish("Линь",             "uncommon",   0.7,  0.3,  false, "fresh")
+        val fRo = upsertFish("Ротан",            "common",     0.15, 0.05, true,  "fresh")
+        val fZu = upsertFish("Судак",            "rare",       2.0,  1.0,  true,  "fresh")
+        val fCh = upsertFish("Чехонь",           "uncommon",   0.4,  0.15, false, "fresh")
+        val fHa = upsertFish("Хариус",           "rare",       0.6,  0.25, true,  "fresh")
+        val fFr = upsertFish("Форель ручьевая",  "rare",       1.2,  0.6,  true,  "fresh")
+        val fTa = upsertFish("Таймень",          "legendary", 15.0,  7.0,  true,  "fresh")
+        val fNa = upsertFish("Налим",            "uncommon",   1.5,  0.8,  true,  "fresh")
+        val fSi = upsertFish("Сиг",              "uncommon",   1.2,  0.5,  false, "fresh")
+        val fSm = upsertFish("Корюшка",          "common",     0.06, 0.02, true,  "fresh")
+        val fGo = upsertFish("Голавль",          "uncommon",   0.8,  0.4,  true,  "fresh")
+        val fJe = upsertFish("Жерех",            "rare",       2.0,  1.0,  true,  "fresh")
+        val fTo = upsertFish("Толстолобик",      "rare",       4.0,  2.0,  false, "fresh")
+        val fGa = upsertFish("Белый амур",       "rare",       3.5,  1.5,  false, "fresh")
 
         // Морские/солоноватые
-        val fMu = upsertFish("Кефаль",           "uncommon",   1.0,  0.5)
-        val fFl = upsertFish("Камбала",          "uncommon",   0.8,  0.4)
-        val fHe = upsertFish("Сельдь",           "common",     0.3,  0.1)
-        val fSt = upsertFish("Ставрида",         "common",     0.25, 0.1)
-        val fCo = upsertFish("Треска",           "rare",       3.0,  1.5)
-        val fSa = upsertFish("Сайда",            "uncommon",   2.0,  1.0)
-        val fSe = upsertFish("Морская форель",   "rare",       1.5,  0.7)
-        val fHa2= upsertFish("Палтус",           "legendary", 20.0, 10.0)
+        val fMu = upsertFish("Кефаль",           "uncommon",   1.0,  0.5, false, "salt")
+        val fFl = upsertFish("Камбала",          "uncommon",   0.8,  0.4, false, "salt")
+        val fHe = upsertFish("Сельдь",           "common",     0.3,  0.1,  false, "salt")
+        val fSt = upsertFish("Ставрида",         "common",     0.25, 0.1,  true,  "salt")
+        val fCo = upsertFish("Треска",           "rare",       3.0,  1.5,  true,  "salt")
+        val fSa = upsertFish("Сайда",            "uncommon",   2.0,  1.0,  true,  "salt")
+        val fSe = upsertFish("Морская форель",   "rare",       1.5,  0.7,  true,  "salt")
+        val fHa2= upsertFish("Палтус",           "legendary", 20.0, 10.0, true,  "salt")
 
         // --- Weights per location (вероятности спавна относительно друг друга) ---
 
@@ -213,14 +239,18 @@ object DB {
         setLFWeight(fjord, fSe,  0.4)
         setLFWeight(fjord, fHa2, 0.08)
 
-        // Приманка как была
-        if (Lures.selectAll().where { Lures.name eq "Basic Bait" }.empty()) {
-            Lures.insert {
-                it[name] = "Basic Bait"
-                it[priceStars] = null
-                it[modsJson] = "{\"rare\":1.0}"
-            }
-        }
+        // --- Приманки ---
+        val presnMir = upsertLure("Пресная мирная", false, "fresh")
+        val presnHish = upsertLure("Пресная хищная", true, "fresh")
+        val morsMir = upsertLure("Морская мирная", false, "salt")
+        val morsHish = upsertLure("Морская хищная", true, "salt")
+        upsertLure("Пресная мирная+", false, "fresh", 0.3)
+        upsertLure("Пресная хищная+", true, "fresh", 0.3)
+        upsertLure("Морская мирная+", false, "salt", 0.3)
+        upsertLure("Морская хищная+", true, "salt", 0.3)
+
+        // set default current lure for existing users if null
+        Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }
     }
 
 }
@@ -234,6 +264,7 @@ object Users : LongIdTable() {
     val createdAt = timestamp("created_at")
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val currentLocationId = reference("current_location_id", Locations).nullable()
+    val currentLureId = reference("current_lure_id", Lures).nullable()
     val lastCastAt = timestamp("last_cast_at").nullable()
 }
 
@@ -248,12 +279,17 @@ object Fish : LongIdTable() {
     val rarity = varchar("rarity", 50)
     val meanKg = double("mean_kg")
     val varKg = double("var_kg")
+    val predator = bool("predator").default(false)
+    val water = varchar("water", 20).default("fresh")
 }
 
 object Lures : LongIdTable() {
     val name = varchar("name", 100)
     val priceStars = integer("price_stars").nullable()
     val modsJson = text("mods_json")
+    val predator = bool("predator").default(false)
+    val water = varchar("water", 20).default("fresh")
+    val rarityBonus = double("rarity_bonus").default(0.0)
 }
 
 object Rods : LongIdTable() {

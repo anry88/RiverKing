@@ -12,6 +12,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import service.FishingService
 import service.LocationDTO
 import service.RecentDTO
+import service.FishingService.LureDTO
 import db.Users
 
 fun Application.apiRoutes(env: Env) {
@@ -40,7 +41,7 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val baits = fishing.getBaits(uid)
+            val lures = fishing.listLures(uid)
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid)
@@ -50,12 +51,16 @@ fun Application.apiRoutes(env: Env) {
             }
             val currentLocId = storedLoc?.takeIf { id -> locs.any { it.id == id && it.unlocked } }
                 ?: locs.first { it.unlocked }.id
+            val currentLureId = transaction {
+                Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
+            }
             val recent = fishing.recent(uid)
 
             @Serializable
             data class MeResp(
                 val username: String,
-                val baits: Int,
+                val lures: List<LureDTO>,
+                val currentLureId: Long?,
                 val totalWeight: Double,
                 val todayWeight: Double,
                 val locationId: Long,
@@ -63,7 +68,19 @@ fun Application.apiRoutes(env: Env) {
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
             )
-            call.respond(MeResp("angler", baits, totalWeight, todayWeight, currentLocId, locs, recent, dailyAvailable))
+            call.respond(
+                MeResp(
+                    "angler",
+                    lures,
+                    currentLureId,
+                    totalWeight,
+                    todayWeight,
+                    currentLocId,
+                    locs,
+                    recent,
+                    dailyAvailable
+                )
+            )
         }
 
         // Daily baits
@@ -75,9 +92,13 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val ok = fishing.giveDailyBaits(uid)
-            if (!ok) return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
-            call.respond(mapOf("baitsGranted" to 15))
+            val res = fishing.giveDailyBaits(uid)
+                ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
+
+            @Serializable
+            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+
+            call.respond(DailyResp(res.first, res.second))
         }
 
         // Change location
@@ -114,6 +135,24 @@ fun Application.apiRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to (e.message ?: "rate limit")))
             }
             call.respond(res)
+        }
+
+        // Change lure
+        post("/api/lure/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            try {
+                fishing.setLure(uid, id)
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
+            }
         }
     }
 }
