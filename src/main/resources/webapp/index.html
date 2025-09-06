@@ -97,8 +97,10 @@
       );
     }
 
-    function Header({me,onOpenLocations}){
+    function Header({me,onOpenLocations,onOpenBaits}){
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
+      const curLure = me.lures.find(l=>l.id===me.currentLureId);
+      const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
         <div className="sticky top-0 z-40 -mx-4">
           <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
@@ -110,7 +112,7 @@
           <div className="px-4 py-2 bg-black/20 border-b border-white/10">
             <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
               <StatChip icon={'📍'} label="Локация" value={currentLoc} onClick={onOpenLocations} />
-              <StatChip icon={'🪱'} label="Приманки" value={me.baits} />
+              <StatChip icon={'🪱'} label="Приманки" value={lureVal} onClick={onOpenBaits} />
               <StatChip icon={'🐟'} label="Всего" value={`${Number(me.totalWeight||0).toFixed(1)} кг`} />
               <StatChip icon={'📅'} label="Сегодня" value={`${Number(me.todayWeight||0).toFixed(1)} кг`} />
             </div>
@@ -139,6 +141,35 @@
                       {l.unlocked? <div className="text-xs opacity-70">Открыто</div> : <div className="text-xs opacity-70">Требуется {l.unlockKg} кг</div>}
                     </div>
                     {me.locationId===l.id && <div className="text-emerald-400 text-sm">Текущая</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function BaitsDrawer({open,onClose,me,onSelect}){
+      return (
+        <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
+          <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
+          <div className={`absolute right-0 top-0 h-full w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} p-4 flex flex-col`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-semibold">Приманки</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+            </div>
+            <div className="space-y-2 overflow-y-auto pr-1">
+              {me.lures.map(l=> (
+                <button key={l.id} disabled={l.qty<=0}
+                        onClick={()=>{ if(l.qty>0){ onSelect(l.id); onClose(); } }}
+                        className={`w-full text-left p-3 rounded-xl border ${me.currentLureId===l.id? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${l.qty<=0?'opacity-50 cursor-not-allowed':''}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{l.name}</div>
+                      <div className="text-xs opacity-70">{l.qty} шт.</div>
+                    </div>
+                    {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">Текущая</div>}
                   </div>
                 </button>
               ))}
@@ -298,6 +329,7 @@
       const [result,setResult] = React.useState(null);
       const [error,setError] = React.useState(null);
       const [drawerOpen, setDrawerOpen] = React.useState(false);
+      const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
 
       React.useEffect(()=>{
@@ -315,7 +347,10 @@
             const d = await r.json(); setMe(d);
           }catch(e){
             setMe({
-              username:'angler', baits:5, totalWeight:0, todayWeight:0, locationId:1,
+              username:'angler',
+              lures:[{id:1,name:'Fresh Herb Bait',qty:5,predator:false,water:'fresh',rarityBonus:0}],
+              currentLureId:1,
+              totalWeight:0, todayWeight:0, locationId:1,
               locations:[
                 {id:1,name:'Пруд',unlockKg:0,unlocked:true},
                 {id:2,name:'Река',unlockKg:10,unlocked:false},
@@ -333,7 +368,14 @@
           const r = await fetch(`/api/daily`,{method:'POST',credentials:'include'});
           if(!r.ok) throw 0;
           const d = await r.json();
-          setMe(p=>({...p,baits:p.baits+(d.baitsGranted||15),dailyAvailable:false}));
+          setMe(p=>({
+            ...p,
+            lures: p.lures.map(l=>{
+              const g=d.granted.find(x=>x.id===l.id);
+              return g? {...l,qty:l.qty+g.qty}:l;
+            }),
+            dailyAvailable:false
+          }));
         }catch{ setError('Ежедневные приманки уже забраны.'); }
       }
 
@@ -348,7 +390,8 @@
 
       async function cast(){
         if(castingRef.current) return; if(!me) return;
-        if(me.baits<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
+        const curLure = me.lures.find(l=>l.id===me.currentLureId);
+        if(!curLure || curLure.qty<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
         setError(null);
         castingRef.current = true;
         setCasting(true);
@@ -359,12 +402,12 @@
         biteTimeRef.current = Date.now();
         setBiting(true);
         bitingRef.current = true;
-        hookTimeoutRef.current = setTimeout(()=>hook(true),3000);
+        hookTimeoutRef.current = setTimeout(()=>hook(true),5000);
       }
 
       async function hook(auto=false){
         if(!bitingRef.current) return;
-        const reaction = auto ? 3.1 : (Date.now()-biteTimeRef.current)/1000;
+        const reaction = auto ? 5.1 : (Date.now()-biteTimeRef.current)/1000;
         clearTimeout(hookTimeoutRef.current);
         setBiting(false);
         bitingRef.current = false;
@@ -379,11 +422,11 @@
           if(d.caught){
             const c=d.catch;
             setResult(c);
-            setMe(p=>{
+            setMe(p=>{ 
               const newTotal=(p.totalWeight||0)+c.weight;
               return {
                 ...p,
-                baits:Math.max(0,p.baits-1),
+                lures:p.lures.map(l=> l.id===p.currentLureId ? {...l,qty:Math.max(0,l.qty-1)} : l),
                 totalWeight:newTotal,
                 todayWeight:(p.todayWeight||0)+c.weight,
                 locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
@@ -392,7 +435,7 @@
             });
           } else {
             setError('Рыба сорвалась!');
-            setMe(p=>({...p,baits:Math.max(0,p.baits-1)}));
+            setMe(p=>({...p,lures:p.lures.map(l=> l.id===p.currentLureId ? {...l,qty:Math.max(0,l.qty-1)}:l)}));
           }
         }catch{
           setError('Слишком часто забрасываешь. Подожди пару секунд.');
@@ -415,7 +458,7 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} onOpenLocations={()=>setDrawerOpen(true)} />
+          <Header me={me} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
 
           {tab === 'fish' && (
             <>
@@ -482,6 +525,9 @@
 
           {/* Шторка локаций */}
           <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
+          <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
+            try{ await fetch(`/api/lure/`+id,{method:'POST',credentials:'include'}); setMe(p=>({...p,currentLureId:id})); }catch(e){ setError('Не удалось выбрать приманку'); }
+          }} />
 
           {/* Нижние вкладки */}
           <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">

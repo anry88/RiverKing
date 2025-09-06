@@ -54,23 +54,31 @@ class FishingService {
         }
     }
 
-    fun giveDailyBaits(userId: Long, qty: Int = 15): Boolean = transaction {
+    @Serializable
+    data class LureQtyDTO(val id: Long, val qty: Int)
+
+    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): List<LureQtyDTO>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
-        if (last == today) return@transaction false
-        val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
-        val cur = InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
-            .singleOrNull()?.get(InventoryLures.qty) ?: 0
-        if (cur == 0) InventoryLures.insert {
-            it[InventoryLures.userId] = userId
-            it[InventoryLures.lureId] = basicId
-            it[InventoryLures.qty] = qty
-        } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
-            it[InventoryLures.qty] = cur + qty
+        if (last == today) return@transaction null
+        val freshId = Lures.select { Lures.name eq "Fresh Herb Bait" }.single()[Lures.id].value
+        val predId = Lures.select { Lures.name eq "Fresh Predator Bait" }.single()[Lures.id].value
+        fun add(id: Long, qty: Int) {
+            val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }
+                .singleOrNull()?.get(InventoryLures.qty) ?: 0
+            if (cur == 0) InventoryLures.insert {
+                it[InventoryLures.userId] = userId
+                it[InventoryLures.lureId] = id
+                it[InventoryLures.qty] = qty
+            } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                it[InventoryLures.qty] = cur + qty
+            }
         }
+        add(freshId, freshQty)
+        add(predId, predQty)
         Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
-        true
+        listOf(LureQtyDTO(freshId, freshQty), LureQtyDTO(predId, predQty))
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
@@ -80,10 +88,30 @@ class FishingService {
         last != today
     }
 
-    fun getBaits(userId: Long): Int = transaction {
-        val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
-        InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
+    @Serializable
+    data class LureDTO(val id: Long, val name: String, val qty: Int, val predator: Boolean, val water: String, val rarityBonus: Double)
+
+    fun listLures(userId: Long): List<LureDTO> = transaction {
+        (InventoryLures innerJoin Lures)
+            .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
+            .select { InventoryLures.userId eq userId }
+            .map {
+                LureDTO(
+                    it[Lures.id].value,
+                    it[Lures.name],
+                    it[InventoryLures.qty],
+                    it[Lures.predator],
+                    it[Lures.water],
+                    it[Lures.rarityBonus],
+                )
+            }
+    }
+
+    fun setLure(userId: Long, lureId: Long) = transaction {
+        val has = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
             .singleOrNull()?.get(InventoryLures.qty) ?: 0
+        require(has > 0) { "no lure" }
+        Users.update({ Users.id eq userId }) { it[currentLureId] = lureId }
     }
 
     fun setLocation(userId: Long, locationId: Long) = transaction {
@@ -110,28 +138,33 @@ class FishingService {
     }
 
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
-        // consume 1 Basic Bait
-        val basicId = Lures.selectAll().where { Lures.name eq "Basic Bait" }.single()[Lures.id].value
-        val row = InventoryLures.selectAll().where { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }
+        val lureId = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+            ?: error("No lure selected")
+        val lureRow = (InventoryLures innerJoin Lures)
+            .select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
             .forUpdate().singleOrNull() ?: error("No baits")
-        val q = row[InventoryLures.qty]; require(q > 0) { "No baits" }
-        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq basicId) }) {
+        val q = lureRow[InventoryLures.qty]; require(q > 0) { "No baits" }
+        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
             it[InventoryLures.qty] = q - 1
         }
 
+        val lurePred = lureRow[Lures.predator]
+        val lureWater = lureRow[Lures.water]
+        val rarityBonus = lureRow[Lures.rarityBonus]
+
         val total = totalKg(userId)
-        val locId = Users.selectAll().where { Users.id eq userId }.single()[Users.currentLocationId]?.value
-            ?: Locations.selectAll().where { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
-        val locRow = Locations.selectAll().where { Locations.id eq locId }.single()
+        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
+            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+        val locRow = Locations.select { Locations.id eq locId }.single()
         require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
             .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
-            .selectAll().where { LocationFishWeights.locationId eq locId }
+            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
             .toList()
-        require(pool.isNotEmpty()) { "Empty location" }
+        require(pool.isNotEmpty()) { "No suitable fish" }
 
         val wait = waitSeconds.coerceIn(5, 30)
-        val factor = (wait - 5).toDouble() / 25.0
+        val factor = ((wait - 5).toDouble() / 25.0 + rarityBonus).coerceIn(0.0, 1.0)
         val rnd = Rng.fast()
         val totalWeight = pool.sumOf { it[LocationFishWeights.weight] * rarityModifier(it[Fish.rarity], factor) }
         var roll = rnd.nextDouble() * totalWeight
@@ -140,8 +173,8 @@ class FishingService {
             roll <= 0.0
         }
 
-        if (reactionTime >= 3.0) return@transaction CastResultDTO(false)
-        val catchChance = 1.0 - reactionTime / 3.0
+        if (reactionTime >= 5.0) return@transaction CastResultDTO(false)
+        val catchChance = 1.0 - reactionTime / 5.0
         if (rnd.nextDouble() > catchChance) return@transaction CastResultDTO(false)
 
         val fishId = picked[Fish.id].value
