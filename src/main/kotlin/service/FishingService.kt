@@ -79,14 +79,19 @@ class FishingService {
         val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
         val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
         fun add(id: Long, qty: Int) {
-            val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }
-                .singleOrNull()?.get(InventoryLures.qty) ?: 0
-            if (cur == 0) InventoryLures.insert {
-                it[InventoryLures.userId] = userId
-                it[InventoryLures.lureId] = id
-                it[InventoryLures.qty] = qty
-            } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
-                it[InventoryLures.qty] = cur + qty
+            val cur = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
+            }.singleOrNull()?.get(InventoryLures.qty)
+            if (cur == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = id
+                    it[InventoryLures.qty] = qty
+                }
+            } else {
+                InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                    it[InventoryLures.qty] = cur + qty
+                }
             }
         }
         add(freshId, freshQty)
@@ -296,14 +301,19 @@ class FishingService {
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
         val pack = shopPackages.find { it.id == packageId } ?: error("bad package")
         fun add(id: Long, qty: Int) {
-            val cur = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }
-                .singleOrNull()?.get(InventoryLures.qty) ?: 0
-            if (cur == 0) InventoryLures.insert {
-                it[InventoryLures.userId] = userId
-                it[InventoryLures.lureId] = id
-                it[InventoryLures.qty] = qty
-            } else InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
-                it[InventoryLures.qty] = cur + qty
+            val cur = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
+            }.singleOrNull()?.get(InventoryLures.qty)
+            if (cur == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = id
+                    it[InventoryLures.qty] = qty
+                }
+            } else {
+                InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                    it[InventoryLures.qty] = cur + qty
+                }
             }
         }
         for ((name, qty) in pack.items) {
