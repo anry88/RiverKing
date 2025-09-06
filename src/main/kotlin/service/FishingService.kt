@@ -492,7 +492,13 @@ class FishingService {
     }
 
     @Serializable
-    data class CatchDTO(val fish: String, val weight: Double, val location: String, val rarity: String)
+    data class CatchDTO(
+        val fish: String,
+        val weight: Double,
+        val location: String,
+        val rarity: String,
+        val userId: Long? = null,
+    )
 
     @Serializable
     data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
@@ -605,6 +611,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
@@ -621,6 +628,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
@@ -640,6 +648,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
@@ -658,6 +667,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
@@ -674,6 +684,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
@@ -693,6 +704,7 @@ class FishingService {
                         it[Catches.weight],
                         it[Locations.name],
                         it[Fish.rarity],
+                        it[Catches.userId].value,
                     )
                 }
         }
