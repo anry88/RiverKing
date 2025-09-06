@@ -22,7 +22,10 @@ fun Application.apiRoutes(env: Env) {
     data class CastReq(val wait: Int, val reaction: Double)
 
     @Serializable
-    data class ShopItemDTO(val id: String, val name: String, val desc: String, val price: Int)
+    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int)
+
+    @Serializable
+    data class ShopCategoryDTO(val id: String, val name: String, val packs: List<ShopPackageDTO>)
 
     @Serializable
     data class ShopBuyResp(val lures: List<LureDTO>, val currentLureId: Long?)
@@ -116,7 +119,13 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             fishing.ensureUserByTgId(tgId)
-            val items = fishing.listShop().map { ShopItemDTO(it.id, it.name, it.desc, it.price) }
+            val items = fishing.listShop().map { cat ->
+                ShopCategoryDTO(
+                    cat.id,
+                    cat.name,
+                    cat.packs.map { ShopPackageDTO(it.id, it.name, it.desc, it.price) }
+                )
+            }
             call.respond(items)
         }
 

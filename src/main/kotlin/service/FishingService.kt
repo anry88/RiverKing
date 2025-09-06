@@ -141,6 +141,7 @@ class FishingService {
             }
     }
 
+    @Serializable
     data class ShopPackage(
         val id: String,
         val name: String,
@@ -149,157 +150,201 @@ class FishingService {
         val items: List<Pair<String, Int>>,
     )
 
-    private val shopPackages = listOf(
-        ShopPackage(
-            "fresh_topup_s",
-            "Top-up S (пресные)",
-            "20 шт: 10 мирн. + 10 хищн.",
-            39,
-            listOf("Пресная мирная" to 10, "Пресная хищная" to 10)
-        ),
-        ShopPackage(
-            "fresh_stock_m",
-            "Stock M (пресные)",
-            "50 шт: 25 + 25",
-            89,
-            listOf("Пресная мирная" to 25, "Пресная хищная" to 25)
-        ),
-        ShopPackage(
-            "fresh_crate_l",
-            "Crate L (пресные)",
-            "120 шт: 60 + 60",
-            199,
-            listOf("Пресная мирная" to 60, "Пресная хищная" to 60)
-        ),
-        ShopPackage(
-            "salt_topup_s",
-            "Top-up S (морские)",
-            "20 шт: 10 мирн. + 10 хищн.",
-            55,
-            listOf("Морская мирная" to 10, "Морская хищная" to 10)
-        ),
-        ShopPackage(
-            "salt_stock_m",
-            "Stock M (морские)",
-            "50 шт: 25 + 25",
-            129,
-            listOf("Морская мирная" to 25, "Морская хищная" to 25)
-        ),
-        ShopPackage(
-            "salt_crate_l",
-            "Crate L (морские)",
-            "120 шт: 60 + 60",
-            299,
-            listOf("Морская мирная" to 60, "Морская хищная" to 60)
-        ),
-        ShopPackage(
-            "fresh_boost_s",
-            "Boost S (пресные)",
-            "10 шт: 5 мирн. + 5 хищн.",
-            69,
-            listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)
-        ),
-        ShopPackage(
-            "fresh_boost_m",
-            "Boost M (пресные)",
-            "25 шт",
-            159,
-            listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)
-        ),
-        ShopPackage(
-            "fresh_boost_l",
-            "Boost L (пресные)",
-            "60 шт",
-            349,
-            listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)
-        ),
-        ShopPackage(
-            "salt_boost_s",
-            "Boost S (морские)",
-            "10 шт: 5 + 5",
-            99,
-            listOf("Морская мирная+" to 5, "Морская хищная+" to 5)
-        ),
-        ShopPackage(
-            "salt_boost_m",
-            "Boost M (морские)",
-            "25 шт",
-            239,
-            listOf("Морская мирная+" to 12, "Морская хищная+" to 13)
-        ),
-        ShopPackage(
-            "salt_boost_l",
-            "Boost L (морские)",
-            "60 шт",
-            549,
-            listOf("Морская мирная+" to 30, "Морская хищная+" to 30)
-        ),
-        ShopPackage(
-            "bundle_starter",
-            "Starter Bundle",
-            "40 пресных + 20 морских + 5 пресных бустов",
-            129,
+    @Serializable
+    data class ShopCategory(
+        val id: String,
+        val name: String,
+        val packs: List<ShopPackage>,
+    )
+
+    private val shopCategories = listOf(
+        ShopCategory(
+            "fresh_basic",
+            "Пресные простые",
             listOf(
-                "Пресная мирная" to 20,
-                "Пресная хищная" to 20,
-                "Морская мирная" to 10,
-                "Морская хищная" to 10,
-                "Пресная мирная+" to 3,
-                "Пресная хищная+" to 2,
+                ShopPackage(
+                    "fresh_topup_s",
+                    "Пополнение S",
+                    "20 пресных простых: 10 мирных и 10 хищных",
+                    39,
+                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10)
+                ),
+                ShopPackage(
+                    "fresh_stock_m",
+                    "Запас M",
+                    "50 пресных простых: 25 мирных и 25 хищных",
+                    89,
+                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25)
+                ),
+                ShopPackage(
+                    "fresh_crate_l",
+                    "Ящик L",
+                    "120 пресных простых: 60 мирных и 60 хищных",
+                    199,
+                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60)
+                ),
             )
         ),
-        ShopPackage(
-            "bundle_pro",
-            "Pro Angler",
-            "80 пресных + 40 морских + 15 пресных бустов + 5 морских бустов",
-            319,
+        ShopCategory(
+            "salt_basic",
+            "Морские простые",
             listOf(
-                "Пресная мирная" to 40,
-                "Пресная хищная" to 40,
-                "Морская мирная" to 20,
-                "Морская хищная" to 20,
-                "Пресная мирная+" to 8,
-                "Пресная хищная+" to 7,
-                "Морская мирная+" to 3,
-                "Морская хищная+" to 2,
+                ShopPackage(
+                    "salt_topup_s",
+                    "Пополнение S",
+                    "20 морских простых: 10 мирных и 10 хищных",
+                    55,
+                    listOf("Морская мирная" to 10, "Морская хищная" to 10)
+                ),
+                ShopPackage(
+                    "salt_stock_m",
+                    "Запас M",
+                    "50 морских простых: 25 мирных и 25 хищных",
+                    129,
+                    listOf("Морская мирная" to 25, "Морская хищная" to 25)
+                ),
+                ShopPackage(
+                    "salt_crate_l",
+                    "Ящик L",
+                    "120 морских простых: 60 мирных и 60 хищных",
+                    299,
+                    listOf("Морская мирная" to 60, "Морская хищная" to 60)
+                ),
             )
         ),
-        ShopPackage(
-            "bundle_whale",
-            "Whale Crate",
-            "200 пресных + 120 морских + 40 пресных бустов + 20 морских бустов",
-            869,
+        ShopCategory(
+            "fresh_boost",
+            "Пресные улучшенные",
             listOf(
-                "Пресная мирная" to 100,
-                "Пресная хищная" to 100,
-                "Морская мирная" to 60,
-                "Морская хищная" to 60,
-                "Пресная мирная+" to 20,
-                "Пресная хищная+" to 20,
-                "Морская мирная+" to 10,
-                "Морская хищная+" to 10,
+                ShopPackage(
+                    "fresh_boost_s",
+                    "Буст S",
+                    "10 пресных улучшенных: 5 мирных и 5 хищных",
+                    69,
+                    listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)
+                ),
+                ShopPackage(
+                    "fresh_boost_m",
+                    "Буст M",
+                    "25 пресных улучшенных: 12 мирных и 13 хищных",
+                    159,
+                    listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)
+                ),
+                ShopPackage(
+                    "fresh_boost_l",
+                    "Буст L",
+                    "60 пресных улучшенных: 30 мирных и 30 хищных",
+                    349,
+                    listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)
+                ),
             )
         ),
-        ShopPackage(
-            "micro_pred_fresh",
-            "Pred-Fresh Top-up",
-            "15 пресных хищных",
-            29,
-            listOf("Пресная хищная" to 15)
+        ShopCategory(
+            "salt_boost",
+            "Морские улучшенные",
+            listOf(
+                ShopPackage(
+                    "salt_boost_s",
+                    "Буст S",
+                    "10 морских улучшенных: 5 мирных и 5 хищных",
+                    99,
+                    listOf("Морская мирная+" to 5, "Морская хищная+" to 5)
+                ),
+                ShopPackage(
+                    "salt_boost_m",
+                    "Буст M",
+                    "25 морских улучшенных: 12 мирных и 13 хищных",
+                    239,
+                    listOf("Морская мирная+" to 12, "Морская хищная+" to 13)
+                ),
+                ShopPackage(
+                    "salt_boost_l",
+                    "Буст L",
+                    "60 морских улучшенных: 30 мирных и 30 хищных",
+                    549,
+                    listOf("Морская мирная+" to 30, "Морская хищная+" to 30)
+                ),
+            )
         ),
-        ShopPackage(
-            "micro_salt_starter",
-            "Salt Starter",
-            "10 шт: 5 мирн. + 5 хищн.",
-            25,
-            listOf("Морская мирная" to 5, "Морская хищная" to 5)
+        ShopCategory(
+            "mixed",
+            "Смешанные",
+            listOf(
+                ShopPackage(
+                    "bundle_starter",
+                    "Стартовый набор",
+                    "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (10 мирных и 10 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)",
+                    129,
+                    listOf(
+                        "Пресная мирная" to 20,
+                        "Пресная хищная" to 20,
+                        "Морская мирная" to 10,
+                        "Морская хищная" to 10,
+                        "Пресная мирная+" to 3,
+                        "Пресная хищная+" to 2,
+                    )
+                ),
+                ShopPackage(
+                    "bundle_pro",
+                    "Профи рыболов",
+                    "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (20 мирных и 20 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (3 мирные+ и 2 хищные+)",
+                    319,
+                    listOf(
+                        "Пресная мирная" to 40,
+                        "Пресная хищная" to 40,
+                        "Морская мирная" to 20,
+                        "Морская хищная" to 20,
+                        "Пресная мирная+" to 8,
+                        "Пресная хищная+" to 7,
+                        "Морская мирная+" to 3,
+                        "Морская хищная+" to 2,
+                    )
+                ),
+                ShopPackage(
+                    "bundle_whale",
+                    "Китовый ящик",
+                    "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (60 мирных и 60 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (10 мирных+ и 10 хищных+)",
+                    869,
+                    listOf(
+                        "Пресная мирная" to 100,
+                        "Пресная хищная" to 100,
+                        "Морская мирная" to 60,
+                        "Морская хищная" to 60,
+                        "Пресная мирная+" to 20,
+                        "Пресная хищная+" to 20,
+                        "Морская мирная+" to 10,
+                        "Морская хищная+" to 10,
+                    )
+                ),
+            )
+        ),
+        ShopCategory(
+            "starter",
+            "Стартовые",
+            listOf(
+                ShopPackage(
+                    "micro_pred_fresh",
+                    "Пополнение пресных хищных",
+                    "15 пресных хищных",
+                    29,
+                    listOf("Пресная хищная" to 15)
+                ),
+                ShopPackage(
+                    "micro_salt_starter",
+                    "Морской старт",
+                    "10 морских простых: 5 мирных и 5 хищных",
+                    25,
+                    listOf("Морская мирная" to 5, "Морская хищная" to 5)
+                ),
+            )
         ),
     )
 
-    fun listShop(): List<ShopPackage> = shopPackages
+    fun listShop(): List<ShopCategory> = shopCategories
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
-        val pack = shopPackages.find { it.id == packageId } ?: error("bad package")
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)

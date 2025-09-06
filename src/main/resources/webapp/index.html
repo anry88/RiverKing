@@ -547,14 +547,21 @@
               {shop.length===0 ? (
                 <div className="text-center opacity-70">Магазин пуст</div>
               ) : (
-                <div className="space-y-2">
-                  {shop.map(item=> (
-                    <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold">{item.name}</div>
-                        <div className="text-xs opacity-70">{item.desc}</div>
+                <div className="space-y-4">
+                  {shop.map(cat=> (
+                    <div key={cat.id}>
+                      <div className="font-semibold mb-1">{cat.name}</div>
+                      <div className="space-y-2">
+                        {cat.packs.map(item=> (
+                          <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                            <div>
+                              <div className="font-semibold">{item.name}</div>
+                              <div className="text-xs opacity-70">{item.desc}</div>
+                            </div>
+                            <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
+                          </div>
+                        ))}
                       </div>
-                      <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
                     </div>
                   ))}
                 </div>
