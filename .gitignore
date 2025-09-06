@@ -35,4 +35,5 @@ replay_pid*
 build/
 
 # Конфиг файл
-config.properties
+*.properties
+
