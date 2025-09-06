@@ -94,12 +94,17 @@
           if(!r.ok) throw 0;
           const d=await r.json();
           setResult(d);
-          setMe(p=>({...p,
-            baits:Math.max(0,p.baits-1),
-            totalWeight:(p.totalWeight||0)+d.weight,
-            todayWeight:(p.todayWeight||0)+d.weight,
-            recent:[{fish:d.fish,weight:d.weight,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
-          }));
+          setMe(p=>{
+            const newTotal = (p.totalWeight||0)+d.weight;
+            return {
+              ...p,
+              baits:Math.max(0,p.baits-1),
+              totalWeight:newTotal,
+              todayWeight:(p.todayWeight||0)+d.weight,
+              locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
+              recent:[{fish:d.fish,weight:d.weight,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
+            };
+          });
         }catch{
           setError('Слишком часто забрасываешь. Подожди пару секунд.');
         }finally{
