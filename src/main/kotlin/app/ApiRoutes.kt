@@ -38,7 +38,7 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val baits = fishing.getBaits(uid)
-            val locs = fishing.locations()
+            val locs = fishing.locations(uid)
             val currentLocId = transaction { Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value } ?: locs.first().id
             val recent = fishing.recent(uid)
 

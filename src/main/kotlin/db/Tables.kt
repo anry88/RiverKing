@@ -21,9 +21,15 @@ object DB {
 
     private fun seedIfEmpty() {
         if (Locations.selectAll().empty()) {
-            val pond = Locations.insertAndGetId { it[name] = "Пруд"; it[levelReq] = 1 }.value
-            val river = Locations.insertAndGetId { it[name] = "Река"; it[levelReq] = 1 }.value
-            val lake  = Locations.insertAndGetId { it[name] = "Озеро"; it[levelReq] = 2 }.value
+            val pond = Locations.insertAndGetId {
+                it[name] = "Пруд"; it[unlockKg] = 0.0; it[sizeMultiplier] = 1.0
+            }.value
+            val river = Locations.insertAndGetId {
+                it[name] = "Река"; it[unlockKg] = 10.0; it[sizeMultiplier] = 1.5
+            }.value
+            val lake  = Locations.insertAndGetId {
+                it[name] = "Озеро"; it[unlockKg] = 50.0; it[sizeMultiplier] = 2.0
+            }.value
 
             fun addFish(n: String, r: String, mean: Double, vari: Double) =
                 Fish.insertAndGetId { it[name] = n; it[rarity] = r; it[meanKg] = mean; it[varKg] = vari }.value
@@ -67,7 +73,8 @@ object Users : LongIdTable() {
 
 object Locations : LongIdTable() {
     val name = varchar("name", 100)
-    val levelReq = integer("level_req")
+    val unlockKg = double("unlock_kg")
+    val sizeMultiplier = double("size_multiplier")
 }
 
 object Fish : LongIdTable() {

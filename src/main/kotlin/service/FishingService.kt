@@ -23,8 +23,13 @@ class FishingService {
         }
     }
 
-    fun locations(): List<LocationDTO> = transaction {
-        Locations.selectAll().orderBy(Locations.id).map {
+    private fun totalKg(userId: Long) =
+        Catches.slice(Catches.weight.sum()).select { Catches.userId eq userId }
+            .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
+
+    fun locations(userId: Long): List<LocationDTO> = transaction {
+        val total = totalKg(userId)
+        Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.id).map {
             LocationDTO(it[Locations.id].value, it[Locations.name], "…")
         }
     }
@@ -55,7 +60,10 @@ class FishingService {
     }
 
     fun setLocation(userId: Long, locationId: Long) = transaction {
-        require(Locations.select { Locations.id eq locationId }.any()) { "bad location" }
+        val loc = Locations.select { Locations.id eq locationId }.singleOrNull()
+            ?: error("bad location")
+        val total = totalKg(userId)
+        require(loc[Locations.unlockKg] <= total) { "locked" }
         Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
     }
 
@@ -82,7 +90,11 @@ class FishingService {
             it[InventoryLures.qty] = q - 1
         }
 
-        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value ?: Locations.selectAll().first()[Locations.id].value
+        val total = totalKg(userId)
+        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
+            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
             .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, LocationFishWeights.weight)
             .select { LocationFishWeights.locationId eq locId }
@@ -90,8 +102,8 @@ class FishingService {
         require(pool.isNotEmpty()) { "Empty location" }
 
         val rnd = Rng.fast()
-        val total = pool.sumOf { it[LocationFishWeights.weight] }
-        var roll = rnd.nextDouble() * total
+        val totalWeight = pool.sumOf { it[LocationFishWeights.weight] }
+        var roll = rnd.nextDouble() * totalWeight
         val picked = pool.first { row2 ->
             roll -= row2[LocationFishWeights.weight]
             roll <= 0.0
@@ -99,7 +111,7 @@ class FishingService {
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
-        val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg])
+        val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
 
         Catches.insert {
             it[Catches.userId] = userId
@@ -108,7 +120,7 @@ class FishingService {
             it[Catches.locationId] = locId
             it[Catches.createdAt] = Instant.now()
         }
-        val locName = Locations.select { Locations.id eq locId }.single()[Locations.name]
+        val locName = locRow[Locations.name]
         CatchDTO(fishName, weight, locName)
     }
 
