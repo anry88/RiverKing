@@ -511,8 +511,9 @@
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
         try{
-          new Image().src = '/app/assets/riverking_bg_pond_1600x900.png';
-          new Image().src = ROD_IMG;
+          Object.values(LOCATION_BG)
+            .concat([ROD_IMG, '/app/assets/riverking_bobber.svg'])
+            .forEach(src=>{ new Image().src = src; });
         }catch(e){}
         (async()=>{
           setLoading(true);
