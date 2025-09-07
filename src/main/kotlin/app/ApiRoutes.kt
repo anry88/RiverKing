@@ -9,6 +9,7 @@ import io.ktor.server.sessions.*
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.slf4j.LoggerFactory
 import service.FishingService
 import service.LocationDTO
 import service.RecentDTO
@@ -16,9 +17,32 @@ import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.FishingService.FishExtremeDTO
 import db.Users
+import util.Metrics
 
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
+    val log = LoggerFactory.getLogger("Api")
+
+    intercept(ApplicationCallPipeline.Monitoring) {
+        val session = call.sessions.get<AppSession>()
+        val tgId = session?.tgId
+        val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
+        log.info(
+            "call {} {} tgId={} params={}",
+            call.request.httpMethod.value,
+            call.request.uri,
+            tgId,
+            params
+        )
+        Metrics.counter(
+            "api_call_total",
+            mapOf(
+                "path" to call.request.uri.substringBefore('?'),
+                "method" to call.request.httpMethod.value
+            )
+        )
+        proceed()
+    }
 
     @Serializable
     data class CastReq(val wait: Int, val reaction: Double)
@@ -138,12 +162,21 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
-            val uid = fishing.ensureUserByTgId(tgId)
-            if (!env.devMode) return@post call.respond(HttpStatusCode.PaymentRequired)
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            log.info("shop purchase click tgId={} pack={}", tgId, id)
+            Metrics.counter("shop_purchase_click_total", mapOf("pack" to id))
+            val uid = fishing.ensureUserByTgId(tgId)
+            if (!env.devMode) {
+                Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
+                return@post call.respond(HttpStatusCode.PaymentRequired)
+            }
             val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
+                Metrics.counter("shop_purchase_failed_total", mapOf("pack" to id))
+                log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
             }
+            Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
+            log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
         }
 
@@ -191,7 +224,48 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val req = call.receive<CastReq>()
             val res = try { fishing.cast(uid, req.wait, req.reaction) } catch (e: Exception) {
-                return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to (e.message ?: "rate limit")))
+                log.warn(
+                    "cast failed tgId={} wait={} reaction={} err={}",
+                    tgId,
+                    req.wait,
+                    req.reaction,
+                    e.message
+                )
+                return@post call.respond(
+                    HttpStatusCode.TooManyRequests,
+                    mapOf("error" to (e.message ?: "rate limit"))
+                )
+            }
+            log.info(
+                "cast tgId={} wait={} reaction={} caught={} fish={} weight={} location={} rarity={}",
+                tgId,
+                req.wait,
+                req.reaction,
+                res.caught,
+                res.catch?.fish,
+                res.catch?.weight,
+                res.catch?.location,
+                res.catch?.rarity
+            )
+            Metrics.counter("cast_total", mapOf("caught" to res.caught.toString()))
+            res.catch?.let { c ->
+                Metrics.counter(
+                    "fish_caught_total",
+                    mapOf(
+                        "fish" to c.fish,
+                        "location" to c.location,
+                        "rarity" to c.rarity
+                    )
+                )
+                Metrics.gauge(
+                    "catch_weight_kg",
+                    c.weight,
+                    mapOf(
+                        "fish" to c.fish,
+                        "location" to c.location,
+                        "rarity" to c.rarity
+                    )
+                )
             }
             call.respond(res)
         }
