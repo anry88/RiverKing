@@ -8,9 +8,16 @@ import javax.crypto.spec.SecretKeySpec
 
 object TgWebAppAuth {
     fun verifyAndExtractTgId(initData: String, botToken: String): Long {
-        val params = initData.split("&").map {
-            val i = it.indexOf('='); it.substring(0, i) to it.substring(i + 1)
-        }.toMap()
+        // Telegram sends initData as a query-string-style payload where values are URL-encoded.
+        // For signature verification we must decode each key/value before building the
+        // data check string. Using encoded values leads to "bad hash" errors even for
+        // valid initData.
+        val params = initData.split("&").associate {
+            val i = it.indexOf('=')
+            val key = URLDecoder.decode(it.substring(0, i), StandardCharsets.UTF_8)
+            val value = URLDecoder.decode(it.substring(i + 1), StandardCharsets.UTF_8)
+            key to value
+        }
         val hash = params["hash"] ?: error("no hash")
         val dataCheckString = params.filterKeys { it != "hash" }.toList().sortedBy { it.first }
             .joinToString("\n") { (k, v) -> "$k=$v" }
@@ -24,7 +31,7 @@ object TgWebAppAuth {
                 .joinToString("") { "%02x".format(it) }
         }
         require(calcHex.equals(hash, ignoreCase = true)) { "bad hash" }
-        val userJson = URLDecoder.decode(params["user"] ?: error("no user"), StandardCharsets.UTF_8)
+        val userJson = params["user"] ?: error("no user")
         return Json.parseToJsonElement(userJson).jsonObject["id"]?.jsonPrimitive?.long
             ?: error("user.id missing")
     }
