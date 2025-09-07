@@ -549,39 +549,49 @@
               throw new Error('me failed');
             }
             const d = await r.json(); setMe(d);
-            try{
-              const s = await fetch(`/api/shop`,{credentials:'include'});
-              if(s.ok){ setShop(await s.json()); }
-            }catch(e){}
-          }catch(e){
-            if(e.message==='unauthorized'){
-              setError('Требуется авторизация. Запустите игру через кнопку бота.');
-              setShop([]);
-            } else {
-              setMe({
-                username:'angler',
-                lures:[
-                  {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
-                  {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
-                  {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
-                  {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
-                  {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
-                  {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
-                  {id:7,name:'Морская мирная+',qty:2,predатор:false,water:'salt',rarityBonus:0.3},
-                  {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
-                ],
-                currentLureId:1,
-                totalWeight:0, todayWeight:0, locationId:1,
-                locations:[
-                  {id:1,name:'Пруд',unlockKg:0,unlocked:true},
-                  {id:2,name:'Река',unlockKg:10,unlocked:false},
-                  {id:3,name:'Озеро',unlockKg:50,unlocked:false},
-                ],
-                recent:[], dailyAvailable:true,
-              });
-              setShop([]);
-            }
-          }finally{ setLoading(false); }
+              try{
+                const s = await fetch(`/api/shop`,{credentials:'include'});
+                if(!s.ok){
+                  if(s.status===401) throw new Error('unauthorized');
+                } else {
+                  setShop(await s.json());
+                }
+              }catch(e){
+                if(e.message==='unauthorized'){
+                  setError('Требуется авторизация. Запустите игру через кнопку бота.');
+                  setShop([]);
+                }
+              }
+            }catch(e){
+              if(e.message==='unauthorized'){
+                setError('Требуется авторизация. Запустите игру через кнопку бота.');
+                setShop([]);
+              } else {
+                setError('Не удалось загрузить профиль');
+                setMe({
+                  username:'angler',
+                  lures:[
+                    {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
+                    {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
+                    {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
+                    {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
+                    {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
+                    {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
+                    {id:7,name:'Морская мирная+',qty:2,predator:false,water:'salt',rarityBonus:0.3},
+                    {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
+                  ],
+                  currentLureId:1,
+                  totalWeight:0, todayWeight:0, locationId:1,
+                  locations:[
+                    {id:1,name:'Пруд',unlockKg:0,unlocked:true},
+                    {id:2,name:'Река',unlockKg:10,unlocked:false},
+                    {id:3,name:'Озеро',unlockKg:50,unlocked:false},
+                  ],
+                  recent:[], dailyAvailable:true,
+                });
+                setShop([]);
+              }
+            }finally{ setLoading(false); }
         })();
       },[]);
 
@@ -589,7 +599,10 @@
         setError(null);
         try{
           const r = await fetch(`/api/daily`,{method:'POST',credentials:'include'});
-          if(!r.ok) throw 0;
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            throw 0;
+          }
           const d = await r.json();
           setMe(p=>({
             ...p,
@@ -597,26 +610,44 @@
             currentLureId:d.currentLureId,
             dailyAvailable:false
           }));
-        }catch{ setError('Ежедневные приманки уже забраны.'); }
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
+            : 'Ежедневные приманки уже забраны.');
+        }
       }
 
       async function buyPack(id){
         setError(null);
         try{
           const r = await fetch(`/api/shop/`+id,{method:'POST',credentials:'include'});
-          if(!r.ok) throw 0;
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            throw 0;
+          }
           const d = await r.json();
           setMe(p=>({...p,lures:d.lures,currentLureId:d.currentLureId}));
-        }catch(e){ setError('Не удалось купить'); }
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
+            : 'Не удалось купить');
+        }
       }
 
       async function selectLocation(id){
         setError(null);
         try{
           const r = await fetch(`/api/location/`+id,{method:'POST',credentials:'include'});
-          if(!r.ok) throw r.status;
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            throw r.status;
+          }
           setMe(p=>({...p,locationId:id}));
-        }catch(e){ setError(e===403?'Локация закрыта':'Не удалось сменить локацию'); }
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
+            : e===403?'Локация закрыта':'Не удалось сменить локацию');
+        }
       }
 
       async function cast(){
@@ -799,7 +830,18 @@
           {/* Шторка локаций */}
           <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
           <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
-            try{ await fetch(`/api/lure/`+id,{method:'POST',credentials:'include'}); setMe(p=>({...p,currentLureId:id})); }catch(e){ setError('Не удалось выбрать приманку'); }
+            try{
+              const r = await fetch(`/api/lure/`+id,{method:'POST',credentials:'include'});
+              if(!r.ok){
+                if(r.status===401) throw new Error('unauthorized');
+                throw 0;
+              }
+              setMe(p=>({...p,currentLureId:id}));
+            }catch(e){
+              setError(e.message==='unauthorized'
+                ? 'Требуется авторизация. Запустите игру через кнопку бота.'
+                : 'Не удалось выбрать приманку');
+            }
           }} />
 
           {/* Нижние вкладки */}
