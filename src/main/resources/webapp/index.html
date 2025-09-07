@@ -638,13 +638,27 @@
       async function buyPack(id){
         setError(null);
         try{
-          const r = await fetch(`/api/shop/`+id,{method:'POST',credentials:'include'});
+          const initData = tg?.initData;
+          const r = await fetch('/api/create-invoice',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({productId:id, initData})
+          });
           if(!r.ok){
             if(r.status===401) throw new Error('unauthorized');
             throw 0;
           }
-          const d = await r.json();
-          setMe(p=>({...p,lures:d.lures,currentLureId:d.currentLureId}));
+          const {invoice_url} = await r.json();
+          tg?.openInvoice(invoice_url, async (status)=>{
+            if(status==='paid'){
+              try{
+                const meResp = await fetch(`/api/me`,{credentials:'include'});
+                if(meResp.ok){
+                  setMe(await meResp.json());
+                }
+              }catch(err){}
+            }
+          });
         }catch(e){
           setError(e.message==='unauthorized'
             ? 'Требуется авторизация. Запустите игру через кнопку бота.'

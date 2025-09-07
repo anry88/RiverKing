@@ -18,11 +18,13 @@ import service.FishingService.CatchDTO
 import service.FishingService.FishExtremeDTO
 import db.Users
 import service.PayService
+import service.StarsPaymentService
 import util.Metrics
 
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
     val log = LoggerFactory.getLogger("Api")
+    val stars = StarsPaymentService(env, fishing)
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -71,6 +73,12 @@ fun Application.apiRoutes(env: Env) {
         val amount: Int = 0,
         val currency: String = "XTR",
     )
+
+    @Serializable
+    data class InvoiceReq(val productId: String, val initData: String)
+
+    @Serializable
+    data class InvoiceResp(val invoice_url: String)
 
     routing {
         // Telegram WebApp auth: client sends initData in a header
@@ -168,6 +176,18 @@ fun Application.apiRoutes(env: Env) {
             data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
 
             call.respond(DailyResp(res.first, res.second))
+        }
+
+        post("/api/create-invoice") {
+            val req = try { call.receive<InvoiceReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val tgUser = try { TgWebAppAuth.verifyAndExtractUser(req.initData, env.botToken) }
+                catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized) }
+            fishing.ensureUserByTgId(tgUser.id)
+            val url = try { stars.createInvoiceLink(tgUser.id, req.productId) }
+                catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
+            call.respond(InvoiceResp(url))
         }
 
         // Shop

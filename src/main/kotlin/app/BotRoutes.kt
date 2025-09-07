@@ -5,6 +5,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import service.FishingService
 import service.PayService
@@ -16,8 +17,42 @@ fun Application.botRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     routing {
         post("/bot") {
-            val update = try { call.receive<TgUpdate>() } catch (_: Exception) { return@post call.respond(HttpStatusCode.OK) }
+            val update = try { call.receive<TgUpdate>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
+            update.preCheckoutQuery?.let { q ->
+                bot.answerPreCheckoutQuery(q.id)
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
             val message = update.message ?: return@post call.respond(HttpStatusCode.OK)
+
+            message.successfulPayment?.let { sp ->
+                val chatId = message.chat.id
+                val parts = sp.invoicePayload.split(';').mapNotNull {
+                    val p = it.split('=', limit = 2)
+                    if (p.size == 2) p[0] to p[1] else null
+                }.toMap()
+                val packId = parts["pack"]
+                val payloadUser = parts["user"]?.toLongOrNull()
+                if (packId != null && payloadUser == chatId) {
+                    val uid = fishing.ensureUserByTgId(chatId)
+                    fishing.buyPackage(uid, packId)
+                    PayService.recordPayment(
+                        uid,
+                        packId,
+                        PayService.PaymentInfo(
+                            providerChargeId = sp.providerPaymentChargeId,
+                            telegramChargeId = sp.telegramPaymentChargeId,
+                            amount = sp.totalAmount,
+                            currency = sp.currency,
+                        )
+                    )
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
             val chatId = message.chat.id
             val text = message.text ?: ""
             if (text.startsWith("/paysupport")) {
@@ -81,10 +116,30 @@ fun Application.botRoutes(env: Env) {
 }
 
 @Serializable
-private data class TgUpdate(val message: TgMessage? = null)
+private data class TgUpdate(
+    val message: TgMessage? = null,
+    @SerialName("pre_checkout_query") val preCheckoutQuery: TgPreCheckoutQuery? = null,
+)
 
 @Serializable
-private data class TgMessage(val message_id: Long, val chat: TgChat, val text: String? = null)
+private data class TgMessage(
+    val message_id: Long,
+    val chat: TgChat,
+    val text: String? = null,
+    @SerialName("successful_payment") val successfulPayment: TgSuccessfulPayment? = null,
+)
+
+@Serializable
+private data class TgPreCheckoutQuery(val id: String)
+
+@Serializable
+private data class TgSuccessfulPayment(
+    @SerialName("telegram_payment_charge_id") val telegramPaymentChargeId: String,
+    @SerialName("provider_payment_charge_id") val providerPaymentChargeId: String? = null,
+    @SerialName("total_amount") val totalAmount: Int,
+    val currency: String,
+    @SerialName("invoice_payload") val invoicePayload: String,
+)
 
 @Serializable
 private data class TgChat(val id: Long)

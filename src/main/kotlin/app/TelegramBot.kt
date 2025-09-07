@@ -17,4 +17,17 @@ class TelegramBot(private val token: String) {
             disconnect()
         }
     }
+
+    fun answerPreCheckoutQuery(id: String, ok: Boolean = true) {
+        val url = URL("https://api.telegram.org/bot$token/answerPreCheckoutQuery")
+        val data = "pre_checkout_query_id=" + URLEncoder.encode(id, "UTF-8") + "&ok=$ok"
+        (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            outputStream.use { it.write(data.toByteArray()) }
+            inputStream.buffered().use { it.readBytes() }
+            disconnect()
+        }
+    }
 }
