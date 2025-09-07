@@ -198,7 +198,9 @@ class FishingService {
                 .select { LocationFishWeights.locationId eq locId }
                 .map { it[Fish.water] }
                 .distinct()
-            val waterFilter = if (waters.isNotEmpty()) Lures.water inList waters else Lures.water eq "fresh"
+            val waterFilter = with(SqlExpressionBuilder) {
+                if (waters.isNotEmpty()) Lures.water inList waters else Lures.water eq "fresh"
+            }
             val lureNames = Lures.select { waterFilter }.map { it[Lures.name] }
             GuideLocationDTO(locId, locName, fishRows, lureNames)
         }
