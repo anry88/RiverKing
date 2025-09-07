@@ -191,7 +191,7 @@
         fetch('/api/guide',{credentials:'include'})
           .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
           .then(setData)
-          .catch(e=> setError(e===401 ? 'Требуется авторизация' : 'Не удалось загрузить'));
+          .catch(e=> setError(e===401 ? 'Требуется авторизация. Запустите игру через кнопку бота.' : 'Не удалось загрузить'));
       },[]);
       if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
       if(!data) return <div className="mt-6 text-center opacity-70">Загрузка...</div>;
@@ -504,6 +504,13 @@
 
     function App(){
       const tg = window.Telegram?.WebApp;
+      const tgParam = (()=>{
+        try{
+          const search = new URLSearchParams(window.location.search);
+          const hash = new URLSearchParams(window.location.hash.slice(1));
+          return search.get('tgWebAppData') || hash.get('tgWebAppData');
+        }catch{ return null; }
+      })();
       const [me,setMe] = React.useState(null);
       const [loading,setLoading] = React.useState(true);
       const [casting,setCasting] = React.useState(false);
@@ -529,7 +536,12 @@
         }catch(e){}
         (async()=>{
           setLoading(true);
-          try{ if(tg?.initData){ await fetch(`/api/auth/telegram`, {method:'POST', body: tg.initData, credentials:'include'}); } }catch(e){}
+          try{
+            const initData = tg?.initData || tgParam;
+            if(initData){
+              await fetch(`/api/auth/telegram`, {method:'POST', body: initData, credentials:'include'});
+            }
+          }catch(e){}
           try{
             const r = await fetch(`/api/me`, {credentials:'include'});
             if(!r.ok){
@@ -543,7 +555,7 @@
             }catch(e){}
           }catch(e){
             if(e.message==='unauthorized'){
-              setError('Требуется авторизация. Откройте игру через Telegram.');
+              setError('Требуется авторизация. Запустите игру через кнопку бота.');
               setShop([]);
             } else {
               setMe({
@@ -661,7 +673,7 @@
           }
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Откройте игру через Telegram.'
+            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
             : 'Слишком часто забрасываешь. Подожди пару секунд.');
         }finally{
           castingRef.current = false;
