@@ -57,16 +57,19 @@ class FishingService {
     }
 
     private fun nameFromRow(row: ResultRow): String? {
-        val fn = row[Users.firstName]
-        val ln = row[Users.lastName]
-        val un = row[Users.username]
-        val nn = row[Users.nickname]
+        val fn = row.getOrNull(Users.firstName)
+        val ln = row.getOrNull(Users.lastName)
+        val un = row.getOrNull(Users.username)
+        val nn = row.getOrNull(Users.nickname)
         return when {
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
             else -> nn
         }
     }
+
+    private fun catchUser(row: ResultRow): String? =
+        nameFromRow(row)
 
     private fun totalKg(userId: Long) =
         Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
@@ -660,7 +663,8 @@ class FishingService {
 
     fun personalTopByLocation(userId: Long, locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
                 .map {
                     CatchDTO(
@@ -670,7 +674,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -680,7 +684,8 @@ class FishingService {
 
     fun personalTopByFish(userId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { Catches.userId eq userId }
                 .map {
                     CatchDTO(
@@ -690,7 +695,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -703,7 +708,8 @@ class FishingService {
 
     fun personalFishExtremes(userId: Long, fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { (Catches.userId eq userId) and (Catches.fishId eq fishId) }
                 .map {
                     CatchDTO(
@@ -713,7 +719,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -725,7 +731,8 @@ class FishingService {
 
     fun globalTopByLocation(locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { Catches.locationId eq locationId }
                 .map {
                     CatchDTO(
@@ -735,7 +742,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -745,7 +752,8 @@ class FishingService {
 
     fun globalTopByFish(limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .selectAll()
                 .map {
                     CatchDTO(
@@ -755,7 +763,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -768,7 +776,8 @@ class FishingService {
 
     fun globalFishExtremes(fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            ((Catches leftJoin Users) innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { Catches.fishId eq fishId }
                 .map {
                     CatchDTO(
@@ -778,7 +787,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
