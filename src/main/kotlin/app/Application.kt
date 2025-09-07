@@ -34,7 +34,11 @@ fun main() {
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app", "webapp")
-            get("/") { call.respondRedirect("/app", permanent = false) }
+            get("/") {
+                val qs = call.request.queryString()
+                val target = if (qs.isBlank()) "/app" else "/app?$qs"
+                call.respondRedirect(target, permanent = false)
+            }
             get("/health") { call.respondText("OK") }
             get("/metrics") { call.respondText(Metrics.dump(), ContentType.Text.Plain) }
         }
