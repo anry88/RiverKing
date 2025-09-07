@@ -186,12 +186,14 @@
     function Guide(){
       const [section,setSection] = React.useState('locations');
       const [data,setData] = React.useState(null);
+      const [error,setError] = React.useState(null);
       React.useEffect(()=>{
         fetch('/api/guide',{credentials:'include'})
-          .then(r=>r.json())
+          .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
           .then(setData)
-          .catch(()=>{});
+          .catch(e=> setError(e===401 ? 'Требуется авторизация' : 'Не удалось загрузить'));
       },[]);
+      if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
       if(!data) return <div className="mt-6 text-center opacity-70">Загрузка...</div>;
       return (
         <div className="mt-4">
@@ -530,35 +532,43 @@
           try{ if(tg?.initData){ await fetch(`/api/auth/telegram`, {method:'POST', body: tg.initData, credentials:'include'}); } }catch(e){}
           try{
             const r = await fetch(`/api/me`, {credentials:'include'});
-            if(!r.ok) throw new Error('me failed');
+            if(!r.ok){
+              if(r.status===401) throw new Error('unauthorized');
+              throw new Error('me failed');
+            }
             const d = await r.json(); setMe(d);
             try{
               const s = await fetch(`/api/shop`,{credentials:'include'});
               if(s.ok){ setShop(await s.json()); }
             }catch(e){}
           }catch(e){
-            setMe({
-              username:'angler',
-              lures:[
-                {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
-                {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
-                {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
-                {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
-                {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
-                {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
-                {id:7,name:'Морская мирная+',qty:2,predator:false,water:'salt',rarityBonus:0.3},
-                {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
-              ],
-              currentLureId:1,
-              totalWeight:0, todayWeight:0, locationId:1,
-              locations:[
-                {id:1,name:'Пруд',unlockKg:0,unlocked:true},
-                {id:2,name:'Река',unlockKg:10,unlocked:false},
-                {id:3,name:'Озеро',unlockKg:50,unlocked:false},
-              ],
-              recent:[], dailyAvailable:true,
-            });
-            setShop([]);
+            if(e.message==='unauthorized'){
+              setError('Требуется авторизация. Откройте игру через Telegram.');
+              setShop([]);
+            } else {
+              setMe({
+                username:'angler',
+                lures:[
+                  {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
+                  {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
+                  {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
+                  {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
+                  {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
+                  {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
+                  {id:7,name:'Морская мирная+',qty:2,predатор:false,water:'salt',rarityBonus:0.3},
+                  {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
+                ],
+                currentLureId:1,
+                totalWeight:0, todayWeight:0, locationId:1,
+                locations:[
+                  {id:1,name:'Пруд',unlockKg:0,unlocked:true},
+                  {id:2,name:'Река',unlockKg:10,unlocked:false},
+                  {id:3,name:'Озеро',unlockKg:50,unlocked:false},
+                ],
+                recent:[], dailyAvailable:true,
+              });
+              setShop([]);
+            }
           }finally{ setLoading(false); }
         })();
       },[]);
@@ -626,7 +636,10 @@
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({wait:waitRef.current,reaction})
           });
-          if(!r.ok) throw 0;
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            throw 0;
+          }
           const d=await r.json();
           if(d.caught){
             const c=d.catch;
@@ -646,20 +659,33 @@
             setError('Рыба сорвалась!');
             setMe(p=>({...p,lures:p.lures.map(l=> l.id===p.currentLureId ? {...l,qty:Math.max(0,l.qty-1)}:l)}));
           }
-        }catch{
-          setError('Слишком часто забрасываешь. Подожди пару секунд.');
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? 'Требуется авторизация. Откройте игру через Telegram.'
+            : 'Слишком часто забрасываешь. Подожди пару секунд.');
         }finally{
           castingRef.current = false;
           setCasting(false);
         }
       }
 
-      if(loading || !me){
+      if(loading){
         return (
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">Загружаем…</div>
+            </div>
+          </div>
+        );
+      }
+
+      if(!me){
+        return (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-2xl font-semibold">RiverKing</div>
+              <div className="opacity-70 mt-2">{error || 'Не удалось загрузить'}</div>
             </div>
           </div>
         );
