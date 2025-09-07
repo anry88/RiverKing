@@ -23,6 +23,7 @@
   <link rel="preload" as="image" href="/app/assets/riverking_bg_sea_coast_1600x900.png">
   <link rel="preload" as="image" href="/app/assets/riverking_bg_fjord_1600x900.png">
   <link rel="preload" as="image" href="/app/assets/riverking_rod_right_v2.png">
+  <link rel="preload" as="image" href="/app/assets/riverking_bobber.svg">
 
   <style>
     :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); }
@@ -466,7 +467,7 @@
 
           {/* Поплавок */}
           <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
-            <div className={`relative w-6 h-6 rounded-full bg-red-500 border-2 border-white shadow-lg ${bobberAnim}`}></div>
+            <img src="/app/assets/riverking_bobber.svg" alt="bobber" className={`relative w-6 h-6 drop-shadow ${bobberAnim}`}/>
             {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
           </div>
 
