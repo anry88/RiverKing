@@ -68,8 +68,8 @@ class FishingService {
         }
     }
 
-    private fun catchUser(row: ResultRow): String =
-        nameFromRow(row) ?: "#${row[Catches.userId].value}"
+    private fun catchUser(row: ResultRow): String? =
+        nameFromRow(row)
 
     private fun totalKg(userId: Long) =
         Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
