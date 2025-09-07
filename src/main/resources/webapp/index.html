@@ -506,9 +506,9 @@
       const tg = window.Telegram?.WebApp;
       const tgParam = (()=>{
         try{
-          const search = new URLSearchParams(window.location.search);
-          const hash = new URLSearchParams(window.location.hash.slice(1));
-          return search.get('tgWebAppData') || hash.get('tgWebAppData');
+          const raw = window.location.search + window.location.hash;
+          const m = raw.match(/[?#]tgWebAppData=([^&]+)/);
+          return m ? decodeURIComponent(m[1].replace(/\+/g, '%2B')) : null;
         }catch{ return null; }
       })();
       const [me,setMe] = React.useState(null);
