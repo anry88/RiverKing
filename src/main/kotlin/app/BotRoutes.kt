@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
+import org.slf4j.LoggerFactory
 
 internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
     return if ('=' in payload) {
@@ -31,6 +32,7 @@ fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
     val fishing = FishingService()
     val stars = StarsPaymentService(env, fishing)
+    val log = LoggerFactory.getLogger("Bot")
     routing {
         post("/bot") {
             val update = try { call.receive<TgUpdate>() } catch (_: Exception) {
@@ -46,20 +48,46 @@ fun Application.botRoutes(env: Env) {
 
             message.successfulPayment?.let { sp ->
                 val chatId = message.chat.id
-                val packId = parseInvoicePayload(sp.invoicePayload, chatId)
-                if (packId != null) {
+                val rawPayload = sp.invoicePayload
+                val packId = parseInvoicePayload(rawPayload, chatId)
+                if (packId == null) {
+                    val parts = rawPayload.split(';').mapNotNull {
+                        val p = it.split('=', limit = 2)
+                        if (p.size == 2) p[0] to p[1] else null
+                    }.toMap()
+                    val payloadUser = parts["user"]?.toLongOrNull()
+                    when {
+                        parts["pack"] == null ->
+                            log.warn("successfulPayment with no packId: chatId={} payload={}", chatId, rawPayload)
+                        payloadUser != null && payloadUser != chatId ->
+                            log.warn(
+                                "successfulPayment payload user mismatch: chatId={} payloadUser={} payload={}",
+                                chatId,
+                                payloadUser,
+                                rawPayload
+                            )
+                    }
+                } else {
                     val uid = fishing.ensureUserByTgId(chatId)
-                    fishing.buyPackage(uid, packId)
-                    PayService.recordPayment(
-                        uid,
-                        packId,
-                        PayService.PaymentInfo(
-                            providerChargeId = sp.providerPaymentChargeId,
-                            telegramChargeId = sp.telegramPaymentChargeId,
-                            amount = sp.totalAmount,
-                            currency = sp.currency,
+                    try {
+                        fishing.buyPackage(uid, packId)
+                    } catch (e: Exception) {
+                        log.error("buyPackage failed uid={} packId={}", uid, packId, e)
+                    }
+                    try {
+                        PayService.recordPayment(
+                            uid,
+                            packId,
+                            PayService.PaymentInfo(
+                                providerChargeId = sp.providerPaymentChargeId,
+                                telegramChargeId = sp.telegramPaymentChargeId,
+                                amount = sp.totalAmount,
+                                currency = sp.currency,
+                            )
                         )
-                    )
+                    } catch (e: Exception) {
+                        log.error("recordPayment failed uid={} packId={}", uid, packId, e)
+                    }
                 }
                 return@post call.respond(HttpStatusCode.OK)
             }
