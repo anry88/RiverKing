@@ -277,6 +277,7 @@
       },[me.needsNickname]);
 
       React.useEffect(()=>{
+        if(me.needsNickname) return;
         if(section==='location'){
           fetch(`/api/achievements/${mode}/location/${locId}`,{credentials:'include'})
             .then(r=>r.json()).then(setList).catch(()=>setList([]));
@@ -287,7 +288,7 @@
           fetch(`/api/achievements/${mode}/fish/${fishId}`,{credentials:'include'})
             .then(r=>r.json()).then(setExt).catch(()=>setExt(null));
         }
-      },[mode,section,locId,fishId]);
+      },[mode,section,locId,fishId,me.needsNickname]);
 
       return (
         <div className="mt-4 space-y-4">
