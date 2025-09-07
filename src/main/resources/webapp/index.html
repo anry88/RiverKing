@@ -434,6 +434,13 @@
       }, [casting, shorePosRel, tipX, w]);
 
       const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
+      const [bgLoaded, setBgLoaded] = React.useState(false);
+      React.useEffect(() => {
+        setBgLoaded(false);
+        const img = new Image();
+        img.src = bgUrl;
+        img.onload = () => setBgLoaded(true);
+      }, [bgUrl]);
       const bobberAnim = biting ? 'animate-[bite_0.6s_ease-in-out_infinite]' : (casting ? 'animate-[bob_3s_ease-in-out_infinite]' : '');
       const showRipple = casting && !biting;
 
@@ -441,7 +448,10 @@
         <div className="relative rounded-2xl overflow-hidden border border-white/10" ref={stageRef}
              style={{height:'56vh'}}>
           {/* Фон локации */}
-          <div className="absolute inset-0" style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center'}}></div>
+          <div
+            className="absolute inset-0 transition-opacity duration-200"
+            style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center', opacity:bgLoaded?1:0}}
+          ></div>
           <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
           {me.dailyAvailable && (
