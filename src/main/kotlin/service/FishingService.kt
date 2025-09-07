@@ -509,11 +509,11 @@ class FishingService {
     data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
-        "common" -> 1.0 - 0.8 * factor
-        "uncommon" -> 0.6 + 0.4 * factor
-        "rare" -> 0.3 + 0.7 * factor
-        "epic" -> 0.2 + 0.8 * factor
-        "legendary" -> 0.1 + 0.9 * factor
+        "common" -> 1.0 - 0.7 * factor
+        "uncommon" -> 0.6 + 0.3 * factor
+        "rare" -> 0.3 + 0.4 * factor
+        "epic" -> 0.2 + 0.3 * factor
+        "legendary" -> 0.1 + 0.2 * factor
         else -> 1.0
     }
 
