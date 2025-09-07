@@ -538,6 +538,37 @@ class FishingService {
         Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
     }
 
+    /**
+     * Consume a lure and validate that it can be used at the current location.
+     * Returns the new current lure id if changed after consumption.
+     */
+    fun startCast(userId: Long): Long? = transaction {
+        val lureId = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+            ?: error("No lure selected")
+        val lureRow = (InventoryLures innerJoin Lures)
+            .select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
+            .forUpdate().singleOrNull() ?: error("No baits")
+        val q = lureRow[InventoryLures.qty]; require(q > 0) { "No baits" }
+
+        val lurePred = lureRow[Lures.predator]
+        val lureWater = lureRow[Lures.water]
+
+        val total = totalKg(userId)
+        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
+            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        require(locRow[Locations.unlockKg] <= total) { "locked" }
+        val hasFish = (LocationFishWeights innerJoin Fish)
+            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
+            .limit(1).any()
+        require(hasFish) { "No suitable fish" }
+
+        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
+            it[InventoryLures.qty] = q - 1
+        }
+        ensureCurrentLure(userId)
+    }
+
     @Serializable
     data class CatchDTO(
         val fish: String,
@@ -565,13 +596,7 @@ class FishingService {
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
         val lureId = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
             ?: error("No lure selected")
-        val lureRow = (InventoryLures innerJoin Lures)
-            .select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
-            .forUpdate().singleOrNull() ?: error("No baits")
-        val q = lureRow[InventoryLures.qty]; require(q > 0) { "No baits" }
-        InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
-            it[InventoryLures.qty] = q - 1
-        }
+        val lureRow = Lures.select { Lures.id eq lureId }.single()
 
         val lurePred = lureRow[Lures.predator]
         val lureWater = lureRow[Lures.water]

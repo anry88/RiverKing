@@ -285,7 +285,26 @@ fun Application.apiRoutes(env: Env) {
             }
         }
 
-        // Cast
+        // Start cast: consume lure and validate
+        post("/api/start-cast") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            try {
+                val newLure = fishing.startCast(uid)
+                call.respond(mapOf("currentLureId" to newLure))
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to (e.message ?: "rate limit")))
+            }
+        }
+
+        // Cast result / hook
         post("/api/cast") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
