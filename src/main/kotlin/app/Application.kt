@@ -28,6 +28,9 @@ fun main() {
         // API for Mini App
         apiRoutes(env)
 
+        // Telegram bot webhook
+        botRoutes(env)
+
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app", "webapp")
