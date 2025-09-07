@@ -7,7 +7,15 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 object TgWebAppAuth {
-    fun verifyAndExtractTgId(initData: String, botToken: String): Long {
+    @kotlinx.serialization.Serializable
+    data class TgUser(
+        val id: Long,
+        val firstName: String? = null,
+        val lastName: String? = null,
+        val username: String? = null,
+    )
+
+    fun verifyAndExtractUser(initData: String, botToken: String): TgUser {
         // Telegram sends initData as a query-string-style payload where values are URL-encoded.
         // For signature verification we must decode each key/value before building the
         // data check string. Using encoded values leads to "bad hash" errors even for
@@ -32,7 +40,12 @@ object TgWebAppAuth {
         }
         require(calcHex.equals(hash, ignoreCase = true)) { "bad hash" }
         val userJson = params["user"] ?: error("no user")
-        return Json.parseToJsonElement(userJson).jsonObject["id"]?.jsonPrimitive?.long
-            ?: error("user.id missing")
+        val obj = Json.parseToJsonElement(userJson).jsonObject
+        return TgUser(
+            obj["id"]?.jsonPrimitive?.long ?: error("user.id missing"),
+            obj["first_name"]?.jsonPrimitive?.contentOrNull,
+            obj["last_name"]?.jsonPrimitive?.contentOrNull,
+            obj["username"]?.jsonPrimitive?.contentOrNull,
+        )
     }
 }
