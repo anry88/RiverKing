@@ -38,7 +38,7 @@ class StarsPaymentService(
         val title: String,
         val description: String,
         val payload: String,
-        @SerialName("provider_token") val providerToken: String = "",
+        @SerialName("provider_token") val providerToken: String,
         val currency: String,
         val prices: List<LabeledPrice>,
     )
@@ -82,6 +82,7 @@ class StarsPaymentService(
             title = pack.name,
             description = pack.desc,
             payload = "pack=${pack.id};user=$userId",
+            providerToken = env.providerToken,
             currency = "XTR",
             prices = listOf(LabeledPrice(pack.name, pack.price)),
         )
