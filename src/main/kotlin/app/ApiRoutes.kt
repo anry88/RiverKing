@@ -36,12 +36,16 @@ fun Application.apiRoutes(env: Env) {
             val session = call.sessions.get<AppSession>()
             val tgId = session?.tgId
             val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
+            val body = if (call.request.httpMethod in listOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch)) {
+                try { call.receiveText() } catch (_: Exception) { "" }
+            } else ""
             log.info(
-                "call {} {} tgId={} params={}",
+                "call {} {} tgId={} params={} body={}",
                 call.request.httpMethod.value,
                 call.request.uri,
                 tgId,
-                params
+                params,
+                body
             )
             Metrics.counter(
                 "api_call_total",
