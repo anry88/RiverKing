@@ -684,9 +684,29 @@
 
       async function cast(){
         if(castingRef.current) return; if(!me) return;
-        const curLure = me.lures.find(l=>l.id===me.currentLureId);
+        const curId = me.currentLureId;
+        const curLure = me.lures.find(l=>l.id===curId);
         if(!curLure || curLure.qty<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
         setError(null);
+        try{
+          const r = await fetch(`/api/start-cast`,{method:'POST',credentials:'include'});
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            const e=await r.json().catch(()=>({}));
+            throw new Error(e.error||'failed');
+          }
+          const {currentLureId} = await r.json();
+          setMe(p=>({
+            ...p,
+            currentLureId,
+            lures:p.lures.map(l=> l.id===curId ? {...l,qty:Math.max(0,l.qty-1)} : l)
+          }));
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
+            : e.message==='failed'?'Не удалось забросить': (e.message||'Неверная приманка для этой локации'));
+          return;
+        }
         castingRef.current = true;
         setCasting(true);
         setResult(null);
@@ -719,11 +739,10 @@
           if(d.caught){
             const c=d.catch;
             setResult(c);
-            setMe(p=>{ 
+            setMe(p=>{
               const newTotal=(p.totalWeight||0)+c.weight;
               return {
                 ...p,
-                lures:p.lures.map(l=> l.id===p.currentLureId ? {...l,qty:Math.max(0,l.qty-1)} : l),
                 totalWeight:newTotal,
                 todayWeight:(p.todayWeight||0)+c.weight,
                 locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
@@ -732,7 +751,6 @@
             });
           } else {
             setError('Рыба сорвалась!');
-            setMe(p=>({...p,lures:p.lures.map(l=> l.id===p.currentLureId ? {...l,qty:Math.max(0,l.qty-1)}:l)}));
           }
         }catch(e){
           setError(e.message==='unauthorized'
