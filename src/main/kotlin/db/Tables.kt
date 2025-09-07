@@ -13,7 +13,17 @@ object DB {
         Database.connect(url = env.dbUrl, driver = "org.sqlite.JDBC")
         transaction {
             SchemaUtils.createMissingTablesAndColumns(
-                Users, Locations, Fish, Lures, Rods, InventoryLures, InventoryRods, Catches, LocationFishWeights
+                Users,
+                Locations,
+                Fish,
+                Lures,
+                Rods,
+                InventoryLures,
+                InventoryRods,
+                Catches,
+                LocationFishWeights,
+                Payments,
+                PaySupportRequests,
             )
             seedIfEmpty()
         }
@@ -440,4 +450,24 @@ object LocationFishWeights : Table() {
     val fishId = reference("fish_id", Fish)
     val weight = double("weight")
     override val primaryKey = PrimaryKey(locationId, fishId)
+}
+
+object Payments : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val packageId = varchar("package_id", 100)
+    val providerChargeId = varchar("provider_charge_id", 100)
+    val telegramChargeId = varchar("telegram_charge_id", 100)
+    val amount = integer("amount").default(0)
+    val currency = varchar("currency", 16).default("XTR")
+    val refunded = bool("refunded").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object PaySupportRequests : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val paymentId = reference("payment_id", Payments).nullable()
+    val reason = text("reason")
+    val status = varchar("status", 20)
+    val adminMessage = text("admin_message").nullable()
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }

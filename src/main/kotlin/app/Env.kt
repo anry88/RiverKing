@@ -10,7 +10,8 @@ data class Env(
     val dbUser: String,
     val dbPass: String,
     val port: Int,
-    val devMode: Boolean
+    val devMode: Boolean,
+    val adminTgId: Long,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -25,7 +26,8 @@ data class Env(
                 dbUser = props.getProperty("DATABASE_USER") ?: "postgres",
                 dbPass = props.getProperty("DATABASE_PASSWORD") ?: "postgres",
                 port = props.getProperty("PORT")?.toIntOrNull() ?: 8080,
-                devMode = props.getProperty("DEV_MODE")?.equals("true", ignoreCase = true) ?: false
+                devMode = props.getProperty("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
+                adminTgId = props.getProperty("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,
             )
         }
     }

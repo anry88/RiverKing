@@ -17,6 +17,7 @@ import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.FishingService.FishExtremeDTO
 import db.Users
+import service.PayService
 import util.Metrics
 
 fun Application.apiRoutes(env: Env) {
@@ -62,6 +63,14 @@ fun Application.apiRoutes(env: Env) {
 
     @Serializable
     data class ShopBuyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+
+    @Serializable
+    data class PaymentReq(
+        val providerChargeId: String,
+        val telegramChargeId: String,
+        val amount: Int = 0,
+        val currency: String = "XTR",
+    )
 
     routing {
         // Telegram WebApp auth: client posts initData
@@ -173,6 +182,7 @@ fun Application.apiRoutes(env: Env) {
             log.info("shop purchase click tgId={} pack={}", tgId, id)
             Metrics.counter("shop_purchase_click_total", mapOf("pack" to id))
             val uid = fishing.ensureUserByTgId(tgId)
+            val paymentReq = try { call.receive<PaymentReq>() } catch (_: Exception) { null }
             if (!env.devMode) {
                 Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
                 return@post call.respond(HttpStatusCode.PaymentRequired)
@@ -181,6 +191,18 @@ fun Application.apiRoutes(env: Env) {
                 Metrics.counter("shop_purchase_failed_total", mapOf("pack" to id))
                 log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
+            }
+            paymentReq?.let {
+                PayService.recordPayment(
+                    uid,
+                    id,
+                    PayService.PaymentInfo(
+                        it.providerChargeId,
+                        it.telegramChargeId,
+                        it.amount,
+                        it.currency,
+                    )
+                )
             }
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
