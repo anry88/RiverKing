@@ -15,7 +15,6 @@ import util.Metrics
 
 fun main() {
     val env = Env.fromConfig()
-    Metrics.configure(env.metricsUrl)
     embeddedServer(Netty, port = env.port) {
         install(ContentNegotiation) { json() }
         install(CORS) {
