@@ -11,6 +11,7 @@ import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
 import io.ktor.server.response.*
+import util.Metrics
 
 fun main() {
     val env = Env.fromConfig()
@@ -32,6 +33,7 @@ fun main() {
             staticResources("/app", "webapp")
             get("/") { call.respondRedirect("/app", permanent = false) }
             get("/health") { call.respondText("OK") }
+            get("/metrics") { call.respondText(Metrics.dump(), ContentType.Text.Plain) }
         }
 
         Scheduler.install(this)
