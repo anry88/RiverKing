@@ -57,10 +57,10 @@ class FishingService {
     }
 
     private fun nameFromRow(row: ResultRow): String? {
-        val fn = row[Users.firstName]
-        val ln = row[Users.lastName]
-        val un = row[Users.username]
-        val nn = row[Users.nickname]
+        val fn = row.getOrNull(Users.firstName)
+        val ln = row.getOrNull(Users.lastName)
+        val un = row.getOrNull(Users.username)
+        val nn = row.getOrNull(Users.nickname)
         return when {
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
