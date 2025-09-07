@@ -23,7 +23,11 @@ fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
     val log = LoggerFactory.getLogger("Api")
 
-    intercept(ApplicationCallPipeline.Monitoring) {
+    // Use the Plugins phase so that sessions are already available
+    // when logging each incoming request. Intercepting earlier can
+    // cause SessionNotYetConfiguredException for routes like `/app`
+    // that are served before the Sessions plugin runs.
+    intercept(ApplicationCallPipeline.Plugins) {
         val session = call.sessions.get<AppSession>()
         val tgId = session?.tgId
         val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
