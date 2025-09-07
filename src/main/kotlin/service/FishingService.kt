@@ -660,7 +660,7 @@ class FishingService {
 
     fun personalTopByLocation(userId: Long, locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
                 .map {
                     CatchDTO(
@@ -680,7 +680,7 @@ class FishingService {
 
     fun personalTopByFish(userId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .select { Catches.userId eq userId }
                 .map {
                     CatchDTO(
@@ -703,7 +703,7 @@ class FishingService {
 
     fun personalFishExtremes(userId: Long, fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .select { (Catches.userId eq userId) and (Catches.fishId eq fishId) }
                 .map {
                     CatchDTO(
@@ -725,7 +725,7 @@ class FishingService {
 
     fun globalTopByLocation(locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .select { Catches.locationId eq locationId }
                 .map {
                     CatchDTO(
@@ -745,7 +745,7 @@ class FishingService {
 
     fun globalTopByFish(limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .selectAll()
                 .map {
                     CatchDTO(
@@ -768,7 +768,7 @@ class FishingService {
 
     fun globalFishExtremes(fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
+            (Catches innerJoin Fish innerJoin Locations leftJoin Users)
                 .select { Catches.fishId eq fishId }
                 .map {
                     CatchDTO(
