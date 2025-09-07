@@ -13,12 +13,13 @@ import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.json.Json
 import util.Metrics
 
 fun main() {
     val env = Env.fromConfig()
     embeddedServer(Netty, port = env.port) {
-        install(ContentNegotiation) { json() }
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(CORS) {
             allowMethod(HttpMethod.Get); allowMethod(HttpMethod.Post)
             allowHeader(HttpHeaders.ContentType); allowCredentials = true
