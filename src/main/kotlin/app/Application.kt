@@ -10,6 +10,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import util.Metrics
 
@@ -35,7 +36,7 @@ fun main() {
         routing {
             staticResources("/app", "webapp")
             get("/") {
-                val qs = call.request.queryString()
+                val qs = call.request.rawQueryParameters.formUrlEncode()
                 val target = if (qs.isBlank()) "/app" else "/app?$qs"
                 call.respondRedirect(target, permanent = false)
             }
