@@ -459,7 +459,7 @@ object LocationFishWeights : Table() {
 object Payments : LongIdTable() {
     val userId = reference("user_id", Users)
     val packageId = varchar("package_id", 100)
-    val providerChargeId = varchar("provider_charge_id", 100)
+    val providerChargeId = varchar("provider_charge_id", 100).nullable()
     val telegramChargeId = varchar("telegram_charge_id", 100)
     val amount = integer("amount").default(0)
     val currency = varchar("currency", 16).default("XTR")
