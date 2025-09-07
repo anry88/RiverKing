@@ -56,7 +56,7 @@ object Metrics {
                     setBody(line)
                 }
             } catch (e: Exception) {
-                val msg = "failed to push metrics: ${'$'}{e.message}"
+                val msg = "failed to push metrics: ${e.message}"
                 if (warned.compareAndSet(false, true)) {
                     log.warn(msg)
                 } else {
