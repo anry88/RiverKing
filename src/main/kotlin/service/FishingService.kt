@@ -68,6 +68,9 @@ class FishingService {
         }
     }
 
+    private fun catchUser(row: ResultRow): String =
+        nameFromRow(row) ?: "#${row[Catches.userId].value}"
+
     private fun totalKg(userId: Long) =
         Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
@@ -670,7 +673,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -690,7 +693,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -713,7 +716,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -735,7 +738,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -755,7 +758,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
@@ -778,7 +781,7 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
-                        user = nameFromRow(it),
+                        user = catchUser(it),
                         at = it[Catches.createdAt].toString(),
                     )
                 }
