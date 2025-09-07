@@ -8,10 +8,12 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import service.FishingService
 import service.PayService
+import service.StarsPaymentService
 
 fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
     val fishing = FishingService()
+    val stars = StarsPaymentService(env, fishing)
     routing {
         post("/bot") {
             val update = try { call.receive<TgUpdate>() } catch (_: Exception) { return@post call.respond(HttpStatusCode.OK) }
@@ -25,6 +27,15 @@ fun Application.botRoutes(env: Env) {
                 bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
                 if (env.adminTgId != 0L) {
                     bot.sendMessage(env.adminTgId, "Запрос #$reqId от $chatId: $reason")
+                }
+            } else if (text.startsWith("/buy")) {
+                val packId = text.split(" ").getOrNull(1)
+                if (packId != null) {
+                    try {
+                        stars.sendPackageInvoice(chatId, packId)
+                    } catch (_: Exception) {
+                        bot.sendMessage(chatId, "Пакет не найден")
+                    }
                 }
             } else if (chatId == env.adminTgId) {
                 when {
