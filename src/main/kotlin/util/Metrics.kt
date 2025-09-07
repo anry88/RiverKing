@@ -7,11 +7,13 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 object Metrics {
     private val log = LoggerFactory.getLogger("Metrics")
     private val client = HttpClient(CIO)
     @Volatile private var url: String? = null
+    private val warned = AtomicBoolean(false)
 
     private data class MetricKey(val name: String, val tags: Map<String, String>)
 
@@ -54,7 +56,12 @@ object Metrics {
                     setBody(line)
                 }
             } catch (e: Exception) {
-                log.warn("failed to push metrics", e)
+                val msg = "failed to push metrics: ${'$'}{e.message}"
+                if (warned.compareAndSet(false, true)) {
+                    log.warn(msg)
+                } else {
+                    log.debug(msg)
+                }
             }
         }
     }
