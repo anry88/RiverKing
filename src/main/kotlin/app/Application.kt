@@ -22,7 +22,7 @@ fun main() {
             allowHeader(HttpHeaders.ContentType); allowCredentials = true
             anyHost() // прод: ограничь доменом мини-аппа
         }
-        installSessions(env.devMode)
+        installSessions(env)
         DB.init(env)
 
         // API for Mini App
