@@ -10,6 +10,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import util.Metrics
 
@@ -22,7 +23,7 @@ fun main() {
             allowHeader(HttpHeaders.ContentType); allowCredentials = true
             anyHost() // прод: ограничь доменом мини-аппа
         }
-        installSessions(env.devMode)
+        installSessions(env)
         DB.init(env)
 
         // API for Mini App
@@ -34,7 +35,11 @@ fun main() {
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app", "webapp")
-            get("/") { call.respondRedirect("/app", permanent = false) }
+            get("/") {
+                val qs = call.request.rawQueryParameters.formUrlEncode()
+                val target = if (qs.isBlank()) "/app" else "/app?$qs"
+                call.respondRedirect(target, permanent = false)
+            }
             get("/health") { call.respondText("OK") }
             get("/metrics") { call.respondText(Metrics.dump(), ContentType.Text.Plain) }
         }
