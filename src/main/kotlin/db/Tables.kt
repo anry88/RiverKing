@@ -384,6 +384,10 @@ object DB {
 
 object Users : LongIdTable() {
     val tgId = long("tg_id").uniqueIndex()
+    val firstName = varchar("first_name", 100).nullable()
+    val lastName = varchar("last_name", 100).nullable()
+    val username = varchar("username", 100).nullable()
+    val nickname = varchar("nickname", 100).nullable()
     val level = integer("level")
     val xp = integer("xp")
     val createdAt = timestamp("created_at")

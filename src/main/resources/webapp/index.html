@@ -249,7 +249,7 @@
       );
     }
 
-    function Achievements({me}){
+    function Achievements({me, setMe}){
       const [mode,setMode] = React.useState('personal');
       const [section,setSection] = React.useState('location');
       const [locId,setLocId] = React.useState(me.locationId);
@@ -266,6 +266,18 @@
       },[]);
 
       React.useEffect(()=>{
+        if(me.needsNickname){
+          const nick = prompt('Придумай ник для отображения в достижениях');
+          if(nick){
+            fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
+              .then(()=>setMe({...me, username:nick, needsNickname:false}))
+              .catch(()=>{});
+          }
+        }
+      },[me.needsNickname]);
+
+      React.useEffect(()=>{
+        if(me.needsNickname) return;
         if(section==='location'){
           fetch(`/api/achievements/${mode}/location/${locId}`,{credentials:'include'})
             .then(r=>r.json()).then(setList).catch(()=>setList([]));
@@ -276,7 +288,7 @@
           fetch(`/api/achievements/${mode}/fish/${fishId}`,{credentials:'include'})
             .then(r=>r.json()).then(setExt).catch(()=>setExt(null));
         }
-      },[mode,section,locId,fishId]);
+      },[mode,section,locId,fishId,me.needsNickname]);
 
       return (
         <div className="mt-4 space-y-4">
@@ -300,7 +312,7 @@
                   <div key={i} className="p-3 glass rounded-xl flex justify-between">
                     <div>
                       <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                      <div className="text-xs opacity-70">{c.location}</div>
+                      <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
                     </div>
                     <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                   </div>
@@ -316,7 +328,7 @@
                 <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
                   <div>
                     <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                    <div className="text-xs opacity-70">{c.location}</div>
+                    <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
                   </div>
                   <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                 </div>
@@ -337,7 +349,7 @@
                     <div className="p-3 glass rounded-xl flex justify-between">
                       <div>
                         <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.smallest.location}</div>
+                        <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
                       </div>
                       <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} кг</div>
                     </div>
@@ -346,7 +358,7 @@
                     <div className="p-3 glass rounded-xl flex justify-between">
                       <div>
                         <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.largest.location}</div>
+                        <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
                       </div>
                       <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} кг</div>
                     </div>
@@ -575,6 +587,7 @@
                 setError('Не удалось загрузить профиль');
                 setMe({
                   username:'angler',
+                  needsNickname:false,
                   lures:[
                     {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
                     {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
@@ -800,7 +813,7 @@
             <div className="mt-6 text-center opacity-70">Турниры в разработке</div>
           )}
           {tab === 'achievements' && (
-            <Achievements me={me} />
+            <Achievements me={me} setMe={setMe} />
           )}
           {tab === 'shop' && (
             <div className="mt-6">

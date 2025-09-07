@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
+import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
 data class LocationDTO(
@@ -19,12 +20,51 @@ data class LocationDTO(
 data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
 
 class FishingService {
-    fun ensureUserByTgId(tgId: Long): Long = transaction {
-        Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()?.get(Users.id)?.value ?: run {
+    fun ensureUserByTgId(
+        tgId: Long,
+        firstName: String? = null,
+        lastName: String? = null,
+        username: String? = null,
+    ): Long = transaction {
+        val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
+        if (existing == null) {
             Users.insertAndGetId {
                 it[Users.tgId] = tgId
                 it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
+                it[Users.firstName] = firstName
+                it[Users.lastName] = lastName
+                it[Users.username] = username
             }.value
+        } else {
+            val id = existing[Users.id].value
+            if (firstName != null || lastName != null || username != null) {
+                Users.update({ Users.id eq id }) {
+                    if (firstName != null) it[Users.firstName] = firstName
+                    if (lastName != null) it[Users.lastName] = lastName
+                    if (username != null) it[Users.username] = username
+                }
+            }
+            id
+        }
+    }
+
+    fun setNickname(userId: Long, nickname: String) = transaction {
+        Users.update({ Users.id eq userId }) { it[Users.nickname] = nickname }
+    }
+
+    fun displayName(userId: Long): String? = transaction {
+        Users.select { Users.id eq userId }.singleOrNull()?.let { nameFromRow(it) }
+    }
+
+    private fun nameFromRow(row: ResultRow): String? {
+        val fn = row[Users.firstName]
+        val ln = row[Users.lastName]
+        val un = row[Users.username]
+        val nn = row[Users.nickname]
+        return when {
+            !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
+            !un.isNullOrBlank() -> un
+            else -> nn
         }
     }
 
@@ -503,6 +543,8 @@ class FishingService {
         val rarity: String,
         val userId: Long? = null,
         val fishId: Long? = null,
+        val user: String? = null,
+        val at: String? = null,
     )
 
     @Serializable
@@ -618,7 +660,7 @@ class FishingService {
 
     fun personalTopByLocation(userId: Long, locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
                 .map {
                     CatchDTO(
@@ -628,6 +670,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }
@@ -636,7 +680,7 @@ class FishingService {
 
     fun personalTopByFish(userId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .select { Catches.userId eq userId }
                 .map {
                     CatchDTO(
@@ -646,6 +690,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }
@@ -657,7 +703,7 @@ class FishingService {
 
     fun personalFishExtremes(userId: Long, fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .select { (Catches.userId eq userId) and (Catches.fishId eq fishId) }
                 .map {
                     CatchDTO(
@@ -667,6 +713,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }
@@ -677,7 +725,7 @@ class FishingService {
 
     fun globalTopByLocation(locationId: Long, limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .select { Catches.locationId eq locationId }
                 .map {
                     CatchDTO(
@@ -687,6 +735,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }
@@ -695,7 +745,7 @@ class FishingService {
 
     fun globalTopByFish(limit: Int = 10): List<CatchDTO> {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .selectAll()
                 .map {
                     CatchDTO(
@@ -705,6 +755,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }
@@ -716,7 +768,7 @@ class FishingService {
 
     fun globalFishExtremes(fishId: Long): FishExtremeDTO {
         val catches = transaction {
-            (Catches innerJoin Fish innerJoin Locations)
+            (Catches innerJoin Fish innerJoin Locations innerJoin Users)
                 .select { Catches.fishId eq fishId }
                 .map {
                     CatchDTO(
@@ -726,6 +778,8 @@ class FishingService {
                         it[Fish.rarity],
                         it[Catches.userId].value,
                         it[Fish.id].value,
+                        user = nameFromRow(it),
+                        at = it[Catches.createdAt].toString(),
                     )
                 }
         }

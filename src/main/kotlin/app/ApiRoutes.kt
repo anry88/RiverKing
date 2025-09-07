@@ -77,10 +77,10 @@ fun Application.apiRoutes(env: Env) {
         post("/api/auth/telegram") {
             val initData = call.request.headers["Telegram-Init-Data"] ?: call.receiveText()
             if (initData.isBlank()) return@post call.respond(HttpStatusCode.BadRequest, "missing initData")
-            val tgId = try { TgWebAppAuth.verifyAndExtractTgId(initData, env.botToken) }
+            val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
-            call.sessions.set(AppSession(tgId))
-            fishing.ensureUserByTgId(tgId)
+            call.sessions.set(AppSession(tgUser.id))
+            fishing.ensureUserByTgId(tgUser.id, tgUser.firstName, tgUser.lastName, tgUser.username)
             call.respond(HttpStatusCode.OK)
         }
 
@@ -98,6 +98,7 @@ fun Application.apiRoutes(env: Env) {
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid)
             val dailyAvailable = fishing.canClaimDaily(uid)
+            val displayName = fishing.displayName(uid)
             val storedLoc = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
             }
@@ -110,7 +111,8 @@ fun Application.apiRoutes(env: Env) {
 
             @Serializable
             data class MeResp(
-                val username: String,
+                val username: String?,
+                val needsNickname: Boolean,
                 val lures: List<LureDTO>,
                 val currentLureId: Long?,
                 val totalWeight: Double,
@@ -122,7 +124,8 @@ fun Application.apiRoutes(env: Env) {
             )
             call.respond(
                 MeResp(
-                    "angler",
+                    displayName,
+                    displayName == null,
                     lures,
                     currentLureId,
                     totalWeight,
@@ -133,6 +136,20 @@ fun Application.apiRoutes(env: Env) {
                     dailyAvailable
                 )
             )
+        }
+
+        post("/api/nickname") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            @Serializable data class NickReq(val nickname: String)
+            val req = call.receive<NickReq>()
+            fishing.setNickname(uid, req.nickname)
+            call.respond(HttpStatusCode.OK)
         }
 
         // Daily baits
