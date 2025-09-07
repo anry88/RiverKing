@@ -193,12 +193,13 @@ class FishingService {
                 .select { LocationFishWeights.locationId eq locId }
                 .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
                 .sortedBy { rarityRank(it.rarity) }
-            val water = (LocationFishWeights innerJoin Fish)
+            val waters = (LocationFishWeights innerJoin Fish)
                 .slice(Fish.water)
                 .select { LocationFishWeights.locationId eq locId }
-                .limit(1)
-                .singleOrNull()?.get(Fish.water) ?: "fresh"
-            val lureNames = Lures.select { Lures.water eq water }.map { it[Lures.name] }
+                .map { it[Fish.water] }
+                .distinct()
+            val waterFilter = if (waters.isNotEmpty()) Lures.water inList waters else Lures.water eq "fresh"
+            val lureNames = Lures.select { waterFilter }.map { it[Lures.name] }
             GuideLocationDTO(locId, locName, fishRows, lureNames)
         }
 
