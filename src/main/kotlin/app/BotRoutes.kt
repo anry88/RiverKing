@@ -11,6 +11,22 @@ import service.FishingService
 import service.PayService
 import service.StarsPaymentService
 
+internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
+    return if ('=' in payload) {
+        val parts = payload.split(';').mapNotNull {
+            val p = it.split('=', limit = 2)
+            if (p.size == 2) p[0] to p[1] else null
+        }.toMap()
+        val packId = parts["pack"]
+        val payloadUser = parts["user"]?.toLongOrNull()
+        if (packId != null && payloadUser == chatId) packId else null
+    } else if (payload.startsWith("pack_")) {
+        payload.removePrefix("pack_")
+    } else {
+        null
+    }
+}
+
 fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
     val fishing = FishingService()
@@ -30,13 +46,8 @@ fun Application.botRoutes(env: Env) {
 
             message.successfulPayment?.let { sp ->
                 val chatId = message.chat.id
-                val parts = sp.invoicePayload.split(';').mapNotNull {
-                    val p = it.split('=', limit = 2)
-                    if (p.size == 2) p[0] to p[1] else null
-                }.toMap()
-                val packId = parts["pack"]
-                val payloadUser = parts["user"]?.toLongOrNull()
-                if (packId != null && payloadUser == chatId) {
+                val packId = parseInvoicePayload(sp.invoicePayload, chatId)
+                if (packId != null) {
                     val uid = fishing.ensureUserByTgId(chatId)
                     fishing.buyPackage(uid, packId)
                     PayService.recordPayment(
