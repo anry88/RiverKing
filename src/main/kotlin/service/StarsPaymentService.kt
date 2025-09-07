@@ -52,7 +52,7 @@ class StarsPaymentService(
             chatId = chatId,
             title = pack.name,
             description = pack.desc,
-            payload = "pack_${pack.id}",
+            payload = "pack=${pack.id};user=$chatId",
             providerToken = env.providerToken,
             currency = "XTR",
             prices = listOf(LabeledPrice(pack.name, pack.price)),
