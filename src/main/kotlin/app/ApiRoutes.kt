@@ -73,9 +73,10 @@ fun Application.apiRoutes(env: Env) {
     )
 
     routing {
-        // Telegram WebApp auth: client posts initData
+        // Telegram WebApp auth: client sends initData in a header
         post("/api/auth/telegram") {
-            val initData = call.receiveText()
+            val initData = call.request.headers["Telegram-Init-Data"] ?: call.receiveText()
+            if (initData.isBlank()) return@post call.respond(HttpStatusCode.BadRequest, "missing initData")
             val tgId = try { TgWebAppAuth.verifyAndExtractTgId(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
             call.sessions.set(AppSession(tgId))

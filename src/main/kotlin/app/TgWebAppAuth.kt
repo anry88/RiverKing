@@ -1,8 +1,8 @@
 package app
 
 import kotlinx.serialization.json.*
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -14,11 +14,17 @@ object TgWebAppAuth {
         val hash = params["hash"] ?: error("no hash")
         val dataCheckString = params.filterKeys { it != "hash" }.toList().sortedBy { it.first }
             .joinToString("\n") { (k, v) -> "$k=$v" }
-        val secretKey = MessageDigest.getInstance("SHA-256").digest(botToken.toByteArray(StandardCharsets.UTF_8))
-        val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(secretKey, "HmacSHA256")) }
-        val calcHex = mac.doFinal(dataCheckString.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02x".format(it) }
+        val secretKey = Mac.getInstance("HmacSHA256").run {
+            init(SecretKeySpec("WebAppData".toByteArray(StandardCharsets.UTF_8), algorithm))
+            doFinal(botToken.toByteArray(StandardCharsets.UTF_8))
+        }
+        val calcHex = Mac.getInstance("HmacSHA256").run {
+            init(SecretKeySpec(secretKey, algorithm))
+            doFinal(dataCheckString.toByteArray(StandardCharsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        }
         require(calcHex.equals(hash, ignoreCase = true)) { "bad hash" }
-        val userJson = params["user"] ?: error("no user")
+        val userJson = URLDecoder.decode(params["user"] ?: error("no user"), StandardCharsets.UTF_8)
         return Json.parseToJsonElement(userJson).jsonObject["id"]?.jsonPrimitive?.long
             ?: error("user.id missing")
     }

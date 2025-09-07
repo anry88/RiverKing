@@ -20,7 +20,7 @@ fun Application.installSessions(env: Env) {
             cookie.httpOnly = true
             cookie.secure = env.publicBaseUrl.startsWith("https", ignoreCase = true)
             cookie.maxAgeInSeconds = 60L * 60 * 24 * 30
-            cookie.extensions["SameSite"] = "None"
+            cookie.extensions["SameSite"] = "Lax"
         }
     }
 }

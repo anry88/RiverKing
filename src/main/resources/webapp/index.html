@@ -508,7 +508,7 @@
         try{
           const raw = window.location.search + window.location.hash;
           const m = raw.match(/[?#]tgWebAppData=([^&]+)/);
-          return m ? decodeURIComponent(m[1].replace(/\+/g, '%2B')) : null;
+          return m ? decodeURIComponent(m[1]) : null;
         }catch{ return null; }
       })();
       const [me,setMe] = React.useState(null);
@@ -539,7 +539,11 @@
           try{
             const initData = tg?.initData || tgParam;
             if(initData){
-              await fetch(`/api/auth/telegram`, {method:'POST', body: initData, credentials:'include'});
+              await fetch(`/api/auth/telegram`, {
+                method:'POST',
+                headers:{'Telegram-Init-Data': initData},
+                credentials:'include'
+              });
             }
           }catch(e){}
           try{
