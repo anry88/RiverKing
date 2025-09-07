@@ -244,6 +244,116 @@
       );
     }
 
+    function Achievements({me}){
+      const [mode,setMode] = React.useState('personal');
+      const [section,setSection] = React.useState('location');
+      const [locId,setLocId] = React.useState(me.locationId);
+      const [fishList,setFishList] = React.useState([]);
+      const [fishId,setFishId] = React.useState(null);
+      const [list,setList] = React.useState([]);
+      const [ext,setExt] = React.useState(null);
+
+      React.useEffect(()=>{
+        fetch('/api/guide',{credentials:'include'})
+          .then(r=>r.json())
+          .then(d=> setFishList(d.fish||[]))
+          .catch(()=>{});
+      },[]);
+
+      React.useEffect(()=>{
+        if(section==='location'){
+          fetch(`/api/achievements/${mode}/location/${locId}`,{credentials:'include'})
+            .then(r=>r.json()).then(setList).catch(()=>setList([]));
+        } else if(section==='fish'){
+          fetch(`/api/achievements/${mode}/fish`,{credentials:'include'})
+            .then(r=>r.json()).then(setList).catch(()=>setList([]));
+        } else if(section==='species' && fishId){
+          fetch(`/api/achievements/${mode}/fish/${fishId}`,{credentials:'include'})
+            .then(r=>r.json()).then(setExt).catch(()=>setExt(null));
+        }
+      },[mode,section,locId,fishId]);
+
+      return (
+        <div className="mt-4 space-y-4">
+          <div className="flex gap-2">
+            <button onClick={()=>setMode('personal')} className={`flex-1 py-2 rounded-xl ${mode==='personal'?'bg-emerald-600':'glass'}`}>Личные</button>
+            <button onClick={()=>setMode('global')} className={`flex-1 py-2 rounded-xl ${mode==='global'?'bg-emerald-600':'glass'}`}>Глобальные</button>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={()=>setSection('location')} className={`flex-1 py-2 rounded-xl ${section==='location'?'bg-emerald-600':'glass'}`}>Локации</button>
+            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>Рыбы</button>
+            <button onClick={()=>setSection('species')} className={`flex-1 py-2 rounded-xl ${section==='species'?'bg-emerald-600':'glass'}`}>Виды</button>
+          </div>
+
+          {section==='location' && (
+            <div className="space-y-3">
+              <select value={locId} onChange={e=>setLocId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
+                {me.locations.map(l=> <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <div className="space-y-2">
+                {list.map((c,i)=>(
+                  <div key={i} className="p-3 glass rounded-xl flex justify-between">
+                    <div>
+                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                      <div className="text-xs opacity-70">{c.location}</div>
+                    </div>
+                    <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                  </div>
+                ))}
+                {list.length===0 && <div className="text-center text-sm opacity-70">Нет данных</div>}
+              </div>
+            </div>
+          )}
+
+          {section==='fish' && (
+            <div className="space-y-2">
+              {list.map((c,i)=>(
+                <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
+                  <div>
+                    <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                    <div className="text-xs opacity-70">{c.location}</div>
+                  </div>
+                  <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                </div>
+              ))}
+              {list.length===0 && <div className="text-center text-sm opacity-70">Нет данных</div>}
+            </div>
+          )}
+
+          {section==='species' && (
+            <div className="space-y-3">
+              <select value={fishId||''} onChange={e=>setFishId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
+                <option value="" disabled>Выбери рыбу</option>
+                {fishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              {ext && (
+                <div className="space-y-2">
+                  {ext.smallest && (
+                    <div className="p-3 glass rounded-xl flex justify-between">
+                      <div>
+                        <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
+                        <div className="text-xs opacity-70">{ext.smallest.location}</div>
+                      </div>
+                      <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} кг</div>
+                    </div>
+                  )}
+                  {ext.largest && (
+                    <div className="p-3 glass rounded-xl flex justify-between">
+                      <div>
+                        <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
+                        <div className="text-xs opacity-70">{ext.largest.location}</div>
+                      </div>
+                      <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} кг</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
@@ -605,7 +715,7 @@
             <div className="mt-6 text-center opacity-70">Турниры в разработке</div>
           )}
           {tab === 'achievements' && (
-            <div className="mt-6 text-center opacity-70">Здесь будут достижения</div>
+            <Achievements me={me} />
           )}
           {tab === 'shop' && (
             <div className="mt-6">

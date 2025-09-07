@@ -13,6 +13,8 @@ import service.FishingService
 import service.LocationDTO
 import service.RecentDTO
 import service.FishingService.LureDTO
+import service.FishingService.CatchDTO
+import service.FishingService.FishExtremeDTO
 import db.Users
 
 fun Application.apiRoutes(env: Env) {
@@ -210,6 +212,84 @@ fun Application.apiRoutes(env: Env) {
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
             }
+        }
+
+        // Achievements - personal
+        get("/api/achievements/personal/location/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val res: List<CatchDTO> = fishing.personalTopByLocation(uid, id)
+            call.respond(res)
+        }
+
+        get("/api/achievements/personal/fish") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val res: List<CatchDTO> = fishing.personalTopByFish(uid)
+            call.respond(res)
+        }
+
+        get("/api/achievements/personal/fish/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val res: FishExtremeDTO = fishing.personalFishExtremes(uid, id)
+            call.respond(res)
+        }
+
+        // Achievements - global
+        get("/api/achievements/global/location/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val res: List<CatchDTO> = fishing.globalTopByLocation(id)
+            call.respond(res)
+        }
+
+        get("/api/achievements/global/fish") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val res: List<CatchDTO> = fishing.globalTopByFish()
+            call.respond(res)
+        }
+
+        get("/api/achievements/global/fish/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val res: FishExtremeDTO = fishing.globalFishExtremes(id)
+            call.respond(res)
         }
     }
 }

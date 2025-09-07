@@ -154,6 +154,7 @@ class FishingService {
 
     @Serializable
     data class GuideFishDTO(
+        val id: Long,
         val name: String,
         val rarity: String,
         val locations: List<String>,
@@ -213,7 +214,7 @@ class FishingService {
                 .map { it[Locations.name] }
             val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
                 .map { it[Lures.name] }
-            GuideFishDTO(name, rarity, locations, lures)
+            GuideFishDTO(fid, name, rarity, locations, lures)
         }.sortedBy { rarityRank(it.rarity) }
 
         // Lures with fish and locations
@@ -492,7 +493,14 @@ class FishingService {
     }
 
     @Serializable
-    data class CatchDTO(val fish: String, val weight: Double, val location: String, val rarity: String)
+    data class CatchDTO(
+        val fish: String,
+        val weight: Double,
+        val location: String,
+        val rarity: String,
+        val userId: Long? = null,
+        val fishId: Long? = null,
+    )
 
     @Serializable
     data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
@@ -559,7 +567,17 @@ class FishingService {
             it[Catches.createdAt] = Instant.now()
         }
         val locName = locRow[Locations.name]
-        CastResultDTO(true, CatchDTO(fishName, weight, locName, rarity))
+        CastResultDTO(
+            true,
+            CatchDTO(
+                fishName,
+                weight,
+                locName,
+                rarity,
+                userId = null,
+                fishId = fishId,
+            ),
+        )
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
@@ -577,5 +595,139 @@ class FishingService {
                     it[Catches.createdAt].toString()
                 )
             }
+    }
+
+    private fun rarityRank(r: String) = when (r) {
+        "legendary" -> 5
+        "epic" -> 4
+        "rare" -> 3
+        "uncommon" -> 2
+        "common" -> 1
+        else -> 0
+    }
+
+    private fun sortCatches(list: List<CatchDTO>, limit: Int) =
+        list.sortedWith(compareByDescending<CatchDTO> { rarityRank(it.rarity) }
+            .thenByDescending { it.weight }).take(limit)
+
+    @Serializable
+    data class FishExtremeDTO(val smallest: CatchDTO?, val largest: CatchDTO?)
+
+    fun personalTopByLocation(userId: Long, locationId: Long, limit: Int = 10): List<CatchDTO> {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        return sortCatches(catches, limit)
+    }
+
+    fun personalTopByFish(userId: Long, limit: Int = 10): List<CatchDTO> {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .select { Catches.userId eq userId }
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        val best = catches.groupBy { it.fish }.values.mapNotNull { group ->
+            group.maxByOrNull { it.weight }
+        }
+        return sortCatches(best, limit)
+    }
+
+    fun personalFishExtremes(userId: Long, fishId: Long): FishExtremeDTO {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .select { (Catches.userId eq userId) and (Catches.fishId eq fishId) }
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        val max = catches.maxByOrNull { it.weight }
+        val min = catches.minByOrNull { it.weight }
+        return FishExtremeDTO(min, max)
+    }
+
+    fun globalTopByLocation(locationId: Long, limit: Int = 10): List<CatchDTO> {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .select { Catches.locationId eq locationId }
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        return sortCatches(catches, limit)
+    }
+
+    fun globalTopByFish(limit: Int = 10): List<CatchDTO> {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .selectAll()
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        val best = catches.groupBy { it.fish }.values.mapNotNull { group ->
+            group.maxByOrNull { it.weight }
+        }
+        return sortCatches(best, limit)
+    }
+
+    fun globalFishExtremes(fishId: Long): FishExtremeDTO {
+        val catches = transaction {
+            (Catches innerJoin Fish innerJoin Locations)
+                .select { Catches.fishId eq fishId }
+                .map {
+                    CatchDTO(
+                        it[Fish.name],
+                        it[Catches.weight],
+                        it[Locations.name],
+                        it[Fish.rarity],
+                        it[Catches.userId].value,
+                        it[Fish.id].value,
+                    )
+                }
+        }
+        val max = catches.maxByOrNull { it.weight }
+        val min = catches.minByOrNull { it.weight }
+        return FishExtremeDTO(min, max)
     }
 }
