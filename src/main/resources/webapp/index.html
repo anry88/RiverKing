@@ -504,6 +504,7 @@
 
     function App(){
       const tg = window.Telegram?.WebApp;
+      console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.platform);
       const tgParam = (()=>{
         try{
           const raw = window.location.search + window.location.hash;
