@@ -112,8 +112,9 @@ object DB {
         val delta      = upsertLocation("Дельта реки",     350.0, 2.6)
         val coast      = upsertLocation("Прибрежье моря",  600.0, 3.0)
         val fjord      = upsertLocation("Фьорд",           900.0, 3.5)
+        val openOcean  = upsertLocation("Открытый океан", 5000.0, 4.2)
 
-        // --- Fish (исправленные флаги + новые эпики/легендарки + простые виды) ---
+        // --- Fish (исправленные флаги + эпики/легендарки + простые виды) ---
         // Пресные (базовые)
         val fP  = upsertFish("Плотва",           "common",     0.2,  0.05, false, "fresh")
         val fO  = upsertFish("Окунь",            "common",     0.25, 0.07, true,  "fresh")
@@ -142,7 +143,7 @@ object DB {
         val fEel= upsertFish("Угорь европейский","epic",       1.5,  0.7,  true,  "fresh")
         val fSter=upsertFish("Стерлядь",         "epic",       3.0,  1.2,  false, "fresh")
 
-        // Морские/солоноватые
+        // Морские/солоноватые (прибрежье/шельф/фьорды)
         val fMu = upsertFish("Кефаль",           "uncommon",   1.0,  0.5,  false, "salt")
         val fFl = upsertFish("Камбала",          "uncommon",   0.8,  0.4,  true,  "salt")
         val fHe = upsertFish("Сельдь",           "common",     0.3,  0.1,  false, "salt")
@@ -151,13 +152,13 @@ object DB {
         val fSa = upsertFish("Сайда",            "uncommon",   2.0,  1.0,  true,  "salt")
         val fSe = upsertFish("Морская форель",   "rare",       1.5,  0.7,  true,  "salt")
         val fHa2= upsertFish("Палтус",           "legendary", 20.0, 10.0, true,  "salt")
-        val fSm = upsertFish("Корюшка",          "common",     0.06, 0.02, true,  "salt") // используется в дельте/фьорде
+        val fSm = upsertFish("Корюшка",          "common",     0.06, 0.02, true,  "salt")
         val fSal= upsertFish("Лосось атлантический","epic",    6.0,  3.0,  true,  "salt")
         val fBas= upsertFish("Лаврак",           "rare",       2.0,  1.0,  true,  "salt")
         val fMac= upsertFish("Скумбрия атлантическая","uncommon",0.6,0.25, true,  "salt")
         val fBel= upsertFish("Белуга",           "legendary", 40.0, 20.0, true,  "salt")
 
-        // Пресные «простые» виды
+        // Пресные «простые»
         val fEr  = upsertFish("Ёрш",           "common",   0.08, 0.03, true,  "fresh")
         val fPe  = upsertFish("Пескарь",       "common",   0.07, 0.03, false, "fresh")
         val fGu2 = upsertFish("Густера",       "common",   0.35, 0.12, false, "fresh")
@@ -170,6 +171,15 @@ object DB {
         val fBy2 = upsertFish("Бычок",         "common",   0.12, 0.06, true,  "salt")
         val fKi2 = upsertFish("Килька",        "common",   0.03, 0.01, false, "salt")
         val fMo2 = upsertFish("Мойва",         "common",   0.04, 0.015,false, "salt")
+
+        // --- Новые пелагические виды для Открытого океана ---
+        val fDor = upsertFish("Дорадо",             "rare",       6.0,   3.0,  true,  "salt") // махи-махи
+        val fWah = upsertFish("Ваху",               "rare",      10.0,   5.0,  true,  "salt")
+        val fSail= upsertFish("Парусник",           "epic",      30.0,  12.0,  true,  "salt")
+        val fSwf = upsertFish("Рыба-меч",           "epic",      55.0,  25.0,  true,  "salt")
+        val fBmr = upsertFish("Марлин синий",       "legendary",180.0,  80.0,  true,  "salt")
+        val fTbf = upsertFish("Тунец синеперый",    "legendary",200.0,  90.0,  true,  "salt")
+        val fMak = upsertFish("Акула мако",         "epic",      70.0,  30.0,  true,  "salt")
 
         // --- Weights per location (вероятности спавна относительно друг друга) ---
 
@@ -260,7 +270,6 @@ object DB {
         setLFWeight(mtnRiver, fNa, 0.4)
         setLFWeight(mtnRiver, fGo, 0.3)
         setLFWeight(mtnRiver, fTa, 0.05) // legendary
-
         // немного мелочи для реализма
         setLFWeight(mtnRiver, fEl2, 0.25)
         setLFWeight(mtnRiver, fEr,  0.20)
@@ -277,14 +286,13 @@ object DB {
         setLFWeight(reservoir, fGa,  0.3)
         setLFWeight(reservoir, fSter,0.03) // epic
         setLFWeight(reservoir, fOs,  0.01) // legendary
-
-        // простые для водохранилища
+        // простые
         setLFWeight(reservoir, fGu2, 0.4)
         setLFWeight(reservoir, fEr,  0.3)
         setLFWeight(reservoir, fPe,  0.35)
         setLFWeight(reservoir, fYa2, 0.35)
 
-        // Дельта реки — смешанная солоноватая зона (пресные + морские)
+        // Дельта реки — смешанная солоноватая зона
         setLFWeight(delta, fCh,  0.7)   // fresh
         setLFWeight(delta, fZu,  0.6)   // fresh
         setLFWeight(delta, fL,   0.5)   // fresh
@@ -292,12 +300,11 @@ object DB {
         setLFWeight(delta, fOs,  0.05)  // fresh legendary (проходной)
         setLFWeight(delta, fMu,  0.45)  // salt
         setLFWeight(delta, fHe,  0.35)  // salt
-        setLFWeight(delta, fSm,  0.30)  // salt (корюшка)
-        setLFWeight(delta, fBas, 0.18)  // salt (лаврак)
+        setLFWeight(delta, fSm,  0.30)  // salt
+        setLFWeight(delta, fBas, 0.18)  // salt
         setLFWeight(delta, fSal, 0.12)  // salt epic
         setLFWeight(delta, fBel, 0.01)  // salt legendary
-
-        // простые для дельты (оба типа воды)
+        // простые для дельты
         setLFWeight(delta, fBy2, 0.50)  // salt
         setLFWeight(delta, fKi2, 0.25)  // salt
         setLFWeight(delta, fMo2, 0.20)  // salt
@@ -310,15 +317,18 @@ object DB {
         setLFWeight(coast, fHe,  0.8)
         setLFWeight(coast, fSt,  0.6)
         setLFWeight(coast, fSe,  0.3)
-        setLFWeight(coast, fMac, 0.6)   // скумбрия
-        setLFWeight(coast, fBas, 0.25)  // лаврак
+        setLFWeight(coast, fMac, 0.6)
+        setLFWeight(coast, fBas, 0.25)
         setLFWeight(coast, fSal, 0.08)  // epic
         // простая мелочь
         setLFWeight(coast, fBy2, 0.35)
         setLFWeight(coast, fKi2, 0.30)
         setLFWeight(coast, fMo2, 0.25)
-        // можно добавить немного корюшки и у берега:
         setLFWeight(coast, fSm,  0.10)
+        // редкие залёты пелагики у бонитов/термоклинов близко к берегу
+        setLFWeight(coast, fDor, 0.03)
+        setLFWeight(coast, fWah, 0.02)
+        setLFWeight(coast, fSail,0.01)
 
         // Фьорд — холодные глубины: легендарный палтус, эпик лосось
         setLFWeight(fjord, fCo,   0.9)
@@ -327,12 +337,23 @@ object DB {
         setLFWeight(fjord, fSe,   0.4)
         setLFWeight(fjord, fHa2,  0.08) // legendary
         setLFWeight(fjord, fSal,  0.10) // epic
-        setLFWeight(fjord, fSm,   0.12) // корюшка
-
+        setLFWeight(fjord, fSm,   0.12)
         // простая мелочь для фьорда
         setLFWeight(fjord, fMo2, 0.20)
         setLFWeight(fjord, fKi2, 0.20)
         setLFWeight(fjord, fBy2, 0.10)
+
+        // Открытый океан — пелагическая мечта: тунцы/марлины/рыба-меч и т.д.
+        // базовый «частый» клёв на скумбрию/ставриду, поверх — слои редких трофеев
+        setLFWeight(openOcean, fMac,  0.80) // скумбрия — массовка, стаи
+        setLFWeight(openOcean, fSt,   0.40) // ставрида — косяки
+        setLFWeight(openOcean, fDor,  0.60) // дорaдо — линии водорослей/саргассы
+        setLFWeight(openOcean, fWah,  0.50) // ваху — быстрый хищник
+        setLFWeight(openOcean, fSail, 0.18) // эпик
+        setLFWeight(openOcean, fSwf,  0.16) // эпик
+        setLFWeight(openOcean, fMak,  0.10) // эпик
+        setLFWeight(openOcean, fBmr,  0.05) // легендарный марлин
+        setLFWeight(openOcean, fTbf,  0.04) // легендарный синий тунец
 
         // --- Приманки ---
         val presnMir = upsertLure("Пресная мирная", false, "fresh")
