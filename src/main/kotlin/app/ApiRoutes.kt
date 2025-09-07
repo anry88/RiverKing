@@ -28,23 +28,26 @@ fun Application.apiRoutes(env: Env) {
     // cause SessionNotYetConfiguredException for routes like `/app`
     // that are served before the Sessions plugin runs.
     intercept(ApplicationCallPipeline.Plugins) {
-        val session = call.sessions.get<AppSession>()
-        val tgId = session?.tgId
-        val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
-        log.info(
-            "call {} {} tgId={} params={}",
-            call.request.httpMethod.value,
-            call.request.uri,
-            tgId,
-            params
-        )
-        Metrics.counter(
-            "api_call_total",
-            mapOf(
-                "path" to call.request.uri.substringBefore('?'),
-                "method" to call.request.httpMethod.value
+        val path = call.request.path()
+        if (path != "/metrics") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = session?.tgId
+            val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
+            log.info(
+                "call {} {} tgId={} params={}",
+                call.request.httpMethod.value,
+                call.request.uri,
+                tgId,
+                params
             )
-        )
+            Metrics.counter(
+                "api_call_total",
+                mapOf(
+                    "path" to path,
+                    "method" to call.request.httpMethod.value
+                )
+            )
+        }
         proceed()
     }
 
