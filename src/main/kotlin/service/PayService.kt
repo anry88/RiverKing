@@ -8,7 +8,7 @@ import java.time.Instant
 
 object PayService {
     data class PaymentInfo(
-        val providerChargeId: String,
+        val providerChargeId: String? = null,
         val telegramChargeId: String,
         val amount: Int = 0,
         val currency: String = "XTR"

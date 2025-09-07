@@ -66,8 +66,8 @@ fun Application.apiRoutes(env: Env) {
 
     @Serializable
     data class PaymentReq(
-        val providerChargeId: String,
         val telegramChargeId: String,
+        val providerChargeId: String? = null,
         val amount: Int = 0,
         val currency: String = "XTR",
     )
@@ -216,10 +216,10 @@ fun Application.apiRoutes(env: Env) {
                     uid,
                     id,
                     PayService.PaymentInfo(
-                        it.providerChargeId,
-                        it.telegramChargeId,
-                        it.amount,
-                        it.currency,
+                        providerChargeId = it.providerChargeId,
+                        telegramChargeId = it.telegramChargeId,
+                        amount = it.amount,
+                        currency = it.currency,
                     )
                 )
             }
