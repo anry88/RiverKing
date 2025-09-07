@@ -200,11 +200,12 @@ fun Application.apiRoutes(env: Env) {
             log.info("shop purchase click tgId={} pack={}", tgId, id)
             Metrics.counter("shop_purchase_click_total", mapOf("pack" to id))
             val uid = fishing.ensureUserByTgId(tgId)
-            val paymentReq = try { call.receive<PaymentReq>() } catch (_: Exception) { null }
-            if (!env.devMode) {
-                Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
-                return@post call.respond(HttpStatusCode.PaymentRequired)
-            }
+            val paymentReq = if (!env.devMode) {
+                try { call.receive<PaymentReq>() } catch (_: Exception) {
+                    Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
+                    return@post call.respond(HttpStatusCode.PaymentRequired)
+                }
+            } else try { call.receive<PaymentReq>() } catch (_: Exception) { null }
             val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
                 Metrics.counter("shop_purchase_failed_total", mapOf("pack" to id))
                 log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
