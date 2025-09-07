@@ -1,6 +1,8 @@
 package service
 
 import app.Env
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -42,7 +44,7 @@ class StarsPaymentService(
     )
 
     /** Send invoice for lure package purchase to chat. */
-    fun sendPackageInvoice(chatId: Long, packageId: String) {
+    suspend fun sendPackageInvoice(chatId: Long, packageId: String) = withContext(Dispatchers.IO) {
         val pack = fishing.listShop().flatMap { it.packs }.find { it.id == packageId }
             ?: throw IllegalArgumentException("Unknown package")
 
@@ -60,16 +62,19 @@ class StarsPaymentService(
         val body = Json.encodeToString(invoice)
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 15000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             outputStream.use { it.write(body.toByteArray()) }
-            inputStream.use { it.readBytes() }
+            val stream = if (responseCode in 200..299) inputStream else errorStream
+            stream.use { it.readBytes() }
             disconnect()
         }
     }
 
     /** Create invoice link for package purchase to be used in a Mini App. */
-    fun createInvoiceLink(userId: Long, packageId: String): String {
+    suspend fun createInvoiceLink(userId: Long, packageId: String): String = withContext(Dispatchers.IO) {
         val pack = fishing.listShop().flatMap { it.packs }.find { it.id == packageId }
             ?: throw IllegalArgumentException("Unknown package")
 
@@ -85,26 +90,32 @@ class StarsPaymentService(
         val body = Json.encodeToString(req)
         val response = (url.openConnection() as HttpURLConnection).run {
             requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 15000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             outputStream.use { it.write(body.toByteArray()) }
-            val resp = inputStream.buffered().use { it.readBytes().decodeToString() }
+            val stream = if (responseCode in 200..299) inputStream else errorStream
+            val resp = stream.buffered().use { it.readBytes().decodeToString() }
             disconnect()
             resp
         }
-        return Json.parseToJsonElement(response).jsonObject["result"]!!.jsonPrimitive.content
+        Json.parseToJsonElement(response).jsonObject["result"]!!.jsonPrimitive.content
     }
 
     /** Refund a Stars payment given its Telegram charge id. */
-    fun refundStars(userId: Long, telegramPaymentChargeId: String) {
+    suspend fun refundStars(userId: Long, telegramPaymentChargeId: String) = withContext(Dispatchers.IO) {
         val url = URL("https://api.telegram.org/bot${env.botToken}/refundStarPayment")
         val body = "{\"user_id\":$userId,\"telegram_payment_charge_id\":\"$telegramPaymentChargeId\"}"
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 15000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             outputStream.use { it.write(body.toByteArray()) }
-            inputStream.use { it.readBytes() }
+            val stream = if (responseCode in 200..299) inputStream else errorStream
+            stream.use { it.readBytes() }
             disconnect()
         }
     }
