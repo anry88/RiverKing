@@ -98,7 +98,12 @@ fun Application.botRoutes(env: Env) {
 
             val chatId = message.chat.id
             val text = message.text ?: ""
-            if (text.startsWith("/paysupport")) {
+            if (text.startsWith("/start")) {
+                val markup = """
+                    {"keyboard":[[{"text":"\uD83C\uDFA3 Играть","web_app":{"url":"${env.publicBaseUrl}/app"}}]],"resize_keyboard":true}
+                """.trimIndent()
+                bot.sendMessage(chatId, "Нажми кнопку, чтобы начать игру", markup)
+            } else if (text.startsWith("/paysupport")) {
                 val reason = text.removePrefix("/paysupport").trim()
                 val uid = fishing.ensureUserByTgId(chatId)
                 val reqId = PayService.createSupportRequest(uid, null, reason)
