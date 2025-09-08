@@ -25,6 +25,9 @@
   <link rel="preload" as="image" href="/app/assets/riverking_bg_open_ocean_1600x900.png">
   <link rel="preload" as="image" href="/app/assets/riverking_rod_right_v2.png">
   <link rel="preload" as="image" href="/app/assets/riverking_bobber.svg">
+  <link rel="preload" as="image" href="/app/assets/fish/test_karas.png">
+  <link rel="preload" as="image" href="/app/assets/fish/test_leschc.png">
+  <link rel="preload" as="image" href="/app/assets/fish/test_plotva.png">
 
   <style>
     :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); }
@@ -71,6 +74,12 @@
     // Новые пожелания:
     const ROD_SIZE_MULT = 1.5;       // УВЕЛИЧИТЬ в 1.5 раза от предыдущей логики
     const ROD_BASE_X_FRACTION = 2/3; // Начинать примерно в 2/3 ширины сцены
+
+    const FISH_IMG = {
+      'Карась': '/app/assets/fish/test_karas.png',
+      'Лещ': '/app/assets/fish/test_leschc.png',
+      'Плотва': '/app/assets/fish/test_plotva.png'
+    };
 
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
@@ -319,9 +328,12 @@
               <div className="space-y-2">
                 {list.map((c,i)=>(
                   <div key={i} className="p-3 glass rounded-xl flex justify-between">
-                    <div>
-                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                      <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                    <div className="flex items-center gap-3">
+                      {FISH_IMG[c.fish] && <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" />}
+                      <div>
+                        <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                        <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                      </div>
                     </div>
                     <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                   </div>
@@ -335,9 +347,12 @@
             <div className="space-y-2">
               {list.map((c,i)=>(
                 <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
-                  <div>
-                    <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                    <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                  <div className="flex items-center gap-3">
+                    {FISH_IMG[c.fish] && <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" />}
+                    <div>
+                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                      <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                    </div>
                   </div>
                   <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                 </div>
@@ -356,18 +371,24 @@
                 <div className="space-y-2">
                   {ext.smallest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
-                      <div>
-                        <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
+                      <div className="flex items-center gap-3">
+                        {FISH_IMG[ext.smallest.fish] && <img src={FISH_IMG[ext.smallest.fish]} alt={ext.smallest.fish} className="w-10 h-10 object-contain" />}
+                        <div>
+                          <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
+                          <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
+                        </div>
                       </div>
                       <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} кг</div>
                     </div>
                   )}
                   {ext.largest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
-                      <div>
-                        <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
+                      <div className="flex items-center gap-3">
+                        {FISH_IMG[ext.largest.fish] && <img src={FISH_IMG[ext.largest.fish]} alt={ext.largest.fish} className="w-10 h-10 object-contain" />}
+                        <div>
+                          <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
+                          <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
+                        </div>
                       </div>
                       <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} кг</div>
                     </div>
@@ -839,10 +860,13 @@
 
               {/* Результат / Ошибка */}
               {result && (
-                <div className="mt-4 p-4 rounded-xl glass">
-                  <div className="text-base">Улов!</div>
-                  <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
-                  <div className="text-xs opacity-70">Локация: {result.location}</div>
+                <div className="mt-4 p-4 rounded-xl glass flex items-center gap-4">
+                  {FISH_IMG[result.fish] && <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" />}
+                  <div>
+                    <div className="text-base">Улов!</div>
+                    <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
+                    <div className="text-xs opacity-70">Локация: {result.location}</div>
+                  </div>
                 </div>
               )}
               {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
@@ -856,9 +880,12 @@
                   <div className="space-y-2">
                     {me.recent.map((c,i)=> (
                       <div key={i} className="p-3 rounded--xl border border-white/10 flex items-center justify-between">
-                        <div>
-                          <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                          <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
+                        <div className="flex items-center gap-3">
+                          {FISH_IMG[c.fish] && <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" />}
+                          <div>
+                            <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                            <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
+                          </div>
                         </div>
                         <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                       </div>
