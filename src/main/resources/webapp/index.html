@@ -737,6 +737,8 @@
         const curLure = me.lures.find(l=>l.id===curId);
         if(!curLure || curLure.qty<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
         setError(null);
+        setDrawerOpen(false);
+        setBaitsOpen(false);
         try{
           const r = await fetch(`/api/start-cast`,{method:'POST',credentials:'include'});
           if(!r.ok){
@@ -835,7 +837,7 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
+          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 
           {tab === 'fish' && (
