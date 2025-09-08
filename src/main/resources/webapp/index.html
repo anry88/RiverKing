@@ -101,18 +101,10 @@
       );
     }
 
-    function Header({me,setMe,onOpenLocations,onOpenBaits}){
+    function Header({me,onEditNickname,onOpenLocations,onOpenBaits}){
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
-      const editNickname = () => {
-        const nick = prompt('Изменить ник', me.username || '');
-        if(nick && nick !== me.username){
-          fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
-            .then(()=> setMe(p=>({...p, username:nick, needsNickname:false})))
-            .catch(()=>{});
-        }
-      };
       return (
         <div className="sticky top-0 z-40 -mx-4">
           <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
@@ -120,7 +112,7 @@
               <span className="text-xl font-semibold">🎣 RiverKing</span>
               <span className="text-xs opacity-70">beta</span>
             </div>
-            <button onClick={editNickname} className="text-sm hover:underline">
+            <button onClick={onEditNickname} className="text-sm hover:underline">
               {me.username || '—'}
             </button>
           </div>
@@ -188,6 +180,23 @@
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function NicknameModal({me,onClose,onSave}){
+      const [value,setValue] = React.useState(me.username||'');
+      return (
+        <div className="fixed inset-0 z-50">
+          <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass p-4 rounded-xl w-[90%] max-w-sm">
+            <div className="text-lg font-semibold mb-3">Никнейм</div>
+            <input value={value} onChange={e=>setValue(e.target.value)} className="w-full p-2 mb-4 rounded-lg bg-black/20 border border-white/10" />
+            <div className="flex gap-2">
+              <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">Отмена</button>
+              <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">Сохранить</button>
             </div>
           </div>
         </div>
@@ -275,17 +284,6 @@
           .then(d=> setFishList(d.fish||[]))
           .catch(()=>{});
       },[]);
-
-      React.useEffect(()=>{
-        if(me.needsNickname){
-          const nick = prompt('Придумай ник для отображения в достижениях');
-          if(nick){
-            fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
-              .then(()=>setMe({...me, username:nick, needsNickname:false}))
-              .catch(()=>{});
-          }
-        }
-      },[me.needsNickname]);
 
       React.useEffect(()=>{
         if(me.needsNickname) return;
@@ -550,6 +548,7 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
+      const [nickOpen,setNickOpen] = React.useState(false);
 
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
@@ -624,6 +623,12 @@
         })();
       },[]);
 
+      React.useEffect(()=>{
+        if(me?.needsNickname){
+          setNickOpen(true);
+        }
+      },[me?.needsNickname]);
+
       async function claimDaily(){
         setError(null);
         try{
@@ -691,6 +696,17 @@
             ? 'Требуется авторизация. Запустите игру через кнопку бота.'
             : e===403?'Локация закрыта':'Не удалось сменить локацию');
         }
+      }
+
+      function saveNickname(nick){
+        if(!nick || nick===me?.username){
+          setNickOpen(false);
+          return;
+        }
+        fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
+          .then(()=> setMe(p=>({...p, username:nick, needsNickname:false})))
+          .catch(()=>{})
+          .finally(()=> setNickOpen(false));
       }
 
       async function cast(){
@@ -797,7 +813,8 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} setMe={setMe} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
+          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
+          {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 
           {tab === 'fish' && (
             <>
