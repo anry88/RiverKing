@@ -25,6 +25,25 @@
   <link rel="preload" as="image" href="/app/assets/riverking_bg_open_ocean_1600x900.png">
   <link rel="preload" as="image" href="/app/assets/riverking_rod_right_v2.png">
   <link rel="preload" as="image" href="/app/assets/riverking_bobber.svg">
+  <link rel="preload" as="image" href="/app/assets/fish/karas.png">
+  <link rel="preload" as="image" href="/app/assets/fish/karp.png">
+  <link rel="preload" as="image" href="/app/assets/fish/lesch.png">
+  <link rel="preload" as="image" href="/app/assets/fish/lin.png">
+  <link rel="preload" as="image" href="/app/assets/fish/okun.png">
+  <link rel="preload" as="image" href="/app/assets/fish/osetr.png">
+  <link rel="preload" as="image" href="/app/assets/fish/plotva.png">
+  <link rel="preload" as="image" href="/app/assets/fish/schuka.png">
+  <link rel="preload" as="image" href="/app/assets/fish/som.png">
+  <link rel="preload" as="image" href="/app/assets/fish/ukleyka.png">
+  <link rel="preload" as="image" href="/app/assets/fish/chehon.png">
+  <link rel="preload" as="image" href="/app/assets/fish/golavl.png">
+  <link rel="preload" as="image" href="/app/assets/fish/nalim.png">
+  <link rel="preload" as="image" href="/app/assets/fish/rotan.png">
+  <link rel="preload" as="image" href="/app/assets/fish/sig.png">
+  <link rel="preload" as="image" href="/app/assets/fish/sudak.png">
+  <link rel="preload" as="image" href="/app/assets/fish/forel_ruchevaya.png">
+  <link rel="preload" as="image" href="/app/assets/fish/harius.png">
+  <link rel="preload" as="image" href="/app/assets/fish/taymen.png">
 
   <style>
     :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); }
@@ -71,6 +90,63 @@
     // Новые пожелания:
     const ROD_SIZE_MULT = 1.5;       // УВЕЛИЧИТЬ в 1.5 раза от предыдущей логики
     const ROD_BASE_X_FRACTION = 2/3; // Начинать примерно в 2/3 ширины сцены
+
+    const FISH_IMG = {
+      'Плотва': '/app/assets/fish/plotva.png',
+      'Окунь': '/app/assets/fish/okun.png',
+      'Карась': '/app/assets/fish/karas.png',
+      'Лещ': '/app/assets/fish/lesch.png',
+      'Щука': '/app/assets/fish/schuka.png',
+      'Карп': '/app/assets/fish/karp.png',
+      'Сом': '/app/assets/fish/som.png',
+      'Осётр': '/app/assets/fish/osetr.png',
+      'Уклейка': '/app/assets/fish/ukleyka.png',
+      'Линь': '/app/assets/fish/lin.png',
+      'Ротан': '/app/assets/fish/rotan.png',
+      'Судак': '/app/assets/fish/sudak.png',
+      'Чехонь': '/app/assets/fish/chehon.png',
+      'Хариус': '/app/assets/fish/harius.png',
+      'Форель ручьевая': '/app/assets/fish/forel_ruchevaya.png',
+      'Таймень': '/app/assets/fish/taymen.png',
+      'Налим': '/app/assets/fish/nalim.png',
+      'Сиг': '/app/assets/fish/sig.png',
+      'Голавль': '/app/assets/fish/golavl.png',
+      'Жерех': '/app/assets/fish/zhereh.png',
+      'Толстолобик': '/app/assets/fish/tolstolobik.png',
+      'Белый амур': '/app/assets/fish/beliy_amur.png',
+      'Угорь европейский': '/app/assets/fish/ugor_evropeyskiy.png',
+      'Стерлядь': '/app/assets/fish/sterlyad.png',
+      'Кефаль': '/app/assets/fish/kefal.png',
+      'Камбала': '/app/assets/fish/kambala.png',
+      'Сельдь': '/app/assets/fish/seld.png',
+      'Ставрида': '/app/assets/fish/stavrida.png',
+      'Треска': '/app/assets/fish/treska.png',
+      'Сайда': '/app/assets/fish/sayda.png',
+      'Морская форель': '/app/assets/fish/morskaya_forel.png',
+      'Палтус': '/app/assets/fish/paltus.png',
+      'Корюшка': '/app/assets/fish/koryushka.png',
+      'Лосось атлантический': '/app/assets/fish/losos_atlanticheskiy.png',
+      'Лаврак': '/app/assets/fish/lavrak.png',
+      'Скумбрия атлантическая': '/app/assets/fish/skumbriya_atlanticheskaya.png',
+      'Белуга': '/app/assets/fish/beluga.png',
+      'Ёрш': '/app/assets/fish/yorsh.png',
+      'Пескарь': '/app/assets/fish/peskar.png',
+      'Густера': '/app/assets/fish/gustera.png',
+      'Краснопёрка': '/app/assets/fish/krasnopyorka.png',
+      'Елец': '/app/assets/fish/elets.png',
+      'Верхоплавка': '/app/assets/fish/verhoplavka.png',
+      'Язь': '/app/assets/fish/yaz.png',
+      'Бычок': '/app/assets/fish/bychyok.png',
+      'Килька': '/app/assets/fish/kilka.png',
+      'Мойва': '/app/assets/fish/mojva.png',
+      'Дорадо': '/app/assets/fish/dorado.png',
+      'Ваху': '/app/assets/fish/vahu.png',
+      'Парусник': '/app/assets/fish/parusnik.png',
+      'Рыба-меч': '/app/assets/fish/ryba_mech.png',
+      'Марлин синий': '/app/assets/fish/marlin_siniy.png',
+      'Тунец синеперый': '/app/assets/fish/tunets_sineperiy.png',
+      'Акула мако': '/app/assets/fish/akula_mako.png',
+    };
 
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
@@ -244,6 +320,7 @@
             <div className="space-y-4">
               {data.fish.map(f=>(
                 <div key={f.name} className="p-4 glass rounded-xl">
+                  <img src={FISH_IMG[f.name]} alt={f.name} className="w-24 h-24 object-contain mb-2 mx-auto" onError={e=>e.currentTarget.style.display='none'} />
                   <div className={`font-semibold ${rarityColors[f.rarity]||''}`}>{f.name}</div>
                   <div className="text-xs mt-1">Локации: {f.locations.join(', ')}</div>
                   <div className="text-xs mt-1">Приманки: {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
@@ -319,9 +396,12 @@
               <div className="space-y-2">
                 {list.map((c,i)=>(
                   <div key={i} className="p-3 glass rounded-xl flex justify-between">
-                    <div>
-                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                      <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                    <div className="flex items-center gap-3">
+                      <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                      <div>
+                        <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                        <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                      </div>
                     </div>
                     <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                   </div>
@@ -335,9 +415,12 @@
             <div className="space-y-2">
               {list.map((c,i)=>(
                 <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
-                  <div>
-                    <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                    <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                  <div className="flex items-center gap-3">
+                    <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                    <div>
+                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                      <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                    </div>
                   </div>
                   <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                 </div>
@@ -356,18 +439,24 @@
                 <div className="space-y-2">
                   {ext.smallest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
-                      <div>
-                        <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
+                      <div className="flex items-center gap-3">
+                        <img src={FISH_IMG[ext.smallest.fish]} alt={ext.smallest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        <div>
+                          <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
+                          <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
+                        </div>
                       </div>
                       <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} кг</div>
                     </div>
                   )}
                   {ext.largest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
-                      <div>
-                        <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
-                        <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
+                      <div className="flex items-center gap-3">
+                        <img src={FISH_IMG[ext.largest.fish]} alt={ext.largest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        <div>
+                          <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
+                          <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
+                        </div>
                       </div>
                       <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} кг</div>
                     </div>
@@ -715,6 +804,8 @@
         const curLure = me.lures.find(l=>l.id===curId);
         if(!curLure || curLure.qty<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
         setError(null);
+        setDrawerOpen(false);
+        setBaitsOpen(false);
         try{
           const r = await fetch(`/api/start-cast`,{method:'POST',credentials:'include'});
           if(!r.ok){
@@ -813,7 +904,7 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
+          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 
           {tab === 'fish' && (
@@ -839,10 +930,13 @@
 
               {/* Результат / Ошибка */}
               {result && (
-                <div className="mt-4 p-4 rounded-xl glass">
-                  <div className="text-base">Улов!</div>
-                  <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
-                  <div className="text-xs opacity-70">Локация: {result.location}</div>
+                <div className="mt-4 p-4 rounded-xl glass flex items-center gap-4">
+                  <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                  <div>
+                    <div className="text-base">Улов!</div>
+                    <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
+                    <div className="text-xs opacity-70">Локация: {result.location}</div>
+                  </div>
                 </div>
               )}
               {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
@@ -856,9 +950,12 @@
                   <div className="space-y-2">
                     {me.recent.map((c,i)=> (
                       <div key={i} className="p-3 rounded--xl border border-white/10 flex items-center justify-between">
-                        <div>
-                          <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                          <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
+                        <div className="flex items-center gap-3">
+                          <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                          <div>
+                            <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                            <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
+                          </div>
                         </div>
                         <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
                       </div>

@@ -330,6 +330,7 @@ object DB {
         setLFWeight(coast, fMac, 0.6)
         setLFWeight(coast, fBas, 0.25)
         setLFWeight(coast, fSal, 0.08)  // epic
+        setLFWeight(delta, fBel, 0.01)  // salt legendary
         // простая мелочь
         setLFWeight(coast, fBy2, 0.35)
         setLFWeight(coast, fKi2, 0.30)
@@ -394,6 +395,8 @@ object Users : LongIdTable() {
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
+    val castLureId = reference("cast_lure_id", Lures).nullable()
+    val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
 }
 
