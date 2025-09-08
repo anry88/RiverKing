@@ -35,6 +35,10 @@ fun Application.botRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Bot")
     routing {
         post("/bot") {
+            val secret = call.request.headers["X-Telegram-Bot-Api-Secret-Token"]
+            if (secret == null || secret != env.telegramWebhookSecret) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
             val update = try { call.receive<TgUpdate>() } catch (_: Exception) {
                 return@post call.respond(HttpStatusCode.OK)
             }
