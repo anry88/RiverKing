@@ -129,7 +129,7 @@ class FishingService {
         return first
     }
 
-    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): Pair<List<LureDTO>, Long?>? = transaction {
+    fun giveDailyBaits(userId: Long, freshQty: Int = 7, predQty: Int = 3): Pair<List<LureDTO>, Long?>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
