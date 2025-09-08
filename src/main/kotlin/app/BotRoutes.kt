@@ -44,7 +44,11 @@ fun Application.botRoutes(env: Env) {
             }
 
             update.preCheckoutQuery?.let { q ->
-                bot.answerPreCheckoutQuery(q.id)
+                try {
+                    bot.answerPreCheckoutQuery(q.id)
+                } catch (e: Exception) {
+                    log.error("answerPreCheckoutQuery failed id={}", q.id, e)
+                }
                 return@post call.respond(HttpStatusCode.OK)
             }
 
@@ -102,14 +106,26 @@ fun Application.botRoutes(env: Env) {
                 val markup = """
                     {"keyboard":[[{"text":"\uD83C\uDFA3 Играть","web_app":{"url":"${env.publicBaseUrl}/app"}}]],"resize_keyboard":true}
                 """.trimIndent()
-                bot.sendMessage(chatId, "Нажми кнопку, чтобы начать игру", markup)
+                try {
+                    bot.sendMessage(chatId, "Нажми кнопку, чтобы начать игру", markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
             } else if (text.startsWith("/paysupport")) {
                 val reason = text.removePrefix("/paysupport").trim()
                 val uid = fishing.ensureUserByTgId(chatId)
                 val reqId = PayService.createSupportRequest(uid, null, reason)
-                bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
+                try {
+                    bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
                 if (env.adminTgId != 0L) {
-                    bot.sendMessage(env.adminTgId, "Запрос #$reqId от $chatId: $reason")
+                    try {
+                        bot.sendMessage(env.adminTgId, "Запрос #$reqId от $chatId: $reason")
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={}", env.adminTgId, e)
+                    }
                 }
             } else if (text.startsWith("/buy")) {
                 val packId = text.split(" ").getOrNull(1)
@@ -117,7 +133,11 @@ fun Application.botRoutes(env: Env) {
                     try {
                         stars.sendPackageInvoice(chatId, packId)
                     } catch (_: Exception) {
-                        bot.sendMessage(chatId, "Пакет не найден")
+                        try {
+                            bot.sendMessage(chatId, "Пакет не найден")
+                        } catch (e: Exception) {
+                            log.error("sendMessage failed chatId={}", chatId, e)
+                        }
                     }
                 }
             } else if (chatId == env.adminTgId) {
@@ -128,7 +148,11 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "refunded", null)
-                                bot.sendMessage(req.userId, "Ваш запрос #$id одобрен, возврат будет выполнен")
+                                try {
+                                    bot.sendMessage(req.userId, "Ваш запрос #$id одобрен, возврат будет выполнен")
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", req.userId, e)
+                                }
                             }
                         }
                     }
@@ -140,7 +164,11 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "rejected", reason)
-                                bot.sendMessage(req.userId, "Запрос #$id отклонен: $reason")
+                                try {
+                                    bot.sendMessage(req.userId, "Запрос #$id отклонен: $reason")
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", req.userId, e)
+                                }
                             }
                         }
                     }
@@ -152,7 +180,11 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "info", question)
-                                bot.sendMessage(req.userId, "Админ уточняет по запросу #$id: $question")
+                                try {
+                                    bot.sendMessage(req.userId, "Админ уточняет по запросу #$id: $question")
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", req.userId, e)
+                                }
                             }
                         }
                     }
