@@ -28,13 +28,27 @@ class FishingService {
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
         if (existing == null) {
-            Users.insertAndGetId {
+            val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
+            val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
+            val newId = Users.insertAndGetId {
                 it[Users.tgId] = tgId
                 it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.username] = username
+                it[currentLureId] = freshId
             }.value
+            InventoryLures.insert {
+                it[InventoryLures.userId] = newId
+                it[InventoryLures.lureId] = freshId
+                it[InventoryLures.qty] = 10
+            }
+            InventoryLures.insert {
+                it[InventoryLures.userId] = newId
+                it[InventoryLures.lureId] = predId
+                it[InventoryLures.qty] = 5
+            }
+            newId
         } else {
             val id = existing[Users.id].value
             if (firstName != null || lastName != null || username != null) {
