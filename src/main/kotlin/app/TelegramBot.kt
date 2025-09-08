@@ -5,9 +5,16 @@ import java.net.URLEncoder
 import java.net.URL
 
 class TelegramBot(private val token: String) {
-    fun sendMessage(chatId: Long, text: String) {
+    fun sendMessage(chatId: Long, text: String, replyMarkup: String? = null) {
         val url = URL("https://api.telegram.org/bot$token/sendMessage")
-        val data = "chat_id=$chatId&text=" + URLEncoder.encode(text, "UTF-8")
+        val params = mutableListOf(
+            "chat_id=$chatId",
+            "text=" + URLEncoder.encode(text, "UTF-8")
+        )
+        if (replyMarkup != null) {
+            params += "reply_markup=" + URLEncoder.encode(replyMarkup, "UTF-8")
+        }
+        val data = params.joinToString("&")
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
