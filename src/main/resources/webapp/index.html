@@ -101,10 +101,18 @@
       );
     }
 
-    function Header({me,onOpenLocations,onOpenBaits}){
+    function Header({me,setMe,onOpenLocations,onOpenBaits}){
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+      const editNickname = () => {
+        const nick = prompt('Изменить ник', me.username || '');
+        if(nick && nick !== me.username){
+          fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
+            .then(()=> setMe(p=>({...p, username:nick, needsNickname:false})))
+            .catch(()=>{});
+        }
+      };
       return (
         <div className="sticky top-0 z-40 -mx-4">
           <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
@@ -112,6 +120,9 @@
               <span className="text-xl font-semibold">🎣 RiverKing</span>
               <span className="text-xs opacity-70">beta</span>
             </div>
+            <button onClick={editNickname} className="text-sm hover:underline">
+              {me.username || '—'}
+            </button>
           </div>
           <div className="px-4 py-2 bg-black/20 border-b border-white/10">
             <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
@@ -471,7 +482,7 @@
           {me.dailyAvailable && (
             <button
               onClick={onClaimDaily}
-              className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm"
+              className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[2]"
             >
               <span>🎁</span>
               <span>Подарок</span>
@@ -786,7 +797,7 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
+          <Header me={me} setMe={setMe} onOpenLocations={()=>setDrawerOpen(true)} onOpenBaits={()=>setBaitsOpen(true)} />
 
           {tab === 'fish' && (
             <>
