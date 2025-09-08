@@ -4,7 +4,7 @@ import java.util.Properties
 
 data class Env(
     val botToken: String,
-    val webhookSecret: String,
+    val telegramWebhookSecret: String,
     val publicBaseUrl: String,
     val dbUrl: String,
     val dbUser: String,
@@ -21,7 +21,10 @@ data class Env(
                 ?: error("config file $path not found")
             return Env(
                 botToken = props.getProperty("BOT_TOKEN") ?: error("BOT_TOKEN required"),
-                webhookSecret = props.getProperty("WEBHOOK_SECRET") ?: "dev-secret",
+                telegramWebhookSecret =
+                    props.getProperty("TELEGRAM_WEBHOOK_SECRET")
+                        ?: props.getProperty("WEBHOOK_SECRET")
+                        ?: "dev-secret",
                 publicBaseUrl = props.getProperty("PUBLIC_BASE_URL") ?: error("PUBLIC_BASE_URL required"),
                 dbUrl = props.getProperty("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
                 dbUser = props.getProperty("DATABASE_USER") ?: "postgres",
