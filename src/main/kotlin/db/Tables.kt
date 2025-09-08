@@ -330,6 +330,7 @@ object DB {
         setLFWeight(coast, fMac, 0.6)
         setLFWeight(coast, fBas, 0.25)
         setLFWeight(coast, fSal, 0.08)  // epic
+        setLFWeight(delta, fBel, 0.01)  // salt legendary
         // простая мелочь
         setLFWeight(coast, fBy2, 0.35)
         setLFWeight(coast, fKi2, 0.30)
