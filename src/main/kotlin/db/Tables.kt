@@ -395,6 +395,7 @@ object Users : LongIdTable() {
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
+    val castLureId = reference("cast_lure_id", Lures).nullable()
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
 }

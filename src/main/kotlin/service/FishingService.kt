@@ -588,7 +588,10 @@ class FishingService {
             it[InventoryLures.qty] = q - 1
         }
         val newLure = ensureCurrentLure(userId)
-        Users.update({ Users.id eq userId }) { it[Users.isCasting] = true }
+        Users.update({ Users.id eq userId }) {
+            it[Users.isCasting] = true
+            it[Users.castLureId] = lureId
+        }
         newLure
     }
 
@@ -619,7 +622,7 @@ class FishingService {
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
-        val lureId = userRow[Users.currentLureId]?.value
+        val lureId = userRow[Users.castLureId]?.value
             ?: error("No lure selected")
         val lureRow = Lures.select { Lures.id eq lureId }.single()
 
@@ -651,6 +654,7 @@ class FishingService {
         fun finish(res: CastResultDTO): CastResultDTO {
             Users.update({ Users.id eq userId }) {
                 it[Users.isCasting] = false
+                it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
             return res
