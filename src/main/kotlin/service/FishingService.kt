@@ -76,9 +76,10 @@ class FishingService {
         val un = row.getOrNull(Users.username)
         val nn = row.getOrNull(Users.nickname)
         return when {
+            !nn.isNullOrBlank() -> nn
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
-            else -> nn
+            else -> null
         }
     }
 
