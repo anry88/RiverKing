@@ -539,6 +539,8 @@ class FishingService {
     }
 
     fun setLure(userId: Long, lureId: Long) = transaction {
+        val casting = Users.select { Users.id eq userId }.single()[Users.isCasting]
+        require(!casting) { "casting" }
         val has = InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
             .singleOrNull()?.get(InventoryLures.qty) ?: 0
         require(has > 0) { "no lure" }
@@ -546,6 +548,8 @@ class FishingService {
     }
 
     fun setLocation(userId: Long, locationId: Long) = transaction {
+        val casting = Users.select { Users.id eq userId }.single()[Users.isCasting]
+        require(!casting) { "casting" }
         val loc = Locations.selectAll().where { Locations.id eq locationId }.singleOrNull()
             ?: error("bad location")
         val total = totalKg(userId)
@@ -558,7 +562,9 @@ class FishingService {
      * Returns the new current lure id if changed after consumption.
      */
     fun startCast(userId: Long): Long? = transaction {
-        val lureId = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+        val userRow = Users.select { Users.id eq userId }.single()
+        require(!userRow[Users.isCasting]) { "casting" }
+        val lureId = userRow[Users.currentLureId]?.value
             ?: error("No lure selected")
         val lureRow = (InventoryLures innerJoin Lures)
             .select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
@@ -581,7 +587,9 @@ class FishingService {
         InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
             it[InventoryLures.qty] = q - 1
         }
-        ensureCurrentLure(userId)
+        val newLure = ensureCurrentLure(userId)
+        Users.update({ Users.id eq userId }) { it[Users.isCasting] = true }
+        newLure
     }
 
     @Serializable
@@ -609,7 +617,9 @@ class FishingService {
     }
 
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
-        val lureId = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+        val userRow = Users.select { Users.id eq userId }.single()
+        require(userRow[Users.isCasting]) { "no cast" }
+        val lureId = userRow[Users.currentLureId]?.value
             ?: error("No lure selected")
         val lureRow = Lures.select { Lures.id eq lureId }.single()
 
@@ -638,9 +648,17 @@ class FishingService {
             roll <= 0.0
         }
 
-        if (reactionTime >= 5.0) return@transaction CastResultDTO(false)
+        fun finish(res: CastResultDTO): CastResultDTO {
+            Users.update({ Users.id eq userId }) {
+                it[Users.isCasting] = false
+                it[Users.lastCastAt] = Instant.now()
+            }
+            return res
+        }
+
+        if (reactionTime >= 5.0) return@transaction finish(CastResultDTO(false))
         val catchChance = 1.0 - reactionTime / 5.0
-        if (rnd.nextDouble() > catchChance) return@transaction CastResultDTO(false)
+        if (rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false))
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
@@ -655,7 +673,8 @@ class FishingService {
             it[Catches.createdAt] = Instant.now()
         }
         val locName = locRow[Locations.name]
-        CastResultDTO(
+        finish(
+            CastResultDTO(
             true,
             CatchDTO(
                 fishName,
@@ -665,7 +684,7 @@ class FishingService {
                 userId = null,
                 fishId = fishId,
             ),
-        )
+        ))
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
