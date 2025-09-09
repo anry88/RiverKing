@@ -255,8 +255,8 @@ class FishingService {
             else -> 5
         }
 
-        // Locations with fish and possible lures
-        val locationDtos = Locations.selectAll().map { locRow ->
+        // Locations with fish and possible lures, ordered by unlock requirement
+        val locationDtos = Locations.selectAll().orderBy(Locations.unlockKg).map { locRow ->
             val locId = locRow[Locations.id].value
             val locName = I18n.location(locRow[Locations.name], lang)
             val fishRows = (LocationFishWeights innerJoin Fish)
