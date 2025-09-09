@@ -19,7 +19,7 @@ Full MVP codebase: Kotlin/Ktor + Exposed + SQLite, Telegram Mini App.
 3. Из бота открой мини‑апп кнопкой `web_app`:
    ```
    {
-     "keyboard": [[{ "text": "🎣 Играть", "web_app": { "url": "https://YOUR_DOMAIN/app" } }]],
+     "keyboard": [[{ "text": "🎣 Играть", "web_app": { "url": "https://YOUR_DOMAIN/app?tgId=USER_ID" } }]],
      "resize_keyboard": true
    }
    ```
