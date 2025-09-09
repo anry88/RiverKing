@@ -8,12 +8,16 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.int
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
 import service.TournamentService
+import service.PrizeSpec
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -46,17 +50,28 @@ private data class AdminDraft(
     var location: String? = null,
     var metric: String = "",
     var prizePlaces: Int = 0,
-    var prizes: MutableList<String> = mutableListOf(),
+    var prizes: MutableList<PrizeSpec> = mutableListOf(),
     var currentPrize: Int = 1,
 )
 
 private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
 
-private fun parsePrizes(str: String): MutableList<String> {
+private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
-        Json.parseToJsonElement(str).jsonArray.map { it.jsonPrimitive.content }.toMutableList()
+        Json.parseToJsonElement(str).jsonArray.map { el ->
+            val obj = el.jsonObject
+            PrizeSpec(
+                obj["pack"]?.jsonPrimitive?.content ?: "",
+                obj["qty"]?.jsonPrimitive?.int ?: 1
+            )
+        }.toMutableList()
     } catch (_: Exception) {
-        str.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        str.split(',').map { it.trim() }.filter { it.isNotEmpty() }.map { s ->
+            val parts = s.split(':')
+            val pack = parts.getOrNull(0) ?: s
+            val qty = parts.getOrNull(1)?.toIntOrNull() ?: 1
+            PrizeSpec(pack, qty)
+        }.toMutableList()
     }
 }
 
@@ -260,17 +275,20 @@ fun Application.botRoutes(env: Env) {
                         val n = text.toIntOrNull()
                         if (n != null) {
                             draft.prizePlaces = n
-                            draft.prizes = MutableList(n) { i -> draft.prizes.getOrNull(i) ?: "" }
+                            draft.prizes = MutableList(n) { i -> draft.prizes.getOrNull(i) ?: PrizeSpec("", 1) }
                             draft.currentPrize = 1
                             draft.step = AdminStep.PRIZE
-                            val currentPrize = draft.prizes.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { " (сейчас: $it)" } ?: ""
+                            val currentPrize = draft.prizes.getOrNull(0)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
                             try { bot.sendMessage(chatId, "Награда за 1 место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.PRIZE -> {
-                        val prize = text.trim()
+                        val p = text.trim().split(' ', ':')
+                        val pack = p.getOrNull(0) ?: ""
+                        val qty = p.getOrNull(1)?.toIntOrNull() ?: 1
+                        val prize = PrizeSpec(pack, qty)
                         val idx = draft.currentPrize - 1
                         if (draft.prizes.size > idx) {
                             draft.prizes[idx] = prize
@@ -279,13 +297,13 @@ fun Application.botRoutes(env: Env) {
                         }
                         if (draft.currentPrize < draft.prizePlaces) {
                             draft.currentPrize += 1
-                            val currentPrize = draft.prizes.getOrNull(draft.currentPrize - 1)?.takeIf { it.isNotBlank() }?.let { " (сейчас: $it)" } ?: ""
+                            val currentPrize = draft.prizes.getOrNull(draft.currentPrize - 1)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
                             try { bot.sendMessage(chatId, "Награда за ${draft.currentPrize} место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             val start = draft.start
                             val end = draft.end
                             if (start != null && end != null) {
-                                val prizesJson = draft.prizes.take(draft.prizePlaces).joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+                                val prizesJson = draft.prizes.take(draft.prizePlaces).joinToString(prefix = "[", postfix = "]") { Json.encodeToString(it) }
                                 try {
                                     if (draft.id == null) {
                                         tournaments.createTournament(

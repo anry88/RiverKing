@@ -94,6 +94,9 @@ fun Application.apiRoutes(env: Env) {
     data class InvoiceResp(val invoice_url: String)
 
     @Serializable
+    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int)
+
+    @Serializable
     data class TournamentDTO(
         val id: Long,
         val startTime: Long,
@@ -298,6 +301,35 @@ fun Application.apiRoutes(env: Env) {
                 )
             }
             call.respond(list)
+        }
+
+        get("/api/prizes") {
+            tournaments.distributePrizes()
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty) }
+            call.respond(prizes)
+        }
+
+        post("/api/prizes/{id}/claim") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val (lures, current) = try { tournaments.claimPrize(uid, id, fishing) }
+            catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            call.respond(ShopBuyResp(lures2, current))
         }
 
         // Daily baits
