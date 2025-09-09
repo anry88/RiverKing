@@ -818,7 +818,7 @@
       const tgParam = (()=>{
         try{
           const raw = window.location.search + window.location.hash;
-          const m = raw.match(/[?#]tgWebAppData=([^&]+)/);
+          const m = raw.match(/(?:^|[?&#])tgWebAppData=([^&]+)/);
           return m ? decodeURIComponent(m[1]) : null;
         }catch{ return null; }
       })();
