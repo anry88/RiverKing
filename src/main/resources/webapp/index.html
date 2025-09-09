@@ -530,10 +530,6 @@
       const [list,setList] = React.useState([]);
       const [order,setOrder] = React.useState('desc');
 
-      const sortedFishList = React.useMemo(() => {
-        return order === 'asc' ? fishList : [...fishList].reverse();
-      }, [fishList, order]);
-
       React.useEffect(()=>{
         fetch('/api/guide',{credentials:'include'})
           .then(r=>r.json())
@@ -542,10 +538,10 @@
       },[me.language]);
 
       React.useEffect(()=>{
-        if(section==='species' && sortedFishList.length){
-          setFishId(sortedFishList[0].id);
+        if(section==='species' && fishList.length){
+          setFishId(fishList[0].id);
         }
-      },[section, sortedFishList]);
+      },[section, fishList]);
 
       React.useEffect(()=>{
         if(me.needsNickname) return;
@@ -612,7 +608,7 @@
           {section==='species' && (
             <div className="space-y-3">
               <select value={fishId||''} onChange={e=>setFishId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
-                {sortedFishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
+                {fishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
               <div className="space-y-2">
                 {list.map((c,i)=>(

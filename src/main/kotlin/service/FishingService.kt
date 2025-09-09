@@ -755,7 +755,7 @@ class FishingService {
     private fun sortCatches(list: List<CatchDTO>, limit: Int, asc: Boolean = false) =
         if (asc) {
             list.sortedWith(
-                compareByDescending<CatchDTO> { rarityRank(it.rarity) }
+                compareBy<CatchDTO> { rarityRank(it.rarity) }
                     .thenBy { it.weight }
             ).take(limit)
         } else {
