@@ -230,8 +230,9 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
-            val items = fishing.listShop().map { cat ->
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val items = fishing.listShop(language).map { cat ->
                 ShopCategoryDTO(
                     cat.id,
                     cat.name,

@@ -156,10 +156,130 @@
       if(en) FISH_IMG[en]=path;
     });
 
-    const UI_STRINGS = {
-      ru: { location:'Локация', baits:'Приманки', total:'Всего', today:'Сегодня' },
-      en: { location:'Location', baits:'Baits', total:'Total', today:'Today' }
+    const STRINGS = {
+      ru: {
+        location:'Локация',
+        baits:'Приманки',
+        total:'Всего',
+        today:'Сегодня',
+        kg:'кг',
+        locations:'Локации',
+        unlocked:'Открыто',
+        requiresKg: kg=>`Требуется ${kg} кг`,
+        current:'Текущая',
+        lures:'Приманки',
+        qty: qty=>`${qty} шт.`,
+        nickname:'Никнейм',
+        cancel:'Отмена',
+        save:'Сохранить',
+        authRequired:'Требуется авторизация. Запустите игру через кнопку бота.',
+        loadFailed:'Не удалось загрузить',
+        loadProfileFailed:'Не удалось загрузить профиль',
+        purchaseFailed:'Не удалось купить',
+        locationLocked:'Локация закрыта',
+        changeLocationFailed:'Не удалось сменить локацию',
+        castFailed:'Не удалось забросить',
+        selectBaitFailed:'Не удалось выбрать приманку',
+        loading:'Загрузка...',
+        fish:'Рыбы',
+        reachKg: kg=>`Набери ${kg} кг, чтобы открыть`,
+        fishes:'Рыбы:',
+        baitsLabel:'Приманки:',
+        locationsLabel:'Локации:',
+        catchToLearn:'Поймай эту рыбу, чтобы узнать больше',
+        noData:'Нет данных',
+        recentCatches:'Последние уловы',
+        emptyCatches:'Пока пусто — сделай первый заброс!',
+        tournamentsSoon:'Турниры в разработке',
+        shopEmpty:'Магазин пуст',
+        selectFish:'Выбери рыбу',
+        castRod:'Забросить удочку',
+        hook:'Подсечь!',
+        waitingBite:'Ожидаем поклёвку…',
+        catch:'Улов!',
+        new:'Новая!',
+        locationLabel:'Локация:',
+        newLocation:'Открыта новая локация:',
+        dailyTaken:'Ежедневные приманки уже забраны.',
+        noBaits:'Нет приманок. Забери ежедневные или купи в магазине.',
+        castOften:'Слишком часто забрасываешь. Подожди пару секунд.',
+        fishEscaped:'Рыба сорвалась!',
+        wrongLure:'Неверная приманка для этой локации',
+        fishing:'Рыбалка',
+        tournaments:'Турниры',
+        achievements:'Достижения',
+        guide:'Справочник',
+        shop:'Магазин',
+        gift:'Подарок',
+        personal:'Личные',
+        global:'Глобальные',
+        species:'Виды',
+        smallest:'Самая маленькая',
+        largest:'Самая большая',
+      },
+      en: {
+        location:'Location',
+        baits:'Baits',
+        total:'Total',
+        today:'Today',
+        kg:'kg',
+        locations:'Locations',
+        unlocked:'Unlocked',
+        requiresKg: kg=>`${kg} kg required`,
+        current:'Current',
+        lures:'Baits',
+        qty: qty=>`${qty} pcs`,
+        nickname:'Nickname',
+        cancel:'Cancel',
+        save:'Save',
+        authRequired:'Authorization required. Launch the game via the bot button.',
+        loadFailed:'Failed to load',
+        loadProfileFailed:'Failed to load profile',
+        purchaseFailed:'Purchase failed',
+        locationLocked:'Location locked',
+        changeLocationFailed:'Failed to change location',
+        castFailed:'Failed to cast',
+        selectBaitFailed:'Failed to select bait',
+        loading:'Loading...',
+        fish:'Fish',
+        reachKg: kg=>`Reach ${kg} kg to unlock`,
+        fishes:'Fish:',
+        baitsLabel:'Baits:',
+        locationsLabel:'Locations:',
+        catchToLearn:'Catch this fish to learn more',
+        noData:'No data',
+        recentCatches:'Recent catches',
+        emptyCatches:'No catches yet — make your first cast!',
+        tournamentsSoon:'Tournaments in development',
+        shopEmpty:'Shop is empty',
+        selectFish:'Select fish',
+        castRod:'Cast rod',
+        hook:'Hook!',
+        waitingBite:'Waiting for a bite…',
+        catch:'Catch!',
+        new:'New!',
+        locationLabel:'Location:',
+        newLocation:'New location unlocked:',
+        dailyTaken:'Daily baits already claimed.',
+        noBaits:'No baits. Claim daily or buy in shop.',
+        castOften:'Casting too often. Wait a few seconds.',
+        fishEscaped:'Fish got away!',
+        wrongLure:'Wrong lure for this location',
+        fishing:'Fishing',
+        tournaments:'Tournaments',
+        achievements:'Achievements',
+        guide:'Guide',
+        shop:'Shop',
+        gift:'Gift',
+        personal:'Personal',
+        global:'Global',
+        species:'Species',
+        smallest:'Smallest',
+        largest:'Largest',
+      }
     };
+    function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
+    let t = makeT('ru');
 
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
@@ -194,7 +314,6 @@
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
-      const t = k => (UI_STRINGS[lang]||UI_STRINGS.ru)[k]||k;
       return (
         <div className="sticky top-0 z-40 -mx-4">
           <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
@@ -215,8 +334,8 @@
             <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
               <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
               <StatChip icon={'🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
-              <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} кг`} />
-              <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} кг`} />
+              <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
+              <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
             </div>
           </div>
         </div>
@@ -229,7 +348,7 @@
           <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
           <div className={`absolute right-0 top-0 h-full w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} p-4 flex flex-col`}>
             <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">Локации</div>
+              <div className="text-lg font-semibold">{t('locations')}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
@@ -240,9 +359,9 @@
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="font-semibold">{l.name}</div>
-                      {l.unlocked? <div className="text-xs opacity-70">Открыто</div> : <div className="text-xs opacity-70">Требуется {l.unlockKg} кг</div>}
+                      {l.unlocked? <div className="text-xs opacity-70">{t('unlocked')}</div> : <div className="text-xs opacity-70">{t('requiresKg', l.unlockKg)}</div>}
                     </div>
-                    {me.locationId===l.id && <div className="text-emerald-400 text-sm">Текущая</div>}
+                    {me.locationId===l.id && <div className="text-emerald-400 text-sm">{t('current')}</div>}
                   </div>
                 </button>
               ))}
@@ -258,7 +377,7 @@
           <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
           <div className={`absolute right-0 top-0 h-full w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} p-4 flex flex-col`}>
             <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">Приманки</div>
+              <div className="text-lg font-semibold">{t('baits')}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
@@ -269,9 +388,9 @@
                   <div className="flex items-center justify-between">
                     <div>
                       <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
-                      <div className="text-xs opacity-70">{l.qty} шт.</div>
+                      <div className="text-xs opacity-70">{t('qty', l.qty)}</div>
                     </div>
-                    {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">Текущая</div>}
+                    {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">{t('current')}</div>}
                   </div>
                 </button>
               ))}
@@ -287,11 +406,11 @@
         <div className="fixed inset-0 z-50">
           <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass p-4 rounded-xl w-[90%] max-w-sm">
-            <div className="text-lg font-semibold mb-3">Никнейм</div>
+            <div className="text-lg font-semibold mb-3">{t('nickname')}</div>
             <input value={value} onChange={e=>setValue(e.target.value)} className="w-full p-2 mb-4 rounded-lg bg-black/20 border border-white/10" />
             <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">Отмена</button>
-              <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">Сохранить</button>
+              <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">{t('cancel')}</button>
+              <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">{t('save')}</button>
             </div>
           </div>
         </div>
@@ -306,16 +425,16 @@
         fetch('/api/guide',{credentials:'include'})
           .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
           .then(setData)
-          .catch(e=> setError(e===401 ? 'Требуется авторизация. Запустите игру через кнопку бота.' : 'Не удалось загрузить'));
+          .catch(e=> setError(e===401 ? t('authRequired') : t('loadFailed')));
       },[]);
       if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
-      if(!data) return <div className="mt-6 text-center opacity-70">Загрузка...</div>;
+      if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
       return (
         <div className="mt-4">
           <div className="flex gap-2 mb-4">
-            <button onClick={()=>setSection('locations')} className={`flex-1 py-2 rounded-xl ${section==='locations'?'bg-emerald-600':'glass'}`}>Локации</button>
-            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>Рыбы</button>
-            <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>Приманки</button>
+            <button onClick={()=>setSection('locations')} className={`flex-1 py-2 rounded-xl ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
+            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
+            <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
           </div>
           {section==='locations' && (
             <div className="space-y-4">
@@ -328,11 +447,11 @@
                     {unlocked ? (
                       <>
                         <img src={LOCATION_BG[loc.id]} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
-                        <div className="text-sm opacity-80 text-left">Рыбы:</div>
+                        <div className="text-sm opacity-80 text-left">{t('fishes')}</div>
                         <div className="flex flex-wrap gap-1 text-sm mb-2 text-left">
                           {loc.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
                         </div>
-                        <div className="text-sm opacity-80 text-left">Приманки:</div>
+                        <div className="text-sm opacity-80 text-left">{t('baitsLabel')}</div>
                         <div className="flex flex-wrap gap-1 text-sm opacity-80 text-left">
                           {loc.lures.map(l=> <span key={l} className={lureColor(l)}>{l}</span>)}
                         </div>
@@ -340,7 +459,7 @@
                     ) : (
                       <>
                         <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-3xl">?</div>
-                        <div className="text-sm opacity-70">Набери {myLoc.unlockKg} кг, чтобы открыть</div>
+                        <div className="text-sm opacity-70">{t('reachKg', myLoc.unlockKg)}</div>
                       </>
                     )}
                   </div>
@@ -365,11 +484,11 @@
                     <div className={`font-semibold ${caught?(rarityColors[f.rarity]||''):''}`}>{caught ? f.name : '???'}</div>
                     {caught ? (
                       <>
-                        <div className="text-xs mt-1">Локации: {f.locations.join(', ')}</div>
-                        <div className="text-xs mt-1">Приманки: {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
+                        <div className="text-xs mt-1">{t('locationsLabel')} {f.locations.join(', ')}</div>
+                        <div className="text-xs mt-1">{t('baitsLabel')} {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
                       </>
                     ) : (
-                      <div className="text-xs mt-1 opacity-70">Поймай эту рыбу, чтобы узнать больше</div>
+                      <div className="text-xs mt-1 opacity-70">{t('catchToLearn')}</div>
                     )}
                   </div>
                 );
@@ -381,11 +500,11 @@
               {data.lures.map(l=>(
                 <div key={l.name} className="p-4 glass rounded-xl">
                   <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
-                  <div className="text-xs mt-1">Рыбы:</div>
+                  <div className="text-xs mt-1">{t('fishes')}</div>
                   <div className="flex flex-wrap gap-1 text-xs mb-1">
                     {l.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
                   </div>
-                  <div className="text-xs">Локации: {l.locations.join(', ')}</div>
+                  <div className="text-xs">{t('locationsLabel')} {l.locations.join(', ')}</div>
                 </div>
               ))}
             </div>
@@ -427,13 +546,13 @@
       return (
         <div className="mt-4 space-y-4">
           <div className="flex gap-2">
-            <button onClick={()=>setMode('personal')} className={`flex-1 py-2 rounded-xl ${mode==='personal'?'bg-emerald-600':'glass'}`}>Личные</button>
-            <button onClick={()=>setMode('global')} className={`flex-1 py-2 rounded-xl ${mode==='global'?'bg-emerald-600':'glass'}`}>Глобальные</button>
+            <button onClick={()=>setMode('personal')} className={`flex-1 py-2 rounded-xl ${mode==='personal'?'bg-emerald-600':'glass'}`}>{t('personal')}</button>
+            <button onClick={()=>setMode('global')} className={`flex-1 py-2 rounded-xl ${mode==='global'?'bg-emerald-600':'glass'}`}>{t('global')}</button>
           </div>
           <div className="flex gap-2">
-            <button onClick={()=>setSection('location')} className={`flex-1 py-2 rounded-xl ${section==='location'?'bg-emerald-600':'glass'}`}>Локации</button>
-            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>Рыбы</button>
-            <button onClick={()=>setSection('species')} className={`flex-1 py-2 rounded-xl ${section==='species'?'bg-emerald-600':'glass'}`}>Виды</button>
+            <button onClick={()=>setSection('location')} className={`flex-1 py-2 rounded-xl ${section==='location'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
+            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
+            <button onClick={()=>setSection('species')} className={`flex-1 py-2 rounded-xl ${section==='species'?'bg-emerald-600':'glass'}`}>{t('species')}</button>
           </div>
 
           {section==='location' && (
@@ -458,10 +577,10 @@
                         <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
                       </div>
                     </div>
-                    <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                    <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
                   </div>
                 ))}
-                {list.length===0 && <div className="text-center text-sm opacity-70">Нет данных</div>}
+                {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
               </div>
             </div>
           )}
@@ -484,17 +603,17 @@
                       <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
                     </div>
                   </div>
-                  <div className="font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                  <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
                 </div>
               ))}
-              {list.length===0 && <div className="text-center text-sm opacity-70">Нет данных</div>}
+              {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
             </div>
           )}
 
           {section==='species' && (
             <div className="space-y-3">
               <select value={fishId||''} onChange={e=>setFishId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
-                <option value="" disabled>Выбери рыбу</option>
+                <option value="" disabled>{t('selectFish')}</option>
                 {fishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
               {ext && (
@@ -511,11 +630,11 @@
                           </div>
                         )}
                         <div>
-                          <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
+                          <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>{t('smallest')} {ext.smallest.fish}</div>
                           <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
                         </div>
                       </div>
-                      <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} кг</div>
+                      <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} {t('kg')}</div>
                     </div>
                   )}
                   {ext.largest && (
@@ -530,11 +649,11 @@
                           </div>
                         )}
                         <div>
-                          <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
+                          <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>{t('largest')} {ext.largest.fish}</div>
                           <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
                         </div>
                       </div>
-                      <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} кг</div>
+                      <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} {t('kg')}</div>
                     </div>
                   )}
                 </div>
@@ -648,7 +767,7 @@
               className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[1.33]"
             >
               <span>🎁</span>
-              <span>Подарок</span>
+              <span>{t('gift')}</span>
             </button>
           )}
 
@@ -674,13 +793,13 @@
           {/* На десктопе CTA поверх сцены; на мобиле — ниже (см. ниже) */}
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
-              <button onClick={onCast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
+              <button onClick={onCast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
             ) : biting ? (
-              <button onClick={onHook} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">Подсечь!</button>
+              <button onClick={onHook} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
             ) : (
               <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
                 <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-                <div className="opacity-90">Ожидаем поклёвку…</div>
+                <div className="opacity-90">{t('waitingBite')}</div>
               </div>
             )}
           </div>
@@ -740,7 +859,7 @@
               if(r.status===401) throw new Error('unauthorized');
               throw new Error('me failed');
             }
-            const d = await r.json(); setMe(d);
+            const d = await r.json(); t = makeT(d.language); document.documentElement.lang = d.language; setMe(d);
               try{
                 const s = await fetch(`/api/shop`,{credentials:'include'});
                 if(!s.ok){
@@ -750,16 +869,17 @@
                 }
               }catch(e){
                 if(e.message==='unauthorized'){
-                  setError('Требуется авторизация. Запустите игру через кнопку бота.');
+                  setError(t('authRequired'));
                   setShop([]);
                 }
               }
             }catch(e){
               if(e.message==='unauthorized'){
-                setError('Требуется авторизация. Запустите игру через кнопку бота.');
+                setError(t('authRequired'));
                 setShop([]);
               } else {
-                setError('Не удалось загрузить профиль');
+                setError(t('loadProfileFailed'));
+                t = makeT('ru'); document.documentElement.lang = 'ru';
                 setMe({
                   username:'angler',
                   needsNickname:false,
@@ -813,8 +933,8 @@
           }));
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-            : 'Ежедневные приманки уже забраны.');
+            ? t('authRequired')
+            : t('dailyTaken'));
         }
       }
 
@@ -844,8 +964,8 @@
           });
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-            : 'Не удалось купить');
+            ? t('authRequired')
+            : t('purchaseFailed'));
         }
       }
 
@@ -860,8 +980,8 @@
           setMe(p=>({...p,locationId:id}));
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-            : e===403?'Локация закрыта':'Не удалось сменить локацию');
+            ? t('authRequired')
+            : e===403? t('locationLocked') : t('changeLocationFailed'));
         }
       }
 
@@ -881,7 +1001,7 @@
         try{
           await fetch('/api/language',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:newLang})});
           const r = await fetch(`/api/me`,{credentials:'include'});
-          if(r.ok) setMe(await r.json());
+          if(r.ok){ const m = await r.json(); t = makeT(m.language); document.documentElement.lang = m.language; setMe(m); }
         }catch(e){}
       }
 
@@ -889,7 +1009,7 @@
         if(castingRef.current) return; if(!me) return;
         const curId = me.currentLureId;
         const curLure = me.lures.find(l=>l.id===curId);
-        if(!curLure || curLure.qty<=0){ setError('Нет приманок. Забери ежедневные или купи в магазине.'); return; }
+        if(!curLure || curLure.qty<=0){ setError(t('noBaits')); return; }
         setError(null);
         setDrawerOpen(false);
         setBaitsOpen(false);
@@ -908,8 +1028,8 @@
           }));
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-            : e.message==='failed'?'Не удалось забросить': (e.message||'Неверная приманка для этой локации'));
+            ? t('authRequired')
+            : e.message==='failed'? t('castFailed') : (e.message||t('wrongLure')));
           return;
         }
         castingRef.current = true;
@@ -959,12 +1079,12 @@
               };
             });
           } else {
-            setError('Рыба сорвалась!');
+            setError(t('fishEscaped'));
           }
         }catch(e){
           setError(e.message==='unauthorized'
-            ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-            : 'Слишком часто забрасываешь. Подожди пару секунд.');
+            ? t('authRequired')
+            : t('castOften'));
         }finally{
           castingRef.current = false;
           setCasting(false);
@@ -976,7 +1096,7 @@
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
-              <div className="opacity-70 mt-2">Загружаем…</div>
+              <div className="opacity-70 mt-2">{t('loading')}</div>
             </div>
           </div>
         );
@@ -987,7 +1107,7 @@
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
-              <div className="opacity-70 mt-2">{error || 'Не удалось загрузить'}</div>
+              <div className="opacity-70 mt-2">{error || t('loadFailed')}</div>
             </div>
           </div>
         );
@@ -1008,13 +1128,13 @@
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
-                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">Забросить удочку</button>
+                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
                 ) : biting ? (
-                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">Подсечь!</button>
+                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
                 ) : (
                   <div className="glass w-full py-4 rounded-2xl text-center">
                     <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-                    <div className="opacity-90">Ожидаем поклёвку…</div>
+                    <div className="opacity-90">{t('waitingBite')}</div>
                   </div>
                 )}
               </div>
@@ -1024,11 +1144,11 @@
                 <div className="mt-4 p-4 rounded-xl glass flex items-center gap-4">
                   <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>e.currentTarget.style.display='none'} />
                   <div>
-                    <div className="text-base">Улов! {result.newFish && <span className="ml-1 text-yellow-300">Новая!</span>}</div>
-                    <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
-                    <div className="text-xs opacity-70">Локация: {result.location}</div>
+                    <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
+                    <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} {t('kg')}</div>
+                    <div className="text-xs opacity-70">{t('locationLabel')} {result.location}</div>
                     {result.newLocations && result.newLocations.map((n,i)=>(
-                      <div key={i} className="text-xs text-emerald-400">Открыта новая локация: {n}</div>
+                      <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
                     ))}
                   </div>
                 </div>
@@ -1037,9 +1157,9 @@
 
               {/* Последние уловы */}
               <div className="mt-6">
-                <div className="text-sm opacity-80 mb-2">Последние уловы</div>
+                <div className="text-sm opacity-80 mb-2">{t('recentCatches')}</div>
                 {(me.recent||[]).length===0 ? (
-                  <div className="text-sm opacity-60">Пока пусто — сделай первый заброс!</div>
+                  <div className="text-sm opacity-60">{t('emptyCatches')}</div>
                 ) : (
                   <div className="space-y-2">
                     {me.recent.map((c,i)=> (
@@ -1051,7 +1171,7 @@
                             <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
                           </div>
                         </div>
-                        <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} кг</div>
+                        <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
                       </div>
                     ))}
                   </div>
@@ -1061,7 +1181,7 @@
           )}
 
           {tab === 'tournaments' && (
-            <div className="mt-6 text-center opacity-70">Турниры в разработке</div>
+            <div className="mt-6 text-center opacity-70">{t('tournamentsSoon')}</div>
           )}
           {tab === 'achievements' && (
             <Achievements me={me} setMe={setMe} />
@@ -1069,7 +1189,7 @@
           {tab === 'shop' && (
             <div className="mt-6">
               {shop.length===0 ? (
-                <div className="text-center opacity-70">Магазин пуст</div>
+                <div className="text-center opacity-70">{t('shopEmpty')}</div>
               ) : (
                 <div className="space-y-4">
                   {shop.map(cat=> (
@@ -1108,19 +1228,19 @@
               setMe(p=>({...p,currentLureId:id}));
             }catch(e){
               setError(e.message==='unauthorized'
-                ? 'Требуется авторизация. Запустите игру через кнопку бота.'
-                : 'Не удалось выбрать приманку');
+                ? t('authRequired')
+                : t('selectBaitFailed'));
             }
           }} />
 
           {/* Нижние вкладки */}
           <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">
             <div className="flex text-center text-xs">
-              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>Рыбалка</button>
-              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>Турниры</button>
-              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>Достижения</button>
-              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>Справочник</button>
-              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>Магазин</button>
+              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('achievements')}</button>
+              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
           </div>
         </div>

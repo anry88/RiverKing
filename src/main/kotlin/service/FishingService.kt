@@ -508,7 +508,18 @@ class FishingService {
         ),
     )
 
-    fun listShop(): List<ShopCategory> = shopCategories
+    fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
+        cat.copy(
+            name = I18n.text(cat.name, lang),
+            packs = cat.packs.map { p ->
+                p.copy(
+                    name = I18n.text(p.name, lang),
+                    desc = I18n.text(p.desc, lang),
+                    items = p.items.map { I18n.lure(it.first, lang) to it.second }
+                )
+            }
+        )
+    }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
         val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
