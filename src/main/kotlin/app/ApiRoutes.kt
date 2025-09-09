@@ -113,6 +113,7 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
+            fishing.resetCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures = fishing.listLures(uid).map { it.copy(name = I18n.lure(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
