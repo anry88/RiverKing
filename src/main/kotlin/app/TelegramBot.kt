@@ -37,4 +37,17 @@ class TelegramBot(private val token: String) {
             disconnect()
         }
     }
+
+    fun answerCallbackQuery(id: String) {
+        val url = URL("https://api.telegram.org/bot$token/answerCallbackQuery")
+        val data = "callback_query_id=" + URLEncoder.encode(id, "UTF-8")
+        (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            outputStream.use { it.write(data.toByteArray()) }
+            inputStream.buffered().use { it.readBytes() }
+            disconnect()
+        }
+    }
 }

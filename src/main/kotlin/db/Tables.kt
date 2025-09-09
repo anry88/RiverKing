@@ -24,6 +24,7 @@ object DB {
                 LocationFishWeights,
                 Payments,
                 PaySupportRequests,
+                Tournaments,
             )
             seedIfEmpty()
         }
@@ -478,4 +479,15 @@ object PaySupportRequests : LongIdTable() {
     val status = varchar("status", 20)
     val adminMessage = text("admin_message").nullable()
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object Tournaments : LongIdTable() {
+    val name = varchar("name", 100)
+    val startTime = timestamp("start_time")
+    val endTime = timestamp("end_time")
+    val fish = varchar("fish", 100).nullable()
+    val location = varchar("location", 100).nullable()
+    val metric = varchar("metric", 20)
+    val prizePlaces = integer("prize_places")
+    val prizesJson = text("prizes_json")
 }
