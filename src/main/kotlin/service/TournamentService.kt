@@ -141,6 +141,9 @@ class TournamentService {
         val user: String?,
         val value: Double,
         val rank: Int,
+        val fish: String? = null,
+        val location: String? = null,
+        val at: Instant? = null,
     )
 
     private fun rowUser(row: ResultRow): String? {
@@ -160,20 +163,41 @@ class TournamentService {
         var cond: Op<Boolean> = (Catches.createdAt greaterEq t.startTime) and (Catches.createdAt lessEq t.endTime)
         if (t.fish != null) cond = cond and (Fish.name eq t.fish)
         if (t.location != null) cond = cond and (Locations.name eq t.location)
+        data class CatchRow(
+            val userId: Long,
+            val user: String?,
+            val weight: Double,
+            val fish: String,
+            val location: String,
+            val at: Instant,
+        )
         val rows = ((Catches leftJoin Users) innerJoin Fish)
             .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
             .select { cond }
-            .map { row -> Triple(row[Catches.userId].value, rowUser(row), row[Catches.weight]) }
-        val grouped = rows.groupBy { it.first }
+            .map { row ->
+                CatchRow(
+                    row[Catches.userId].value,
+                    rowUser(row),
+                    row[Catches.weight],
+                    row[Fish.name],
+                    row[Locations.name],
+                    row[Catches.createdAt],
+                )
+            }
+        val grouped = rows.groupBy { it.userId }
             .map { (uid, list) ->
-                val name = list.first().second
-                val weights = list.map { it.third }
-                val value = when (t.metric.lowercase()) {
-                    "smallest" -> weights.minOrNull() ?: 0.0
-                    "count" -> list.size.toDouble()
-                    else -> weights.maxOrNull() ?: 0.0
+                val name = list.first().user
+                val chosen = when (t.metric.lowercase()) {
+                    "smallest" -> list.minByOrNull { it.weight }
+                    "count" -> null
+                    else -> list.maxByOrNull { it.weight }
                 }
-                LeaderboardEntry(uid, name, value, 0)
+                val value = when (t.metric.lowercase()) {
+                    "smallest" -> chosen?.weight ?: 0.0
+                    "count" -> list.size.toDouble()
+                    else -> chosen?.weight ?: 0.0
+                }
+                LeaderboardEntry(uid, name, value, 0, chosen?.fish, chosen?.location, chosen?.at)
             }
         val sorted = when (t.metric.lowercase()) {
             "smallest" -> grouped.sortedBy { it.value }
