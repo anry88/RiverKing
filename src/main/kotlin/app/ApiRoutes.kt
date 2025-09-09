@@ -33,6 +33,13 @@ fun Application.apiRoutes(env: Env) {
     // that are served before the Sessions plugin runs.
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
+        if (path.startsWith("/app")) {
+            val qsTgId = call.request.queryParameters["tgId"]?.toLongOrNull()
+            val sessionTgId = call.sessions.get<AppSession>()?.tgId
+            if (qsTgId != null && sessionTgId != null && qsTgId != sessionTgId) {
+                call.sessions.clear<AppSession>()
+            }
+        }
         if (path != "/metrics") {
             val session = call.sessions.get<AppSession>()
             val tgId = session?.tgId
