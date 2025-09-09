@@ -204,8 +204,10 @@
         dailyTaken:'Ежедневные приманки уже забраны.',
         noBaits:'Нет приманок. Забери ежедневные или купи в магазине.',
         castOften:'Слишком часто забрасываешь. Подожди пару секунд.',
+        alreadyCasting:'Заброс уже выполняется.',
         fishEscaped:'Рыба сорвалась!',
         wrongLure:'Неверная приманка для этой локации',
+        noSuitableFish:'Нет подходящей рыбы на эту приманку.',
         fishing:'Рыбалка',
         tournaments:'Турниры',
         achievements:'Достижения',
@@ -265,8 +267,10 @@
         dailyTaken:'Daily baits already claimed.',
         noBaits:'No baits. Claim daily or buy in shop.',
         castOften:'Casting too often. Wait a few seconds.',
+        alreadyCasting:'Casting already in progress.',
         fishEscaped:'Fish got away!',
         wrongLure:'Wrong lure for this location',
+        noSuitableFish:'No suitable fish for this bait here.',
         fishing:'Fishing',
         tournaments:'Tournaments',
         achievements:'Achievements',
@@ -1015,7 +1019,10 @@
         }catch(e){
           setError(e.message==='unauthorized'
             ? t('authRequired')
-            : e.message==='failed'? t('castFailed') : (e.message||t('wrongLure')));
+            : e.message==='failed'? t('castFailed')
+            : e.message==='casting'? t('alreadyCasting')
+            : e.message==='No suitable fish'? t('noSuitableFish')
+            : (e.message||t('wrongLure')));
           return;
         }
         castingRef.current = true;
