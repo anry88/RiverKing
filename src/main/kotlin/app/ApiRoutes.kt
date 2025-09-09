@@ -289,8 +289,9 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
-            val data = fishing.guide()
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val data = fishing.guide(language)
             call.respond(data)
         }
 
@@ -423,7 +424,13 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res: List<CatchDTO> = fishing.personalTopByLocation(uid, id)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val res = fishing.personalTopByLocation(uid, id).map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
+                )
+            }
             call.respond(res)
         }
 
@@ -435,7 +442,13 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val res: List<CatchDTO> = fishing.personalTopByFish(uid)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val res = fishing.personalTopByFish(uid).map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
+                )
+            }
             call.respond(res)
         }
 
@@ -448,8 +461,20 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res: FishExtremeDTO = fishing.personalFishExtremes(uid, id)
-            call.respond(res)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val res = fishing.personalFishExtremes(uid, id)
+            call.respond(
+                FishExtremeDTO(
+                    res.smallest?.copy(
+                        fish = I18n.fish(res.smallest.fish, language),
+                        location = I18n.location(res.smallest.location, language)
+                    ),
+                    res.largest?.copy(
+                        fish = I18n.fish(res.largest.fish, language),
+                        location = I18n.location(res.largest.location, language)
+                    )
+                )
+            )
         }
 
         // Achievements - global
@@ -460,9 +485,15 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res: List<CatchDTO> = fishing.globalTopByLocation(id)
+            val res = fishing.globalTopByLocation(id).map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
+                )
+            }
             call.respond(res)
         }
 
@@ -473,8 +504,14 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
-            val res: List<CatchDTO> = fishing.globalTopByFish()
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val res = fishing.globalTopByFish().map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
+                )
+            }
             call.respond(res)
         }
 
@@ -485,10 +522,22 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res: FishExtremeDTO = fishing.globalFishExtremes(id)
-            call.respond(res)
+            val res = fishing.globalFishExtremes(id)
+            call.respond(
+                FishExtremeDTO(
+                    res.smallest?.copy(
+                        fish = I18n.fish(res.smallest.fish, language),
+                        location = I18n.location(res.smallest.location, language)
+                    ),
+                    res.largest?.copy(
+                        fish = I18n.fish(res.largest.fish, language),
+                        location = I18n.location(res.largest.location, language)
+                    )
+                )
+            )
         }
     }
 }

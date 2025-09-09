@@ -245,7 +245,7 @@ class FishingService {
         val lures: List<GuideLureDTO>,
     )
 
-    fun guide(): GuideDTO = transaction {
+    fun guide(lang: String): GuideDTO = transaction {
         fun rarityRank(r: String) = when(r) {
             "common" -> 0
             "uncommon" -> 1
@@ -258,10 +258,10 @@ class FishingService {
         // Locations with fish and possible lures
         val locationDtos = Locations.selectAll().map { locRow ->
             val locId = locRow[Locations.id].value
-            val locName = locRow[Locations.name]
+            val locName = I18n.location(locRow[Locations.name], lang)
             val fishRows = (LocationFishWeights innerJoin Fish)
                 .select { LocationFishWeights.locationId eq locId }
-                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
                 .sortedBy { rarityRank(it.rarity) }
             val waters = (LocationFishWeights innerJoin Fish)
                 .slice(Fish.water)
@@ -271,37 +271,37 @@ class FishingService {
             val waterFilter = with(SqlExpressionBuilder) {
                 if (waters.isNotEmpty()) Lures.water inList waters else Lures.water eq "fresh"
             }
-            val lureNames = Lures.select { waterFilter }.map { it[Lures.name] }
+            val lureNames = Lures.select { waterFilter }.map { I18n.lure(it[Lures.name], lang) }
             GuideLocationDTO(locId, locName, fishRows, lureNames)
         }
 
         // Fish with locations and matching lures
         val fishDtos = Fish.selectAll().map { fRow ->
             val fid = fRow[Fish.id].value
-            val name = fRow[Fish.name]
+            val name = I18n.fish(fRow[Fish.name], lang)
             val rarity = fRow[Fish.rarity]
             val pred = fRow[Fish.predator]
             val water = fRow[Fish.water]
             val locations = (LocationFishWeights innerJoin Locations)
                 .select { LocationFishWeights.fishId eq fid }
-                .map { it[Locations.name] }
+                .map { I18n.location(it[Locations.name], lang) }
             val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
-                .map { it[Lures.name] }
+                .map { I18n.lure(it[Lures.name], lang) }
             GuideFishDTO(fid, name, rarity, locations, lures)
         }.sortedBy { rarityRank(it.rarity) }
 
         // Lures with fish and locations
         val lureDtos = Lures.selectAll().map { lRow ->
-            val name = lRow[Lures.name]
+            val name = I18n.lure(lRow[Lures.name], lang)
             val pred = lRow[Lures.predator]
             val water = lRow[Lures.water]
             val fishList = Fish.select { (Fish.predator eq pred) and (Fish.water eq water) }
-                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
                 .sortedBy { rarityRank(it.rarity) }
             val locations = (LocationFishWeights innerJoin Fish innerJoin Locations)
                 .slice(Locations.name)
                 .select { (Fish.predator eq pred) and (Fish.water eq water) }
-                .map { it[Locations.name] }
+                .map { I18n.location(it[Locations.name], lang) }
                 .distinct()
             GuideLureDTO(name, fishList, locations)
         }

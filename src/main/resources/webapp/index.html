@@ -422,11 +422,12 @@
       const [data,setData] = React.useState(null);
       const [error,setError] = React.useState(null);
       React.useEffect(()=>{
+        setData(null); setError(null);
         fetch('/api/guide',{credentials:'include'})
           .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
           .then(setData)
           .catch(e=> setError(e===401 ? t('authRequired') : t('loadFailed')));
-      },[]);
+      },[me.language]);
       if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
       if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
       return (
@@ -527,7 +528,7 @@
           .then(r=>r.json())
           .then(d=> setFishList(d.fish||[]))
           .catch(()=>{});
-      },[]);
+      },[me.language]);
 
       React.useEffect(()=>{
         if(me.needsNickname) return;
@@ -541,7 +542,7 @@
           fetch(`/api/achievements/${mode}/fish/${fishId}`,{credentials:'include'})
             .then(r=>r.json()).then(setExt).catch(()=>setExt(null));
         }
-      },[mode,section,locId,fishId,me.needsNickname]);
+      },[mode,section,locId,fishId,me.needsNickname,me.language]);
 
       return (
         <div className="mt-4 space-y-4">
@@ -1002,6 +1003,8 @@
           await fetch('/api/language',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:newLang})});
           const r = await fetch(`/api/me`,{credentials:'include'});
           if(r.ok){ const m = await r.json(); t = makeT(m.language); document.documentElement.lang = m.language; setMe(m); }
+          const s = await fetch(`/api/shop`,{credentials:'include'});
+          if(s.ok){ setShop(await s.json()); }
         }catch(e){}
       }
 
