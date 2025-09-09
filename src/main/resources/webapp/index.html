@@ -1277,33 +1277,39 @@
                       <div className="space-y-2">
                         {(currentTournament.leaderboard || []).map(e=> (
                           <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div>{e.rank}</div>
-                              {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
-                              <div>
-                                <div>{e.user||'-'}</div>
-                                {e.fish && <div className="text-xs opacity-70">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <div className="w-8 h-8 flex items-center justify-center shrink-0">{e.rank}</div>
+                              {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  <div className="truncate">{e.user||'-'}</div>
+                                  {e.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===e.prize.packageId)?.name)||e.prize.packageId} x{e.prize.qty}</div>}
+                                </div>
+                                {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="w-12 text-right shrink-0">
                               <div>{currentTournament.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
-                              {currentTournament.tournament.metric!=='count' && <div>{t('kg')}</div>}
+                              {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                           </div>
                         ))}
                         {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
                           <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
-                            <div className="flex items-center gap-2">
-                              <div>{currentTournament.mine.rank}</div>
-                              {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
-                              <div>
-                                <div>{currentTournament.mine.user||t('you')}</div>
-                                {currentTournament.mine.fish && <div className="text-xs opacity-70">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <div className="w-8 h-8 flex items-center justify-center shrink-0">{currentTournament.mine.rank}</div>
+                              {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  <div className="truncate">{currentTournament.mine.user||t('you')}</div>
+                                  {currentTournament.mine.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===currentTournament.mine.prize.packageId)?.name)||currentTournament.mine.prize.packageId} x{currentTournament.mine.prize.qty}</div>}
+                                </div>
+                                {currentTournament.mine.fish && <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="w-12 text-right shrink-0">
                               <div>{currentTournament.tournament.metric==='count'? Number(currentTournament.mine.value).toFixed(0) : Number(currentTournament.mine.value).toFixed(2)}</div>
-                              {currentTournament.tournament.metric!=='count' && <div>{t('kg')}</div>}
+                              {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                           </div>
                         )}

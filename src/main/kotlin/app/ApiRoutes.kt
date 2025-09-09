@@ -7,6 +7,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
@@ -17,6 +18,7 @@ import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.TournamentService
 import service.I18n
+import service.PrizeSpec
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -97,6 +99,9 @@ fun Application.apiRoutes(env: Env) {
     data class PrizeDTO(val id: Long, val packageId: String, val qty: Int)
 
     @Serializable
+    data class PrizeSpecDTO(val packageId: String, val qty: Int)
+
+    @Serializable
     data class TournamentDTO(
         val id: Long,
         val startTime: Long,
@@ -114,6 +119,7 @@ fun Application.apiRoutes(env: Env) {
         val fish: String? = null,
         val location: String? = null,
         val at: Long? = null,
+        val prize: PrizeSpecDTO? = null,
     )
 
     @Serializable
@@ -241,6 +247,7 @@ fun Application.apiRoutes(env: Env) {
             val t = tournaments.currentTournament()
                 ?: return@get call.respond(HttpStatusCode.NoContent)
             val (top, mine) = tournaments.leaderboard(t, uid)
+            val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val dto = TournamentDTO(
                 id = t.id,
                 startTime = t.startTime.epochSecond,
@@ -259,6 +266,7 @@ fun Application.apiRoutes(env: Env) {
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
                     )
                 },
                 mine = mine?.let {
@@ -269,6 +277,7 @@ fun Application.apiRoutes(env: Env) {
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
                     )
                 },
             )
