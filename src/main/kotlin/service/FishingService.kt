@@ -80,6 +80,13 @@ class FishingService {
         Users.select { Users.id eq userId }.singleOrNull()?.let { nameFromRow(it) }
     }
 
+    fun resetCasting(userId: Long) = transaction {
+        Users.update({ Users.id eq userId }) {
+            it[Users.isCasting] = false
+            it[Users.castLureId] = null
+        }
+    }
+
     private fun nameFromRow(row: ResultRow): String? {
         val fn = row.getOrNull(Users.firstName)
         val ln = row.getOrNull(Users.lastName)
