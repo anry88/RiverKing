@@ -104,8 +104,6 @@ fun Application.apiRoutes(env: Env) {
         val fish: String? = null,
         val location: String? = null,
         val metric: String,
-        val prizePlaces: Int,
-        val prizes: String,
     )
 
     @Serializable
@@ -250,8 +248,6 @@ fun Application.apiRoutes(env: Env) {
                 fish = t.fish?.let { I18n.fish(it, language) },
                 location = t.location?.let { I18n.location(it, language) },
                 metric = t.metric.lowercase(),
-                prizePlaces = t.prizePlaces,
-                prizes = t.prizesJson,
             )
             val resp = CurrentTournamentDTO(
                 tournament = dto,
@@ -296,8 +292,6 @@ fun Application.apiRoutes(env: Env) {
                     fish = t.fish?.let { I18n.fish(it, language) },
                     location = t.location?.let { I18n.location(it, language) },
                     metric = t.metric.lowercase(),
-                    prizePlaces = t.prizePlaces,
-                    prizes = t.prizesJson,
                 )
             }
             call.respond(list)
