@@ -226,6 +226,7 @@
         fishLabel:'Рыба:',
         anyFish:'Любая рыба',
         anyLocation:'Любая локация',
+        conditionsLabel:'Условия:',
         tapToClaim:'Нажмите, чтобы получить',
       },
       en: {
@@ -297,6 +298,7 @@
         fishLabel:'Fish:',
         anyFish:'Any fish',
         anyLocation:'Any location',
+        conditionsLabel:'Conditions:',
         tapToClaim:'Tap to claim',
       }
     };
@@ -1269,10 +1271,11 @@
                   (
                     <div>
                       <div className="p-4 rounded-xl glass text-left mb-4">
+                        <div className="text-base font-semibold mb-1">{currentTournament.tournament.name}</div>
                         <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
                         <div className="text-sm opacity-80">{t('fishLabel')} {currentTournament.tournament.fish || t('anyFish')}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
-                        <div className="text-sm opacity-80">{t(currentTournament.tournament.metric)}</div>
+                        <div className="text-sm opacity-80">{t('conditionsLabel')} {t(currentTournament.tournament.metric)}</div>
                       </div>
                       <div className="space-y-2">
                         {(currentTournament.leaderboard || []).map(e=> (
@@ -1326,10 +1329,11 @@
                   <div className="space-y-4">
                     {upcomingTournaments.map(tn=> (
                       <div key={tn.id} className="p-4 rounded-xl glass text-left">
+                        <div className="text-base font-semibold mb-1">{tn.name}</div>
                         <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
                         <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
-                        <div className="text-sm opacity-80">{t(tn.metric)}</div>
+                        <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
                       </div>
                     ))}
                   </div>

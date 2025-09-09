@@ -25,7 +25,8 @@ class TournamentServiceTest {
         val svc = TournamentService()
         val now = Instant.now()
         svc.createTournament(
-            name = "Test",
+            nameRu = "Тест",
+            nameEn = "Test",
             start = now,
             end = now.plusSeconds(3600),
             fish = "Щука",
@@ -36,7 +37,7 @@ class TournamentServiceTest {
         )
         val list = svc.listTournaments()
         assertEquals(1, list.size)
-        assertEquals("Test", list[0].name)
+        assertEquals("Тест", list[0].nameRu)
     }
 
     @Test
@@ -57,7 +58,8 @@ class TournamentServiceTest {
         val svc = TournamentService()
         val now = Instant.now()
         val id = svc.createTournament(
-            name = "Orig",
+            nameRu = "Ориг",
+            nameEn = "Orig",
             start = now,
             end = now.plusSeconds(100),
             fish = null,
@@ -67,10 +69,11 @@ class TournamentServiceTest {
             prizes = "[{\"pack\":\"fresh_topup_s\",\"qty\":1}]",
         )
         var t = svc.getTournament(id)
-        assertEquals("Orig", t?.name)
+        assertEquals("Ориг", t?.nameRu)
         svc.updateTournament(
             id,
-            name = "New",
+            nameRu = "Нью",
+            nameEn = "New",
             start = now,
             end = now.plusSeconds(200),
             fish = "Щука",
@@ -80,7 +83,7 @@ class TournamentServiceTest {
             prizes = "[{\"pack\":\"fresh_topup_s\",\"qty\":1},{\"pack\":\"fresh_topup_s\",\"qty\":1}]",
         )
         t = svc.getTournament(id)
-        assertEquals("New", t?.name)
+        assertEquals("Нью", t?.nameRu)
         svc.deleteTournament(id)
         assertEquals(0, svc.listTournaments().size)
     }

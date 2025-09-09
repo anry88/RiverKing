@@ -13,7 +13,8 @@ import java.time.Instant
 
 data class Tournament(
     val id: Long,
-    val name: String,
+    val nameRu: String,
+    val nameEn: String,
     val startTime: Instant,
     val endTime: Instant,
     val fish: String?,
@@ -30,7 +31,8 @@ data class UserPrize(val id: Long, val packageId: String, val qty: Int)
 
 class TournamentService {
     fun createTournament(
-        name: String,
+        nameRu: String,
+        nameEn: String,
         start: Instant,
         end: Instant,
         fish: String?,
@@ -40,7 +42,8 @@ class TournamentService {
         prizes: String,
     ): Long = transaction {
         Tournaments.insert {
-            it[Tournaments.name] = name
+            it[Tournaments.nameRu] = nameRu
+            it[Tournaments.nameEn] = nameEn
             it[Tournaments.startTime] = start
             it[Tournaments.endTime] = end
             it[Tournaments.fish] = fish
@@ -55,7 +58,8 @@ class TournamentService {
         Tournaments.selectAll().map { row ->
             Tournament(
                 id = row[Tournaments.id].value,
-                name = row[Tournaments.name],
+                nameRu = row[Tournaments.nameRu],
+                nameEn = row[Tournaments.nameEn],
                 startTime = row[Tournaments.startTime],
                 endTime = row[Tournaments.endTime],
                 fish = row[Tournaments.fish],
@@ -71,7 +75,8 @@ class TournamentService {
         Tournaments.select { Tournaments.id eq id }.singleOrNull()?.let { row ->
             Tournament(
                 id = row[Tournaments.id].value,
-                name = row[Tournaments.name],
+                nameRu = row[Tournaments.nameRu],
+                nameEn = row[Tournaments.nameEn],
                 startTime = row[Tournaments.startTime],
                 endTime = row[Tournaments.endTime],
                 fish = row[Tournaments.fish],
@@ -85,7 +90,8 @@ class TournamentService {
 
     fun updateTournament(
         id: Long,
-        name: String,
+        nameRu: String,
+        nameEn: String,
         start: Instant,
         end: Instant,
         fish: String?,
@@ -95,7 +101,8 @@ class TournamentService {
         prizes: String,
     ) = transaction {
         Tournaments.update({ Tournaments.id eq id }) {
-            it[Tournaments.name] = name
+            it[Tournaments.nameRu] = nameRu
+            it[Tournaments.nameEn] = nameEn
             it[Tournaments.startTime] = start
             it[Tournaments.endTime] = end
             it[Tournaments.fish] = fish
@@ -116,7 +123,8 @@ class TournamentService {
         }.singleOrNull()?.let { row ->
             Tournament(
                 id = row[Tournaments.id].value,
-                name = row[Tournaments.name],
+                nameRu = row[Tournaments.nameRu],
+                nameEn = row[Tournaments.nameEn],
                 startTime = row[Tournaments.startTime],
                 endTime = row[Tournaments.endTime],
                 fish = row[Tournaments.fish],
@@ -132,7 +140,8 @@ class TournamentService {
         Tournaments.select { Tournaments.startTime greater now }.map { row ->
             Tournament(
                 id = row[Tournaments.id].value,
-                name = row[Tournaments.name],
+                nameRu = row[Tournaments.nameRu],
+                nameEn = row[Tournaments.nameEn],
                 startTime = row[Tournaments.startTime],
                 endTime = row[Tournaments.endTime],
                 fish = row[Tournaments.fish],
@@ -169,7 +178,10 @@ class TournamentService {
 
     fun leaderboard(t: Tournament, userId: Long, limit: Int = 10): Pair<List<LeaderboardEntry>, LeaderboardEntry?> = transaction {
         var cond: Op<Boolean> = (Catches.createdAt greaterEq t.startTime) and (Catches.createdAt lessEq t.endTime)
-        if (t.fish != null) cond = cond and (Fish.name eq t.fish)
+        if (t.fish != null) {
+            val rarities = setOf("common", "uncommon", "rare", "epic", "legendary")
+            cond = cond and if (t.fish in rarities) (Fish.rarity eq t.fish) else (Fish.name eq t.fish)
+        }
         if (t.location != null) cond = cond and (Locations.name eq t.location)
         data class CatchRow(
             val userId: Long,
@@ -242,7 +254,8 @@ class TournamentService {
                 val awarded = !UserPrizes.select { UserPrizes.tournamentId eq id }.empty()
                 if (awarded) null else Tournament(
                     id = id,
-                    name = row[Tournaments.name],
+                    nameRu = row[Tournaments.nameRu],
+                    nameEn = row[Tournaments.nameEn],
                     startTime = row[Tournaments.startTime],
                     endTime = row[Tournaments.endTime],
                     fish = row[Tournaments.fish],
