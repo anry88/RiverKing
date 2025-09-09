@@ -114,7 +114,7 @@ fun Application.botRoutes(env: Env) {
                 val lang = fishing.userLanguage(uid)
                 val button = if (lang == "ru") "\uD83C\uDFA3 Играть" else "\uD83C\uDFA3 Play"
                 val reply = if (lang == "ru") "Нажми кнопку, чтобы начать игру" else "Press the button to start the game"
-                val markup = """{"keyboard":[[{"text":"$button","web_app":{"url":"${env.publicBaseUrl}/app"}}]],"resize_keyboard":true}"""
+                val markup = """{"keyboard":[[{"text":"$button","web_app":{"url":"${env.publicBaseUrl}/app?tgId=$chatId"}}]],"resize_keyboard":true}"""
                 try {
                     bot.sendMessage(chatId, reply, markup)
                 } catch (e: Exception) {
