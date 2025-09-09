@@ -883,7 +883,7 @@
                   setCurrentTournament(null);
                 }
                 const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
-                if(ut.ok){
+                if(ut.status===200){
                   setUpcomingTournaments(await ut.json());
                 } else {
                   setUpcomingTournaments([]);
@@ -1050,7 +1050,11 @@
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
           if(ct.status===200){ setCurrentTournament(await ct.json()); } else { setCurrentTournament(null); }
           const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
-          if(ut.ok){ setUpcomingTournaments(await ut.json()); } else { setUpcomingTournaments([]); }
+          if(ut.status===200){
+            setUpcomingTournaments(await ut.json());
+          } else {
+            setUpcomingTournaments([]);
+          }
         }catch(e){}
       }
 
