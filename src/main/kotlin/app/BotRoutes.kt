@@ -71,12 +71,16 @@ private fun parsePrizes(str: String): MutableList<PrizeSpec> {
             )
         }.toMutableList()
     } catch (_: Exception) {
-        str.split(',').map { it.trim() }.filter { it.isNotEmpty() }.map { s ->
-            val parts = s.split(':')
-            val pack = parts.getOrNull(0) ?: s
-            val qty = parts.getOrNull(1)?.toIntOrNull() ?: 1
-            PrizeSpec(pack, qty)
-        }.toMutableList()
+        str.split(Regex("""[,\n]+"""))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { s ->
+                val parts = s.split(Regex("""[:\s]+""")).filter { it.isNotBlank() }
+                val pack = parts.getOrNull(0) ?: s
+                val qty = parts.getOrNull(1)?.toIntOrNull() ?: 1
+                PrizeSpec(pack, qty)
+            }
+            .toMutableList()
     }
 }
 
