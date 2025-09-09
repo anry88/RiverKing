@@ -1,0 +1,88 @@
+package service
+
+object I18n {
+    private val fish = mapOf(
+        "Плотва" to "Roach",
+        "Окунь" to "Perch",
+        "Карась" to "Crucian Carp",
+        "Лещ" to "Bream",
+        "Щука" to "Pike",
+        "Карп" to "Carp",
+        "Сом" to "Catfish",
+        "Осётр" to "Sturgeon",
+        "Уклейка" to "Bleak",
+        "Линь" to "Tench",
+        "Ротан" to "Rotan",
+        "Судак" to "Zander",
+        "Чехонь" to "Sabrefish",
+        "Хариус" to "Grayling",
+        "Форель ручьевая" to "Brook Trout",
+        "Таймень" to "Taimen",
+        "Налим" to "Burbot",
+        "Сиг" to "Whitefish",
+        "Голавль" to "Chub",
+        "Жерех" to "Asp",
+        "Толстолобик" to "Bighead Carp",
+        "Белый амур" to "Grass Carp",
+        "Угорь европейский" to "European Eel",
+        "Стерлядь" to "Sterlet",
+        "Кефаль" to "Mullet",
+        "Камбала" to "Flounder",
+        "Сельдь" to "Herring",
+        "Ставрида" to "Horse Mackerel",
+        "Треска" to "Cod",
+        "Сайда" to "Pollock",
+        "Морская форель" to "Sea Trout",
+        "Палтус" to "Halibut",
+        "Корюшка" to "Smelt",
+        "Лосось атлантический" to "Atlantic Salmon",
+        "Лаврак" to "Sea Bass",
+        "Скумбрия атлантическая" to "Atlantic Mackerel",
+        "Белуга" to "Beluga",
+        "Ёрш" to "Ruffe",
+        "Пескарь" to "Gudgeon",
+        "Густера" to "Blue Bream",
+        "Краснопёрка" to "Rudd",
+        "Елец" to "Dace",
+        "Верхоплавка" to "Topmouth Gudgeon",
+        "Язь" to "Ide",
+        "Бычок" to "Goby",
+        "Килька" to "Sprat",
+        "Мойва" to "Capelin",
+        "Дорадо" to "Dorado",
+        "Ваху" to "Wahoo",
+        "Парусник" to "Sailfish",
+        "Рыба-меч" to "Swordfish",
+        "Марлин синий" to "Blue Marlin",
+        "Тунец синеперый" to "Bluefin Tuna",
+        "Акула мако" to "Mako Shark",
+    )
+
+    private val locations = mapOf(
+        "Пруд" to "Pond",
+        "Река" to "River",
+        "Озеро" to "Lake",
+        "Болото" to "Swamp",
+        "Горная река" to "Mountain River",
+        "Водохранилище" to "Reservoir",
+        "Дельта реки" to "River Delta",
+        "Прибрежье моря" to "Sea Coast",
+        "Фьорд" to "Fjord",
+        "Открытый океан" to "Open Ocean",
+    )
+
+    private val lures = mapOf(
+        "Пресная мирная" to "Freshwater Peaceful",
+        "Пресная хищная" to "Freshwater Predator",
+        "Морская мирная" to "Saltwater Peaceful",
+        "Морская хищная" to "Saltwater Predator",
+        "Пресная мирная+" to "Freshwater Peaceful+",
+        "Пресная хищная+" to "Freshwater Predator+",
+        "Морская мирная+" to "Saltwater Peaceful+",
+        "Морская хищная+" to "Saltwater Predator+",
+    )
+
+    fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
+    fun location(name: String, lang: String) = if (lang == "en") locations[name] ?: name else name
+    fun lure(name: String, lang: String) = if (lang == "en") lures[name] ?: name else name
+}

@@ -91,7 +91,11 @@
     const ROD_SIZE_MULT = 1.5;       // УВЕЛИЧИТЬ в 1.5 раза от предыдущей логики
     const ROD_BASE_X_FRACTION = 2/3; // Начинать примерно в 2/3 ширины сцены
 
-    const FISH_IMG = {
+    const FISH_TRANSLATIONS = {
+      'Плотва':'Roach','Окунь':'Perch','Карась':'Crucian Carp','Лещ':'Bream','Щука':'Pike','Карп':'Carp','Сом':'Catfish','Осётр':'Sturgeon','Уклейка':'Bleak','Линь':'Tench','Ротан':'Rotan','Судак':'Zander','Чехонь':'Sabrefish','Хариус':'Grayling','Форель ручьевая':'Brook Trout','Таймень':'Taimen','Налим':'Burbot','Сиг':'Whitefish','Голавль':'Chub','Жерех':'Asp','Толстолобик':'Bighead Carp','Белый амур':'Grass Carp','Угорь европейский':'European Eel','Стерлядь':'Sterlet','Кефаль':'Mullet','Камбала':'Flounder','Сельдь':'Herring','Ставрида':'Horse Mackerel','Треска':'Cod','Сайда':'Pollock','Морская форель':'Sea Trout','Палтус':'Halibut','Корюшка':'Smelt','Лосось атлантический':'Atlantic Salmon','Лаврак':'Sea Bass','Скумбрия атлантическая':'Atlantic Mackerel','Белуга':'Beluga','Ёрш':'Ruffe','Пескарь':'Gudgeon','Густера':'Blue Bream','Краснопёрка':'Rudd','Елец':'Dace','Верхоплавка':'Topmouth Gudgeon','Язь':'Ide','Бычок':'Goby','Килька':'Sprat','Мойва':'Capelin','Дорадо':'Dorado','Ваху':'Wahoo','Парусник':'Sailfish','Рыба-меч':'Swordfish','Марлин синий':'Blue Marlin','Тунец синеперый':'Bluefin Tuna','Акула мако':'Mako Shark'
+    };
+    const FISH_IMG = {};
+    Object.entries({
       'Плотва': '/app/assets/fish/plotva.png',
       'Окунь': '/app/assets/fish/okun.png',
       'Карась': '/app/assets/fish/karas.png',
@@ -146,6 +150,15 @@
       'Марлин синий': '/app/assets/fish/marlin_siniy.png',
       'Тунец синеперый': '/app/assets/fish/tunets_sineperiy.png',
       'Акула мако': '/app/assets/fish/akula_mako.png',
+    }).forEach(([ru,path])=>{
+      FISH_IMG[ru]=path;
+      const en = FISH_TRANSLATIONS[ru];
+      if(en) FISH_IMG[en]=path;
+    });
+
+    const UI_STRINGS = {
+      ru: { location:'Локация', baits:'Приманки', total:'Всего', today:'Сегодня' },
+      en: { location:'Location', baits:'Baits', total:'Total', today:'Today' }
     };
 
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
@@ -177,10 +190,11 @@
       );
     }
 
-    function Header({me,onEditNickname,onOpenLocations,onOpenBaits}){
+    function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+      const t = k => (UI_STRINGS[lang]||UI_STRINGS.ru)[k]||k;
       return (
         <div className="sticky top-0 z-40 -mx-4">
           <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
@@ -188,16 +202,21 @@
               <span className="text-xl font-semibold">🎣 RiverKing</span>
               <span className="text-xs opacity-70">beta</span>
             </div>
-            <button onClick={onEditNickname} className="text-sm hover:underline">
-              {me.username || '—'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={onEditNickname} className="text-sm hover:underline">
+                {me.username || '—'}
+              </button>
+              <button onClick={onToggleLanguage} className="text-sm hover:underline">
+                {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
+              </button>
+            </div>
           </div>
           <div className="px-4 py-2 bg-black/20 border-b border-white/10">
             <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
-              <StatChip icon={'📍'} label="Локация" value={currentLoc} onClick={onOpenLocations} />
-              <StatChip icon={'🪱'} label="Приманки" value={lureVal} onClick={onOpenBaits} />
-              <StatChip icon={'🐟'} label="Всего" value={`${Number(me.totalWeight||0).toFixed(1)} кг`} />
-              <StatChip icon={'📅'} label="Сегодня" value={`${Number(me.todayWeight||0).toFixed(1)} кг`} />
+              <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
+              <StatChip icon={'🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
+              <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} кг`} />
+              <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} кг`} />
             </div>
           </div>
         </div>
@@ -744,6 +763,7 @@
                 setMe({
                   username:'angler',
                   needsNickname:false,
+                  language:'ru',
                   lures:[
                     {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
                     {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
@@ -856,6 +876,15 @@
           .finally(()=> setNickOpen(false));
       }
 
+      async function toggleLanguage(){
+        const newLang = me.language==='ru' ? 'en' : 'ru';
+        try{
+          await fetch('/api/language',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:newLang})});
+          const r = await fetch(`/api/me`,{credentials:'include'});
+          if(r.ok) setMe(await r.json());
+        }catch(e){}
+      }
+
       async function cast(){
         if(castingRef.current) return; if(!me) return;
         const curId = me.currentLureId;
@@ -966,7 +995,7 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
-          <Header me={me} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} />
+          <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 
           {tab === 'fish' && (

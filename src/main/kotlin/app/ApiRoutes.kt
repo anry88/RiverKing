@@ -16,6 +16,7 @@ import service.RecentDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.FishingService.FishExtremeDTO
+import service.I18n
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -92,7 +93,7 @@ fun Application.apiRoutes(env: Env) {
             val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
             call.sessions.set(AppSession(tgUser.id))
-            fishing.ensureUserByTgId(tgUser.id, tgUser.firstName, tgUser.lastName, tgUser.username)
+            fishing.ensureUserByTgId(tgUser.id, tgUser.firstName, tgUser.lastName, tgUser.username, tgUser.languageCode)
             call.respond(HttpStatusCode.OK)
         }
 
@@ -105,10 +106,11 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val lures = fishing.listLures(uid)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val lures = fishing.listLures(uid).map { it.copy(name = I18n.lure(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
-            val locs = fishing.locations(uid)
+            val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
             val dailyAvailable = fishing.canClaimDaily(uid)
             val displayName = fishing.displayName(uid)
             val storedLoc = transaction {
@@ -119,7 +121,12 @@ fun Application.apiRoutes(env: Env) {
             val currentLureId = transaction {
                 Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
             }
-            val recent = fishing.recent(uid)
+            val recent = fishing.recent(uid).map { r ->
+                r.copy(
+                    fish = I18n.fish(r.fish, language),
+                    location = I18n.location(r.location, language)
+                )
+            }
             val caughtFishIds = fishing.caughtFishIds(uid)
 
             @Serializable
@@ -135,6 +142,7 @@ fun Application.apiRoutes(env: Env) {
                 val caughtFishIds: List<Long>,
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
+                val language: String,
             )
             call.respond(
                 MeResp(
@@ -148,7 +156,8 @@ fun Application.apiRoutes(env: Env) {
                     locs,
                     caughtFishIds,
                     recent,
-                    dailyAvailable
+                    dailyAvailable,
+                    language,
                 )
             )
         }
@@ -167,6 +176,20 @@ fun Application.apiRoutes(env: Env) {
             call.respond(HttpStatusCode.OK)
         }
 
+        post("/api/language") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            @Serializable data class LangReq(val language: String)
+            val req = call.receive<LangReq>()
+            fishing.setLanguage(uid, req.language)
+            call.respond(HttpStatusCode.OK)
+        }
+
         // Daily baits
         post("/api/daily") {
             val session = call.sessions.get<AppSession>()
@@ -176,13 +199,15 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val res = fishing.giveDailyBaits(uid)
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
 
             @Serializable
             data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
 
-            call.respond(DailyResp(res.first, res.second))
+            val lures = res.first.map { it.copy(name = I18n.lure(it.name, language)) }
+            call.respond(DailyResp(lures, res.second))
         }
 
         post("/api/create-invoice") {
@@ -316,6 +341,7 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@post call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<CastReq>()
             val res = try { fishing.cast(uid, req.wait, req.reaction) } catch (e: Exception) {
                 log.warn(
@@ -342,7 +368,7 @@ fun Application.apiRoutes(env: Env) {
                 res.catch?.rarity
             )
             Metrics.counter("cast_total", mapOf("caught" to res.caught.toString()))
-            res.catch?.let { c ->
+            val localizedCatch = res.catch?.let { c ->
                 Metrics.counter(
                     "fish_caught_total",
                     mapOf(
@@ -360,8 +386,12 @@ fun Application.apiRoutes(env: Env) {
                         "rarity" to c.rarity
                     )
                 )
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
+                )
             }
-            call.respond(res)
+            call.respond(res.copy(catch = localizedCatch))
         }
 
         // Change lure
