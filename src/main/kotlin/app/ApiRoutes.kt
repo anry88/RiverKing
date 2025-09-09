@@ -110,6 +110,9 @@ fun Application.apiRoutes(env: Env) {
         val rank: Int,
         val user: String? = null,
         val value: Double,
+        val fish: String? = null,
+        val location: String? = null,
+        val at: Long? = null,
     )
 
     @Serializable
@@ -249,8 +252,26 @@ fun Application.apiRoutes(env: Env) {
             )
             val resp = CurrentTournamentDTO(
                 tournament = dto,
-                leaderboard = top.map { LeaderboardEntryDTO(it.rank, it.user, it.value) },
-                mine = mine?.let { LeaderboardEntryDTO(it.rank, it.user, it.value) },
+                leaderboard = top.map {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                    )
+                },
+                mine = mine?.let {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                    )
+                },
             )
             call.respond(resp)
         }

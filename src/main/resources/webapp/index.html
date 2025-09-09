@@ -167,7 +167,7 @@
         locations:'Локации',
         unlocked:'Открыто',
         requiresKg: kg=>`Требуется ${kg} кг`,
-        current:'Текущая',
+        current:'Текущий',
         upcoming:'Предстоящие',
         lures:'Приманки',
         qty: qty=>`${qty} шт.`,
@@ -222,6 +222,10 @@
         species:'Виды',
         smallest:'Самая маленькая',
         largest:'Самая большая',
+        count:'Количество',
+        fishLabel:'Рыба:',
+        anyFish:'Любая рыба',
+        anyLocation:'Любая локация',
       },
       en: {
         location:'Location',
@@ -288,6 +292,10 @@
         species:'Species',
         smallest:'Smallest',
         largest:'Largest',
+        count:'Count',
+        fishLabel:'Fish:',
+        anyFish:'Any fish',
+        anyLocation:'Any location',
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -1104,6 +1112,14 @@
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
               };
             });
+            try{
+              const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+              if(ct.status===200){
+                setCurrentTournament(await ct.json());
+              } else {
+                setCurrentTournament(null);
+              }
+            }catch(e){}
           } else {
             setError(t('fishEscaped'));
           }
@@ -1220,21 +1236,43 @@
                       <div>
                         <div className="p-4 rounded-xl glass text-left mb-4">
                           <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
-                          {currentTournament.tournament.fish && <div className="text-lg font-bold">{currentTournament.tournament.fish}</div>}
-                          {currentTournament.tournament.location && <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location}</div>}
-                          <div className="text-sm opacity-80">{currentTournament.tournament.metric}</div>
+                          <div className="text-sm opacity-80">{t('fishLabel')} {currentTournament.tournament.fish || t('anyFish')}</div>
+                          <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
+                          <div className="text-sm opacity-80">{t(currentTournament.tournament.metric)}</div>
                         </div>
                         <div className="space-y-2">
                           {currentTournament.leaderboard.map(e=> (
                             <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
-                              <div className="flex items-center gap-2"><div>{e.rank}</div><div>{e.user||'-'}</div></div>
-                              <div className="flex items-center gap-2"><div>{Number(e.value).toFixed(2)}</div>{e.rank<=prizes.length && <div className="text-yellow-300">{prizes[e.rank-1]}</div>}</div>
+                              <div className="flex items-center gap-2">
+                                <div>{e.rank}</div>
+                                {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                                <div>
+                                  <div>{e.user||'-'}</div>
+                                  {e.fish && <div className="text-xs opacity-70">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div>{currentTournament.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
+                                {currentTournament.tournament.metric!=='count' && <div>{t('kg')}</div>}
+                                {e.rank<=prizes.length && <div className="text-yellow-300">{prizes[e.rank-1]}</div>}
+                              </div>
                             </div>
                           ))}
                           {currentTournament.mine && currentTournament.mine.rank>currentTournament.leaderboard.length && (
                             <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
-                              <div className="flex items-center gap-2"><div>{currentTournament.mine.rank}</div><div>{currentTournament.mine.user||t('you')}</div></div>
-                              <div className="flex items-center gap-2"><div>{Number(currentTournament.mine.value).toFixed(2)}</div>{currentTournament.mine.rank<=prizes.length && <div className="text-yellow-300">{prizes[currentTournament.mine.rank-1]}</div>}</div>
+                              <div className="flex items-center gap-2">
+                                <div>{currentTournament.mine.rank}</div>
+                                {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                                <div>
+                                  <div>{currentTournament.mine.user||t('you')}</div>
+                                  {currentTournament.mine.fish && <div className="text-xs opacity-70">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div>{currentTournament.tournament.metric==='count'? Number(currentTournament.mine.value).toFixed(0) : Number(currentTournament.mine.value).toFixed(2)}</div>
+                                {currentTournament.tournament.metric!=='count' && <div>{t('kg')}</div>}
+                                {currentTournament.mine.rank<=prizes.length && <div className="text-yellow-300">{prizes[currentTournament.mine.rank-1]}</div>}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1254,9 +1292,9 @@
                       return (
                         <div key={tn.id} className="p-4 rounded-xl glass text-left">
                           <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
-                          {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
-                          {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
-                          <div className="text-sm opacity-80">{tn.metric}</div>
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
+                          <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
+                          <div className="text-sm opacity-80">{t(tn.metric)}</div>
                           <div className="text-sm opacity-80">{t('prizes')}: {prizes.join(', ')}</div>
                         </div>
                       );
