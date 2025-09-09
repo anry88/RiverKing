@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -279,7 +279,11 @@
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
-    let t = makeT('ru');
+    const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code?.slice(0,2);
+    const savedLang = (()=>{ try{ return localStorage.getItem('lang'); }catch(e){ return null; } })();
+    const initLang = (savedLang || tgLang || 'en') === 'ru' ? 'ru' : 'en';
+    let t = makeT(initLang);
+    document.documentElement.lang = initLang;
 
     const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
@@ -860,7 +864,11 @@
               if(r.status===401) throw new Error('unauthorized');
               throw new Error('me failed');
             }
-            const d = await r.json(); t = makeT(d.language); document.documentElement.lang = d.language; setMe(d);
+            const d = await r.json();
+            t = makeT(d.language);
+            document.documentElement.lang = d.language;
+            try{ localStorage.setItem('lang', d.language); }catch(e){}
+            setMe(d);
               try{
                 const s = await fetch(`/api/shop`,{credentials:'include'});
                 if(!s.ok){
@@ -880,11 +888,11 @@
                 setShop([]);
               } else {
                 setError(t('loadProfileFailed'));
-                t = makeT('ru'); document.documentElement.lang = 'ru';
+                t = makeT(initLang); document.documentElement.lang = initLang; try{ localStorage.setItem('lang', initLang); }catch(e){}
                 setMe({
                   username:'angler',
                   needsNickname:false,
-                  language:'ru',
+                  language:initLang,
                   lures:[
                     {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
                     {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
@@ -1002,7 +1010,13 @@
         try{
           await fetch('/api/language',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:newLang})});
           const r = await fetch(`/api/me`,{credentials:'include'});
-          if(r.ok){ const m = await r.json(); t = makeT(m.language); document.documentElement.lang = m.language; setMe(m); }
+          if(r.ok){
+            const m = await r.json();
+            t = makeT(m.language);
+            document.documentElement.lang = m.language;
+            try{ localStorage.setItem('lang', m.language); }catch(e){}
+            setMe(m);
+          }
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){ setShop(await s.json()); }
         }catch(e){}
