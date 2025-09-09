@@ -528,6 +528,7 @@
       const [fishList,setFishList] = React.useState([]);
       const [fishId,setFishId] = React.useState(null);
       const [list,setList] = React.useState([]);
+      const [order,setOrder] = React.useState('desc');
 
       React.useEffect(()=>{
         fetch('/api/guide',{credentials:'include'})
@@ -539,13 +540,13 @@
       React.useEffect(()=>{
         if(me.needsNickname) return;
         if(section==='location'){
-          fetch(`/api/achievements/${mode}/location/${locId}?period=${period}`,{credentials:'include'})
+          fetch(`/api/achievements/${mode}/location/${locId}?period=${period}&order=${order}`,{credentials:'include'})
             .then(r=>r.json()).then(setList).catch(()=>setList([]));
         } else if(section==='species' && fishId){
-          fetch(`/api/achievements/${mode}/species/${fishId}?period=${period}`,{credentials:'include'})
+          fetch(`/api/achievements/${mode}/species/${fishId}?period=${period}&order=${order}`,{credentials:'include'})
             .then(r=>r.json()).then(setList).catch(()=>setList([]));
         }
-      },[mode,section,locId,fishId,period,me.needsNickname,me.language]);
+      },[mode,section,locId,fishId,period,order,me.needsNickname,me.language]);
 
       return (
         <div className="mt-4 space-y-4">
@@ -561,6 +562,10 @@
             <select value={period} onChange={e=>setPeriod(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
               <option value="today">{t('today')}</option>
               <option value="all">{t('allTime')}</option>
+            </select>
+            <select value={order} onChange={e=>setOrder(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
+              <option value="desc">{t('largest')}</option>
+              <option value="asc">{t('smallest')}</option>
             </select>
           </div>
 
