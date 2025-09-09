@@ -279,7 +279,7 @@
       );
     }
 
-    function Guide(){
+    function Guide({me}){
       const [section,setSection] = React.useState('locations');
       const [data,setData] = React.useState(null);
       const [error,setError] = React.useState(null);
@@ -300,32 +300,61 @@
           </div>
           {section==='locations' && (
             <div className="space-y-4">
-              {data.locations.map(loc=>(
-                <div key={loc.id} className="p-4 glass rounded-xl">
-                  <div className="font-semibold mb-2">{loc.name}</div>
-                  <img src={LOCATION_BG[loc.id]} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
-                  <div className="text-sm opacity-80">Рыбы:</div>
-                  <div className="flex flex-wrap gap-1 text-sm mb-2">
-                    {loc.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
+              {data.locations.map(loc=>{
+                const myLoc = me.locations.find(l=>l.id===loc.id) || {};
+                const unlocked = myLoc.unlocked;
+                return (
+                  <div key={loc.id} className="p-4 glass rounded-xl text-center">
+                    <div className="font-semibold mb-2">{myLoc.name || loc.name}</div>
+                    {unlocked ? (
+                      <>
+                        <img src={LOCATION_BG[loc.id]} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                        <div className="text-sm opacity-80 text-left">Рыбы:</div>
+                        <div className="flex flex-wrap gap-1 text-sm mb-2 text-left">
+                          {loc.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
+                        </div>
+                        <div className="text-sm opacity-80 text-left">Приманки:</div>
+                        <div className="flex flex-wrap gap-1 text-sm opacity-80 text-left">
+                          {loc.lures.map(l=> <span key={l} className={lureColor(l)}>{l}</span>)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-3xl">?</div>
+                        <div className="text-sm opacity-70">Набери {myLoc.unlockKg} кг, чтобы открыть</div>
+                      </>
+                    )}
                   </div>
-                  <div className="text-sm opacity-80">Приманки:</div>
-                  <div className="flex flex-wrap gap-1 text-sm opacity-80">
-                    {loc.lures.map(l=> <span key={l} className={lureColor(l)}>{l}</span>)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {section==='fish' && (
             <div className="space-y-4">
-              {data.fish.map(f=>(
-                <div key={f.name} className="p-4 glass rounded-xl">
-                  <img src={FISH_IMG[f.name]} alt={f.name} className="w-24 h-24 object-contain mb-2 mx-auto" onError={e=>e.currentTarget.style.display='none'} />
-                  <div className={`font-semibold ${rarityColors[f.rarity]||''}`}>{f.name}</div>
-                  <div className="text-xs mt-1">Локации: {f.locations.join(', ')}</div>
-                  <div className="text-xs mt-1">Приманки: {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
-                </div>
-              ))}
+              {data.fish.map(f=>{
+                const caught = (me.caughtFishIds||[]).includes(f.id);
+                return (
+                  <div key={f.id} className="p-4 glass rounded-xl text-center">
+                    {caught ? (
+                      <img src={FISH_IMG[f.name]} alt={f.name} className="w-24 h-24 object-contain mb-2 mx-auto" onError={e=>e.currentTarget.style.display='none'} />
+                    ) : (
+                      <div className="w-24 h-24 bg-gray-800 rounded mb-2 mx-auto flex items-center justify-center relative">
+                        <span className="text-4xl opacity-20">🐟</span>
+                        <span className="absolute text-2xl">?</span>
+                      </div>
+                    )}
+                    <div className={`font-semibold ${caught?(rarityColors[f.rarity]||''):''}`}>{caught ? f.name : '???'}</div>
+                    {caught ? (
+                      <>
+                        <div className="text-xs mt-1">Локации: {f.locations.join(', ')}</div>
+                        <div className="text-xs mt-1">Приманки: {f.lures.map((l,i)=>(<span key={l} className={lureColor(l)}>{l}{i<f.lures.length-1?', ':''}</span>))}</div>
+                      </>
+                    ) : (
+                      <div className="text-xs mt-1 opacity-70">Поймай эту рыбу, чтобы узнать больше</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           {section==='lures' && (
@@ -397,7 +426,14 @@
                 {list.map((c,i)=>(
                   <div key={i} className="p-3 glass rounded-xl flex justify-between">
                     <div className="flex items-center gap-3">
-                      <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                      {(me.caughtFishIds||[]).includes(c.fishId) ? (
+                        <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                          <span className="text-xl opacity-20">🐟</span>
+                          <span className="absolute">?</span>
+                        </div>
+                      )}
                       <div>
                         <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
                         <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
@@ -416,7 +452,14 @@
               {list.map((c,i)=>(
                 <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
                   <div className="flex items-center gap-3">
-                    <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                    {(me.caughtFishIds||[]).includes(c.fishId) ? (
+                      <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                        <span className="text-xl opacity-20">🐟</span>
+                        <span className="absolute">?</span>
+                      </div>
+                    )}
                     <div>
                       <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
                       <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
@@ -440,7 +483,14 @@
                   {ext.smallest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
                       <div className="flex items-center gap-3">
-                        <img src={FISH_IMG[ext.smallest.fish]} alt={ext.smallest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        {(me.caughtFishIds||[]).includes(ext.smallest.fishId) ? (
+                          <img src={FISH_IMG[ext.smallest.fish]} alt={ext.smallest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                            <span className="text-xl opacity-20">🐟</span>
+                            <span className="absolute">?</span>
+                          </div>
+                        )}
                         <div>
                           <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>Самая маленькая {ext.smallest.fish}</div>
                           <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
@@ -452,7 +502,14 @@
                   {ext.largest && (
                     <div className="p-3 glass rounded-xl flex justify-between">
                       <div className="flex items-center gap-3">
-                        <img src={FISH_IMG[ext.largest.fish]} alt={ext.largest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        {(me.caughtFishIds||[]).includes(ext.largest.fishId) ? (
+                          <img src={FISH_IMG[ext.largest.fish]} alt={ext.largest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                            <span className="text-xl opacity-20">🐟</span>
+                            <span className="absolute">?</span>
+                          </div>
+                        )}
                         <div>
                           <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>Самая большая {ext.largest.fish}</div>
                           <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
@@ -569,7 +626,7 @@
           {me.dailyAvailable && (
             <button
               onClick={onClaimDaily}
-              className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[2]"
+              className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[1.33]"
             >
               <span>🎁</span>
               <span>Подарок</span>
@@ -704,6 +761,7 @@
                     {id:2,name:'Река',unlockKg:10,unlocked:false},
                     {id:3,name:'Озеро',unlockKg:50,unlocked:false},
                   ],
+                  caughtFishIds:[],
                   recent:[], dailyAvailable:true,
                 });
                 setShop([]);
@@ -856,15 +914,19 @@
           const d=await r.json();
           if(d.caught){
             const c=d.catch;
-            setResult(c);
+            const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
+            const newTotal = (me.totalWeight||0)+c.weight;
+            const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
+            setResult({...c,newFish:isNewFish,newLocations:newLocs});
             setMe(p=>{
-              const newTotal=(p.totalWeight||0)+c.weight;
+              const tot=(p.totalWeight||0)+c.weight;
               return {
                 ...p,
-                totalWeight:newTotal,
+                totalWeight:tot,
                 todayWeight:(p.todayWeight||0)+c.weight,
-                locations:p.locations.map(l=> l.unlocked || newTotal>=l.unlockKg ? {...l,unlocked:true} : l),
-                recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5)
+                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
+                caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
               };
             });
           } else {
@@ -933,9 +995,12 @@
                 <div className="mt-4 p-4 rounded-xl glass flex items-center gap-4">
                   <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>e.currentTarget.style.display='none'} />
                   <div>
-                    <div className="text-base">Улов!</div>
+                    <div className="text-base">Улов! {result.newFish && <span className="ml-1 text-yellow-300">Новая!</span>}</div>
                     <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} кг</div>
                     <div className="text-xs opacity-70">Локация: {result.location}</div>
+                    {result.newLocations && result.newLocations.map((n,i)=>(
+                      <div key={i} className="text-xs text-emerald-400">Открыта новая локация: {n}</div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -999,7 +1064,7 @@
             </div>
           )}
           {tab === 'guide' && (
-            <Guide />
+            <Guide me={me} />
           )}
 
           {/* Шторка локаций */}
