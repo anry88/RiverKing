@@ -25,6 +25,7 @@ object DB {
                 Payments,
                 PaySupportRequests,
                 Tournaments,
+                UserPrizes,
             )
             seedIfEmpty()
         }
@@ -490,4 +491,12 @@ object Tournaments : LongIdTable() {
     val metric = varchar("metric", 20)
     val prizePlaces = integer("prize_places")
     val prizesJson = text("prizes_json")
+}
+
+object UserPrizes : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val tournamentId = reference("tournament_id", Tournaments)
+    val packageId = varchar("package_id", 100)
+    val qty = integer("qty").default(1)
+    val claimed = bool("claimed").default(false)
 }

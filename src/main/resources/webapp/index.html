@@ -226,6 +226,7 @@
         fishLabel:'Рыба:',
         anyFish:'Любая рыба',
         anyLocation:'Любая локация',
+        tapToClaim:'Нажмите, чтобы получить',
       },
       en: {
         location:'Location',
@@ -296,6 +297,7 @@
         fishLabel:'Fish:',
         anyFish:'Any fish',
         anyLocation:'Any location',
+        tapToClaim:'Tap to claim',
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -828,6 +830,7 @@
       const [upcomingTournaments,setUpcomingTournaments] = React.useState([]);
       const [tournamentTab,setTournamentTab] = React.useState('current');
       const [nickOpen,setNickOpen] = React.useState(false);
+      const [prize,setPrize] = React.useState(null);
 
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
@@ -885,6 +888,11 @@
                 } else {
                   setUpcomingTournaments([]);
                 }
+                const pr = await fetch(`/api/prizes`,{credentials:'include'});
+                if(pr.ok){
+                  const list = await pr.json();
+                  if(list.length>0) setPrize(list[0]);
+                }
               }catch(e){
                 if(e.message==='unauthorized'){
                   setError(t('authRequired'));
@@ -934,6 +942,16 @@
           setNickOpen(true);
         }
       },[me?.needsNickname]);
+
+      async function claimPrize(){
+        if(!prize) return;
+        try{
+          await fetch(`/api/prizes/${prize.id}/claim`,{method:'POST',credentials:'include'});
+          const r = await fetch(`/api/me`,{credentials:'include'});
+          if(r.ok) setMe(await r.json());
+        }catch(e){}
+        setPrize(null);
+      }
 
       async function claimDaily(){
         setError(null);
@@ -1157,6 +1175,14 @@
 
       return (
         <div className="min-h-screen w-full px-4 pb-20">
+          {prize && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
+              <div className="bg-white text-black p-4 rounded">
+                {(shop.flatMap(c=>c.packs).find(p=>p.id===prize.packageId)?.name)||prize.packageId} x{prize.qty}
+                <div className="text-sm mt-2">{t('tapToClaim')}</div>
+              </div>
+            </div>
+          )}
           <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 

@@ -32,7 +32,7 @@ class TournamentServiceTest {
             location = "Пруд",
             metric = "largest",
             prizePlaces = 3,
-            prizes = "[100,50,25]",
+            prizes = "[{\"pack\":\"fresh_topup_s\",\"qty\":1},{\"pack\":\"fresh_topup_s\",\"qty\":1},{\"pack\":\"fresh_topup_s\",\"qty\":1}]",
         )
         val list = svc.listTournaments()
         assertEquals(1, list.size)
@@ -64,7 +64,7 @@ class TournamentServiceTest {
             location = null,
             metric = "count",
             prizePlaces = 1,
-            prizes = "[1]",
+            prizes = "[{\"pack\":\"fresh_topup_s\",\"qty\":1}]",
         )
         var t = svc.getTournament(id)
         assertEquals("Orig", t?.name)
@@ -77,7 +77,7 @@ class TournamentServiceTest {
             location = "Река",
             metric = "largest",
             prizePlaces = 2,
-            prizes = "[10,5]",
+            prizes = "[{\"pack\":\"fresh_topup_s\",\"qty\":1},{\"pack\":\"fresh_topup_s\",\"qty\":1}]",
         )
         t = svc.getTournament(id)
         assertEquals("New", t?.name)

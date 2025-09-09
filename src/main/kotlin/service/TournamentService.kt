@@ -1,6 +1,9 @@
 package service
 
 import db.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
@@ -19,6 +22,11 @@ data class Tournament(
     val prizePlaces: Int,
     val prizesJson: String,
 )
+
+@Serializable
+data class PrizeSpec(val pack: String, val qty: Int)
+
+data class UserPrize(val id: Long, val packageId: String, val qty: Int)
 
 class TournamentService {
     fun createTournament(
@@ -208,5 +216,58 @@ class TournamentService {
         val top = ranked.take(limit)
         val mine = ranked.find { it.userId == userId }
         Pair(top, mine)
+    }
+
+    fun pendingPrizes(userId: Long): List<UserPrize> = transaction {
+        UserPrizes.select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
+            .map { UserPrize(it[UserPrizes.id].value, it[UserPrizes.packageId], it[UserPrizes.qty]) }
+    }
+
+    fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {
+        val (pack, qty) = transaction {
+            val row = UserPrizes.select { (UserPrizes.id eq prizeId) and (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
+                .singleOrNull() ?: error("not found")
+            UserPrizes.update({ UserPrizes.id eq prizeId }) { it[claimed] = true }
+            row[UserPrizes.packageId] to row[UserPrizes.qty]
+        }
+        var res: Pair<List<FishingService.LureDTO>, Long?>? = null
+        repeat(qty) { res = fishing.buyPackage(userId, pack) }
+        return res!!
+    }
+
+    fun distributePrizes(now: Instant = Instant.now()) {
+        val ended = transaction {
+            Tournaments.select { Tournaments.endTime lessEq now }.mapNotNull { row ->
+                val id = row[Tournaments.id].value
+                val awarded = !UserPrizes.select { UserPrizes.tournamentId eq id }.empty()
+                if (awarded) null else Tournament(
+                    id = id,
+                    name = row[Tournaments.name],
+                    startTime = row[Tournaments.startTime],
+                    endTime = row[Tournaments.endTime],
+                    fish = row[Tournaments.fish],
+                    location = row[Tournaments.location],
+                    metric = row[Tournaments.metric],
+                    prizePlaces = row[Tournaments.prizePlaces],
+                    prizesJson = row[Tournaments.prizesJson],
+                )
+            }
+        }
+        for (t in ended) {
+            val (top, _) = leaderboard(t, 0L, t.prizePlaces)
+            val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            for ((idx, lb) in top.withIndex()) {
+                val prize = prizes.getOrNull(idx) ?: continue
+                transaction {
+                    UserPrizes.insert {
+                        it[userId] = lb.userId
+                        it[tournamentId] = t.id
+                        it[packageId] = prize.pack
+                        it[qty] = prize.qty
+                        it[claimed] = false
+                    }
+                }
+            }
+        }
     }
 }
