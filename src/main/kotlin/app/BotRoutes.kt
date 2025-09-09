@@ -107,8 +107,8 @@ fun Application.botRoutes(env: Env) {
                             if (id != null) {
                                 val t = tournaments.getTournament(id)
                                 if (t != null) {
-                                    val markup = """{"inline_keyboard":[[{"text":"Редактировать","callback_data":"edit_tournament_${'$'}id"},{"text":"Удалить","callback_data":"delete_tournament_${'$'}id"}]]}"""
-                                    try { bot.sendMessage(target, "Турнир: ${'$'}{t.name}", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                    val markup = """{"inline_keyboard":[[{"text":"Редактировать","callback_data":"edit_tournament_$id"},{"text":"Удалить","callback_data":"delete_tournament_$id"}]]}"""
+                                    try { bot.sendMessage(target, "Турнир: ${t.name}", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                                 }
                             }
                         }
@@ -134,7 +134,7 @@ fun Application.botRoutes(env: Env) {
                                         prizePlaces = t.prizePlaces,
                                         prizes = t.prizesJson,
                                     )
-                                    try { bot.sendMessage(target, "Введите название турнира (сейчас: ${'$'}{t.name})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                    try { bot.sendMessage(target, "Введите название турнира (сейчас: ${t.name})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                                 }
                             }
                         }
@@ -199,16 +199,16 @@ fun Application.botRoutes(env: Env) {
                     AdminStep.NAME -> {
                         draft.name = text
                         draft.step = AdminStep.START
-                        val current = draft.start?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: ${'$'}it)" } ?: ""
-                        try { bot.sendMessage(chatId, "Дата начала (дд.мм.гггг)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val current = draft.start?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Дата начала (дд.мм.гггг)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.START -> {
                         val d = runCatching { LocalDate.parse(text, DATE_FMT) }.getOrNull()
                         if (d != null) {
                             draft.start = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.END
-                            val current = draft.end?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: ${'$'}it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Дата окончания (дд.мм.гггг)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            val current = draft.end?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Дата окончания (дд.мм.гггг)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
@@ -218,8 +218,8 @@ fun Application.botRoutes(env: Env) {
                         if (d != null) {
                             draft.end = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.FISH
-                            val current = draft.fish?.let { " (сейчас: ${'$'}it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Вид рыбы (или '-' для любой)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            val current = draft.fish?.let { " (сейчас: $it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Вид рыбы (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
@@ -228,29 +228,29 @@ fun Application.botRoutes(env: Env) {
                         val v = text.trim()
                         draft.fish = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.LOCATION
-                        val current = draft.location?.let { " (сейчас: ${'$'}it)" } ?: ""
-                        try { bot.sendMessage(chatId, "Локация (или '-' для любой)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val current = draft.location?.let { " (сейчас: $it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Локация (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.LOCATION -> {
                         val v = text.trim()
                         draft.location = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.METRIC
-                        val current = if (draft.metric.isNotBlank()) " (сейчас: ${'$'}{draft.metric})" else ""
-                        try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val current = if (draft.metric.isNotBlank()) " (сейчас: ${draft.metric})" else ""
+                        try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.METRIC -> {
                         draft.metric = text
                         draft.step = AdminStep.PRIZE_PLACES
-                        val current = if (draft.prizePlaces != 0) " (сейчас: ${'$'}{draft.prizePlaces})" else ""
-                        try { bot.sendMessage(chatId, "Количество призовых мест${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val current = if (draft.prizePlaces != 0) " (сейчас: ${draft.prizePlaces})" else ""
+                        try { bot.sendMessage(chatId, "Количество призовых мест$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.PRIZE_PLACES -> {
                         val n = text.toIntOrNull()
                         if (n != null) {
                             draft.prizePlaces = n
                             draft.step = AdminStep.PRIZES
-                            val current = if (draft.prizes.isNotBlank()) " (сейчас: ${'$'}{draft.prizes})" else ""
-                            try { bot.sendMessage(chatId, "Награды через запятую в порядке мест (например: '100,50,25')${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            val current = if (draft.prizes.isNotBlank()) " (сейчас: ${draft.prizes})" else ""
+                            try { bot.sendMessage(chatId, "Награды через запятую в порядке мест (например: '100,50,25')$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
