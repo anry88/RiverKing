@@ -1271,7 +1271,7 @@
                           <div className="text-sm opacity-80">{t(currentTournament.tournament.metric)}</div>
                         </div>
                         <div className="space-y-2">
-                          {currentTournament.leaderboard.map(e=> (
+                          {(currentTournament.leaderboard || []).map(e=> (
                             <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <div>{e.rank}</div>
@@ -1288,7 +1288,7 @@
                               </div>
                             </div>
                           ))}
-                          {currentTournament.mine && currentTournament.mine.rank>currentTournament.leaderboard.length && (
+                          {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
                             <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
                               <div className="flex items-center gap-2">
                                 <div>{currentTournament.mine.rank}</div>
