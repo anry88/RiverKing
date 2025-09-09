@@ -168,6 +168,7 @@
         unlocked:'Открыто',
         requiresKg: kg=>`Требуется ${kg} кг`,
         current:'Текущая',
+        upcoming:'Предстоящие',
         lures:'Приманки',
         qty: qty=>`${qty} шт.`,
         nickname:'Никнейм',
@@ -210,6 +211,7 @@
         noSuitableFish:'Нет подходящей рыбы на эту приманку.',
         fishing:'Рыбалка',
         tournaments:'Турниры',
+        you:'Ты',
         prizes:'Призы',
         achievements:'Достижения',
         guide:'Справочник',
@@ -232,6 +234,7 @@
         unlocked:'Unlocked',
         requiresKg: kg=>`${kg} kg required`,
         current:'Current',
+        upcoming:'Upcoming',
         lures:'Baits',
         qty: qty=>`${qty} pcs`,
         nickname:'Nickname',
@@ -274,6 +277,7 @@
         noSuitableFish:'No suitable fish for this bait here.',
         fishing:'Fishing',
         tournaments:'Tournaments',
+        you:'You',
         prizes:'Prizes',
         achievements:'Achievements',
         guide:'Guide',
@@ -812,7 +816,9 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
-      const [tournaments,setTournaments] = React.useState([]);
+      const [currentTournament,setCurrentTournament] = React.useState(null);
+      const [upcomingTournaments,setUpcomingTournaments] = React.useState([]);
+      const [tournamentTab,setTournamentTab] = React.useState('current');
       const [nickOpen,setNickOpen] = React.useState(false);
 
       React.useEffect(()=>{
@@ -859,16 +865,23 @@
                 }
               }
               try{
-                const ts = await fetch(`/api/tournaments`,{credentials:'include'});
-                if(!ts.ok){
-                  if(ts.status===401) throw new Error('unauthorized');
+                const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+                if(ct.status===200){
+                  setCurrentTournament(await ct.json());
                 } else {
-                  setTournaments(await ts.json());
+                  setCurrentTournament(null);
+                }
+                const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
+                if(ut.ok){
+                  setUpcomingTournaments(await ut.json());
+                } else {
+                  setUpcomingTournaments([]);
                 }
               }catch(e){
                 if(e.message==='unauthorized'){
                   setError(t('authRequired'));
-                  setTournaments([]);
+                  setCurrentTournament(null);
+                  setUpcomingTournaments([]);
                 }
               }
             }catch(e){
@@ -1008,8 +1021,10 @@
           }
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){ setShop(await s.json()); }
-          const ts = await fetch(`/api/tournaments`,{credentials:'include'});
-          if(ts.ok){ setTournaments(await ts.json()); }
+          const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+          if(ct.status===200){ setCurrentTournament(await ct.json()); } else { setCurrentTournament(null); }
+          const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
+          if(ut.ok){ setUpcomingTournaments(await ut.json()); } else { setUpcomingTournaments([]); }
         }catch(e){}
       }
 
@@ -1193,26 +1208,61 @@
 
           {tab === 'tournaments' && (
             <div className="mt-6">
-              {tournaments.length===0 ? (
-                <div className="text-center opacity-70">{t('noData')}</div>
-              ) : (
-                <div className="space-y-4">
-                  {tournaments.map(tn=> {
-                    let prizes = [];
-                    try { prizes = JSON.parse(tn.prizes||'[]'); } catch(e) {}
+              <div className="flex mb-4">
+                <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${tournamentTab==='current'?'text-emerald-400':''}`}>{t('current')}</button>
+                <button onClick={()=>setTournamentTab('upcoming')} className={`flex-1 py-2 ${tournamentTab==='upcoming'?'text-emerald-400':''}`}>{t('upcoming')}</button>
+              </div>
+              {tournamentTab==='current' ? (
+                currentTournament ? (
+                  (()=>{
+                    let prizes=[]; try{prizes=JSON.parse(currentTournament.tournament.prizes||'[]');}catch(e){}
                     return (
-                      <div key={tn.id} className="p-4 rounded-xl glass text-left">
-                        <div className="text-xs opacity-70">
-                          {new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}
+                      <div>
+                        <div className="p-4 rounded-xl glass text-left mb-4">
+                          <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
+                          {currentTournament.tournament.fish && <div className="text-lg font-bold">{currentTournament.tournament.fish}</div>}
+                          {currentTournament.tournament.location && <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location}</div>}
+                          <div className="text-sm opacity-80">{currentTournament.tournament.metric}</div>
                         </div>
-                        {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
-                        {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
-                        <div className="text-sm opacity-80">{tn.metric}</div>
-                        <div className="text-sm opacity-80">{t('prizes')}: {prizes.join(', ')}</div>
+                        <div className="space-y-2">
+                          {currentTournament.leaderboard.map(e=> (
+                            <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
+                              <div className="flex items-center gap-2"><div>{e.rank}</div><div>{e.user||'-'}</div></div>
+                              <div className="flex items-center gap-2"><div>{Number(e.value).toFixed(2)}</div>{e.rank<=prizes.length && <div className="text-yellow-300">{prizes[e.rank-1]}</div>}</div>
+                            </div>
+                          ))}
+                          {currentTournament.mine && currentTournament.mine.rank>currentTournament.leaderboard.length && (
+                            <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-2"><div>{currentTournament.mine.rank}</div><div>{currentTournament.mine.user||t('you')}</div></div>
+                              <div className="flex items-center gap-2"><div>{Number(currentTournament.mine.value).toFixed(2)}</div>{currentTournament.mine.rank<=prizes.length && <div className="text-yellow-300">{prizes[currentTournament.mine.rank-1]}</div>}</div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
-                  })}
-                </div>
+                  })()
+                ) : (
+                  <div className="text-center opacity-70">{t('noData')}</div>
+                )
+              ) : (
+                upcomingTournaments.length===0 ? (
+                  <div className="text-center opacity-70">{t('noData')}</div>
+                ) : (
+                  <div className="space-y-4">
+                    {upcomingTournaments.map(tn=> {
+                      let prizes=[]; try{prizes=JSON.parse(tn.prizes||'[]');}catch(e){}
+                      return (
+                        <div key={tn.id} className="p-4 rounded-xl glass text-left">
+                          <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
+                          {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
+                          {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
+                          <div className="text-sm opacity-80">{tn.metric}</div>
+                          <div className="text-sm opacity-80">{t('prizes')}: {prizes.join(', ')}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
               )}
             </div>
           )}

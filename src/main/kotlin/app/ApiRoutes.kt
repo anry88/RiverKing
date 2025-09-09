@@ -105,6 +105,20 @@ fun Application.apiRoutes(env: Env) {
         val prizes: String,
     )
 
+    @Serializable
+    data class LeaderboardEntryDTO(
+        val rank: Int,
+        val user: String? = null,
+        val value: Double,
+    )
+
+    @Serializable
+    data class CurrentTournamentDTO(
+        val tournament: TournamentDTO,
+        val leaderboard: List<LeaderboardEntryDTO>,
+        val mine: LeaderboardEntryDTO? = null,
+    )
+
     routing {
         // Telegram WebApp auth: client sends initData in a header
         post("/api/auth/telegram") {
@@ -211,7 +225,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(HttpStatusCode.OK)
         }
 
-        get("/api/tournaments") {
+        get("/api/tournament/current") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -220,7 +234,37 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val list = tournaments.listTournaments().map { t ->
+            val t = tournaments.currentTournament()
+                ?: return@get call.respond(HttpStatusCode.NoContent)
+            val (top, mine) = tournaments.leaderboard(t, uid)
+            val dto = TournamentDTO(
+                id = t.id,
+                startTime = t.startTime.epochSecond,
+                endTime = t.endTime.epochSecond,
+                fish = t.fish?.let { I18n.fish(it, language) },
+                location = t.location?.let { I18n.location(it, language) },
+                metric = t.metric,
+                prizePlaces = t.prizePlaces,
+                prizes = t.prizesJson,
+            )
+            val resp = CurrentTournamentDTO(
+                tournament = dto,
+                leaderboard = top.map { LeaderboardEntryDTO(it.rank, it.user, it.value) },
+                mine = mine?.let { LeaderboardEntryDTO(it.rank, it.user, it.value) },
+            )
+            call.respond(resp)
+        }
+
+        get("/api/tournaments/upcoming") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = tournaments.upcomingTournaments().map { t ->
                 TournamentDTO(
                     id = t.id,
                     startTime = t.startTime.epochSecond,
