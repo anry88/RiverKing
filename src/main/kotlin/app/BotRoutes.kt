@@ -10,6 +10,8 @@ import kotlinx.serialization.Serializable
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
+import service.TournamentService
+import java.time.Instant
 import org.slf4j.LoggerFactory
 
 internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
@@ -28,10 +30,27 @@ internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
     }
 }
 
+private data class AdminDraft(
+    var id: Long? = null,
+    var step: AdminStep = AdminStep.NAME,
+    var name: String = "",
+    var start: Instant? = null,
+    var end: Instant? = null,
+    var fish: String? = null,
+    var location: String? = null,
+    var metric: String = "",
+    var prizePlaces: Int = 0,
+    var prizes: String = "",
+)
+
+private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZES }
+
 fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
     val fishing = FishingService()
     val stars = StarsPaymentService(env, fishing)
+    val tournaments = TournamentService()
+    val adminStates = mutableMapOf<Long, AdminDraft>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
         post("/bot") {
@@ -48,6 +67,73 @@ fun Application.botRoutes(env: Env) {
                     bot.answerPreCheckoutQuery(q.id)
                 } catch (e: Exception) {
                     log.error("answerPreCheckoutQuery failed id={}", q.id, e)
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
+            update.callbackQuery?.let { cq ->
+                if (cq.from.id == env.adminTgId) {
+                    try { bot.answerCallbackQuery(cq.id) } catch (_: Exception) {}
+                    val data = cq.data
+                    val target = cq.message?.chat?.id ?: cq.from.id
+                    when {
+                        data == "create_tournament" -> {
+                            adminStates[cq.from.id] = AdminDraft()
+                            try {
+                                bot.sendMessage(target, "Введите название турнира")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", target, e)
+                            }
+                        }
+                        data == "list_tournaments" -> {
+                            val list = tournaments.listTournaments()
+                            if (list.isEmpty()) {
+                                try { bot.sendMessage(target, "Турниров нет") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                            } else {
+                                val buttons = list.joinToString(",") { t ->
+                                    "[{\"text\":\"${t.name}\",\"callback_data\":\"tournament_${'$'}{t.id}\"}]"
+                                }
+                                val markup = "{\"inline_keyboard\":[${'$'}buttons]}"
+                                try { bot.sendMessage(target, "Турниры", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                            }
+                        }
+                        data != null && data.startsWith("tournament_") -> {
+                            val id = data.removePrefix("tournament_").toLongOrNull()
+                            if (id != null) {
+                                val t = tournaments.getTournament(id)
+                                if (t != null) {
+                                    val markup = """{"inline_keyboard":[[{"text":"Редактировать","callback_data":"edit_tournament_${'$'}id"},{"text":"Удалить","callback_data":"delete_tournament_${'$'}id"}]]}"""
+                                    try { bot.sendMessage(target, "Турнир: ${'$'}{t.name}", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                }
+                            }
+                        }
+                        data != null && data.startsWith("delete_tournament_") -> {
+                            val id = data.removePrefix("delete_tournament_").toLongOrNull()
+                            if (id != null) {
+                                try { tournaments.deleteTournament(id); bot.sendMessage(target, "Турнир удален") } catch (e: Exception) { log.error("deleteTournament failed", e) }
+                            }
+                        }
+                        data != null && data.startsWith("edit_tournament_") -> {
+                            val id = data.removePrefix("edit_tournament_").toLongOrNull()
+                            if (id != null) {
+                                val t = tournaments.getTournament(id)
+                                if (t != null) {
+                                    adminStates[cq.from.id] = AdminDraft(
+                                        id = id,
+                                        name = t.name,
+                                        start = t.startTime,
+                                        end = t.endTime,
+                                        fish = t.fish,
+                                        location = t.location,
+                                        metric = t.metric,
+                                        prizePlaces = t.prizePlaces,
+                                        prizes = t.prizesJson,
+                                    )
+                                    try { bot.sendMessage(target, "Введите название турнира (сейчас: ${'$'}{t.name})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                }
+                            }
+                        }
+                    }
                 }
                 return@post call.respond(HttpStatusCode.OK)
             }
@@ -102,6 +188,108 @@ fun Application.botRoutes(env: Env) {
 
             val chatId = message.chat.id
             val text = message.text ?: ""
+
+            adminStates[chatId]?.let { draft ->
+                when (draft.step) {
+                    AdminStep.NAME -> {
+                        draft.name = text
+                        draft.step = AdminStep.START
+                        val current = draft.start?.epochSecond?.let { " (сейчас: ${'$'}it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Время начала (epoch seconds)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    AdminStep.START -> {
+                        val ts = text.toLongOrNull()
+                        if (ts != null) {
+                            draft.start = Instant.ofEpochSecond(ts)
+                            draft.step = AdminStep.END
+                            val current = draft.end?.epochSecond?.let { " (сейчас: ${'$'}it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Время окончания (epoch seconds)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        } else {
+                            try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
+                        }
+                    }
+                    AdminStep.END -> {
+                        val ts = text.toLongOrNull()
+                        if (ts != null) {
+                            draft.end = Instant.ofEpochSecond(ts)
+                            draft.step = AdminStep.FISH
+                            val current = draft.fish?.let { " (сейчас: ${'$'}it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Вид рыбы (или пусто)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        } else {
+                            try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
+                        }
+                    }
+                    AdminStep.FISH -> {
+                        draft.fish = text.ifBlank { null }
+                        draft.step = AdminStep.LOCATION
+                        val current = draft.location?.let { " (сейчас: ${'$'}it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Локация (или пусто)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    AdminStep.LOCATION -> {
+                        draft.location = text.ifBlank { null }
+                        draft.step = AdminStep.METRIC
+                        val current = if (draft.metric.isNotBlank()) " (сейчас: ${'$'}{draft.metric})" else ""
+                        try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    AdminStep.METRIC -> {
+                        draft.metric = text
+                        draft.step = AdminStep.PRIZE_PLACES
+                        val current = if (draft.prizePlaces != 0) " (сейчас: ${'$'}{draft.prizePlaces})" else ""
+                        try { bot.sendMessage(chatId, "Количество призовых мест${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    AdminStep.PRIZE_PLACES -> {
+                        val n = text.toIntOrNull()
+                        if (n != null) {
+                            draft.prizePlaces = n
+                            draft.step = AdminStep.PRIZES
+                            val current = if (draft.prizes.isNotBlank()) " (сейчас: ${'$'}{draft.prizes})" else ""
+                            try { bot.sendMessage(chatId, "Награды через запятую${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        } else {
+                            try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
+                        }
+                    }
+                    AdminStep.PRIZES -> {
+                        draft.prizes = text
+                        val start = draft.start
+                        val end = draft.end
+                        if (start != null && end != null) {
+                            try {
+                                if (draft.id == null) {
+                                    tournaments.createTournament(
+                                        draft.name,
+                                        start,
+                                        end,
+                                        draft.fish,
+                                        draft.location,
+                                        draft.metric,
+                                        draft.prizePlaces,
+                                        draft.prizes,
+                                    )
+                                    bot.sendMessage(chatId, "Турнир создан")
+                                } else {
+                                    tournaments.updateTournament(
+                                        draft.id!!,
+                                        draft.name,
+                                        start,
+                                        end,
+                                        draft.fish,
+                                        draft.location,
+                                        draft.metric,
+                                        draft.prizePlaces,
+                                        draft.prizes,
+                                    )
+                                    bot.sendMessage(chatId, "Турнир обновлен")
+                                }
+                            } catch (e: Exception) {
+                                log.error("tournament save failed", e)
+                            }
+                        }
+                        adminStates.remove(chatId)
+                    }
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
             if (text.startsWith("/start")) {
                 val from = message.from
                 val uid = fishing.ensureUserByTgId(
@@ -153,6 +341,10 @@ fun Application.botRoutes(env: Env) {
                 }
             } else if (chatId == env.adminTgId) {
                 when {
+                    text.startsWith("/admin") -> {
+                        val markup = """{"inline_keyboard":[[{"text":"Создать турнир","callback_data":"create_tournament"},{"text":"Список турниров","callback_data":"list_tournaments"}]]}"""
+                        try { bot.sendMessage(chatId, "Админ меню", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
                     text.startsWith("/refund") -> {
                         val id = text.split(" ").getOrNull(1)?.toLongOrNull()
                         if (id != null) {
@@ -210,6 +402,7 @@ fun Application.botRoutes(env: Env) {
 private data class TgUpdate(
     val message: TgMessage? = null,
     @SerialName("pre_checkout_query") val preCheckoutQuery: TgPreCheckoutQuery? = null,
+    @SerialName("callback_query") val callbackQuery: TgCallbackQuery? = null,
 )
 
 @Serializable
@@ -231,6 +424,14 @@ private data class TgSuccessfulPayment(
     @SerialName("total_amount") val totalAmount: Int,
     val currency: String,
     @SerialName("invoice_payload") val invoicePayload: String,
+)
+
+@Serializable
+private data class TgCallbackQuery(
+    val id: String,
+    val from: TgUser,
+    val message: TgMessage? = null,
+    val data: String? = null,
 )
 
 @Serializable
