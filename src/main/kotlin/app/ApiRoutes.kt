@@ -15,7 +15,6 @@ import service.LocationDTO
 import service.RecentDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
-import service.FishingService.FishExtremeDTO
 import service.I18n
 import db.Users
 import service.PayService
@@ -432,8 +431,10 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val today = call.request.queryParameters["period"] == "today"
+            val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopByLocation(uid, id).map { c ->
+            val res = fishing.personalTopByLocation(uid, id, today, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -442,25 +443,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/personal/fish") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
-            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopByFish(uid).map { c ->
-                c.copy(
-                    fish = I18n.fish(c.fish, language),
-                    location = I18n.location(c.location, language)
-                )
-            }
-            call.respond(res)
-        }
-
-        get("/api/achievements/personal/fish/{id}") {
+        get("/api/achievements/personal/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -469,20 +452,16 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val today = call.request.queryParameters["period"] == "today"
+            val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalFishExtremes(uid, id)
-            call.respond(
-                FishExtremeDTO(
-                    res.smallest?.copy(
-                        fish = I18n.fish(res.smallest.fish, language),
-                        location = I18n.location(res.smallest.location, language)
-                    ),
-                    res.largest?.copy(
-                        fish = I18n.fish(res.largest.fish, language),
-                        location = I18n.location(res.largest.location, language)
-                    )
+            val res = fishing.personalTopBySpecies(uid, id, today, asc).map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
                 )
-            )
+            }
+            call.respond(res)
         }
 
         // Achievements - global
@@ -496,7 +475,9 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res = fishing.globalTopByLocation(id).map { c ->
+            val today = call.request.queryParameters["period"] == "today"
+            val asc = call.request.queryParameters["order"] == "asc"
+            val res = fishing.globalTopByLocation(id, today, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -505,25 +486,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/global/fish") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
-            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.globalTopByFish().map { c ->
-                c.copy(
-                    fish = I18n.fish(c.fish, language),
-                    location = I18n.location(c.location, language)
-                )
-            }
-            call.respond(res)
-        }
-
-        get("/api/achievements/global/fish/{id}") {
+        get("/api/achievements/global/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -533,19 +496,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val res = fishing.globalFishExtremes(id)
-            call.respond(
-                FishExtremeDTO(
-                    res.smallest?.copy(
-                        fish = I18n.fish(res.smallest.fish, language),
-                        location = I18n.location(res.smallest.location, language)
-                    ),
-                    res.largest?.copy(
-                        fish = I18n.fish(res.largest.fish, language),
-                        location = I18n.location(res.largest.location, language)
-                    )
+            val today = call.request.queryParameters["period"] == "today"
+            val asc = call.request.queryParameters["order"] == "asc"
+            val res = fishing.globalTopBySpecies(id, today, asc).map { c ->
+                c.copy(
+                    fish = I18n.fish(c.fish, language),
+                    location = I18n.location(c.location, language)
                 )
-            )
+            }
+            call.respond(res)
         }
     }
 }
