@@ -12,6 +12,9 @@ import service.PayService
 import service.StarsPaymentService
 import service.TournamentService
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import org.slf4j.LoggerFactory
 
 internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
@@ -44,6 +47,8 @@ private data class AdminDraft(
 )
 
 private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZES }
+
+private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
 fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
@@ -91,9 +96,9 @@ fun Application.botRoutes(env: Env) {
                                 try { bot.sendMessage(target, "Турниров нет") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             } else {
                                 val buttons = list.joinToString(",") { t ->
-                                    "[{\"text\":\"${t.name}\",\"callback_data\":\"tournament_${'$'}{t.id}\"}]"
+                                    """[{"text":"${t.name}","callback_data":"tournament_${t.id}"}]"""
                                 }
-                                val markup = "{\"inline_keyboard\":[${'$'}buttons]}"
+                                val markup = """{"inline_keyboard":[$buttons]}"""
                                 try { bot.sendMessage(target, "Турниры", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             }
                         }
@@ -194,39 +199,41 @@ fun Application.botRoutes(env: Env) {
                     AdminStep.NAME -> {
                         draft.name = text
                         draft.step = AdminStep.START
-                        val current = draft.start?.epochSecond?.let { " (сейчас: ${'$'}it)" } ?: ""
-                        try { bot.sendMessage(chatId, "Время начала (epoch seconds)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val current = draft.start?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: ${'$'}it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Дата начала (дд.мм.гггг)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.START -> {
-                        val ts = text.toLongOrNull()
-                        if (ts != null) {
-                            draft.start = Instant.ofEpochSecond(ts)
+                        val d = runCatching { LocalDate.parse(text, DATE_FMT) }.getOrNull()
+                        if (d != null) {
+                            draft.start = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.END
-                            val current = draft.end?.epochSecond?.let { " (сейчас: ${'$'}it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Время окончания (epoch seconds)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            val current = draft.end?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: ${'$'}it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Дата окончания (дд.мм.гггг)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.END -> {
-                        val ts = text.toLongOrNull()
-                        if (ts != null) {
-                            draft.end = Instant.ofEpochSecond(ts)
+                        val d = runCatching { LocalDate.parse(text, DATE_FMT) }.getOrNull()
+                        if (d != null) {
+                            draft.end = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.FISH
                             val current = draft.fish?.let { " (сейчас: ${'$'}it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Вид рыбы (или пусто)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Вид рыбы (или '-' для любой)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.FISH -> {
-                        draft.fish = text.ifBlank { null }
+                        val v = text.trim()
+                        draft.fish = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.LOCATION
                         val current = draft.location?.let { " (сейчас: ${'$'}it)" } ?: ""
-                        try { bot.sendMessage(chatId, "Локация (или пусто)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        try { bot.sendMessage(chatId, "Локация (или '-' для любой)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.LOCATION -> {
-                        draft.location = text.ifBlank { null }
+                        val v = text.trim()
+                        draft.location = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.METRIC
                         val current = if (draft.metric.isNotBlank()) " (сейчас: ${'$'}{draft.metric})" else ""
                         try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
@@ -243,13 +250,13 @@ fun Application.botRoutes(env: Env) {
                             draft.prizePlaces = n
                             draft.step = AdminStep.PRIZES
                             val current = if (draft.prizes.isNotBlank()) " (сейчас: ${'$'}{draft.prizes})" else ""
-                            try { bot.sendMessage(chatId, "Награды через запятую${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Награды через запятую в порядке мест (например: '100,50,25')${'$'}current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.PRIZES -> {
-                        draft.prizes = text
+                        draft.prizes = text.trim()
                         val start = draft.start
                         val end = draft.end
                         if (start != null && end != null) {
