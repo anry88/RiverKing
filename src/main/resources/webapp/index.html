@@ -1182,7 +1182,13 @@
           {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
               <div className="bg-white text-black p-4 rounded">
-                {(shop.flatMap(c=>c.packs).find(p=>p.id===prize.packageId)?.name)||prize.packageId} x{prize.qty}
+                {
+                  (
+                    shop
+                      .reduce((acc, c) => acc.concat(c.packs), [])
+                      .find(p => p.id === prize.packageId)?.name
+                  ) || prize.packageId
+                } x{prize.qty}
                 <div className="text-sm mt-2">{t('tapToClaim')}</div>
               </div>
             </div>
