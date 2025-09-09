@@ -56,6 +56,11 @@ private data class AdminDraft(
 
 private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
 
+private val METRIC_OPTIONS = listOf("largest", "smallest", "count", "rarity")
+private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count","rarity"]],"one_time_keyboard":true,"resize_keyboard":true}"""
+private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+
+
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
         Json.parseToJsonElement(str).jsonArray.map { el ->
@@ -263,13 +268,22 @@ fun Application.botRoutes(env: Env) {
                         draft.location = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.METRIC
                         val current = if (draft.metric.isNotBlank()) " (сейчас: ${draft.metric})" else ""
-                        try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        try {
+                            bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)$current", METRIC_KEYBOARD)
+                        } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.METRIC -> {
-                        draft.metric = text.lowercase()
-                        draft.step = AdminStep.PRIZE_PLACES
-                        val current = if (draft.prizePlaces != 0) " (сейчас: ${draft.prizePlaces})" else ""
-                        try { bot.sendMessage(chatId, "Количество призовых мест$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val m = text.lowercase()
+                        if (m in METRIC_OPTIONS) {
+                            draft.metric = m
+                            draft.step = AdminStep.PRIZE_PLACES
+                            val current = if (draft.prizePlaces != 0) " (сейчас: ${draft.prizePlaces})" else ""
+                            try {
+                                bot.sendMessage(chatId, "Количество призовых мест$current", REMOVE_KEYBOARD)
+                            } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        } else {
+                            try { bot.sendMessage(chatId, "Неверная метрика, выберите largest, smallest, count или rarity", METRIC_KEYBOARD) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        }
                     }
                     AdminStep.PRIZE_PLACES -> {
                         val n = text.toIntOrNull()
@@ -279,15 +293,19 @@ fun Application.botRoutes(env: Env) {
                             draft.currentPrize = 1
                             draft.step = AdminStep.PRIZE
                             val currentPrize = draft.prizes.getOrNull(0)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
-                            try { bot.sendMessage(chatId, "Награда за 1 место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Награда за 1 место (pack qty)$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.PRIZE -> {
                         val p = text.trim().split(' ', ':')
-                        val pack = p.getOrNull(0) ?: ""
+                        val pack = p.getOrNull(0)?.takeIf { it.isNotBlank() }
                         val qty = p.getOrNull(1)?.toIntOrNull() ?: 1
+                        if (pack == null || qty <= 0) {
+                            try { bot.sendMessage(chatId, "Неверный ввод, укажите приз как 'pack qty'") } catch (_: Exception) {}
+                            return@post call.respond(HttpStatusCode.OK)
+                        }
                         val prize = PrizeSpec(pack, qty)
                         val idx = draft.currentPrize - 1
                         if (draft.prizes.size > idx) {
@@ -298,7 +316,7 @@ fun Application.botRoutes(env: Env) {
                         if (draft.currentPrize < draft.prizePlaces) {
                             draft.currentPrize += 1
                             val currentPrize = draft.prizes.getOrNull(draft.currentPrize - 1)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
-                            try { bot.sendMessage(chatId, "Награда за ${draft.currentPrize} место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Награда за ${draft.currentPrize} место (pack qty)$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             val start = draft.start
                             val end = draft.end
