@@ -246,7 +246,7 @@ fun Application.apiRoutes(env: Env) {
                 endTime = t.endTime.epochSecond,
                 fish = t.fish?.let { I18n.fish(it, language) },
                 location = t.location?.let { I18n.location(it, language) },
-                metric = t.metric,
+                metric = t.metric.lowercase(),
                 prizePlaces = t.prizePlaces,
                 prizes = t.prizesJson,
             )
@@ -292,7 +292,7 @@ fun Application.apiRoutes(env: Env) {
                     endTime = t.endTime.epochSecond,
                     fish = t.fish?.let { I18n.fish(it, language) },
                     location = t.location?.let { I18n.location(it, language) },
-                    metric = t.metric,
+                    metric = t.metric.lowercase(),
                     prizePlaces = t.prizePlaces,
                     prizes = t.prizesJson,
                 )
