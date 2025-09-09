@@ -42,8 +42,9 @@ internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
 
 private data class AdminDraft(
     var id: Long? = null,
-    var step: AdminStep = AdminStep.NAME,
-    var name: String = "",
+    var step: AdminStep = AdminStep.NAME_RU,
+    var nameRu: String = "",
+    var nameEn: String = "",
     var start: Instant? = null,
     var end: Instant? = null,
     var fish: String? = null,
@@ -54,10 +55,10 @@ private data class AdminDraft(
     var currentPrize: Int = 1,
 )
 
-private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
+private enum class AdminStep { NAME_RU, NAME_EN, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
 
-private val METRIC_OPTIONS = listOf("largest", "smallest", "count", "rarity")
-private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count","rarity"]],"one_time_keyboard":true,"resize_keyboard":true}"""
+private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
+private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
 
 
@@ -121,7 +122,7 @@ fun Application.botRoutes(env: Env) {
                         data == "create_tournament" -> {
                             adminStates[cq.from.id] = AdminDraft()
                             try {
-                                bot.sendMessage(target, "Введите название турнира")
+                                bot.sendMessage(target, "Введите название турнира на русском")
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", target, e)
                             }
@@ -132,7 +133,7 @@ fun Application.botRoutes(env: Env) {
                                 try { bot.sendMessage(target, "Турниров нет") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             } else {
                                 val buttons = list.joinToString(",") { t ->
-                                    """[{"text":"${t.name}","callback_data":"tournament_${t.id}"}]"""
+                                    """[{"text":"${t.nameRu}","callback_data":"tournament_${t.id}"}]"""
                                 }
                                 val markup = """{"inline_keyboard":[$buttons]}"""
                                 try { bot.sendMessage(target, "Турниры", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
@@ -144,7 +145,7 @@ fun Application.botRoutes(env: Env) {
                                 val t = tournaments.getTournament(id)
                                 if (t != null) {
                                     val markup = """{"inline_keyboard":[[{"text":"Редактировать","callback_data":"edit_tournament_$id"},{"text":"Удалить","callback_data":"delete_tournament_$id"}]]}"""
-                                    try { bot.sendMessage(target, "Турнир: ${t.name}", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                    try { bot.sendMessage(target, "Турнир: ${t.nameRu}", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                                 }
                             }
                         }
@@ -161,7 +162,8 @@ fun Application.botRoutes(env: Env) {
                                 if (t != null) {
                                     adminStates[cq.from.id] = AdminDraft(
                                         id = id,
-                                        name = t.name,
+                                        nameRu = t.nameRu,
+                                        nameEn = t.nameEn,
                                         start = t.startTime,
                                         end = t.endTime,
                                         fish = t.fish,
@@ -170,7 +172,7 @@ fun Application.botRoutes(env: Env) {
                                         prizePlaces = t.prizePlaces,
                                         prizes = parsePrizes(t.prizesJson),
                                     )
-                                    try { bot.sendMessage(target, "Введите название турнира (сейчас: ${t.name})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
+                                    try { bot.sendMessage(target, "Введите название турнира на русском (сейчас: ${t.nameRu})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                                 }
                             }
                         }
@@ -232,8 +234,14 @@ fun Application.botRoutes(env: Env) {
 
             adminStates[chatId]?.let { draft ->
                 when (draft.step) {
-                    AdminStep.NAME -> {
-                        draft.name = text
+                    AdminStep.NAME_RU -> {
+                        draft.nameRu = text
+                        draft.step = AdminStep.NAME_EN
+                        val current = draft.nameEn.takeIf { it.isNotBlank() }?.let { " (сейчас: $it)" } ?: ""
+                        try { bot.sendMessage(chatId, "Название турнира на английском$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    AdminStep.NAME_EN -> {
+                        draft.nameEn = text
                         draft.step = AdminStep.START
                         val current = draft.start?.atZone(ZoneOffset.UTC)?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
                         try { bot.sendMessage(chatId, "Дата начала (дд.мм.гггг)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
@@ -255,7 +263,7 @@ fun Application.botRoutes(env: Env) {
                             draft.end = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.FISH
                             val current = draft.fish?.let { " (сейчас: $it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Вид рыбы (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Введите рыбу на русском или группу (common/legendary и т.д.) (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
@@ -265,7 +273,7 @@ fun Application.botRoutes(env: Env) {
                         draft.fish = v.takeIf { it.isNotEmpty() && it != "-" }
                         draft.step = AdminStep.LOCATION
                         val current = draft.location?.let { " (сейчас: $it)" } ?: ""
-                        try { bot.sendMessage(chatId, "Локация (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        try { bot.sendMessage(chatId, "Локация на русском (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.LOCATION -> {
                         val v = text.trim()
@@ -273,7 +281,7 @@ fun Application.botRoutes(env: Env) {
                         draft.step = AdminStep.METRIC
                         val current = if (draft.metric.isNotBlank()) " (сейчас: ${draft.metric})" else ""
                         try {
-                            bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)$current", METRIC_KEYBOARD)
+                            bot.sendMessage(chatId, "Метрика (largest/smallest/count)$current", METRIC_KEYBOARD)
                         } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.METRIC -> {
@@ -286,7 +294,7 @@ fun Application.botRoutes(env: Env) {
                                 bot.sendMessage(chatId, "Количество призовых мест$current", REMOVE_KEYBOARD)
                             } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
-                            try { bot.sendMessage(chatId, "Неверная метрика, выберите largest, smallest, count или rarity", METRIC_KEYBOARD) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Неверная метрика, выберите largest, smallest или count", METRIC_KEYBOARD) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         }
                     }
                     AdminStep.PRIZE_PLACES -> {
@@ -329,20 +337,22 @@ fun Application.botRoutes(env: Env) {
                                 try {
                                     if (draft.id == null) {
                                         tournaments.createTournament(
-                                            draft.name,
+                                            draft.nameRu,
+                                            draft.nameEn,
                                             start,
                                             end,
                                             draft.fish,
                                             draft.location,
                                             draft.metric,
                                             draft.prizePlaces,
-                                            prizesJson,
+        prizesJson,
                                         )
                                         bot.sendMessage(chatId, "Турнир создан")
                                     } else {
                                         tournaments.updateTournament(
                                             draft.id!!,
-                                            draft.name,
+                                            draft.nameRu,
+                                            draft.nameEn,
                                             start,
                                             end,
                                             draft.fish,

@@ -104,6 +104,7 @@ fun Application.apiRoutes(env: Env) {
     @Serializable
     data class TournamentDTO(
         val id: Long,
+        val name: String,
         val startTime: Long,
         val endTime: Long,
         val fish: String? = null,
@@ -250,6 +251,7 @@ fun Application.apiRoutes(env: Env) {
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val dto = TournamentDTO(
                 id = t.id,
+                name = if (language == "en") t.nameEn else t.nameRu,
                 startTime = t.startTime.epochSecond,
                 endTime = t.endTime.epochSecond,
                 fish = t.fish?.let { I18n.fish(it, language) },
@@ -296,6 +298,7 @@ fun Application.apiRoutes(env: Env) {
             val list = tournaments.upcomingTournaments().map { t ->
                 TournamentDTO(
                     id = t.id,
+                    name = if (language == "en") t.nameEn else t.nameRu,
                     startTime = t.startTime.epochSecond,
                     endTime = t.endTime.epochSecond,
                     fish = t.fish?.let { I18n.fish(it, language) },

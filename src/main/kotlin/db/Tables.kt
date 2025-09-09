@@ -483,7 +483,8 @@ object PaySupportRequests : LongIdTable() {
 }
 
 object Tournaments : LongIdTable() {
-    val name = varchar("name", 100)
+    val nameRu = varchar("name_ru", 100)
+    val nameEn = varchar("name_en", 100)
     val startTime = timestamp("start_time")
     val endTime = timestamp("end_time")
     val fish = varchar("fish", 100).nullable()
