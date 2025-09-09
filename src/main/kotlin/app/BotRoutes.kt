@@ -7,6 +7,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
@@ -43,10 +46,19 @@ private data class AdminDraft(
     var location: String? = null,
     var metric: String = "",
     var prizePlaces: Int = 0,
-    var prizes: String = "",
+    var prizes: MutableList<String> = mutableListOf(),
+    var currentPrize: Int = 1,
 )
 
-private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZES }
+private enum class AdminStep { NAME, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
+
+private fun parsePrizes(str: String): MutableList<String> {
+    return try {
+        Json.parseToJsonElement(str).jsonArray.map { it.jsonPrimitive.content }.toMutableList()
+    } catch (_: Exception) {
+        str.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+    }
+}
 
 private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
@@ -132,7 +144,7 @@ fun Application.botRoutes(env: Env) {
                                         location = t.location,
                                         metric = t.metric,
                                         prizePlaces = t.prizePlaces,
-                                        prizes = t.prizesJson,
+                                        prizes = parsePrizes(t.prizesJson),
                                     )
                                     try { bot.sendMessage(target, "Введите название турнира (сейчас: ${t.name})") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                                 }
@@ -239,7 +251,7 @@ fun Application.botRoutes(env: Env) {
                         try { bot.sendMessage(chatId, "Метрика (largest/smallest/count/rarity)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.METRIC -> {
-                        draft.metric = text
+                        draft.metric = text.lowercase()
                         draft.step = AdminStep.PRIZE_PLACES
                         val current = if (draft.prizePlaces != 0) " (сейчас: ${draft.prizePlaces})" else ""
                         try { bot.sendMessage(chatId, "Количество призовых мест$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
@@ -248,50 +260,65 @@ fun Application.botRoutes(env: Env) {
                         val n = text.toIntOrNull()
                         if (n != null) {
                             draft.prizePlaces = n
-                            draft.step = AdminStep.PRIZES
-                            val current = if (draft.prizes.isNotBlank()) " (сейчас: ${draft.prizes})" else ""
-                            try { bot.sendMessage(chatId, "Награды через запятую в порядке мест (например: '100,50,25')$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            draft.prizes = MutableList(n) { i -> draft.prizes.getOrNull(i) ?: "" }
+                            draft.currentPrize = 1
+                            draft.step = AdminStep.PRIZE
+                            val currentPrize = draft.prizes.getOrNull(0)?.takeIf { it.isNotBlank() }?.let { " (сейчас: $it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Награда за 1 место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
-                    AdminStep.PRIZES -> {
-                        draft.prizes = text.trim()
-                        val start = draft.start
-                        val end = draft.end
-                        if (start != null && end != null) {
-                            try {
-                                if (draft.id == null) {
-                                    tournaments.createTournament(
-                                        draft.name,
-                                        start,
-                                        end,
-                                        draft.fish,
-                                        draft.location,
-                                        draft.metric,
-                                        draft.prizePlaces,
-                                        draft.prizes,
-                                    )
-                                    bot.sendMessage(chatId, "Турнир создан")
-                                } else {
-                                    tournaments.updateTournament(
-                                        draft.id!!,
-                                        draft.name,
-                                        start,
-                                        end,
-                                        draft.fish,
-                                        draft.location,
-                                        draft.metric,
-                                        draft.prizePlaces,
-                                        draft.prizes,
-                                    )
-                                    bot.sendMessage(chatId, "Турнир обновлен")
-                                }
-                            } catch (e: Exception) {
-                                log.error("tournament save failed", e)
-                            }
+                    AdminStep.PRIZE -> {
+                        val prize = text.trim()
+                        val idx = draft.currentPrize - 1
+                        if (draft.prizes.size > idx) {
+                            draft.prizes[idx] = prize
+                        } else {
+                            draft.prizes.add(prize)
                         }
-                        adminStates.remove(chatId)
+                        if (draft.currentPrize < draft.prizePlaces) {
+                            draft.currentPrize += 1
+                            val currentPrize = draft.prizes.getOrNull(draft.currentPrize - 1)?.takeIf { it.isNotBlank() }?.let { " (сейчас: $it)" } ?: ""
+                            try { bot.sendMessage(chatId, "Награда за ${draft.currentPrize} место$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        } else {
+                            val start = draft.start
+                            val end = draft.end
+                            if (start != null && end != null) {
+                                val prizesJson = draft.prizes.take(draft.prizePlaces).joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+                                try {
+                                    if (draft.id == null) {
+                                        tournaments.createTournament(
+                                            draft.name,
+                                            start,
+                                            end,
+                                            draft.fish,
+                                            draft.location,
+                                            draft.metric,
+                                            draft.prizePlaces,
+                                            prizesJson,
+                                        )
+                                        bot.sendMessage(chatId, "Турнир создан")
+                                    } else {
+                                        tournaments.updateTournament(
+                                            draft.id!!,
+                                            draft.name,
+                                            start,
+                                            end,
+                                            draft.fish,
+                                            draft.location,
+                                            draft.metric,
+                                            draft.prizePlaces,
+                                            prizesJson,
+                                        )
+                                        bot.sendMessage(chatId, "Турнир обновлен")
+                                    }
+                                } catch (e: Exception) {
+                                    log.error("tournament save failed", e)
+                                }
+                            }
+                            adminStates.remove(chatId)
+                        }
                     }
                 }
                 return@post call.respond(HttpStatusCode.OK)
