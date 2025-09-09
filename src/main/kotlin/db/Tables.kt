@@ -389,6 +389,7 @@ object Users : LongIdTable() {
     val lastName = varchar("last_name", 100).nullable()
     val username = varchar("username", 100).nullable()
     val nickname = varchar("nickname", 100).nullable()
+    val language = varchar("language", 10).default("en")
     val level = integer("level")
     val xp = integer("xp")
     val createdAt = timestamp("created_at")

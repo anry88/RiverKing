@@ -13,6 +13,7 @@ object TgWebAppAuth {
         val firstName: String? = null,
         val lastName: String? = null,
         val username: String? = null,
+        val languageCode: String? = null,
     )
 
     fun verifyAndExtractUser(initData: String, botToken: String): TgUser {
@@ -46,6 +47,7 @@ object TgWebAppAuth {
             obj["first_name"]?.jsonPrimitive?.contentOrNull,
             obj["last_name"]?.jsonPrimitive?.contentOrNull,
             obj["username"]?.jsonPrimitive?.contentOrNull,
+            obj["language_code"]?.jsonPrimitive?.contentOrNull,
         )
     }
 }

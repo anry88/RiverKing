@@ -25,6 +25,7 @@ class FishingService {
         firstName: String? = null,
         lastName: String? = null,
         username: String? = null,
+        language: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
         if (existing == null) {
@@ -36,6 +37,7 @@ class FishingService {
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.username] = username
+                it[Users.language] = if (language == "ru") "ru" else "en"
                 it[currentLureId] = freshId
             }.value
             InventoryLures.insert {
@@ -51,11 +53,12 @@ class FishingService {
             newId
         } else {
             val id = existing[Users.id].value
-            if (firstName != null || lastName != null || username != null) {
+            if (firstName != null || lastName != null || username != null || language != null) {
                 Users.update({ Users.id eq id }) {
                     if (firstName != null) it[Users.firstName] = firstName
                     if (lastName != null) it[Users.lastName] = lastName
                     if (username != null) it[Users.username] = username
+                    if (language != null) it[Users.language] = if (language == "ru") "ru" else "en"
                 }
             }
             id
@@ -64,6 +67,10 @@ class FishingService {
 
     fun setNickname(userId: Long, nickname: String) = transaction {
         Users.update({ Users.id eq userId }) { it[Users.nickname] = nickname }
+    }
+
+    fun setLanguage(userId: Long, language: String) = transaction {
+        Users.update({ Users.id eq userId }) { it[Users.language] = language }
     }
 
     fun displayName(userId: Long): String? = transaction {
@@ -238,7 +245,7 @@ class FishingService {
         val lures: List<GuideLureDTO>,
     )
 
-    fun guide(): GuideDTO = transaction {
+    fun guide(lang: String): GuideDTO = transaction {
         fun rarityRank(r: String) = when(r) {
             "common" -> 0
             "uncommon" -> 1
@@ -248,13 +255,13 @@ class FishingService {
             else -> 5
         }
 
-        // Locations with fish and possible lures
-        val locationDtos = Locations.selectAll().map { locRow ->
+        // Locations with fish and possible lures, ordered by unlock requirement
+        val locationDtos = Locations.selectAll().orderBy(Locations.unlockKg).map { locRow ->
             val locId = locRow[Locations.id].value
-            val locName = locRow[Locations.name]
+            val locName = I18n.location(locRow[Locations.name], lang)
             val fishRows = (LocationFishWeights innerJoin Fish)
                 .select { LocationFishWeights.locationId eq locId }
-                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
                 .sortedBy { rarityRank(it.rarity) }
             val waters = (LocationFishWeights innerJoin Fish)
                 .slice(Fish.water)
@@ -264,37 +271,37 @@ class FishingService {
             val waterFilter = with(SqlExpressionBuilder) {
                 if (waters.isNotEmpty()) Lures.water inList waters else Lures.water eq "fresh"
             }
-            val lureNames = Lures.select { waterFilter }.map { it[Lures.name] }
+            val lureNames = Lures.select { waterFilter }.map { I18n.lure(it[Lures.name], lang) }
             GuideLocationDTO(locId, locName, fishRows, lureNames)
         }
 
         // Fish with locations and matching lures
         val fishDtos = Fish.selectAll().map { fRow ->
             val fid = fRow[Fish.id].value
-            val name = fRow[Fish.name]
+            val name = I18n.fish(fRow[Fish.name], lang)
             val rarity = fRow[Fish.rarity]
             val pred = fRow[Fish.predator]
             val water = fRow[Fish.water]
             val locations = (LocationFishWeights innerJoin Locations)
                 .select { LocationFishWeights.fishId eq fid }
-                .map { it[Locations.name] }
+                .map { I18n.location(it[Locations.name], lang) }
             val lures = Lures.select { (Lures.predator eq pred) and (Lures.water eq water) }
-                .map { it[Lures.name] }
+                .map { I18n.lure(it[Lures.name], lang) }
             GuideFishDTO(fid, name, rarity, locations, lures)
         }.sortedBy { rarityRank(it.rarity) }
 
         // Lures with fish and locations
         val lureDtos = Lures.selectAll().map { lRow ->
-            val name = lRow[Lures.name]
+            val name = I18n.lure(lRow[Lures.name], lang)
             val pred = lRow[Lures.predator]
             val water = lRow[Lures.water]
             val fishList = Fish.select { (Fish.predator eq pred) and (Fish.water eq water) }
-                .map { FishBriefDTO(it[Fish.name], it[Fish.rarity]) }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
                 .sortedBy { rarityRank(it.rarity) }
             val locations = (LocationFishWeights innerJoin Fish innerJoin Locations)
                 .slice(Locations.name)
                 .select { (Fish.predator eq pred) and (Fish.water eq water) }
-                .map { it[Locations.name] }
+                .map { I18n.location(it[Locations.name], lang) }
                 .distinct()
             GuideLureDTO(name, fishList, locations)
         }
@@ -501,7 +508,18 @@ class FishingService {
         ),
     )
 
-    fun listShop(): List<ShopCategory> = shopCategories
+    fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
+        cat.copy(
+            name = I18n.text(cat.name, lang),
+            packs = cat.packs.map { p ->
+                p.copy(
+                    name = I18n.text(p.name, lang),
+                    desc = I18n.text(p.desc, lang),
+                    items = p.items.map { I18n.lure(it.first, lang) to it.second }
+                )
+            }
+        )
+    }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
         val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
