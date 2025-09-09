@@ -99,6 +99,11 @@ class FishingService {
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
     }
 
+    fun caughtFishIds(userId: Long): List<Long> = transaction {
+        Catches.slice(Catches.fishId).select { Catches.userId eq userId }
+            .withDistinct().map { it[Catches.fishId].value }
+    }
+
     fun locations(userId: Long): List<LocationDTO> = transaction {
         val total = totalKg(userId)
         Locations.selectAll().orderBy(Locations.unlockKg).map {
@@ -129,7 +134,7 @@ class FishingService {
         return first
     }
 
-    fun giveDailyBaits(userId: Long, freshQty: Int = 7, predQty: Int = 3): Pair<List<LureDTO>, Long?>? = transaction {
+    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): Pair<List<LureDTO>, Long?>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
