@@ -1197,17 +1197,21 @@
                 <div className="text-center opacity-70">{t('noData')}</div>
               ) : (
                 <div className="space-y-4">
-                  {tournaments.map(tn=> (
-                    <div key={tn.id} className="p-4 rounded-xl glass text-left">
-                      <div className="text-xs opacity-70">
-                        {new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}
+                  {tournaments.map(tn=> {
+                    let prizes = [];
+                    try { prizes = JSON.parse(tn.prizes||'[]'); } catch(e) {}
+                    return (
+                      <div key={tn.id} className="p-4 rounded-xl glass text-left">
+                        <div className="text-xs opacity-70">
+                          {new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}
+                        </div>
+                        {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
+                        {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
+                        <div className="text-sm opacity-80">{tn.metric}</div>
+                        <div className="text-sm opacity-80">{t('prizes')}: {prizes.join(', ')}</div>
                       </div>
-                      {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
-                      {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
-                      <div className="text-sm opacity-80">{tn.metric}</div>
-                      <div className="text-sm opacity-80">{t('prizes')}: {JSON.parse(tn.prizes||'[]').join(', ')}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
