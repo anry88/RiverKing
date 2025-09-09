@@ -99,6 +99,11 @@ class FishingService {
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
     }
 
+    fun caughtFishIds(userId: Long): List<Long> = transaction {
+        Catches.slice(Catches.fishId).select { Catches.userId eq userId }
+            .withDistinct().map { it[Catches.fishId].value }
+    }
+
     fun locations(userId: Long): List<LocationDTO> = transaction {
         val total = totalKg(userId)
         Locations.selectAll().orderBy(Locations.unlockKg).map {

@@ -120,6 +120,7 @@ fun Application.apiRoutes(env: Env) {
                 Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
             }
             val recent = fishing.recent(uid)
+            val caughtFishIds = fishing.caughtFishIds(uid)
 
             @Serializable
             data class MeResp(
@@ -131,6 +132,7 @@ fun Application.apiRoutes(env: Env) {
                 val todayWeight: Double,
                 val locationId: Long,
                 val locations: List<LocationDTO>,
+                val caughtFishIds: List<Long>,
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
             )
@@ -144,6 +146,7 @@ fun Application.apiRoutes(env: Env) {
                     todayWeight,
                     currentLocId,
                     locs,
+                    caughtFishIds,
                     recent,
                     dailyAvailable
                 )
