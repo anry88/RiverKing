@@ -210,6 +210,7 @@
         noSuitableFish:'Нет подходящей рыбы на эту приманку.',
         fishing:'Рыбалка',
         tournaments:'Турниры',
+        prizes:'Призы',
         achievements:'Достижения',
         guide:'Справочник',
         shop:'Магазин',
@@ -273,6 +274,7 @@
         noSuitableFish:'No suitable fish for this bait here.',
         fishing:'Fishing',
         tournaments:'Tournaments',
+        prizes:'Prizes',
         achievements:'Achievements',
         guide:'Guide',
         shop:'Shop',
@@ -810,6 +812,7 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
+      const [tournaments,setTournaments] = React.useState([]);
       const [nickOpen,setNickOpen] = React.useState(false);
 
       React.useEffect(()=>{
@@ -853,6 +856,19 @@
                 if(e.message==='unauthorized'){
                   setError(t('authRequired'));
                   setShop([]);
+                }
+              }
+              try{
+                const ts = await fetch(`/api/tournaments`,{credentials:'include'});
+                if(!ts.ok){
+                  if(ts.status===401) throw new Error('unauthorized');
+                } else {
+                  setTournaments(await ts.json());
+                }
+              }catch(e){
+                if(e.message==='unauthorized'){
+                  setError(t('authRequired'));
+                  setTournaments([]);
                 }
               }
             }catch(e){
@@ -992,6 +1008,8 @@
           }
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){ setShop(await s.json()); }
+          const ts = await fetch(`/api/tournaments`,{credentials:'include'});
+          if(ts.ok){ setTournaments(await ts.json()); }
         }catch(e){}
       }
 
@@ -1174,7 +1192,25 @@
           )}
 
           {tab === 'tournaments' && (
-            <div className="mt-6 text-center opacity-70">{t('tournamentsSoon')}</div>
+            <div className="mt-6">
+              {tournaments.length===0 ? (
+                <div className="text-center opacity-70">{t('noData')}</div>
+              ) : (
+                <div className="space-y-4">
+                  {tournaments.map(tn=> (
+                    <div key={tn.id} className="p-4 rounded-xl glass text-left">
+                      <div className="text-xs opacity-70">
+                        {new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}
+                      </div>
+                      {tn.fish && <div className="text-lg font-bold">{tn.fish}</div>}
+                      {tn.location && <div className="text-sm opacity-80">{t('locationLabel')} {tn.location}</div>}
+                      <div className="text-sm opacity-80">{tn.metric}</div>
+                      <div className="text-sm opacity-80">{t('prizes')}: {JSON.parse(tn.prizes||'[]').join(', ')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {tab === 'achievements' && (
             <Achievements me={me} setMe={setMe} />
