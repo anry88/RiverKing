@@ -103,11 +103,20 @@ fun Application.botRoutes(env: Env) {
             val chatId = message.chat.id
             val text = message.text ?: ""
             if (text.startsWith("/start")) {
-                val markup = """
-                    {"keyboard":[[{"text":"\uD83C\uDFA3 Играть","web_app":{"url":"${env.publicBaseUrl}/app"}}]],"resize_keyboard":true}
-                """.trimIndent()
+                val from = message.from
+                val uid = fishing.ensureUserByTgId(
+                    tgId = chatId,
+                    firstName = from?.first_name,
+                    lastName = from?.last_name,
+                    username = from?.username,
+                    language = from?.language_code
+                )
+                val lang = fishing.userLanguage(uid)
+                val button = if (lang == "ru") "\uD83C\uDFA3 Играть" else "\uD83C\uDFA3 Play"
+                val reply = if (lang == "ru") "Нажми кнопку, чтобы начать игру" else "Press the button to start the game"
+                val markup = """{"keyboard":[[{"text":"$button","web_app":{"url":"${env.publicBaseUrl}/app"}}]],"resize_keyboard":true}"""
                 try {
-                    bot.sendMessage(chatId, "Нажми кнопку, чтобы начать игру", markup)
+                    bot.sendMessage(chatId, reply, markup)
                 } catch (e: Exception) {
                     log.error("sendMessage failed chatId={}", chatId, e)
                 }
@@ -205,6 +214,7 @@ private data class TgUpdate(
 private data class TgMessage(
     val message_id: Long,
     val chat: TgChat,
+    val from: TgUser? = null,
     val text: String? = null,
     @SerialName("successful_payment") val successfulPayment: TgSuccessfulPayment? = null,
 )
@@ -223,3 +233,12 @@ private data class TgSuccessfulPayment(
 
 @Serializable
 private data class TgChat(val id: Long)
+
+@Serializable
+private data class TgUser(
+    val id: Long,
+    @SerialName("first_name") val first_name: String? = null,
+    @SerialName("last_name") val last_name: String? = null,
+    val username: String? = null,
+    @SerialName("language_code") val language_code: String? = null,
+)

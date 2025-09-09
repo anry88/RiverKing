@@ -37,7 +37,7 @@ class FishingService {
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.username] = username
-                it[Users.language] = if (language == "ru") "ru" else "en"
+                it[Users.language] = if (language?.startsWith("ru") == true) "ru" else "en"
                 it[currentLureId] = freshId
             }.value
             InventoryLures.insert {
@@ -53,12 +53,11 @@ class FishingService {
             newId
         } else {
             val id = existing[Users.id].value
-            if (firstName != null || lastName != null || username != null || language != null) {
+            if (firstName != null || lastName != null || username != null) {
                 Users.update({ Users.id eq id }) {
                     if (firstName != null) it[Users.firstName] = firstName
                     if (lastName != null) it[Users.lastName] = lastName
                     if (username != null) it[Users.username] = username
-                    if (language != null) it[Users.language] = if (language == "ru") "ru" else "en"
                 }
             }
             id
@@ -71,6 +70,10 @@ class FishingService {
 
     fun setLanguage(userId: Long, language: String) = transaction {
         Users.update({ Users.id eq userId }) { it[Users.language] = language }
+    }
+
+    fun userLanguage(userId: Long): String = transaction {
+        Users.select { Users.id eq userId }.singleOrNull()?.get(Users.language) ?: "en"
     }
 
     fun displayName(userId: Long): String? = transaction {
