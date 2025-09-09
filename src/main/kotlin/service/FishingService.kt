@@ -72,6 +72,10 @@ class FishingService {
         Users.update({ Users.id eq userId }) { it[Users.language] = language }
     }
 
+    fun userLanguage(userId: Long): String = transaction {
+        Users.select { Users.id eq userId }.singleOrNull()?.get(Users.language) ?: "en"
+    }
+
     fun displayName(userId: Long): String? = transaction {
         Users.select { Users.id eq userId }.singleOrNull()?.let { nameFromRow(it) }
     }
