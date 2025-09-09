@@ -3,6 +3,8 @@ package service
 import db.*
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
@@ -754,14 +756,14 @@ class FishingService {
         list.sortedWith(compareByDescending<CatchDTO> { rarityRank(it.rarity) }
             .thenByDescending { it.weight }).take(limit)
 
-    @Serializable
-    data class FishExtremeDTO(val smallest: CatchDTO?, val largest: CatchDTO?)
-
-    fun personalTopByLocation(userId: Long, locationId: Long, limit: Int = 10): List<CatchDTO> {
+    fun personalTopByLocation(userId: Long, locationId: Long, today: Boolean = false, limit: Int = 50): List<CatchDTO> {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
         val catches = transaction {
+            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
+            if (today) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
+                .select { cond }
                 .map {
                     CatchDTO(
                         it[Fish.name],
@@ -778,58 +780,14 @@ class FishingService {
         return sortCatches(catches, limit)
     }
 
-    fun personalTopByFish(userId: Long, limit: Int = 10): List<CatchDTO> {
+    fun personalTopBySpecies(userId: Long, fishId: Long, today: Boolean = false, limit: Int = 50): List<CatchDTO> {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
         val catches = transaction {
+            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
+            if (today) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .select { Catches.userId eq userId }
-                .map {
-                    CatchDTO(
-                        it[Fish.name],
-                        it[Catches.weight],
-                        it[Locations.name],
-                        it[Fish.rarity],
-                        it[Catches.userId].value,
-                        it[Fish.id].value,
-                        user = catchUser(it),
-                        at = it[Catches.createdAt].toString(),
-                    )
-                }
-        }
-        val best = catches.groupBy { it.fish }.values.mapNotNull { group ->
-            group.maxByOrNull { it.weight }
-        }
-        return sortCatches(best, limit)
-    }
-
-    fun personalFishExtremes(userId: Long, fishId: Long): FishExtremeDTO {
-        val catches = transaction {
-            ((Catches leftJoin Users) innerJoin Fish)
-                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .select { (Catches.userId eq userId) and (Catches.fishId eq fishId) }
-                .map {
-                    CatchDTO(
-                        it[Fish.name],
-                        it[Catches.weight],
-                        it[Locations.name],
-                        it[Fish.rarity],
-                        it[Catches.userId].value,
-                        it[Fish.id].value,
-                        user = catchUser(it),
-                        at = it[Catches.createdAt].toString(),
-                    )
-                }
-        }
-        val max = catches.maxByOrNull { it.weight }
-        val min = catches.minByOrNull { it.weight }
-        return FishExtremeDTO(min, max)
-    }
-
-    fun globalTopByLocation(locationId: Long, limit: Int = 10): List<CatchDTO> {
-        val catches = transaction {
-            ((Catches leftJoin Users) innerJoin Fish)
-                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .select { Catches.locationId eq locationId }
+                .select { cond }
                 .map {
                     CatchDTO(
                         it[Fish.name],
@@ -846,11 +804,14 @@ class FishingService {
         return sortCatches(catches, limit)
     }
 
-    fun globalTopByFish(limit: Int = 10): List<CatchDTO> {
+    fun globalTopByLocation(locationId: Long, today: Boolean = false, limit: Int = 50): List<CatchDTO> {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
         val catches = transaction {
+            var cond: Op<Boolean> = Catches.locationId eq locationId
+            if (today) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .selectAll()
+                .select { cond }
                 .map {
                     CatchDTO(
                         it[Fish.name],
@@ -864,17 +825,17 @@ class FishingService {
                     )
                 }
         }
-        val best = catches.groupBy { it.fish }.values.mapNotNull { group ->
-            group.maxByOrNull { it.weight }
-        }
-        return sortCatches(best, limit)
+        return sortCatches(catches, limit)
     }
 
-    fun globalFishExtremes(fishId: Long): FishExtremeDTO {
+    fun globalTopBySpecies(fishId: Long, today: Boolean = false, limit: Int = 50): List<CatchDTO> {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
         val catches = transaction {
+            var cond: Op<Boolean> = Catches.fishId eq fishId
+            if (today) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
-                .select { Catches.fishId eq fishId }
+                .select { cond }
                 .map {
                     CatchDTO(
                         it[Fish.name],
@@ -888,8 +849,6 @@ class FishingService {
                     )
                 }
         }
-        val max = catches.maxByOrNull { it.weight }
-        val min = catches.minByOrNull { it.weight }
-        return FishExtremeDTO(min, max)
+        return sortCatches(catches, limit)
     }
 }

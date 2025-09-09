@@ -162,6 +162,7 @@
         baits:'Приманки',
         total:'Всего',
         today:'Сегодня',
+        allTime:'За всё время',
         kg:'кг',
         locations:'Локации',
         unlocked:'Открыто',
@@ -222,6 +223,7 @@
         baits:'Baits',
         total:'Total',
         today:'Today',
+        allTime:'All time',
         kg:'kg',
         locations:'Locations',
         unlocked:'Unlocked',
@@ -521,11 +523,11 @@
     function Achievements({me, setMe}){
       const [mode,setMode] = React.useState('personal');
       const [section,setSection] = React.useState('location');
+      const [period,setPeriod] = React.useState('all');
       const [locId,setLocId] = React.useState(me.locationId);
       const [fishList,setFishList] = React.useState([]);
       const [fishId,setFishId] = React.useState(null);
       const [list,setList] = React.useState([]);
-      const [ext,setExt] = React.useState(null);
 
       React.useEffect(()=>{
         fetch('/api/guide',{credentials:'include'})
@@ -537,16 +539,13 @@
       React.useEffect(()=>{
         if(me.needsNickname) return;
         if(section==='location'){
-          fetch(`/api/achievements/${mode}/location/${locId}`,{credentials:'include'})
-            .then(r=>r.json()).then(setList).catch(()=>setList([]));
-        } else if(section==='fish'){
-          fetch(`/api/achievements/${mode}/fish`,{credentials:'include'})
+          fetch(`/api/achievements/${mode}/location/${locId}?period=${period}`,{credentials:'include'})
             .then(r=>r.json()).then(setList).catch(()=>setList([]));
         } else if(section==='species' && fishId){
-          fetch(`/api/achievements/${mode}/fish/${fishId}`,{credentials:'include'})
-            .then(r=>r.json()).then(setExt).catch(()=>setExt(null));
+          fetch(`/api/achievements/${mode}/species/${fishId}?period=${period}`,{credentials:'include'})
+            .then(r=>r.json()).then(setList).catch(()=>setList([]));
         }
-      },[mode,section,locId,fishId,me.needsNickname,me.language]);
+      },[mode,section,locId,fishId,period,me.needsNickname,me.language]);
 
       return (
         <div className="mt-4 space-y-4">
@@ -556,8 +555,12 @@
           </div>
           <div className="flex gap-2">
             <button onClick={()=>setSection('location')} className={`flex-1 py-2 rounded-xl ${section==='location'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
-            <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
             <button onClick={()=>setSection('species')} className={`flex-1 py-2 rounded-xl ${section==='species'?'bg-emerald-600':'glass'}`}>{t('species')}</button>
+          </div>
+
+          <div className="flex gap-2">
+            <button onClick={()=>setPeriod('today')} className={`flex-1 py-2 rounded-xl ${period==='today'?'bg-emerald-600':'glass'}`}>{t('today')}</button>
+            <button onClick={()=>setPeriod('all')} className={`flex-1 py-2 rounded-xl ${period==='all'?'bg-emerald-600':'glass'}`}>{t('allTime')}</button>
           </div>
 
           {section==='location' && (
@@ -590,79 +593,34 @@
             </div>
           )}
 
-          {section==='fish' && (
-            <div className="space-y-2">
-              {list.map((c,i)=>(
-                <div key={c.fishId||i} onClick={()=>{setFishId(c.fishId); setSection('species');}} className="p-3 glass rounded-xl flex justify-between cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    {(me.caughtFishIds||[]).includes(c.fishId) ? (
-                      <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
-                        <span className="text-xl opacity-20">🐟</span>
-                        <span className="absolute">?</span>
-                      </div>
-                    )}
-                    <div>
-                      <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                      <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
-                    </div>
-                  </div>
-                  <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-                </div>
-              ))}
-              {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
-            </div>
-          )}
-
           {section==='species' && (
             <div className="space-y-3">
               <select value={fishId||''} onChange={e=>setFishId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
                 <option value="" disabled>{t('selectFish')}</option>
                 {fishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
-              {ext && (
-                <div className="space-y-2">
-                  {ext.smallest && (
-                    <div className="p-3 glass rounded-xl flex justify-between">
-                      <div className="flex items-center gap-3">
-                        {(me.caughtFishIds||[]).includes(ext.smallest.fishId) ? (
-                          <img src={FISH_IMG[ext.smallest.fish]} alt={ext.smallest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-                        ) : (
-                          <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
-                            <span className="text-xl opacity-20">🐟</span>
-                            <span className="absolute">?</span>
-                          </div>
-                        )}
-                        <div>
-                          <div className={`font-medium ${rarityColors[ext.smallest.rarity]||''}`}>{t('smallest')} {ext.smallest.fish}</div>
-                          <div className="text-xs opacity-70">{ext.smallest.user} • {ext.smallest.location} • {ext.smallest.at?new Date(ext.smallest.at).toLocaleString():''}</div>
+              <div className="space-y-2">
+                {list.map((c,i)=>(
+                  <div key={i} className="p-3 glass rounded-xl flex justify-between">
+                    <div className="flex items-center gap-3">
+                      {(me.caughtFishIds||[]).includes(c.fishId) ? (
+                        <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                          <span className="text-xl opacity-20">🐟</span>
+                          <span className="absolute">?</span>
                         </div>
+                      )}
+                      <div>
+                        <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
+                        <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
                       </div>
-                      <div className="font-semibold">{Number(ext.smallest.weight).toFixed(2)} {t('kg')}</div>
                     </div>
-                  )}
-                  {ext.largest && (
-                    <div className="p-3 glass rounded-xl flex justify-between">
-                      <div className="flex items-center gap-3">
-                        {(me.caughtFishIds||[]).includes(ext.largest.fishId) ? (
-                          <img src={FISH_IMG[ext.largest.fish]} alt={ext.largest.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-                        ) : (
-                          <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
-                            <span className="text-xl opacity-20">🐟</span>
-                            <span className="absolute">?</span>
-                          </div>
-                        )}
-                        <div>
-                          <div className={`font-medium ${rarityColors[ext.largest.rarity]||''}`}>{t('largest')} {ext.largest.fish}</div>
-                          <div className="text-xs opacity-70">{ext.largest.user} • {ext.largest.location} • {ext.largest.at?new Date(ext.largest.at).toLocaleString():''}</div>
-                        </div>
-                      </div>
-                      <div className="font-semibold">{Number(ext.largest.weight).toFixed(2)} {t('kg')}</div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
+                  </div>
+                ))}
+                {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
+              </div>
             </div>
           )}
         </div>
