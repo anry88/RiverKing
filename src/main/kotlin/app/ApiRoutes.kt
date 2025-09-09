@@ -15,6 +15,7 @@ import service.LocationDTO
 import service.RecentDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
+import service.TournamentService
 import service.I18n
 import db.Users
 import service.PayService
@@ -25,6 +26,7 @@ fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
+    val tournaments = TournamentService()
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -90,6 +92,18 @@ fun Application.apiRoutes(env: Env) {
 
     @Serializable
     data class InvoiceResp(val invoice_url: String)
+
+    @Serializable
+    data class TournamentDTO(
+        val id: Long,
+        val startTime: Long,
+        val endTime: Long,
+        val fish: String? = null,
+        val location: String? = null,
+        val metric: String,
+        val prizePlaces: Int,
+        val prizes: String,
+    )
 
     routing {
         // Telegram WebApp auth: client sends initData in a header
@@ -195,6 +209,30 @@ fun Application.apiRoutes(env: Env) {
             val req = call.receive<LangReq>()
             fishing.setLanguage(uid, req.language)
             call.respond(HttpStatusCode.OK)
+        }
+
+        get("/api/tournaments") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = tournaments.listTournaments().map { t ->
+                TournamentDTO(
+                    id = t.id,
+                    startTime = t.startTime.epochSecond,
+                    endTime = t.endTime.epochSecond,
+                    fish = t.fish?.let { I18n.fish(it, language) },
+                    location = t.location?.let { I18n.location(it, language) },
+                    metric = t.metric,
+                    prizePlaces = t.prizePlaces,
+                    prizes = t.prizesJson,
+                )
+            }
+            call.respond(list)
         }
 
         // Daily baits
