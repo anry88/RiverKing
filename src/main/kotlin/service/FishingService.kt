@@ -765,17 +765,28 @@ class FishingService {
             ).take(limit)
         }
 
+    private fun periodStart(period: String): Instant? {
+        val zone = ZoneId.systemDefault()
+        return when (period) {
+            "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
+            "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
+            "month" -> LocalDate.now().minusMonths(1).atStartOfDay(zone).toInstant()
+            "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
+            else -> null
+        }
+    }
+
     fun personalTopByLocation(
         userId: Long,
         locationId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = periodStart(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -798,14 +809,14 @@ class FishingService {
     fun personalTopBySpecies(
         userId: Long,
         fishId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = periodStart(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -827,14 +838,14 @@ class FishingService {
 
     fun globalTopByLocation(
         locationId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = periodStart(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.locationId eq locationId
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -856,14 +867,14 @@ class FishingService {
 
     fun globalTopBySpecies(
         fishId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = periodStart(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.fishId eq fishId
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }

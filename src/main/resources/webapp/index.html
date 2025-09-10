@@ -165,6 +165,9 @@
         baits:'Приманки',
         total:'Всего',
         today:'Сегодня',
+        lastWeek:'За неделю',
+        lastMonth:'За месяц',
+        lastYear:'За год',
         allTime:'За всё время',
         kg:'кг',
         locations:'Локации',
@@ -217,13 +220,13 @@
         tournaments:'Турниры',
         you:'Ты',
         prizes:'Призы',
-        achievements:'Достижения',
+        records:'Рекорды',
         guide:'Справочник',
         shop:'Магазин',
         gift:'Подарок',
         personal:'Личные',
         global:'Глобальные',
-        species:'Виды',
+        species:'Рыбы',
         smallest:'Самая маленькая',
         largest:'Самая большая',
         count:'Количество',
@@ -231,6 +234,7 @@
         anyFish:'Любая рыба',
         anyLocation:'Любая локация',
         conditionsLabel:'Условия:',
+        prizePlacesLabel:'Призовых мест:',
         tapToClaim:'Нажмите, чтобы получить',
       },
       en: {
@@ -238,6 +242,9 @@
         baits:'Baits',
         total:'Total',
         today:'Today',
+        lastWeek:'Last week',
+        lastMonth:'Last month',
+        lastYear:'Last year',
         allTime:'All time',
         kg:'kg',
         locations:'Locations',
@@ -290,13 +297,13 @@
         tournaments:'Tournaments',
         you:'You',
         prizes:'Prizes',
-        achievements:'Achievements',
+        records:'Records',
         guide:'Guide',
         shop:'Shop',
         gift:'Gift',
         personal:'Personal',
         global:'Global',
-        species:'Species',
+        species:'Fish',
         smallest:'Smallest',
         largest:'Largest',
         count:'Count',
@@ -304,6 +311,7 @@
         anyFish:'Any fish',
         anyLocation:'Any location',
         conditionsLabel:'Conditions:',
+        prizePlacesLabel:'Prize places:',
         tapToClaim:'Tap to claim',
       }
     };
@@ -330,16 +338,15 @@
     }
 
     function StatChip({icon,label,value,active=false,onClick}){
-      const Comp = onClick ? 'button' : 'div';
       return (
-        <Comp onClick={onClick}
-          className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':''} ${active?'ring-1 ring-emerald-500':''}`}>
+        <button type="button" onClick={onClick}
+          className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center justify-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':'pointer-events-none'} ${active?'ring-1 ring-emerald-500':''}`}>
           {icon && <span className="text-base">{icon}</span>}
           <div className="leading-tight">
             <div className="text-[10px] uppercase opacity-70">{label}</div>
             <div className="text-sm font-semibold whitespace-nowrap">{value}</div>
           </div>
-        </Comp>
+        </button>
       );
     }
 
@@ -594,6 +601,9 @@
             </select>
             <select value={period} onChange={e=>setPeriod(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
               <option value="today">{t('today')}</option>
+              <option value="week">{t('lastWeek')}</option>
+              <option value="month">{t('lastMonth')}</option>
+              <option value="year">{t('lastYear')}</option>
               <option value="all">{t('allTime')}</option>
             </select>
             <select value={order} onChange={e=>setOrder(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
@@ -1298,9 +1308,9 @@
           {tab === 'tournaments' && (
             <div className="mt-6">
               <div className="flex mb-4">
+                <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${tournamentTab==='past'?'text-emerald-400':''}`}>{t('past')}</button>
                 <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${tournamentTab==='current'?'text-emerald-400':''}`}>{t('current')}</button>
                 <button onClick={()=>setTournamentTab('upcoming')} className={`flex-1 py-2 ${tournamentTab==='upcoming'?'text-emerald-400':''}`}>{t('upcoming')}</button>
-                <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${tournamentTab==='past'?'text-emerald-400':''}`}>{t('past')}</button>
               </div>
               {tournamentTab==='current' ? (
                 currentTournament ? (
@@ -1312,6 +1322,7 @@
                         <div className="text-sm opacity-80">{t('fishLabel')} {currentTournament.tournament.fish || t('anyFish')}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
                         <div className="text-sm opacity-80">{t('conditionsLabel')} {t(currentTournament.tournament.metric)}</div>
+                        <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
                       </div>
                       <div className="space-y-2">
                         {(currentTournament.leaderboard || []).map(e=> (
@@ -1370,6 +1381,7 @@
                         <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                         <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
+                        <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
                       </div>
                     ))}
                   </div>
@@ -1384,6 +1396,7 @@
                       <div className="text-sm opacity-80">{t('fishLabel')} {pastResult.tournament.fish || t('anyFish')}</div>
                       <div className="text-sm opacity-80">{t('locationLabel')} {pastResult.tournament.location || t('anyLocation')}</div>
                       <div className="text-sm opacity-80">{t('conditionsLabel')} {t(pastResult.tournament.metric)}</div>
+                      <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
                     </div>
                     <div className="space-y-2">
                       {(pastResult.leaderboard || []).map(e=> (
@@ -1438,6 +1451,7 @@
                           <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
                           <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                           <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
+                          <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
                         </div>
                       ))}
                     </div>
@@ -1501,7 +1515,7 @@
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('achievements')}</button>
+              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('records')}</button>
               <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
               <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
