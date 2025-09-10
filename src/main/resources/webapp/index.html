@@ -1253,7 +1253,7 @@
       }
 
       return (
-        <div className="min-h-screen w-full px-4 pb-20">
+        <div className="min-h-screen w-full px-4 pb-20" onClick={()=>setPrizeHint(null)}>
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
               <div className="bg-white text-black p-6 rounded-xl text-center animate-pop">
@@ -1269,14 +1269,7 @@
               </div>
             </div>
           )}
-        {prizeHint && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={()=>setPrizeHint(null)}>
-              <div className="bg-white text-black p-4 rounded-xl text-center animate-pop" onClick={e=>e.stopPropagation()}>
-                <div className="font-semibold mb-2">{t('potentialPrize')}</div>
-                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.packageId)?.name)||prizeHint.packageId} x{prizeHint.qty}
-              </div>
-            </div>
-          )}
+        {/* prizeHint tooltip handled per-card */}
           <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
 
@@ -1363,9 +1356,9 @@
                       </div>
                       <div className="space-y-2">
                         {(currentTournament.leaderboard || []).map(e=> (
-                          <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between" onClick={()=>e.prize && setPrizeHint(e.prize)}>
+                          <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between relative" onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}>
                             <div className="flex items-center gap-2 w-full min-w-0">
-                              <div className="w-8 h-8 flex items-center justify-center shrink-0">{e.rank}</div>
+                              <div className="w-10 h-8 flex items-center justify-center shrink-0">{e.rank}{e.rank <= currentTournament.tournament.prizePlaces && ' 🎁'}</div>
                               {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
@@ -1378,12 +1371,17 @@
                               <div>{currentTournament.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
+                            {prizeHint?.rank===e.rank && (
+                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap">
+                                {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              </div>
+                            )}
                           </div>
                         ))}
                         {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
-                          <div className="p-3 rounded-xl glass flex items-center justify-between mt-2" onClick={()=>currentTournament.mine.prize && setPrizeHint(currentTournament.mine.prize)}>
+                          <div className="p-3 rounded-xl glass flex items-center justify-between mt-2 relative" onClick={ev=>{ev.stopPropagation(); if(currentTournament.mine.prize) setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}>
                             <div className="flex items-center gap-2 w-full min-w-0">
-                              <div className="w-8 h-8 flex items-center justify-center shrink-0">{currentTournament.mine.rank}</div>
+                              <div className="w-10 h-8 flex items-center justify-center shrink-0">{currentTournament.mine.rank}{currentTournament.mine.rank <= currentTournament.tournament.prizePlaces && ' 🎁'}</div>
                               {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
@@ -1396,6 +1394,11 @@
                               <div>{currentTournament.tournament.metric==='count'? Number(currentTournament.mine.value).toFixed(0) : Number(currentTournament.mine.value).toFixed(2)}</div>
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
+                            {prizeHint?.rank===currentTournament.mine.rank && (
+                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap">
+                                {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1435,9 +1438,9 @@
                     </div>
                     <div className="space-y-2">
                       {(pastResult.leaderboard || []).map(e=> (
-                        <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between" onClick={()=>e.prize && setPrizeHint(e.prize)}>
+                        <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between relative" onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}>
                           <div className="flex items-center gap-2 w-full min-w-0">
-                            <div className="w-8 h-8 flex items-center justify-center shrink-0">{e.rank}</div>
+                            <div className="w-10 h-8 flex items-center justify-center shrink-0">{e.rank}{e.rank <= pastResult.tournament.prizePlaces && ' 🎁'}</div>
                             {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
@@ -1450,12 +1453,17 @@
                             <div>{pastResult.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
+                          {prizeHint?.rank===e.rank && (
+                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap">
+                              {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {pastResult.mine && pastResult.mine.rank>(pastResult.leaderboard?.length || 0) && (
-                        <div className="p-3 rounded-xl glass flex items-center justify-between mt-2" onClick={()=>pastResult.mine.prize && setPrizeHint(pastResult.mine.prize)}>
+                        <div className="p-3 rounded-xl glass flex items-center justify-between mt-2 relative" onClick={ev=>{ev.stopPropagation(); if(pastResult.mine.prize) setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}>
                           <div className="flex items-center gap-2 w-full min-w-0">
-                            <div className="w-8 h-8 flex items-center justify-center shrink-0">{pastResult.mine.rank}</div>
+                            <div className="w-10 h-8 flex items-center justify-center shrink-0">{pastResult.mine.rank}{pastResult.mine.rank <= pastResult.tournament.prizePlaces && ' 🎁'}</div>
                             {pastResult.mine.fish && <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
@@ -1468,6 +1476,11 @@
                             <div>{pastResult.tournament.metric==='count'? Number(pastResult.mine.value).toFixed(0) : Number(pastResult.mine.value).toFixed(2)}</div>
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
+                          {prizeHint?.rank===pastResult.mine.rank && (
+                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap">
+                              {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
