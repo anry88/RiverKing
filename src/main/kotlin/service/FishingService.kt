@@ -158,13 +158,25 @@ class FishingService {
         return first
     }
 
-    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): Pair<List<LureDTO>, Long?>? = transaction {
+    fun giveDailyBaits(userId: Long): Triple<List<LureDTO>, Long?, Int>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        var streak = row[Users.dailyStreak]
         if (last == today) return@transaction null
+
+        streak = when (last) {
+            today.minusDays(1) -> (streak % 7) + 1
+            else -> 1
+        }
+
         val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
         val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
+        val saltFreshId = Lures.select { Lures.name eq "Морская мирная" }.single()[Lures.id].value
+        val saltPredId = Lures.select { Lures.name eq "Морская хищная" }.single()[Lures.id].value
+        val freshPlusId = Lures.select { Lures.name eq "Пресная мирная+" }.single()[Lures.id].value
+        val predPlusId = Lures.select { Lures.name eq "Пресная хищная+" }.single()[Lures.id].value
+
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -181,9 +193,25 @@ class FishingService {
                 }
             }
         }
-        add(freshId, freshQty)
-        add(predId, predQty)
-        Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
+
+        when (streak) {
+            1 -> { add(freshId, 10); add(predId, 5) }
+            2 -> { add(freshId, 10); add(predId, 10) }
+            3 -> { add(freshId, 15); add(predId, 10) }
+            4 -> { add(freshId, 15); add(predId, 15) }
+            5 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5) }
+            6 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5) }
+            7 -> {
+                add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5)
+                add(freshPlusId, 1); add(predPlusId, 1)
+            }
+        }
+
+        Users.update({ Users.id eq userId }) {
+            it[lastDailyAt] = Instant.now()
+            it[dailyStreak] = streak
+        }
+
         val current = ensureCurrentLure(userId)
         val lures = (InventoryLures innerJoin Lures)
             .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
@@ -198,7 +226,7 @@ class FishingService {
                     it[Lures.rarityBonus],
                 )
             }
-        Pair(lures, current)
+        Triple(lures, current, streak)
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
