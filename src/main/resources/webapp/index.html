@@ -495,21 +495,30 @@
         [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5} ],
         [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5}, {name:'Пресная мирная+',qty:1}, {name:'Пресная хищная+',qty:1} ],
       ];
+      const current = available ? streak : streak - 1;
       return (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass p-4 rounded-xl w-[90%] max-w-sm">
-            <div className="text-lg font-semibold mb-3">{t('gift')}</div>
-            <div className="space-y-1 mb-3 text-sm">
-              {rewards.map((items,i)=>(
-                <div key={i} className={`flex justify-between ${i < streak ? 'opacity-50' : ''}`}>
-                  <div>{t('day')} {i+1}</div>
-                  <div className="text-right">{items.map(it=>`${it.qty} ${translateLure(it.name)}`).join(', ')}</div>
-                </div>
-              ))}
+          <div className="relative w-[90%] max-w-sm rounded-xl overflow-hidden">
+            <img src="/app/assets/riverking_bg_pond_1600x900.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
+            <div className="absolute inset-0 bg-black/50"></div>
+            <div className="relative p-4">
+              <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
+              <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                {rewards.map((items,i)=>{
+                  const done = i < streak;
+                  const isCurrent = i === current;
+                  return (
+                    <div key={i} className={`p-2 rounded-lg text-center ${done ? 'opacity-40' : 'bg-white/10'} ${isCurrent ? 'ring-2 ring-yellow-300' : ''}`}>
+                      <div className="font-semibold mb-1">{t('day')} {i+1}</div>
+                      {items.map(it=> <div key={it.name} className="text-xs">{it.qty} {translateLure(it.name)}</div>)}
+                    </div>
+                  );
+                })}
+              </div>
+              {available && <button onClick={onClaim} className="w-full py-2 rounded-xl bg-emerald-600 mb-2">{t('tapToClaim')}</button>}
+              <button onClick={onClose} className="w-full py-2 rounded-xl glass">{t('cancel')}</button>
             </div>
-            {available && <button onClick={onClaim} className="w-full py-2 rounded-xl bg-emerald-600 mb-2">{t('tapToClaim')}</button>}
-            <button onClick={onClose} className="w-full py-2 rounded-xl glass">{t('cancel')}</button>
           </div>
         </div>
       );
