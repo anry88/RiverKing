@@ -1374,7 +1374,7 @@
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                             {prizeHint?.rank===e.rank && (
-                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
                                 {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                               </div>
                             )}
@@ -1400,7 +1400,7 @@
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                             {prizeHint?.rank===currentTournament.mine.rank && (
-                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
                                 {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                               </div>
                             )}
@@ -1463,7 +1463,7 @@
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
                           {prizeHint?.rank===e.rank && (
-                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                            <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
                               {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                             </div>
                           )}
@@ -1489,7 +1489,7 @@
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
                           {prizeHint?.rank===pastResult.mine.rank && (
-                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                            <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
                               {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                             </div>
                           )}
