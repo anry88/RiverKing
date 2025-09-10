@@ -244,7 +244,6 @@
         hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
         hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
         hintTapPrize:'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
-        potentialPrize:'Возможный приз',
       },
       en: {
         location:'Location',
@@ -326,7 +325,6 @@
         hintFastBite:'React to bites quickly for a better catch chance',
         hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
         hintTapPrize:'Tap a leaderboard card to see its potential prize',
-        potentialPrize:'Potential prize',
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -1376,8 +1374,8 @@
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                             {prizeHint?.rank===e.rank && (
-                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10">
-                                {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                               </div>
                             )}
                           </div>
@@ -1402,8 +1400,8 @@
                               {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                             </div>
                             {prizeHint?.rank===currentTournament.mine.rank && (
-                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10">
-                                {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                               </div>
                             )}
                           </div>
@@ -1465,8 +1463,8 @@
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
                           {prizeHint?.rank===e.rank && (
-                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10">
-                              {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                             </div>
                           )}
                         </div>
@@ -1491,8 +1489,8 @@
                             {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                           </div>
                           {prizeHint?.rank===pastResult.mine.rank && (
-                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10">
-                              {t('potentialPrize')}: {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            <div className="absolute right-0 top-full mt-1 text-xs glass p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
                             </div>
                           )}
                         </div>
