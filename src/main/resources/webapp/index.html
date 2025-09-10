@@ -73,6 +73,10 @@
 
     // ====== Assets & UI constants ======
     const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
+    const rarityNames = {
+      ru: { common:'Простая', uncommon:'Необычная', rare:'Редкая', epic:'Эпическая', legendary:'Легендарная' },
+      en: { common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', legendary:'Legendary' }
+    };
     const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
     const LOCATION_BG = {
       1: '/app/assets/riverking_bg_pond_1600x900.png', // Пруд (локальный ассет)
@@ -232,6 +236,7 @@
         count:'Количество рыбы',
         fishLabel:'Рыба:',
         anyFish:'Любая рыба',
+        fishWord:'рыба',
         anyLocation:'Любая локация',
         conditionsLabel:'Условия:',
         prizePlacesLabel:'Призовых мест:',
@@ -309,6 +314,7 @@
         count:'Fish count',
         fishLabel:'Fish:',
         anyFish:'Any fish',
+        fishWord:'fish',
         anyLocation:'Any location',
         conditionsLabel:'Conditions:',
         prizePlacesLabel:'Prize places:',
@@ -851,6 +857,15 @@
       const [nickOpen,setNickOpen] = React.useState(false);
       const [prize,setPrize] = React.useState(null);
 
+      function tournamentFish(name, rarity){
+        if(!rarity) return t('anyFish');
+        const cls = rarityColors[rarity]||'';
+        if(name) return <span className={cls}>{name}</span>;
+        const lang = document.documentElement.lang;
+        const rn = rarityNames[lang] || rarityNames.ru;
+        return <span className={cls}>{(rn[rarity]||rarity)} {t('fishWord')}</span>;
+      }
+
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
         try{
@@ -1319,7 +1334,7 @@
                       <div className="p-4 rounded-xl glass text-left mb-4">
                         <div className="text-base font-semibold mb-1">{currentTournament.tournament.name}</div>
                         <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
-                        <div className="text-sm opacity-80">{t('fishLabel')} {currentTournament.tournament.fish || t('anyFish')}</div>
+                        <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(currentTournament.tournament.fish, currentTournament.tournament.fishRarity)}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
                         <div className="text-sm opacity-80">{t('conditionsLabel')} {t(currentTournament.tournament.metric)}</div>
                         <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
@@ -1378,7 +1393,7 @@
                       <div key={tn.id} className="p-4 rounded-xl glass text-left">
                         <div className="text-base font-semibold mb-1">{tn.name}</div>
                         <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
-                        <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
+                        <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                         <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
                         <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
@@ -1393,7 +1408,7 @@
                     <div className="p-4 rounded-xl glass text-left mb-4">
                       <div className="text-base font-semibold mb-1">{pastResult.tournament.name}</div>
                       <div className="text-xs opacity-70">{new Date(pastResult.tournament.startTime*1000).toLocaleString()} — {new Date(pastResult.tournament.endTime*1000).toLocaleString()}</div>
-                      <div className="text-sm opacity-80">{t('fishLabel')} {pastResult.tournament.fish || t('anyFish')}</div>
+                      <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(pastResult.tournament.fish, pastResult.tournament.fishRarity)}</div>
                       <div className="text-sm opacity-80">{t('locationLabel')} {pastResult.tournament.location || t('anyLocation')}</div>
                       <div className="text-sm opacity-80">{t('conditionsLabel')} {t(pastResult.tournament.metric)}</div>
                       <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
@@ -1448,7 +1463,7 @@
                         <div key={tn.id} className="p-4 rounded-xl glass text-left" onClick={()=>openPast(tn.id)}>
                           <div className="text-base font-semibold mb-1">{tn.name}</div>
                           <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
-                          <div className="text-sm opacity-80">{t('fishLabel')} {tn.fish || t('anyFish')}</div>
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
                           <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                           <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
                           <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
