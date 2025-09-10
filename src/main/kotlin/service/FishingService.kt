@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
@@ -769,9 +770,9 @@ class FishingService {
             ).take(limit)
         }
 
-    private fun periodStart(period: String): Instant? {
+    private fun periodRange(period: String): Pair<Instant?, Instant?> {
         val zone = ZoneId.systemDefault()
-        return when (period) {
+        val start = when (period) {
             "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
             "yesterday" -> LocalDate.now().minusDays(1).atStartOfDay(zone).toInstant()
             "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
@@ -779,6 +780,11 @@ class FishingService {
             "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
             else -> null
         }
+        val end = when (period) {
+            "today", "yesterday" -> start?.plus(Duration.ofDays(1))
+            else -> null
+        }
+        return Pair(start, end)
     }
 
     fun personalTopByLocation(
@@ -788,10 +794,11 @@ class FishingService {
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = periodStart(period)
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -818,10 +825,11 @@ class FishingService {
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = periodStart(period)
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -847,10 +855,11 @@ class FishingService {
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = periodStart(period)
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.locationId eq locationId
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -876,10 +885,11 @@ class FishingService {
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = periodStart(period)
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.fishId eq fishId
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
