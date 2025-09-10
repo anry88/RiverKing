@@ -153,6 +153,26 @@ class TournamentService {
         }
     }
 
+    fun pastTournaments(limit: Int = 10, now: Instant = Instant.now()): List<Tournament> = transaction {
+        Tournaments.select { Tournaments.endTime less now }
+            .orderBy(Tournaments.endTime, SortOrder.DESC)
+            .limit(limit)
+            .map { row ->
+                Tournament(
+                    id = row[Tournaments.id].value,
+                    nameRu = row[Tournaments.nameRu],
+                    nameEn = row[Tournaments.nameEn],
+                    startTime = row[Tournaments.startTime],
+                    endTime = row[Tournaments.endTime],
+                    fish = row[Tournaments.fish],
+                    location = row[Tournaments.location],
+                    metric = row[Tournaments.metric],
+                    prizePlaces = row[Tournaments.prizePlaces],
+                    prizesJson = row[Tournaments.prizesJson],
+                )
+            }
+    }
+
     data class LeaderboardEntry(
         val userId: Long,
         val user: String?,
