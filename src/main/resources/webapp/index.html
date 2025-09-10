@@ -169,6 +169,7 @@
         baits:'Приманки',
         total:'Всего',
         today:'Сегодня',
+        yesterday:'Вчера',
         lastWeek:'За неделю',
         lastMonth:'За месяц',
         lastYear:'За год',
@@ -224,7 +225,7 @@
         tournaments:'Турниры',
         you:'Ты',
         prizes:'Призы',
-        records:'Рекорды',
+        ratings:'Рейтинги',
         guide:'Справочник',
         shop:'Магазин',
         gift:'Подарок',
@@ -250,6 +251,7 @@
         baits:'Baits',
         total:'Total',
         today:'Today',
+        yesterday:'Yesterday',
         lastWeek:'Last week',
         lastMonth:'Last month',
         lastYear:'Last year',
@@ -305,7 +307,7 @@
         tournaments:'Tournaments',
         you:'You',
         prizes:'Prizes',
-        records:'Records',
+        ratings:'Ratings',
         guide:'Guide',
         shop:'Shop',
         gift:'Gift',
@@ -613,6 +615,7 @@
             </select>
             <select value={period} onChange={e=>setPeriod(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
               <option value="today">{t('today')}</option>
+              <option value="yesterday">{t('yesterday')}</option>
               <option value="week">{t('lastWeek')}</option>
               <option value="month">{t('lastMonth')}</option>
               <option value="year">{t('lastYear')}</option>
@@ -1573,7 +1576,7 @@
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('records')}</button>
+                <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
               <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
               <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
