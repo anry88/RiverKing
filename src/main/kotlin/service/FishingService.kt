@@ -773,6 +773,7 @@ class FishingService {
         val zone = ZoneId.systemDefault()
         return when (period) {
             "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
+            "yesterday" -> LocalDate.now().minusDays(1).atStartOfDay(zone).toInstant()
             "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
             "month" -> LocalDate.now().minusMonths(1).atStartOfDay(zone).toInstant()
             "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
