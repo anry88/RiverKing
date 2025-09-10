@@ -118,6 +118,10 @@ class FishingService {
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
     }
 
+    fun fishRarity(name: String): String? = transaction {
+        Fish.select { Fish.name eq name }.singleOrNull()?.get(Fish.rarity)
+    }
+
     fun caughtFishIds(userId: Long): List<Long> = transaction {
         Catches.slice(Catches.fishId).select { Catches.userId eq userId }
             .withDistinct().map { it[Catches.fishId].value }

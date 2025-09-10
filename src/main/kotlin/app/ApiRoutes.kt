@@ -29,6 +29,7 @@ fun Application.apiRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val rarityGroups = setOf("common", "uncommon", "rare", "epic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -108,6 +109,7 @@ fun Application.apiRoutes(env: Env) {
         val startTime: Long,
         val endTime: Long,
         val fish: String? = null,
+        val fishRarity: String? = null,
         val location: String? = null,
         val metric: String,
         val prizePlaces: Int,
@@ -250,12 +252,15 @@ fun Application.apiRoutes(env: Env) {
                 ?: return@get call.respond(HttpStatusCode.NoContent)
             val (top, mine) = tournaments.leaderboard(t, uid)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+            val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
             val dto = TournamentDTO(
                 id = t.id,
                 name = if (language == "en") t.nameEn else t.nameRu,
                 startTime = t.startTime.epochSecond,
                 endTime = t.endTime.epochSecond,
-                fish = t.fish?.let { I18n.fish(it, language) },
+                fish = fishName,
+                fishRarity = fishRarity,
                 location = t.location?.let { I18n.location(it, language) },
                 metric = t.metric.lowercase(),
                 prizePlaces = t.prizePlaces,
@@ -301,12 +306,15 @@ fun Application.apiRoutes(env: Env) {
             val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
             val (top, mine) = tournaments.leaderboard(t, uid)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+            val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
             val dto = TournamentDTO(
                 id = t.id,
                 name = if (language == "en") t.nameEn else t.nameRu,
                 startTime = t.startTime.epochSecond,
                 endTime = t.endTime.epochSecond,
-                fish = t.fish?.let { I18n.fish(it, language) },
+                fish = fishName,
+                fishRarity = fishRarity,
                 location = t.location?.let { I18n.location(it, language) },
                 metric = t.metric.lowercase(),
                 prizePlaces = t.prizePlaces,
@@ -349,12 +357,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = tournaments.upcomingTournaments().map { t ->
+                val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+                val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
                 TournamentDTO(
                     id = t.id,
                     name = if (language == "en") t.nameEn else t.nameRu,
                     startTime = t.startTime.epochSecond,
                     endTime = t.endTime.epochSecond,
-                    fish = t.fish?.let { I18n.fish(it, language) },
+                    fish = fishName,
+                    fishRarity = fishRarity,
                     location = t.location?.let { I18n.location(it, language) },
                     metric = t.metric.lowercase(),
                     prizePlaces = t.prizePlaces,
@@ -373,12 +384,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = tournaments.pastTournaments().map { t ->
+                val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+                val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
                 TournamentDTO(
                     id = t.id,
                     name = if (language == "en") t.nameEn else t.nameRu,
                     startTime = t.startTime.epochSecond,
                     endTime = t.endTime.epochSecond,
-                    fish = t.fish?.let { I18n.fish(it, language) },
+                    fish = fishName,
+                    fishRarity = fishRarity,
                     location = t.location?.let { I18n.location(it, language) },
                     metric = t.metric.lowercase(),
                     prizePlaces = t.prizePlaces,
