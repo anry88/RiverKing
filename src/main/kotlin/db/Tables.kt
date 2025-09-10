@@ -396,6 +396,7 @@ object Users : LongIdTable() {
     val xp = integer("xp")
     val createdAt = timestamp("created_at")
     val lastDailyAt = timestamp("last_daily_at").nullable()
+    val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
     val castLureId = reference("cast_lure_id", Lures).nullable()

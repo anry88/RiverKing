@@ -161,6 +161,7 @@ fun Application.apiRoutes(env: Env) {
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
             val dailyAvailable = fishing.canClaimDaily(uid)
+            val dailyStreak = transaction { Users.select { Users.id eq uid }.single()[Users.dailyStreak] }
             val displayName = fishing.displayName(uid)
             val storedLoc = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
@@ -191,6 +192,7 @@ fun Application.apiRoutes(env: Env) {
                 val caughtFishIds: List<Long>,
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
+                val dailyStreak: Int,
                 val language: String,
             )
             call.respond(
@@ -206,6 +208,7 @@ fun Application.apiRoutes(env: Env) {
                     caughtFishIds,
                     recent,
                     dailyAvailable,
+                    dailyStreak,
                     language,
                 )
             )
@@ -444,10 +447,10 @@ fun Application.apiRoutes(env: Env) {
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
 
             @Serializable
-            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?, val dailyStreak: Int)
 
             val lures = res.first.map { it.copy(name = I18n.lure(it.name, language)) }
-            call.respond(DailyResp(lures, res.second))
+            call.respond(DailyResp(lures, res.second, res.third))
         }
 
         post("/api/create-invoice") {

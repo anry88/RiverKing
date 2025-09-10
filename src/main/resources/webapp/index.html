@@ -101,7 +101,19 @@
     const FISH_TRANSLATIONS = {
       'Плотва':'Roach','Окунь':'Perch','Карась':'Crucian Carp','Лещ':'Bream','Щука':'Pike','Карп':'Carp','Сом':'Catfish','Осётр':'Sturgeon','Уклейка':'Bleak','Линь':'Tench','Ротан':'Rotan','Судак':'Zander','Чехонь':'Sabrefish','Хариус':'Grayling','Форель ручьевая':'Brook Trout','Таймень':'Taimen','Налим':'Burbot','Сиг':'Whitefish','Голавль':'Chub','Жерех':'Asp','Толстолобик':'Bighead Carp','Белый амур':'Grass Carp','Угорь европейский':'European Eel','Стерлядь':'Sterlet','Кефаль':'Mullet','Камбала':'Flounder','Сельдь':'Herring','Ставрида':'Horse Mackerel','Треска':'Cod','Сайда':'Pollock','Морская форель':'Sea Trout','Палтус':'Halibut','Корюшка':'Smelt','Лосось атлантический':'Atlantic Salmon','Лаврак':'Sea Bass','Скумбрия атлантическая':'Atlantic Mackerel','Белуга':'Beluga','Ёрш':'Ruffe','Пескарь':'Gudgeon','Густера':'Blue Bream','Краснопёрка':'Rudd','Елец':'Dace','Верхоплавка':'Topmouth Gudgeon','Язь':'Ide','Бычок':'Goby','Килька':'Sprat','Мойва':'Capelin','Дорадо':'Dorado','Ваху':'Wahoo','Парусник':'Sailfish','Рыба-меч':'Swordfish','Марлин синий':'Blue Marlin','Тунец синеперый':'Bluefin Tuna','Акула мако':'Mako Shark'
     };
+    const LURE_TRANSLATIONS = {
+      'Пресная мирная':'Freshwater Peaceful',
+      'Пресная хищная':'Freshwater Predator',
+      'Морская мирная':'Saltwater Peaceful',
+      'Морская хищная':'Saltwater Predator',
+      'Пресная мирная+':'Freshwater Peaceful+',
+      'Пресная хищная+':'Freshwater Predator+',
+    };
     const FISH_IMG = {};
+    const translateLure = n => {
+      if(document.documentElement.lang === 'en') return LURE_TRANSLATIONS[n] || n;
+      return n;
+    };
     Object.entries({
       'Плотва': '/app/assets/fish/plotva.png',
       'Окунь': '/app/assets/fish/okun.png',
@@ -241,6 +253,7 @@
         anyLocation:'Любая локация',
         conditionsLabel:'Условия:',
         prizePlacesLabel:'Призовых мест:',
+        day:'День',
         tapToClaim:'Нажмите, чтобы получить',
         hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
         hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
@@ -323,6 +336,7 @@
         anyLocation:'Any location',
         conditionsLabel:'Conditions:',
         prizePlacesLabel:'Prize places:',
+        day:'Day',
         tapToClaim:'Tap to claim',
         hintFastBite:'React to bites quickly for a better catch chance',
         hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
@@ -466,6 +480,36 @@
               <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">{t('cancel')}</button>
               <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">{t('save')}</button>
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DailyModal({streak,available,onClose,onClaim}){
+      const rewards = [
+        [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:5} ],
+        [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:10} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:10} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5}, {name:'Пресная мирная+',qty:1}, {name:'Пресная хищная+',qty:1} ],
+      ];
+      return (
+        <div className="fixed inset-0 z-50">
+          <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass p-4 rounded-xl w-[90%] max-w-sm">
+            <div className="text-lg font-semibold mb-3">{t('gift')}</div>
+            <div className="space-y-1 mb-3 text-sm">
+              {rewards.map((items,i)=>(
+                <div key={i} className={`flex justify-between ${i < streak ? 'opacity-50' : ''}`}>
+                  <div>{t('day')} {i+1}</div>
+                  <div className="text-right">{items.map(it=>`${it.qty} ${translateLure(it.name)}`).join(', ')}</div>
+                </div>
+              ))}
+            </div>
+            {available && <button onClick={onClaim} className="w-full py-2 rounded-xl bg-emerald-600 mb-2">{t('tapToClaim')}</button>}
+            <button onClick={onClose} className="w-full py-2 rounded-xl glass">{t('cancel')}</button>
           </div>
         </div>
       );
@@ -870,6 +914,7 @@
       const [nickOpen,setNickOpen] = React.useState(false);
       const [prize,setPrize] = React.useState(null);
       const [prizeHint,setPrizeHint] = React.useState(null);
+      const [dailyOpen,setDailyOpen] = React.useState(false);
 
       function tournamentFish(name, rarity){
         if(!rarity) return t('anyFish');
@@ -984,7 +1029,7 @@
                     {id:3,name:'Озеро',unlockKg:50,unlocked:false},
                   ],
                   caughtFishIds:[],
-                  recent:[], dailyAvailable:true,
+                  recent:[], dailyAvailable:true, dailyStreak:0,
                 });
                 setShop([]);
               }
@@ -1035,13 +1080,19 @@
             ...p,
             lures: d.lures,
             currentLureId:d.currentLureId,
-            dailyAvailable:false
+            dailyAvailable:false,
+            dailyStreak:d.dailyStreak
           }));
+          setDailyOpen(false);
         }catch(e){
           setError(e.message==='unauthorized'
             ? t('authRequired')
             : t('dailyTaken'));
         }
+      }
+
+      function openDaily(){
+        setDailyOpen(true);
       }
 
       async function buyPack(id){
@@ -1273,12 +1324,13 @@
         {/* prizeHint tooltip handled per-card */}
           <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
+          {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
           {tab === 'fish' && (
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={claimDaily} />
+                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} />
               </div>
 
               {/* Мобильный CTA под сценой */}
