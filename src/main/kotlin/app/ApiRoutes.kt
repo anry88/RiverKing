@@ -286,6 +286,56 @@ fun Application.apiRoutes(env: Env) {
             call.respond(resp)
         }
 
+        get("/api/tournament/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val (top, mine) = tournaments.leaderboard(t, uid)
+            val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            val dto = TournamentDTO(
+                id = t.id,
+                name = if (language == "en") t.nameEn else t.nameRu,
+                startTime = t.startTime.epochSecond,
+                endTime = t.endTime.epochSecond,
+                fish = t.fish?.let { I18n.fish(it, language) },
+                location = t.location?.let { I18n.location(it, language) },
+                metric = t.metric.lowercase(),
+            )
+            val resp = CurrentTournamentDTO(
+                tournament = dto,
+                leaderboard = top.map {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+                mine = mine?.let {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+            )
+            call.respond(resp)
+        }
+
         get("/api/tournaments/upcoming") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
@@ -296,6 +346,29 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = tournaments.upcomingTournaments().map { t ->
+                TournamentDTO(
+                    id = t.id,
+                    name = if (language == "en") t.nameEn else t.nameRu,
+                    startTime = t.startTime.epochSecond,
+                    endTime = t.endTime.epochSecond,
+                    fish = t.fish?.let { I18n.fish(it, language) },
+                    location = t.location?.let { I18n.location(it, language) },
+                    metric = t.metric.lowercase(),
+                )
+            }
+            call.respond(list)
+        }
+
+        get("/api/tournaments/past") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = tournaments.pastTournaments().map { t ->
                 TournamentDTO(
                     id = t.id,
                     name = if (language == "en") t.nameEn else t.nameRu,

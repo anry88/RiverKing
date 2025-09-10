@@ -87,4 +87,48 @@ class TournamentServiceTest {
         svc.deleteTournament(id)
         assertEquals(0, svc.listTournaments().size)
     }
+
+    @Test
+    fun pastTournaments() {
+        val env = Env(
+            botToken = "",
+            telegramWebhookSecret = "",
+            publicBaseUrl = "http://localhost",
+            dbUrl = "jdbc:sqlite:file:testdb3?mode=memory&cache=shared",
+            dbUser = "",
+            dbPass = "",
+            port = 0,
+            devMode = true,
+            adminTgId = 0L,
+            providerToken = "",
+        )
+        DB.init(env)
+        val svc = TournamentService()
+        val now = Instant.now()
+        svc.createTournament(
+            nameRu = "Past",
+            nameEn = "Past",
+            start = now.minusSeconds(7200),
+            end = now.minusSeconds(3600),
+            fish = null,
+            location = null,
+            metric = "largest",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+        svc.createTournament(
+            nameRu = "Future",
+            nameEn = "Future",
+            start = now.plusSeconds(3600),
+            end = now.plusSeconds(7200),
+            fish = null,
+            location = null,
+            metric = "largest",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+        val past = svc.pastTournaments()
+        assertEquals(1, past.size)
+        assertEquals("Past", past[0].nameEn)
+    }
 }
