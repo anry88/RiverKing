@@ -23,6 +23,10 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import org.slf4j.LoggerFactory
+import db.Users
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.slice
+import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
     return if ('=' in payload) {
@@ -56,6 +60,14 @@ private data class AdminDraft(
 )
 
 private enum class AdminStep { NAME_RU, NAME_EN, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
+
+private data class BroadcastDraft(
+    var step: BroadcastStep = BroadcastStep.TEXT_RU,
+    var textRu: String = "",
+    var textEn: String = "",
+)
+
+private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
@@ -93,6 +105,7 @@ fun Application.botRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val adminStates = mutableMapOf<Long, AdminDraft>()
+    val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
         post("/bot") {
@@ -128,16 +141,27 @@ fun Application.botRoutes(env: Env) {
                             }
                         }
                         data == "list_tournaments" -> {
-                            val list = tournaments.listTournaments()
+                            val current = tournaments.currentTournament()
+                            val upcoming = tournaments.upcomingTournaments()
+                            val past = tournaments.pastTournaments(10)
+                            val list = buildList {
+                                if (current != null) add(current)
+                                addAll(upcoming)
+                                addAll(past)
+                            }
                             if (list.isEmpty()) {
                                 try { bot.sendMessage(target, "Турниров нет") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             } else {
                                 val buttons = list.joinToString(",") { t ->
-                                    """[{"text":"${t.nameRu}","callback_data":"tournament_${t.id}"}]"""
+                                    """[{"text":"${t.nameRu}","callback_data":"tournament_${t.id}"}]""""
                                 }
-                                val markup = """{"inline_keyboard":[$buttons]}"""
+                                val markup = """{"inline_keyboard":[$buttons]}""""
                                 try { bot.sendMessage(target, "Турниры", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             }
+                        }
+                        data == "broadcast_message" -> {
+                            broadcastStates[cq.from.id] = BroadcastDraft()
+                            try { bot.sendMessage(target, "Введите текст на русском") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                         }
                         data != null && data.startsWith("tournament_") -> {
                             val id = data.removePrefix("tournament_").toLongOrNull()
@@ -374,6 +398,34 @@ fun Application.botRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.OK)
             }
 
+            broadcastStates[chatId]?.let { draft ->
+                when (draft.step) {
+                    BroadcastStep.TEXT_RU -> {
+                        draft.textRu = text
+                        draft.step = BroadcastStep.TEXT_EN
+                        try { bot.sendMessage(chatId, "Введите текст на английском") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                    }
+                    BroadcastStep.TEXT_EN -> {
+                        draft.textEn = text
+                        broadcastStates.remove(chatId)
+                        try { bot.sendMessage(chatId, "Начинаю рассылку") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        val users = transaction {
+                            Users.slice(Users.tgId, Users.language).selectAll().map { it[Users.tgId] to it[Users.language] }
+                        }
+                        for ((uid, lang) in users) {
+                            val msg = when (lang) {
+                                "ru" -> draft.textRu
+                                "en" -> draft.textEn
+                                else -> draft.textRu + "\n" + draft.textEn
+                            }
+                            try { bot.sendMessage(uid, msg) } catch (e: Exception) { log.error("sendMessage failed chatId={}", uid, e) }
+                            Thread.sleep(1000)
+                        }
+                    }
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
             if (text.startsWith("/start")) {
                 val from = message.from
                 val uid = fishing.ensureUserByTgId(
@@ -426,7 +478,7 @@ fun Application.botRoutes(env: Env) {
             } else if (chatId == env.adminTgId) {
                 when {
                     text.startsWith("/admin") -> {
-                        val markup = """{"inline_keyboard":[[{"text":"Создать турнир","callback_data":"create_tournament"},{"text":"Список турниров","callback_data":"list_tournaments"}]]}"""
+                        val markup = """{"inline_keyboard":[[{"text":"Создать турнир","callback_data":"create_tournament"},{"text":"Список турниров","callback_data":"list_tournaments"}],[{"text":"Разослать сообщение","callback_data":"broadcast_message"}]]}"""
                         try { bot.sendMessage(chatId, "Админ меню", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     text.startsWith("/refund") -> {
