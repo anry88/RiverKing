@@ -152,10 +152,10 @@ fun Application.botRoutes(env: Env) {
                             if (list.isEmpty()) {
                                 try { bot.sendMessage(target, "Турниров нет") } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             } else {
-                                val buttons = list.joinToString(",") { t ->
-                                    """[{"text":"${t.nameRu}","callback_data":"tournament_${t.id}"}]""""
+                                val buttons = list.map { t ->
+                                    listOf(InlineKeyboardButton(t.nameRu, "tournament_${t.id}"))
                                 }
-                                val markup = """{"inline_keyboard":[$buttons]}""""
+                                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
                                 try { bot.sendMessage(target, "Турниры", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", target, e) }
                             }
                         }
