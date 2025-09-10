@@ -241,6 +241,10 @@
         conditionsLabel:'Условия:',
         prizePlacesLabel:'Призовых мест:',
         tapToClaim:'Нажмите, чтобы получить',
+        hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
+        hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
+        hintTapPrize:'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
+        potentialPrize:'Возможный приз',
       },
       en: {
         location:'Location',
@@ -319,6 +323,10 @@
         conditionsLabel:'Conditions:',
         prizePlacesLabel:'Prize places:',
         tapToClaim:'Tap to claim',
+        hintFastBite:'React to bites quickly for a better catch chance',
+        hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
+        hintTapPrize:'Tap a leaderboard card to see its potential prize',
+        potentialPrize:'Potential prize',
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -836,6 +844,10 @@
       })();
       const [me,setMe] = React.useState(null);
       const [loading,setLoading] = React.useState(true);
+      const [loadingHint] = React.useState(()=>{
+        const hints = [t('hintFastBite'), t('hintWaitRare'), t('hintTapPrize')];
+        return hints[Math.floor(Math.random()*hints.length)];
+      });
       const [casting,setCasting] = React.useState(false);
       const castingRef = React.useRef(false);
       const [biting,setBiting] = React.useState(false);
@@ -856,6 +868,7 @@
       const [tournamentTab,setTournamentTab] = React.useState('current');
       const [nickOpen,setNickOpen] = React.useState(false);
       const [prize,setPrize] = React.useState(null);
+      const [prizeHint,setPrizeHint] = React.useState(null);
 
       function tournamentFish(name, rarity){
         if(!rarity) return t('anyFish');
@@ -1222,6 +1235,7 @@
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{t('loading')}</div>
+              <div className="opacity-70 mt-2">{loadingHint}</div>
             </div>
           </div>
         );
@@ -1252,6 +1266,14 @@
                   ) || prize.packageId
                 } x{prize.qty}
                 <div className="text-sm mt-2">{t('tapToClaim')}</div>
+              </div>
+            </div>
+          )}
+        {prizeHint && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={()=>setPrizeHint(null)}>
+              <div className="bg-white text-black p-4 rounded-xl text-center animate-pop" onClick={e=>e.stopPropagation()}>
+                <div className="font-semibold mb-2">{t('potentialPrize')}</div>
+                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.packageId)?.name)||prizeHint.packageId} x{prizeHint.qty}
               </div>
             </div>
           )}
@@ -1341,14 +1363,13 @@
                       </div>
                       <div className="space-y-2">
                         {(currentTournament.leaderboard || []).map(e=> (
-                          <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
+                          <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between" onClick={()=>e.prize && setPrizeHint(e.prize)}>
                             <div className="flex items-center gap-2 w-full min-w-0">
                               <div className="w-8 h-8 flex items-center justify-center shrink-0">{e.rank}</div>
                               {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <div className="truncate">{e.user||'-'}</div>
-                                  {e.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===e.prize.packageId)?.name)||e.prize.packageId} x{e.prize.qty}</div>}
                                 </div>
                                 {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
                               </div>
@@ -1360,14 +1381,13 @@
                           </div>
                         ))}
                         {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
-                          <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
+                          <div className="p-3 rounded-xl glass flex items-center justify-between mt-2" onClick={()=>currentTournament.mine.prize && setPrizeHint(currentTournament.mine.prize)}>
                             <div className="flex items-center gap-2 w-full min-w-0">
                               <div className="w-8 h-8 flex items-center justify-center shrink-0">{currentTournament.mine.rank}</div>
                               {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <div className="truncate">{currentTournament.mine.user||t('you')}</div>
-                                  {currentTournament.mine.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===currentTournament.mine.prize.packageId)?.name)||currentTournament.mine.prize.packageId} x{currentTournament.mine.prize.qty}</div>}
                                 </div>
                                 {currentTournament.mine.fish && <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
                               </div>
@@ -1415,14 +1435,13 @@
                     </div>
                     <div className="space-y-2">
                       {(pastResult.leaderboard || []).map(e=> (
-                        <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between">
+                        <div key={e.rank} className="p-3 rounded-xl glass flex items-center justify-between" onClick={()=>e.prize && setPrizeHint(e.prize)}>
                           <div className="flex items-center gap-2 w-full min-w-0">
                             <div className="w-8 h-8 flex items-center justify-center shrink-0">{e.rank}</div>
                             {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <div className="truncate">{e.user||'-'}</div>
-                                {e.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===e.prize.packageId)?.name)||e.prize.packageId} x{e.prize.qty}</div>}
                               </div>
                               {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
                             </div>
@@ -1434,14 +1453,13 @@
                         </div>
                       ))}
                       {pastResult.mine && pastResult.mine.rank>(pastResult.leaderboard?.length || 0) && (
-                        <div className="p-3 rounded-xl glass flex items-center justify-between mt-2">
+                        <div className="p-3 rounded-xl glass flex items-center justify-between mt-2" onClick={()=>pastResult.mine.prize && setPrizeHint(pastResult.mine.prize)}>
                           <div className="flex items-center gap-2 w-full min-w-0">
                             <div className="w-8 h-8 flex items-center justify-center shrink-0">{pastResult.mine.rank}</div>
                             {pastResult.mine.fish && <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <div className="truncate">{pastResult.mine.user||t('you')}</div>
-                                {pastResult.mine.prize && <div className="text-[10px] text-yellow-400 truncate">{(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===pastResult.mine.prize.packageId)?.name)||pastResult.mine.prize.packageId} x{pastResult.mine.prize.qty}</div>}
                               </div>
                               {pastResult.mine.fish && <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>}
                             </div>
