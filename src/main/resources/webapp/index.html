@@ -255,6 +255,7 @@
         prizePlacesLabel:'Призовых мест:',
         day:'День',
         tapToClaim:'Нажмите, чтобы получить',
+        prizeCongrats: rank=>`Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`,
         hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
         hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
         hintTapPrize:'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
@@ -338,6 +339,7 @@
         prizePlacesLabel:'Prize places:',
         day:'Day',
         tapToClaim:'Tap to claim',
+        prizeCongrats: rank=>`Congratulations! You placed ${rank} in the tournament. Your prize:`,
         hintFastBite:'React to bites quickly for a better catch chance',
         hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
         hintTapPrize:'Tap a leaderboard card to see its potential prize',
@@ -1316,16 +1318,19 @@
         <div className="min-h-screen w-full px-4 pb-20" onClick={()=>setPrizeHint(null)}>
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
-              <div className="bg-white text-black p-6 rounded-xl text-center animate-pop">
-                <img src="/app/assets/riverking_bobber.svg" alt="prize" className="w-20 h-20 mx-auto mb-2 animate-bounce" />
-                {
-                  (
-                    shop
-                      .reduce((acc, c) => acc.concat(c.packs), [])
-                      .find(p => p.id === prize.packageId)?.name
-                  ) || prize.packageId
-                } x{prize.qty}
-                <div className="text-sm mt-2">{t('tapToClaim')}</div>
+              <div className="glass p-6 rounded-xl text-center animate-pop">
+                <img src="/app/assets/riverking_bobber.svg" alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+                <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
+                <div className="text-lg font-semibold mb-1">
+                  {
+                    (
+                      shop
+                        .reduce((acc, c) => acc.concat(c.packs), [])
+                        .find(p => p.id === prize.packageId)?.name
+                    ) || prize.packageId
+                  } x{prize.qty}
+                </div>
+                <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
               </div>
             </div>
           )}
