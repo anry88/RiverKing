@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.slice
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
@@ -418,7 +420,17 @@ fun Application.botRoutes(env: Env) {
                                 "en" -> draft.textEn
                                 else -> draft.textRu + "\n" + draft.textEn
                             }
-                            try { bot.sendMessage(uid, msg) } catch (e: Exception) { log.error("sendMessage failed chatId={}", uid, e) }
+                            try {
+                                bot.sendMessage(uid, msg)
+                            } catch (e: TelegramApiException) {
+                                if (e.code == 403) {
+                                    transaction { Users.deleteWhere { Users.tgId eq uid } }
+                                } else {
+                                    log.error("sendMessage failed chatId={}", uid, e)
+                                }
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", uid, e)
+                            }
                             Thread.sleep(1000)
                         }
                     }
