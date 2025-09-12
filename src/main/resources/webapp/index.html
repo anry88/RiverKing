@@ -937,6 +937,22 @@
       }
 
       React.useEffect(()=>{
+        if(currentTournament?.mine){
+          setTimeout(()=>{
+            document.getElementById('current-tournament-mine')?.scrollIntoView({block:'center'});
+          },0);
+        }
+      },[currentTournament]);
+
+      React.useEffect(()=>{
+        if(pastResult?.mine){
+          setTimeout(()=>{
+            document.getElementById('past-tournament-mine')?.scrollIntoView({block:'center'});
+          },0);
+        }
+      },[pastResult]);
+
+      React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
         try{
           Object.values(LOCATION_BG)
@@ -1421,10 +1437,13 @@
                         <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
                       </div>
                       <div className="space-y-2">
-                        {(currentTournament.leaderboard || []).map(e=> (
+                        {(currentTournament.leaderboard || []).map(e=> {
+                          const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
+                          return (
                           <div
                             key={e.rank}
-                            className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''}`}
+                            id={isMine ? 'current-tournament-mine' : undefined}
+                            className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
                             onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
                           >
                             <div className="flex items-center gap-2 w-full min-w-0">
@@ -1450,10 +1469,12 @@
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                         {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
                           <div
-                            className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===currentTournament.mine.rank ? 'z-10' : ''}`}
+                            id="current-tournament-mine"
+                            className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===currentTournament.mine.rank ? 'z-10' : ''} border border-emerald-400`}
                             onClick={ev=>{ev.stopPropagation(); if(currentTournament.mine.prize) setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}
                           >
                             <div className="flex items-center gap-2 w-full min-w-0">
@@ -1516,10 +1537,13 @@
                       <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
                     </div>
                     <div className="space-y-2">
-                      {(pastResult.leaderboard || []).map(e=> (
+                      {(pastResult.leaderboard || []).map(e=> {
+                        const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
+                        return (
                         <div
                           key={e.rank}
-                          className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''}`}
+                          id={isMine ? 'past-tournament-mine' : undefined}
+                          className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
                           onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
                         >
                           <div className="flex items-center gap-2 w-full min-w-0">
@@ -1545,10 +1569,12 @@
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                       {pastResult.mine && pastResult.mine.rank>(pastResult.leaderboard?.length || 0) && (
                         <div
-                          className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''}`}
+                          id="past-tournament-mine"
+                          className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''} border border-emerald-400`}
                           onClick={ev=>{ev.stopPropagation(); if(pastResult.mine.prize) setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}
                         >
                           <div className="flex items-center gap-2 w-full min-w-0">
