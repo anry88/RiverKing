@@ -27,7 +27,7 @@ data class Tournament(
 @Serializable
 data class PrizeSpec(val pack: String, val qty: Int)
 
-data class UserPrize(val id: Long, val packageId: String, val qty: Int)
+data class UserPrize(val id: Long, val packageId: String, val qty: Int, val rank: Int)
 
 class TournamentService {
     fun createTournament(
@@ -250,9 +250,24 @@ class TournamentService {
         Pair(top, mine)
     }
 
-    fun pendingPrizes(userId: Long): List<UserPrize> = transaction {
-        UserPrizes.select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
-            .map { UserPrize(it[UserPrizes.id].value, it[UserPrizes.packageId], it[UserPrizes.qty]) }
+    fun pendingPrizes(userId: Long): List<UserPrize> {
+        data class PrizeRow(val id: Long, val packageId: String, val qty: Int, val tournamentId: Long)
+        val rows = transaction {
+            UserPrizes.select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
+                .map {
+                    PrizeRow(
+                        it[UserPrizes.id].value,
+                        it[UserPrizes.packageId],
+                        it[UserPrizes.qty],
+                        it[UserPrizes.tournamentId].value
+                    )
+                }
+        }
+        return rows.map { row ->
+            val t = getTournament(row.tournamentId)
+            val rank = t?.let { leaderboard(it, userId).second?.rank } ?: 0
+            UserPrize(row.id, row.packageId, row.qty, rank)
+        }
     }
 
     fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {

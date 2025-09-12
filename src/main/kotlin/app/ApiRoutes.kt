@@ -97,7 +97,7 @@ fun Application.apiRoutes(env: Env) {
     data class InvoiceResp(val invoice_url: String)
 
     @Serializable
-    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int)
+    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int)
 
     @Serializable
     data class PrizeSpecDTO(val packageId: String, val qty: Int)
@@ -413,7 +413,7 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty) }
+            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank) }
             call.respond(prizes)
         }
 
