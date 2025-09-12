@@ -43,12 +43,29 @@ object PayService {
         }
     }
 
-    data class SupportRequest(val id: Long, val userId: Long)
+    data class SupportRequest(
+        val id: Long,
+        val userId: Long,
+        val paymentId: Long?,
+        val telegramChargeId: String?,
+    )
 
     fun findSupportRequest(id: Long): SupportRequest? = transaction {
-        PaySupportRequests.select { PaySupportRequests.id eq id }
-            .map { SupportRequest(it[PaySupportRequests.id].value, it[PaySupportRequests.userId].value) }
+        (PaySupportRequests leftJoin Payments)
+            .select { PaySupportRequests.id eq id }
+            .map {
+                SupportRequest(
+                    id = it[PaySupportRequests.id].value,
+                    userId = it[PaySupportRequests.userId].value,
+                    paymentId = it[PaySupportRequests.paymentId]?.value,
+                    telegramChargeId = it.getOrNull(Payments.telegramChargeId),
+                )
+            }
             .singleOrNull()
+    }
+
+    fun markPaymentRefunded(paymentId: Long) = transaction {
+        Payments.update({ Payments.id eq paymentId }) { it[refunded] = true }
     }
 }
 

@@ -158,9 +158,25 @@ fun Application.botRoutes(env: Env) {
                         if (id != null) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
+                                var refunded = false
+                                val chargeId = req.telegramChargeId
+                                if (chargeId != null) {
+                                    try {
+                                        stars.refundStars(req.userId, chargeId)
+                                        req.paymentId?.let { PayService.markPaymentRefunded(it) }
+                                        refunded = true
+                                    } catch (e: Exception) {
+                                        log.error("refundStars failed id={} chargeId={}", id, chargeId, e)
+                                    }
+                                }
                                 PayService.updateSupportRequest(id, "refunded", null)
                                 try {
-                                    bot.sendMessage(req.userId, "Ваш запрос #$id одобрен, возврат будет выполнен")
+                                    val msg = if (refunded) {
+                                        "Ваш запрос #$id одобрен, возврат выполнен"
+                                    } else {
+                                        "Ваш запрос #$id одобрен"
+                                    }
+                                    bot.sendMessage(req.userId, msg)
                                 } catch (e: Exception) {
                                     log.error("sendMessage failed chatId={}", req.userId, e)
                                 }
