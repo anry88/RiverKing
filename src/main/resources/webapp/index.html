@@ -262,6 +262,8 @@
         hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
         hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
         hintTapPrize:'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
+        hintAutoCatch:'С подпиской робот позаботится о вашем улове, если вы не успеете вовремя выловить рыбу',
+        hintNoCloseRod:'Не закрывай игру с заброшенной удочкой чтобы не потерять приманку',
       },
       en: {
         location:'Location',
@@ -349,6 +351,8 @@
         hintFastBite:'React to bites quickly for a better catch chance',
         hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
         hintTapPrize:'Tap a leaderboard card to see its potential prize',
+        hintAutoCatch:'With a subscription, the robot will secure your catch if you fail to reel in the fish in time',
+        hintNoCloseRod:"Don't close the game with your rod cast or you'll lose the bait",
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -929,7 +933,7 @@
       const [me,setMe] = React.useState(null);
       const [loading,setLoading] = React.useState(true);
       const [loadingHint] = React.useState(()=>{
-        const hints = [t('hintFastBite'), t('hintWaitRare'), t('hintTapPrize')];
+        const hints = [t('hintFastBite'), t('hintWaitRare'), t('hintTapPrize'), t('hintAutoCatch'), t('hintNoCloseRod')];
         return hints[Math.floor(Math.random()*hints.length)];
       });
       const [casting,setCasting] = React.useState(false);
