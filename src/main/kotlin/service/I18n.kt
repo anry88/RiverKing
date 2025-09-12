@@ -120,6 +120,9 @@ object I18n {
             "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (60 peaceful and 60 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (10 peaceful+ and 10 predator+)",
         "15 пресных хищных" to "15 freshwater predator",
         "10 морских простых: 5 мирных и 5 хищных" to "10 saltwater basics: 5 peaceful and 5 predator",
+        "Подписки" to "Subscriptions",
+        "Автоловля" to "Auto Catch",
+        "Робот ловит за вас целый месяц и не упустит ни одной рыбы" to "Robot catches fish for you for a whole month and won't miss any fish",
     )
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name

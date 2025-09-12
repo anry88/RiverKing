@@ -24,6 +24,8 @@ object DB {
                 LocationFishWeights,
                 Payments,
                 PaySupportRequests,
+                Tournaments,
+                UserPrizes,
             )
             seedIfEmpty()
         }
@@ -394,11 +396,13 @@ object Users : LongIdTable() {
     val xp = integer("xp")
     val createdAt = timestamp("created_at")
     val lastDailyAt = timestamp("last_daily_at").nullable()
+    val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
     val castLureId = reference("cast_lure_id", Lures).nullable()
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
+    val autoFishUntil = timestamp("auto_fish_until").nullable()
 }
 
 object Locations : LongIdTable() {
@@ -478,4 +482,24 @@ object PaySupportRequests : LongIdTable() {
     val status = varchar("status", 20)
     val adminMessage = text("admin_message").nullable()
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object Tournaments : LongIdTable() {
+    val nameRu = varchar("name_ru", 100)
+    val nameEn = varchar("name_en", 100)
+    val startTime = timestamp("start_time")
+    val endTime = timestamp("end_time")
+    val fish = varchar("fish", 100).nullable()
+    val location = varchar("location", 100).nullable()
+    val metric = varchar("metric", 20)
+    val prizePlaces = integer("prize_places")
+    val prizesJson = text("prizes_json")
+}
+
+object UserPrizes : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val tournamentId = reference("tournament_id", Tournaments)
+    val packageId = varchar("package_id", 100)
+    val qty = integer("qty").default(1)
+    val claimed = bool("claimed").default(false)
 }

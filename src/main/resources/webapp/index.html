@@ -58,6 +58,9 @@
     .ripple::before,.ripple::after{ content:""; position:absolute; inset:-6px; border-radius:9999px; border:2px solid rgba(255,255,255,.35); animation:ripple 2.2s linear infinite; }
     .ripple::after{ animation-delay:1.1s; }
 
+    @keyframes pop {0%{transform:scale(.5);opacity:0;}80%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);}}
+    .animate-pop{animation:pop .3s ease-out;}
+
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
     .pb-safe{ padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
   </style>
@@ -70,6 +73,10 @@
 
     // ====== Assets & UI constants ======
     const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
+    const rarityNames = {
+      ru: { common:'Простая', uncommon:'Необычная', rare:'Редкая', epic:'Эпическая', legendary:'Легендарная' },
+      en: { common:'Common', uncommon:'Uncommon', rare:'Rare', epic:'Epic', legendary:'Legendary' }
+    };
     const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
     const LOCATION_BG = {
       1: '/app/assets/riverking_bg_pond_1600x900.png', // Пруд (локальный ассет)
@@ -94,7 +101,19 @@
     const FISH_TRANSLATIONS = {
       'Плотва':'Roach','Окунь':'Perch','Карась':'Crucian Carp','Лещ':'Bream','Щука':'Pike','Карп':'Carp','Сом':'Catfish','Осётр':'Sturgeon','Уклейка':'Bleak','Линь':'Tench','Ротан':'Rotan','Судак':'Zander','Чехонь':'Sabrefish','Хариус':'Grayling','Форель ручьевая':'Brook Trout','Таймень':'Taimen','Налим':'Burbot','Сиг':'Whitefish','Голавль':'Chub','Жерех':'Asp','Толстолобик':'Bighead Carp','Белый амур':'Grass Carp','Угорь европейский':'European Eel','Стерлядь':'Sterlet','Кефаль':'Mullet','Камбала':'Flounder','Сельдь':'Herring','Ставрида':'Horse Mackerel','Треска':'Cod','Сайда':'Pollock','Морская форель':'Sea Trout','Палтус':'Halibut','Корюшка':'Smelt','Лосось атлантический':'Atlantic Salmon','Лаврак':'Sea Bass','Скумбрия атлантическая':'Atlantic Mackerel','Белуга':'Beluga','Ёрш':'Ruffe','Пескарь':'Gudgeon','Густера':'Blue Bream','Краснопёрка':'Rudd','Елец':'Dace','Верхоплавка':'Topmouth Gudgeon','Язь':'Ide','Бычок':'Goby','Килька':'Sprat','Мойва':'Capelin','Дорадо':'Dorado','Ваху':'Wahoo','Парусник':'Sailfish','Рыба-меч':'Swordfish','Марлин синий':'Blue Marlin','Тунец синеперый':'Bluefin Tuna','Акула мако':'Mako Shark'
     };
+    const LURE_TRANSLATIONS = {
+      'Пресная мирная':'Freshwater Peaceful',
+      'Пресная хищная':'Freshwater Predator',
+      'Морская мирная':'Saltwater Peaceful',
+      'Морская хищная':'Saltwater Predator',
+      'Пресная мирная+':'Freshwater Peaceful+',
+      'Пресная хищная+':'Freshwater Predator+',
+    };
     const FISH_IMG = {};
+    const translateLure = n => {
+      if(document.documentElement.lang === 'en') return LURE_TRANSLATIONS[n] || n;
+      return n;
+    };
     Object.entries({
       'Плотва': '/app/assets/fish/plotva.png',
       'Окунь': '/app/assets/fish/okun.png',
@@ -162,12 +181,18 @@
         baits:'Приманки',
         total:'Всего',
         today:'Сегодня',
+        yesterday:'Вчера',
+        lastWeek:'За неделю',
+        lastMonth:'За месяц',
+        lastYear:'За год',
         allTime:'За всё время',
         kg:'кг',
         locations:'Локации',
         unlocked:'Открыто',
         requiresKg: kg=>`Требуется ${kg} кг`,
-        current:'Текущая',
+        current:'Текущий',
+        upcoming:'Предстоящие',
+        past:'Прошедшие',
         lures:'Приманки',
         qty: qty=>`${qty} шт.`,
         nickname:'Никнейм',
@@ -196,6 +221,9 @@
         selectFish:'Выбери рыбу',
         castRod:'Забросить удочку',
         hook:'Подсечь!',
+        autoCast:'Автозаброс',
+        autoFishUntil:d=>`Активно до ${d}`,
+        autoFishExtend:'Продлить ещё на месяц',
         waitingBite:'Ожидаем поклёвку…',
         catch:'Улов!',
         new:'Новая!',
@@ -210,27 +238,50 @@
         noSuitableFish:'Нет подходящей рыбы на эту приманку.',
         fishing:'Рыбалка',
         tournaments:'Турниры',
-        achievements:'Достижения',
+        you:'Ты',
+        prizes:'Призы',
+        ratings:'Рейтинги',
         guide:'Справочник',
         shop:'Магазин',
         gift:'Подарок',
         personal:'Личные',
         global:'Глобальные',
-        species:'Виды',
-        smallest:'Самая маленькая',
-        largest:'Самая большая',
+        species:'Рыбы',
+        smallest:'Самая маленькая рыба',
+        largest:'Самая большая рыба',
+        count:'Количество рыбы',
+        fishLabel:'Рыба:',
+        anyFish:'Любая рыба',
+        fishWord:'рыба',
+        anyLocation:'Любая локация',
+        conditionsLabel:'Условия:',
+        prizePlacesLabel:'Призовых мест:',
+        day:'День',
+        tapToClaim:'Нажмите, чтобы получить',
+        prizeCongrats: rank=>`Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`,
+        hintFastBite:'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
+        hintWaitRare:'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
+        hintTapPrize:'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
+        hintAutoCatch:'С подпиской робот позаботится о вашем улове, если вы не успеете вовремя выловить рыбу',
+        hintNoCloseRod:'Не закрывай игру с заброшенной удочкой чтобы не потерять приманку',
       },
       en: {
         location:'Location',
         baits:'Baits',
         total:'Total',
         today:'Today',
+        yesterday:'Yesterday',
+        lastWeek:'Last week',
+        lastMonth:'Last month',
+        lastYear:'Last year',
         allTime:'All time',
         kg:'kg',
         locations:'Locations',
         unlocked:'Unlocked',
         requiresKg: kg=>`${kg} kg required`,
         current:'Current',
+        upcoming:'Upcoming',
+        past:'Past',
         lures:'Baits',
         qty: qty=>`${qty} pcs`,
         nickname:'Nickname',
@@ -259,6 +310,9 @@
         selectFish:'Select fish',
         castRod:'Cast rod',
         hook:'Hook!',
+        autoCast:'Auto cast',
+        autoFishUntil:d=>`Active until ${d}`,
+        autoFishExtend:'Extend for another month',
         waitingBite:'Waiting for a bite…',
         catch:'Catch!',
         new:'New!',
@@ -273,15 +327,32 @@
         noSuitableFish:'No suitable fish for this bait here.',
         fishing:'Fishing',
         tournaments:'Tournaments',
-        achievements:'Achievements',
+        you:'You',
+        prizes:'Prizes',
+        ratings:'Ratings',
         guide:'Guide',
         shop:'Shop',
         gift:'Gift',
         personal:'Personal',
         global:'Global',
-        species:'Species',
-        smallest:'Smallest',
-        largest:'Largest',
+        species:'Fish',
+        smallest:'Smallest fish',
+        largest:'Largest fish',
+        count:'Fish count',
+        fishLabel:'Fish:',
+        anyFish:'Any fish',
+        fishWord:'fish',
+        anyLocation:'Any location',
+        conditionsLabel:'Conditions:',
+        prizePlacesLabel:'Prize places:',
+        day:'Day',
+        tapToClaim:'Tap to claim',
+        prizeCongrats: rank=>`Congratulations! You placed ${rank} in the tournament. Your prize:`,
+        hintFastBite:'React to bites quickly for a better catch chance',
+        hintWaitRare:'Waiting longer for a bite increases the odds of rare fish',
+        hintTapPrize:'Tap a leaderboard card to see its potential prize',
+        hintAutoCatch:'With a subscription, the robot will secure your catch if you fail to reel in the fish in time',
+        hintNoCloseRod:"Don't close the game with your rod cast or you'll lose the bait",
       }
     };
     function makeT(lang){ return (key, p)=>{ const v=(STRINGS[lang]||STRINGS.ru)[key]; return typeof v==='function'? v(p): (v||key); }; }
@@ -307,16 +378,15 @@
     }
 
     function StatChip({icon,label,value,active=false,onClick}){
-      const Comp = onClick ? 'button' : 'div';
       return (
-        <Comp onClick={onClick}
-          className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':''} ${active?'ring-1 ring-emerald-500':''}`}>
+        <button type="button" onClick={onClick}
+          className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center justify-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':'pointer-events-none'} ${active?'ring-1 ring-emerald-500':''}`}>
           {icon && <span className="text-base">{icon}</span>}
           <div className="leading-tight">
             <div className="text-[10px] uppercase opacity-70">{label}</div>
             <div className="text-sm font-semibold whitespace-nowrap">{value}</div>
           </div>
-        </Comp>
+        </button>
       );
     }
 
@@ -421,6 +491,45 @@
             <div className="flex gap-2">
               <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">{t('cancel')}</button>
               <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">{t('save')}</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DailyModal({streak,available,onClose,onClaim}){
+      const rewards = [
+        [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:5} ],
+        [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:10} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:10} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5} ],
+        [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5}, {name:'Пресная мирная+',qty:1}, {name:'Пресная хищная+',qty:1} ],
+      ];
+      const current = available ? streak : streak - 1;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
+          <div className="relative w-[90%] max-w-sm rounded-xl overflow-hidden">
+            <img src="/app/assets/riverking_bg_pond_1600x900.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
+            <div className="absolute inset-0 bg-black/50"></div>
+            <div className="relative p-4">
+              <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
+              <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+                {rewards.map((items,i)=>{
+                  const done = i < streak;
+                  const isCurrent = i === current;
+                  return (
+                    <div key={i} className={`p-2 rounded-lg text-center ${done ? 'opacity-40' : 'bg-white/10'} ${isCurrent ? 'ring-2 ring-yellow-300' : ''}`}>
+                      <div className="font-semibold mb-1">{t('day')} {i+1}</div>
+                      {items.map(it=> <div key={it.name} className="text-xs">{it.qty} {translateLure(it.name)}</div>)}
+                    </div>
+                  );
+                })}
+              </div>
+              {available && <button onClick={onClaim} className="w-full py-2 rounded-xl bg-emerald-600 mb-2">{t('tapToClaim')}</button>}
+              <button onClick={onClose} className="w-full py-2 rounded-xl glass">{t('cancel')}</button>
             </div>
           </div>
         </div>
@@ -571,6 +680,10 @@
             </select>
             <select value={period} onChange={e=>setPeriod(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
               <option value="today">{t('today')}</option>
+              <option value="yesterday">{t('yesterday')}</option>
+              <option value="week">{t('lastWeek')}</option>
+              <option value="month">{t('lastMonth')}</option>
+              <option value="year">{t('lastYear')}</option>
               <option value="all">{t('allTime')}</option>
             </select>
             <select value={order} onChange={e=>setOrder(e.target.value)} className="flex-1 p-2 rounded-lg bg-black/20 border border-white/10">
@@ -642,7 +755,7 @@
       );
     }
 
-    function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily}){
+    function FishingStage({me, setMe, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -781,6 +894,28 @@
               </div>
             )}
           </div>
+          {me.autoFish && (
+            <button
+              type="button"
+              className="absolute bottom-3 right-3 z-10 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer"
+              onClick={()=>{
+                const checked = !autoCastRef.current;
+                autoCastRef.current = checked;
+                if(!checked){
+                  clearTimeout(autoCastTimeoutRef.current);
+                  autoCastTimeoutRef.current = null;
+                }
+                setAutoCast(checked);
+              }}
+            >
+              <span className={"w-3 h-3 rounded-sm border border-white/50 bg-transparent flex items-center justify-center " + (autoCast ? "bg-emerald-500" : "") }>
+                <svg viewBox="0 0 14 14" className={"w-2 h-2 text-black " + (autoCast ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 7 6 10 11 4" />
+                </svg>
+              </span>
+              <span>{t('autoCast')}</span>
+            </button>
+          )}
         </div>
       );
     }
@@ -797,6 +932,10 @@
       })();
       const [me,setMe] = React.useState(null);
       const [loading,setLoading] = React.useState(true);
+      const [loadingHint] = React.useState(()=>{
+        const hints = [t('hintFastBite'), t('hintWaitRare'), t('hintTapPrize'), t('hintAutoCatch'), t('hintNoCloseRod')];
+        return hints[Math.floor(Math.random()*hints.length)];
+      });
       const [casting,setCasting] = React.useState(false);
       const castingRef = React.useRef(false);
       const [biting,setBiting] = React.useState(false);
@@ -810,7 +949,52 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
+      const [currentTournament,setCurrentTournament] = React.useState(null);
+      const [upcomingTournaments,setUpcomingTournaments] = React.useState([]);
+      const [pastTournaments,setPastTournaments] = React.useState([]);
+      const [pastResult,setPastResult] = React.useState(null);
+      const [tournamentTab,setTournamentTab] = React.useState('current');
       const [nickOpen,setNickOpen] = React.useState(false);
+      const [prize,setPrize] = React.useState(null);
+      const [prizeHint,setPrizeHint] = React.useState(null);
+      const [dailyOpen,setDailyOpen] = React.useState(false);
+      const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
+      const autoCastRef = React.useRef(autoCast);
+      const autoCastTimeoutRef = React.useRef(null);
+      React.useEffect(()=>{
+        autoCastRef.current = autoCast;
+        if(!me?.autoFish) setAutoCast(false);
+        if(!autoCast){
+          clearTimeout(autoCastTimeoutRef.current);
+          autoCastTimeoutRef.current = null;
+        }
+      }, [autoCast, me?.autoFish]);
+      React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
+
+      function tournamentFish(name, rarity){
+        if(!rarity) return t('anyFish');
+        const cls = rarityColors[rarity]||'';
+        if(name) return <span className={cls}>{name}</span>;
+        const lang = document.documentElement.lang;
+        const rn = rarityNames[lang] || rarityNames.ru;
+        return <span className={cls}>{(rn[rarity]||rarity)} {t('fishWord')}</span>;
+      }
+
+      React.useEffect(()=>{
+        if(currentTournament?.mine){
+          setTimeout(()=>{
+            document.getElementById('current-tournament-mine')?.scrollIntoView({block:'center'});
+          },0);
+        }
+      },[currentTournament]);
+
+      React.useEffect(()=>{
+        if(pastResult?.mine){
+          setTimeout(()=>{
+            document.getElementById('past-tournament-mine')?.scrollIntoView({block:'center'});
+          },0);
+        }
+      },[pastResult]);
 
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
@@ -855,6 +1039,38 @@
                   setShop([]);
                 }
               }
+              try{
+                const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+                if(ct.status===200){
+                  setCurrentTournament(await ct.json());
+                } else {
+                  setCurrentTournament(null);
+                }
+                const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
+                if(ut.status===200){
+                  setUpcomingTournaments(await ut.json());
+                } else {
+                  setUpcomingTournaments([]);
+                }
+                const pt = await fetch(`/api/tournaments/past`,{credentials:'include'});
+                if(pt.status===200){
+                  setPastTournaments(await pt.json());
+                } else {
+                  setPastTournaments([]);
+                }
+                const pr = await fetch(`/api/prizes`,{credentials:'include'});
+                if(pr.ok){
+                  const list = await pr.json();
+                  if(list.length>0) setPrize(list[0]);
+                }
+              }catch(e){
+                if(e.message==='unauthorized'){
+                  setError(t('authRequired'));
+                  setCurrentTournament(null);
+                  setUpcomingTournaments([]);
+                  setPastTournaments([]);
+                }
+              }
             }catch(e){
               if(e.message==='unauthorized'){
                 setError(t('authRequired'));
@@ -884,7 +1100,7 @@
                     {id:3,name:'Озеро',unlockKg:50,unlocked:false},
                   ],
                   caughtFishIds:[],
-                  recent:[], dailyAvailable:true,
+                  recent:[], dailyAvailable:true, dailyStreak:0,
                 });
                 setShop([]);
               }
@@ -897,6 +1113,30 @@
           setNickOpen(true);
         }
       },[me?.needsNickname]);
+
+      React.useEffect(()=>{
+        if(tournamentTab!=='past') setPastResult(null);
+      },[tournamentTab]);
+
+      async function claimPrize(){
+        if(!prize) return;
+        try{
+          await fetch(`/api/prizes/${prize.id}/claim`,{method:'POST',credentials:'include'});
+          const r = await fetch(`/api/me`,{credentials:'include'});
+          if(r.ok) setMe(await r.json());
+        }catch(e){}
+        setPrize(null);
+      }
+
+      async function openPast(id){
+        setPastResult(null);
+        try{
+          const r = await fetch(`/api/tournament/${id}`,{credentials:'include'});
+          if(r.status===200){
+            setPastResult(await r.json());
+          }
+        }catch(e){}
+      }
 
       async function claimDaily(){
         setError(null);
@@ -911,13 +1151,19 @@
             ...p,
             lures: d.lures,
             currentLureId:d.currentLureId,
-            dailyAvailable:false
+            dailyAvailable:false,
+            dailyStreak:d.dailyStreak
           }));
+          setDailyOpen(false);
         }catch(e){
           setError(e.message==='unauthorized'
             ? t('authRequired')
             : t('dailyTaken'));
         }
+      }
+
+      function openDaily(){
+        setDailyOpen(true);
       }
 
       async function buyPack(id){
@@ -940,6 +1186,10 @@
                 const meResp = await fetch(`/api/me`,{credentials:'include'});
                 if(meResp.ok){
                   setMe(await meResp.json());
+                }
+                const shopResp = await fetch(`/api/shop`,{credentials:'include'});
+                if(shopResp.ok){
+                  setShop(await shopResp.json());
                 }
               }catch(err){}
             }
@@ -992,6 +1242,20 @@
           }
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){ setShop(await s.json()); }
+          const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+          if(ct.status===200){ setCurrentTournament(await ct.json()); } else { setCurrentTournament(null); }
+          const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
+          if(ut.status===200){
+            setUpcomingTournaments(await ut.json());
+          } else {
+            setUpcomingTournaments([]);
+          }
+          const pt = await fetch(`/api/tournaments/past`,{credentials:'include'});
+          if(pt.status===200){
+            setPastTournaments(await pt.json());
+          } else {
+            setPastTournaments([]);
+          }
         }catch(e){}
       }
 
@@ -1043,6 +1307,8 @@
         clearTimeout(hookTimeoutRef.current);
         setBiting(false);
         bitingRef.current = false;
+        let caught=false;
+        let autoFishActive = me.autoFish;
         try{
           const r=await fetch(`/api/cast`,{
             method:'POST', credentials:'include',
@@ -1054,6 +1320,10 @@
             throw 0;
           }
           const d=await r.json();
+          caught=d.caught;
+          autoFishActive = d.autoFish;
+          setMe(p=>({...p,autoFish:d.autoFish}));
+          if(!d.autoFish) setAutoCast(false);
           if(d.caught){
             const c=d.catch;
             const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
@@ -1071,6 +1341,14 @@
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
               };
             });
+            try{
+              const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+              if(ct.status===200){
+                setCurrentTournament(await ct.json());
+              } else {
+                setCurrentTournament(null);
+              }
+            }catch(e){}
           } else {
             setError(t('fishEscaped'));
           }
@@ -1081,6 +1359,9 @@
         }finally{
           castingRef.current = false;
           setCasting(false);
+          if(caught && autoCastRef.current && autoFishActive){
+            autoCastTimeoutRef.current = setTimeout(()=>cast(),1000);
+          }
         }
       }
 
@@ -1089,7 +1370,7 @@
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
-              <div className="opacity-70 mt-2">{t('loading')}</div>
+              <div className="opacity-70 mt-2">{loadingHint}</div>
             </div>
           </div>
         );
@@ -1107,15 +1388,35 @@
       }
 
       return (
-        <div className="min-h-screen w-full px-4 pb-20">
+        <div className="min-h-screen w-full px-4 pb-20" onClick={()=>setPrizeHint(null)}>
+        {prize && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
+              <div className="glass p-6 rounded-xl text-center animate-pop">
+                <img src="/app/assets/riverking_bobber.svg" alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+                <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
+                <div className="text-lg font-semibold mb-1">
+                  {
+                    (
+                      shop
+                        .reduce((acc, c) => acc.concat(c.packs), [])
+                        .find(p => p.id === prize.packageId)?.name
+                    ) || prize.packageId
+                  } x{prize.qty}
+                </div>
+                <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
+              </div>
+            </div>
+          )}
+        {/* prizeHint tooltip handled per-card */}
           <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
+          {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
           {tab === 'fish' && (
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={claimDaily} />
+                <FishingStage me={me} setMe={setMe} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} autoCastRef={autoCastRef} autoCastTimeoutRef={autoCastTimeoutRef} />
               </div>
 
               {/* Мобильный CTA под сценой */}
@@ -1174,7 +1475,211 @@
           )}
 
           {tab === 'tournaments' && (
-            <div className="mt-6 text-center opacity-70">{t('tournamentsSoon')}</div>
+            <div className="mt-6">
+              <div className="flex mb-4">
+                <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${tournamentTab==='past'?'text-emerald-400':''}`}>{t('past')}</button>
+                <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${tournamentTab==='current'?'text-emerald-400':''}`}>{t('current')}</button>
+                <button onClick={()=>setTournamentTab('upcoming')} className={`flex-1 py-2 ${tournamentTab==='upcoming'?'text-emerald-400':''}`}>{t('upcoming')}</button>
+              </div>
+              {tournamentTab==='current' ? (
+                currentTournament ? (
+                  (
+                    <div>
+                      <div className="p-4 rounded-xl glass text-left mb-4">
+                        <div className="text-base font-semibold mb-1">{currentTournament.tournament.name}</div>
+                        <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
+                        <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(currentTournament.tournament.fish, currentTournament.tournament.fishRarity)}</div>
+                        <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
+                        <div className="text-sm opacity-80">{t('conditionsLabel')} {t(currentTournament.tournament.metric)}</div>
+                        <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
+                      </div>
+                      <div className="space-y-2">
+                        {(currentTournament.leaderboard || []).map(e=> {
+                          const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
+                          return (
+                          <div
+                            key={e.rank}
+                            id={isMine ? 'current-tournament-mine' : undefined}
+                            className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
+                            onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                          >
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+                                <span>{e.rank}</span>
+                                {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              </div>
+                              {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  <div className="truncate">{e.user||'-'}</div>
+                                </div>
+                                {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                              </div>
+                            </div>
+                            <div className="w-12 text-right shrink-0">
+                              <div>{currentTournament.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
+                              {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
+                            </div>
+                            {prizeHint?.rank===e.rank && (
+                              <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              </div>
+                            )}
+                          </div>
+                          );
+                        })}
+                        {currentTournament.mine && currentTournament.mine.rank>(currentTournament.leaderboard?.length || 0) && (
+                          <div
+                            id="current-tournament-mine"
+                            className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===currentTournament.mine.rank ? 'z-10' : ''} border border-emerald-400`}
+                            onClick={ev=>{ev.stopPropagation(); if(currentTournament.mine.prize) setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}
+                          >
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+                                <span>{currentTournament.mine.rank}</span>
+                                {currentTournament.mine.prize && <img src={`/app/assets/baits/${currentTournament.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              </div>
+                              {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                  <div className="truncate">{currentTournament.mine.user||t('you')}</div>
+                                </div>
+                                {currentTournament.mine.fish && <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
+                              </div>
+                            </div>
+                            <div className="w-12 text-right shrink-0">
+                              <div>{currentTournament.tournament.metric==='count'? Number(currentTournament.mine.value).toFixed(0) : Number(currentTournament.mine.value).toFixed(2)}</div>
+                              {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
+                            </div>
+                            {prizeHint?.rank===currentTournament.mine.rank && (
+                              <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                                {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center opacity-70">{t('noData')}</div>
+                )
+              ) : tournamentTab==='upcoming' ? (
+                upcomingTournaments.length===0 ? (
+                  <div className="text-center opacity-70">{t('noData')}</div>
+                ) : (
+                  <div className="space-y-4">
+                    {upcomingTournaments.map(tn=> (
+                      <div key={tn.id} className="p-4 rounded-xl glass text-left">
+                        <div className="text-base font-semibold mb-1">{tn.name}</div>
+                        <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
+                        <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
+                        <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
+                        <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
+                        <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                pastResult ? (
+                  <div>
+                    <button onClick={()=>setPastResult(null)} className="mb-4 text-emerald-400">{t('cancel')}</button>
+                    <div className="p-4 rounded-xl glass text-left mb-4">
+                      <div className="text-base font-semibold mb-1">{pastResult.tournament.name}</div>
+                      <div className="text-xs opacity-70">{new Date(pastResult.tournament.startTime*1000).toLocaleString()} — {new Date(pastResult.tournament.endTime*1000).toLocaleString()}</div>
+                      <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(pastResult.tournament.fish, pastResult.tournament.fishRarity)}</div>
+                      <div className="text-sm opacity-80">{t('locationLabel')} {pastResult.tournament.location || t('anyLocation')}</div>
+                      <div className="text-sm opacity-80">{t('conditionsLabel')} {t(pastResult.tournament.metric)}</div>
+                      <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
+                    </div>
+                    <div className="space-y-2">
+                      {(pastResult.leaderboard || []).map(e=> {
+                        const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
+                        return (
+                        <div
+                          key={e.rank}
+                          id={isMine ? 'past-tournament-mine' : undefined}
+                          className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
+                          onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                        >
+                          <div className="flex items-center gap-2 w-full min-w-0">
+                            <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+                              <span>{e.rank}</span>
+                              {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            </div>
+                            {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                <div className="truncate">{e.user||'-'}</div>
+                              </div>
+                              {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                            </div>
+                          </div>
+                          <div className="w-12 text-right shrink-0">
+                            <div>{pastResult.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
+                            {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
+                          </div>
+                          {prizeHint?.rank===e.rank && (
+                            <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            </div>
+                          )}
+                        </div>
+                        );
+                      })}
+                      {pastResult.mine && pastResult.mine.rank>(pastResult.leaderboard?.length || 0) && (
+                        <div
+                          id="past-tournament-mine"
+                          className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''} border border-emerald-400`}
+                          onClick={ev=>{ev.stopPropagation(); if(pastResult.mine.prize) setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}
+                        >
+                          <div className="flex items-center gap-2 w-full min-w-0">
+                            <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+                              <span>{pastResult.mine.rank}</span>
+                              {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            </div>
+                            {pastResult.mine.fish && <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1 flex-wrap min-w-0">
+                                <div className="truncate">{pastResult.mine.user||t('you')}</div>
+                              </div>
+                              {pastResult.mine.fish && <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>}
+                            </div>
+                          </div>
+                          <div className="w-12 text-right shrink-0">
+                            <div>{pastResult.tournament.metric==='count'? Number(pastResult.mine.value).toFixed(0) : Number(pastResult.mine.value).toFixed(2)}</div>
+                            {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
+                          </div>
+                          {prizeHint?.rank===pastResult.mine.rank && (
+                            <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
+                              {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prizeHint.prize.packageId)?.name)||prizeHint.prize.packageId} x{prizeHint.prize.qty}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  pastTournaments.length===0 ? (
+                    <div className="text-center opacity-70">{t('noData')}</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pastTournaments.map(tn=> (
+                        <div key={tn.id} className="p-4 rounded-xl glass text-left" onClick={()=>openPast(tn.id)}>
+                          <div className="text-base font-semibold mb-1">{tn.name}</div>
+                          <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
+                          <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
+                          <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
+                          <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )
+              )}
+            </div>
           )}
           {tab === 'achievements' && (
             <Achievements me={me} setMe={setMe} />
@@ -1191,9 +1696,15 @@
                       <div className="space-y-2">
                         {cat.packs.map(item=> (
                           <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
-                            <div>
-                              <div className="font-semibold">{item.name}</div>
-                              <div className="text-xs opacity-70">{item.desc}</div>
+                            <div className="flex items-center gap-3">
+                              <img src={`/app/assets/baits/${item.id}.png`} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                              <div>
+                                <div className="font-semibold">{item.name}</div>
+                                <div className="text-xs opacity-70">{item.desc}</div>
+                                {item.until && (
+                                  <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
+                                )}
+                              </div>
                             </div>
                             <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
                           </div>
@@ -1231,7 +1742,7 @@
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-              <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('achievements')}</button>
+                <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
               <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
               <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>

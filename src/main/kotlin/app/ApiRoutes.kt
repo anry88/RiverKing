@@ -7,6 +7,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
@@ -15,16 +16,21 @@ import service.LocationDTO
 import service.RecentDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
+import service.TournamentService
 import service.I18n
+import service.PrizeSpec
 import db.Users
 import service.PayService
 import service.StarsPaymentService
 import util.Metrics
+import java.time.Instant
 
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
+    val tournaments = TournamentService()
+    val rarityGroups = setOf("common", "uncommon", "rare", "epic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -69,7 +75,7 @@ fun Application.apiRoutes(env: Env) {
     data class CastReq(val wait: Int, val reaction: Double)
 
     @Serializable
-    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int)
+    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int, val until: String? = null)
 
     @Serializable
     data class ShopCategoryDTO(val id: String, val name: String, val packs: List<ShopPackageDTO>)
@@ -90,6 +96,43 @@ fun Application.apiRoutes(env: Env) {
 
     @Serializable
     data class InvoiceResp(val invoice_url: String)
+
+    @Serializable
+    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int)
+
+    @Serializable
+    data class PrizeSpecDTO(val packageId: String, val qty: Int)
+
+    @Serializable
+    data class TournamentDTO(
+        val id: Long,
+        val name: String,
+        val startTime: Long,
+        val endTime: Long,
+        val fish: String? = null,
+        val fishRarity: String? = null,
+        val location: String? = null,
+        val metric: String,
+        val prizePlaces: Int,
+    )
+
+    @Serializable
+    data class LeaderboardEntryDTO(
+        val rank: Int,
+        val user: String? = null,
+        val value: Double,
+        val fish: String? = null,
+        val location: String? = null,
+        val at: Long? = null,
+        val prize: PrizeSpecDTO? = null,
+    )
+
+    @Serializable
+    data class CurrentTournamentDTO(
+        val tournament: TournamentDTO,
+        val leaderboard: List<LeaderboardEntryDTO>,
+        val mine: LeaderboardEntryDTO? = null,
+    )
 
     routing {
         // Telegram WebApp auth: client sends initData in a header
@@ -119,6 +162,7 @@ fun Application.apiRoutes(env: Env) {
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
             val dailyAvailable = fishing.canClaimDaily(uid)
+            val dailyStreak = transaction { Users.select { Users.id eq uid }.single()[Users.dailyStreak] }
             val displayName = fishing.displayName(uid)
             val storedLoc = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
@@ -135,6 +179,10 @@ fun Application.apiRoutes(env: Env) {
                 )
             }
             val caughtFishIds = fishing.caughtFishIds(uid)
+            val autoFish = transaction {
+                Users.select { Users.id eq uid }.single()[Users.autoFishUntil]
+                    ?.isAfter(Instant.now()) ?: false
+            }
 
             @Serializable
             data class MeResp(
@@ -149,6 +197,8 @@ fun Application.apiRoutes(env: Env) {
                 val caughtFishIds: List<Long>,
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
+                val dailyStreak: Int,
+                val autoFish: Boolean,
                 val language: String,
             )
             call.respond(
@@ -164,6 +214,8 @@ fun Application.apiRoutes(env: Env) {
                     caughtFishIds,
                     recent,
                     dailyAvailable,
+                    dailyStreak,
+                    autoFish,
                     language,
                 )
             )
@@ -197,6 +249,197 @@ fun Application.apiRoutes(env: Env) {
             call.respond(HttpStatusCode.OK)
         }
 
+        get("/api/tournament/current") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val t = tournaments.currentTournament()
+                ?: return@get call.respond(HttpStatusCode.NoContent)
+            val (top, mine) = tournaments.leaderboard(t, uid)
+            val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+            val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
+            val dto = TournamentDTO(
+                id = t.id,
+                name = if (language == "en") t.nameEn else t.nameRu,
+                startTime = t.startTime.epochSecond,
+                endTime = t.endTime.epochSecond,
+                fish = fishName,
+                fishRarity = fishRarity,
+                location = t.location?.let { I18n.location(it, language) },
+                metric = t.metric.lowercase(),
+                prizePlaces = t.prizePlaces,
+            )
+            val resp = CurrentTournamentDTO(
+                tournament = dto,
+                leaderboard = top.map {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+                mine = mine?.let {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+            )
+            call.respond(resp)
+        }
+
+        get("/api/tournament/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val (top, mine) = tournaments.leaderboard(t, uid)
+            val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
+            val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+            val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
+            val dto = TournamentDTO(
+                id = t.id,
+                name = if (language == "en") t.nameEn else t.nameRu,
+                startTime = t.startTime.epochSecond,
+                endTime = t.endTime.epochSecond,
+                fish = fishName,
+                fishRarity = fishRarity,
+                location = t.location?.let { I18n.location(it, language) },
+                metric = t.metric.lowercase(),
+                prizePlaces = t.prizePlaces,
+            )
+            val resp = CurrentTournamentDTO(
+                tournament = dto,
+                leaderboard = top.map {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+                mine = mine?.let {
+                    LeaderboardEntryDTO(
+                        rank = it.rank,
+                        user = it.user,
+                        value = it.value,
+                        fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        location = it.location?.let { l -> I18n.location(l, language) },
+                        at = it.at?.epochSecond,
+                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                    )
+                },
+            )
+            call.respond(resp)
+        }
+
+        get("/api/tournaments/upcoming") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = tournaments.upcomingTournaments().map { t ->
+                val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+                val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
+                TournamentDTO(
+                    id = t.id,
+                    name = if (language == "en") t.nameEn else t.nameRu,
+                    startTime = t.startTime.epochSecond,
+                    endTime = t.endTime.epochSecond,
+                    fish = fishName,
+                    fishRarity = fishRarity,
+                    location = t.location?.let { I18n.location(it, language) },
+                    metric = t.metric.lowercase(),
+                    prizePlaces = t.prizePlaces,
+                )
+            }
+            call.respond(list)
+        }
+
+        get("/api/tournaments/past") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = tournaments.pastTournaments().map { t ->
+                val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
+                val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
+                TournamentDTO(
+                    id = t.id,
+                    name = if (language == "en") t.nameEn else t.nameRu,
+                    startTime = t.startTime.epochSecond,
+                    endTime = t.endTime.epochSecond,
+                    fish = fishName,
+                    fishRarity = fishRarity,
+                    location = t.location?.let { I18n.location(it, language) },
+                    metric = t.metric.lowercase(),
+                    prizePlaces = t.prizePlaces,
+                )
+            }
+            call.respond(list)
+        }
+
+        get("/api/prizes") {
+            tournaments.distributePrizes()
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank) }
+            call.respond(prizes)
+        }
+
+        post("/api/prizes/{id}/claim") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val (lures, current) = try { tournaments.claimPrize(uid, id, fishing) }
+            catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            call.respond(ShopBuyResp(lures2, current))
+        }
+
         // Daily baits
         post("/api/daily") {
             val session = call.sessions.get<AppSession>()
@@ -211,10 +454,10 @@ fun Application.apiRoutes(env: Env) {
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
 
             @Serializable
-            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?)
+            data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?, val dailyStreak: Int)
 
             val lures = res.first.map { it.copy(name = I18n.lure(it.name, language)) }
-            call.respond(DailyResp(lures, res.second))
+            call.respond(DailyResp(lures, res.second, res.third))
         }
 
         post("/api/create-invoice") {
@@ -239,11 +482,17 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val autoUntil = transaction { Users.select { Users.id eq uid }.single()[Users.autoFishUntil] }
             val items = fishing.listShop(language).map { cat ->
                 ShopCategoryDTO(
                     cat.id,
                     cat.name,
-                    cat.packs.map { ShopPackageDTO(it.id, it.name, it.desc, it.price) }
+                    cat.packs.map { p ->
+                        val until = if (p.id == "autofish") {
+                            autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
+                        } else null
+                        ShopPackageDTO(p.id, p.name, p.desc, p.price, until)
+                    }
                 )
             }
             call.respond(items)
@@ -286,6 +535,18 @@ fun Application.apiRoutes(env: Env) {
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
+        }
+
+        post("/api/autofish/disable") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            fishing.disableAutoFish(uid)
+            call.respond(HttpStatusCode.NoContent)
         }
 
         // Guide data
@@ -431,10 +692,10 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val today = call.request.queryParameters["period"] == "today"
+            val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopByLocation(uid, id, today, asc).map { c ->
+            val res = fishing.personalTopByLocation(uid, id, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -452,10 +713,10 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val today = call.request.queryParameters["period"] == "today"
+            val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopBySpecies(uid, id, today, asc).map { c ->
+            val res = fishing.personalTopBySpecies(uid, id, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -475,9 +736,9 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val today = call.request.queryParameters["period"] == "today"
+            val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopByLocation(id, today, asc).map { c ->
+            val res = fishing.globalTopByLocation(id, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -496,9 +757,9 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val today = call.request.queryParameters["period"] == "today"
+            val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopBySpecies(id, today, asc).map { c ->
+            val res = fishing.globalTopBySpecies(id, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)

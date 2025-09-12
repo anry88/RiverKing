@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import java.time.*
@@ -78,6 +79,10 @@ class FishingService {
         Users.select { Users.id eq userId }.singleOrNull()?.get(Users.language) ?: "en"
     }
 
+    fun userTgId(userId: Long): Long? = transaction {
+        Users.select { Users.id eq userId }.singleOrNull()?.get(Users.tgId)
+    }
+
     fun displayName(userId: Long): String? = transaction {
         Users.select { Users.id eq userId }.singleOrNull()?.let { nameFromRow(it) }
     }
@@ -118,6 +123,10 @@ class FishingService {
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
     }
 
+    fun fishRarity(name: String): String? = transaction {
+        Fish.select { Fish.name eq name }.singleOrNull()?.get(Fish.rarity)
+    }
+
     fun caughtFishIds(userId: Long): List<Long> = transaction {
         Catches.slice(Catches.fishId).select { Catches.userId eq userId }
             .withDistinct().map { it[Catches.fishId].value }
@@ -153,13 +162,25 @@ class FishingService {
         return first
     }
 
-    fun giveDailyBaits(userId: Long, freshQty: Int = 10, predQty: Int = 5): Pair<List<LureDTO>, Long?>? = transaction {
+    fun giveDailyBaits(userId: Long): Triple<List<LureDTO>, Long?, Int>? = transaction {
         val today = LocalDate.now()
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
         val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        var streak = row[Users.dailyStreak]
         if (last == today) return@transaction null
+
+        streak = when (last) {
+            today.minusDays(1) -> (streak % 7) + 1
+            else -> 1
+        }
+
         val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
         val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
+        val saltFreshId = Lures.select { Lures.name eq "Морская мирная" }.single()[Lures.id].value
+        val saltPredId = Lures.select { Lures.name eq "Морская хищная" }.single()[Lures.id].value
+        val freshPlusId = Lures.select { Lures.name eq "Пресная мирная+" }.single()[Lures.id].value
+        val predPlusId = Lures.select { Lures.name eq "Пресная хищная+" }.single()[Lures.id].value
+
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -176,9 +197,25 @@ class FishingService {
                 }
             }
         }
-        add(freshId, freshQty)
-        add(predId, predQty)
-        Users.update({ Users.id eq userId }) { it[lastDailyAt] = Instant.now() }
+
+        when (streak) {
+            1 -> { add(freshId, 10); add(predId, 5) }
+            2 -> { add(freshId, 10); add(predId, 10) }
+            3 -> { add(freshId, 15); add(predId, 10) }
+            4 -> { add(freshId, 15); add(predId, 15) }
+            5 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5) }
+            6 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5) }
+            7 -> {
+                add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5)
+                add(freshPlusId, 1); add(predPlusId, 1)
+            }
+        }
+
+        Users.update({ Users.id eq userId }) {
+            it[lastDailyAt] = Instant.now()
+            it[dailyStreak] = streak
+        }
+
         val current = ensureCurrentLure(userId)
         val lures = (InventoryLures innerJoin Lures)
             .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
@@ -193,7 +230,7 @@ class FishingService {
                     it[Lures.rarityBonus],
                 )
             }
-        Pair(lures, current)
+        Triple(lures, current, streak)
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
@@ -518,6 +555,19 @@ class FishingService {
                 ),
             )
         ),
+        ShopCategory(
+            "subscriptions",
+            "Подписки",
+            listOf(
+                ShopPackage(
+                    "autofish",
+                    "Автоловля",
+                    "Робот ловит за вас целый месяц и не упустит ни одной рыбы",
+                    1,
+                    emptyList()
+                ),
+            )
+        ),
     )
 
     fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
@@ -536,6 +586,16 @@ class FishingService {
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
         val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
             ?: error("bad package")
+
+        if (packageId == "autofish") {
+            val row = Users.select { Users.id eq userId }.forUpdate().single()
+            val cur = row[Users.autoFishUntil]
+            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
+            Users.update({ Users.id eq userId }) {
+                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            }
+            return@transaction Pair(emptyList(), null)
+        }
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -571,6 +631,24 @@ class FishingService {
                 )
             }
         Pair(lures, current)
+    }
+
+    fun disableAutoFish(userId: Long) = transaction {
+        Users.update({ Users.id eq userId }) { it[autoFishUntil] = null }
+    }
+
+    fun removeAutoFishMonth(userId: Long) = transaction {
+        val row = Users.select { Users.id eq userId }.forUpdate().single()
+        val cur = row[Users.autoFishUntil]
+        val now = Instant.now()
+        if (cur != null && cur.isAfter(now)) {
+            val newUntil = cur.atZone(ZoneId.systemDefault()).minusMonths(1).toInstant()
+            Users.update({ Users.id eq userId }) {
+                it[autoFishUntil] = if (newUntil.isAfter(now)) newUntil else null
+            }
+        } else {
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = null }
+        }
     }
 
     fun setLure(userId: Long, lureId: Long) = transaction {
@@ -643,7 +721,7 @@ class FishingService {
     )
 
     @Serializable
-    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
+    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null, val autoFish: Boolean = false)
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
         "common" -> 1.0 - 0.7 * factor
@@ -695,9 +773,10 @@ class FishingService {
             return res
         }
 
-        if (reactionTime >= 5.0) return@transaction finish(CastResultDTO(false))
-        val catchChance = 1.0 - reactionTime / 5.0
-        if (rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false))
+        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
+        val catchChance = if (auto) 1.0 else 1.0 - reactionTime / 5.0
+        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
@@ -714,16 +793,18 @@ class FishingService {
         val locName = locRow[Locations.name]
         finish(
             CastResultDTO(
-            true,
-            CatchDTO(
-                fishName,
-                weight,
-                locName,
-                rarity,
-                userId = null,
-                fishId = fishId,
-            ),
-        ))
+                true,
+                CatchDTO(
+                    fishName,
+                    weight,
+                    locName,
+                    rarity,
+                    userId = null,
+                    fishId = fishId,
+                ),
+                auto
+            )
+        )
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
@@ -765,17 +846,35 @@ class FishingService {
             ).take(limit)
         }
 
+    private fun periodRange(period: String): Pair<Instant?, Instant?> {
+        val zone = ZoneId.systemDefault()
+        val start = when (period) {
+            "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
+            "yesterday" -> LocalDate.now().minusDays(1).atStartOfDay(zone).toInstant()
+            "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
+            "month" -> LocalDate.now().minusMonths(1).atStartOfDay(zone).toInstant()
+            "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
+            else -> null
+        }
+        val end = when (period) {
+            "today", "yesterday" -> start?.plus(Duration.ofDays(1))
+            else -> null
+        }
+        return Pair(start, end)
+    }
+
     fun personalTopByLocation(
         userId: Long,
         locationId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -798,14 +897,15 @@ class FishingService {
     fun personalTopBySpecies(
         userId: Long,
         fishId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -827,14 +927,15 @@ class FishingService {
 
     fun globalTopByLocation(
         locationId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.locationId eq locationId
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
@@ -856,14 +957,15 @@ class FishingService {
 
     fun globalTopBySpecies(
         fishId: Long,
-        today: Boolean = false,
+        period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val (start, end) = periodRange(period)
         val catches = transaction {
             var cond: Op<Boolean> = Catches.fishId eq fishId
-            if (today) cond = cond and (Catches.createdAt greaterEq start)
+            if (start != null) cond = cond and (Catches.createdAt greaterEq start)
+            if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
                 .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
                 .select { cond }
