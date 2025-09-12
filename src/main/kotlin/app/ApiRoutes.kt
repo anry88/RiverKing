@@ -537,6 +537,18 @@ fun Application.apiRoutes(env: Env) {
             call.respond(ShopBuyResp(res.first, res.second))
         }
 
+        post("/api/autofish/disable") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            fishing.disableAutoFish(uid)
+            call.respond(HttpStatusCode.NoContent)
+        }
+
         // Guide data
         get("/api/guide") {
             val session = call.sessions.get<AppSession>()

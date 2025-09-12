@@ -119,6 +119,7 @@ class StarsPaymentService(
             stream.use { it.readBytes() }
             disconnect()
         }
+        fishing.disableAutoFish(userId)
     }
 }
 

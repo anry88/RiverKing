@@ -469,7 +469,13 @@ fun Application.botRoutes(env: Env) {
                 }
                 if (env.adminTgId != 0L) {
                     try {
-                        bot.sendMessage(env.adminTgId, "Запрос #$reqId от $chatId: $reason")
+                        bot.sendMessage(
+                            env.adminTgId,
+                            "Запрос #$reqId от $chatId: $reason\n" +
+                            "/refund $reqId — одобрить возврат\n" +
+                            "/reject $reqId <причина> — отклонить\n" +
+                            "/ask $reqId <вопрос> — запросить информацию"
+                        )
                     } catch (e: Exception) {
                         log.error("sendMessage failed chatId={}", env.adminTgId, e)
                     }
@@ -498,6 +504,7 @@ fun Application.botRoutes(env: Env) {
                         if (id != null) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
+                                fishing.disableAutoFish(req.userId)
                                 PayService.updateSupportRequest(id, "refunded", null)
                                 try {
                                     bot.sendMessage(req.userId, "Ваш запрос #$id одобрен, возврат будет выполнен")
