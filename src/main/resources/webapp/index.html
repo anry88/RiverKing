@@ -894,7 +894,8 @@
             <label className="absolute bottom-3 right-3 z-50 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer">
               <input
                 type="checkbox"
-                className="peer sr-only"
+                id="autoCastToggle"
+                className="peer absolute h-0 w-0 opacity-0"
                 checked={autoCast}
                 onChange={e=>{
                   const checked = e.target.checked;
