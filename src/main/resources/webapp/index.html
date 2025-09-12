@@ -891,11 +891,11 @@
             )}
           </div>
           {me.autoFish && (
-            <label className="absolute bottom-3 right-3 z-50 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer">
+            <label className="absolute bottom-3 right-3 z-50 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer relative">
               <input
                 type="checkbox"
                 id="autoCastToggle"
-                className="peer absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="peer sr-only"
                 checked={autoCast}
                 onChange={e=>{
                   const checked = e.target.checked;
