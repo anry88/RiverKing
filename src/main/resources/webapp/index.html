@@ -899,9 +899,6 @@
                 onChange={e=>{
                   const checked = e.target.checked;
                   setAutoCast(checked);
-                  if(!checked){
-                    fetch('/api/autofish/disable',{method:'POST'}).then(()=>setMe(m=>({...m,autoFish:false}))).catch(()=>{});
-                  }
                 }}
               />
               <span>{t('autoCast')}</span>

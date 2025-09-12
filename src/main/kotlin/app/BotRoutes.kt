@@ -505,10 +505,18 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 val payment = PayService.latestPayment(req.userId)
-                                if (payment != null) {
+                                val tgId = fishing.userTgId(req.userId)
+                                if (payment != null && tgId != null) {
                                     try {
-                                        stars.refundStars(req.userId, payment.telegramChargeId)
+                                        stars.refundStars(tgId, payment.telegramChargeId)
                                         PayService.markPaymentRefunded(payment.id)
+                                        fishing.disableAutoFish(req.userId)
+                                        PayService.updateSupportRequest(id, "refunded", null)
+                                        try {
+                                            bot.sendMessage(tgId, "Ваш запрос #$id одобрен, возврат будет выполнен")
+                                        } catch (e: Exception) {
+                                            log.error("sendMessage failed chatId={}", tgId, e)
+                                        }
                                     } catch (e: Exception) {
                                         log.error(
                                             "refund failed userId={} chargeId={}",
@@ -519,17 +527,10 @@ fun Application.botRoutes(env: Env) {
                                     }
                                 } else {
                                     log.warn(
-                                        "No payment found for refund userId={} requestId={}",
+                                        "No payment or tgId found for refund userId={} requestId={}",
                                         req.userId,
                                         id
                                     )
-                                }
-                                fishing.disableAutoFish(req.userId)
-                                PayService.updateSupportRequest(id, "refunded", null)
-                                try {
-                                    bot.sendMessage(req.userId, "Ваш запрос #$id одобрен, возврат будет выполнен")
-                                } catch (e: Exception) {
-                                    log.error("sendMessage failed chatId={}", req.userId, e)
                                 }
                             }
                         }

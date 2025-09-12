@@ -79,6 +79,10 @@ class FishingService {
         Users.select { Users.id eq userId }.singleOrNull()?.get(Users.language) ?: "en"
     }
 
+    fun userTgId(userId: Long): Long? = transaction {
+        Users.select { Users.id eq userId }.singleOrNull()?.get(Users.tgId)
+    }
+
     fun displayName(userId: Long): String? = transaction {
         Users.select { Users.id eq userId }.singleOrNull()?.let { nameFromRow(it) }
     }
