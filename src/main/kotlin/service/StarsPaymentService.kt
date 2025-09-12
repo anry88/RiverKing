@@ -105,9 +105,9 @@ class StarsPaymentService(
     }
 
     /** Refund a Stars payment given its Telegram charge id. */
-    suspend fun refundStars(userId: Long, telegramPaymentChargeId: String) = withContext(Dispatchers.IO) {
+    suspend fun refundStars(tgUserId: Long, telegramPaymentChargeId: String) = withContext(Dispatchers.IO) {
         val url = URL("https://api.telegram.org/bot${env.botToken}/refundStarPayment")
-        val body = "{\"user_id\":$userId,\"telegram_payment_charge_id\":\"$telegramPaymentChargeId\"}"
+        val body = "{\"user_id\":$tgUserId,\"telegram_payment_charge_id\":\"$telegramPaymentChargeId\"}"
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15000
@@ -119,7 +119,6 @@ class StarsPaymentService(
             stream.use { it.readBytes() }
             disconnect()
         }
-        fishing.disableAutoFish(userId)
     }
 }
 
