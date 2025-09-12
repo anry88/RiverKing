@@ -3,7 +3,6 @@ package service
 import db.Payments
 import db.PaySupportRequests
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 
@@ -48,16 +47,6 @@ object PayService {
 
     fun findSupportRequest(id: Long): SupportRequest? = transaction {
         PaySupportRequests.select { PaySupportRequests.id eq id }
-            .map { SupportRequest(it[PaySupportRequests.id].value, it[PaySupportRequests.userId].value) }
-            .singleOrNull()
-    }
-
-    fun findInfoRequestByUser(userId: Long): SupportRequest? = transaction {
-        PaySupportRequests.select {
-            (PaySupportRequests.userId eq userId) and (PaySupportRequests.status eq "info")
-        }
-            .orderBy(PaySupportRequests.createdAt to SortOrder.DESC)
-            .limit(1)
             .map { SupportRequest(it[PaySupportRequests.id].value, it[PaySupportRequests.userId].value) }
             .singleOrNull()
     }

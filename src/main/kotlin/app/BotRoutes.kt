@@ -151,25 +151,6 @@ fun Application.botRoutes(env: Env) {
                         }
                     }
                 }
-            } else if (text.startsWith("/answer")) {
-                val answer = text.removePrefix("/answer").trim()
-                val uid = fishing.ensureUserByTgId(chatId)
-                val req = PayService.findInfoRequestByUser(uid)
-                if (req != null && answer.isNotEmpty()) {
-                    PayService.updateSupportRequest(req.id, "pending", answer)
-                    if (env.adminTgId != 0L) {
-                        try {
-                            bot.sendMessage(env.adminTgId, "Ответ по запросу #${req.id} от $chatId: $answer")
-                        } catch (e: Exception) {
-                            log.error("sendMessage failed chatId={}", env.adminTgId, e)
-                        }
-                    }
-                    try {
-                        bot.sendMessage(chatId, "Ответ по запросу #${req.id} отправлен администратору")
-                    } catch (e: Exception) {
-                        log.error("sendMessage failed chatId={}", chatId, e)
-                    }
-                }
             } else if (chatId == env.adminTgId) {
                 when {
                     text.startsWith("/refund") -> {
