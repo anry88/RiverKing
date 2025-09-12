@@ -699,7 +699,7 @@ class FishingService {
     )
 
     @Serializable
-    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null)
+    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null, val autoFish: Boolean = false)
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
         "common" -> 1.0 - 0.7 * factor
@@ -752,9 +752,9 @@ class FishingService {
         }
 
         val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
-        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false))
+        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
         val catchChance = if (auto) 1.0 else 1.0 - reactionTime / 5.0
-        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false))
+        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]
@@ -771,16 +771,18 @@ class FishingService {
         val locName = locRow[Locations.name]
         finish(
             CastResultDTO(
-            true,
-            CatchDTO(
-                fishName,
-                weight,
-                locName,
-                rarity,
-                userId = null,
-                fishId = fishId,
-            ),
-        ))
+                true,
+                CatchDTO(
+                    fishName,
+                    weight,
+                    locName,
+                    rarity,
+                    userId = null,
+                    fishId = fishId,
+                ),
+                auto
+            )
+        )
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {

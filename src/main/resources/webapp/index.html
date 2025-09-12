@@ -222,6 +222,8 @@
         castRod:'Забросить удочку',
         hook:'Подсечь!',
         autoCast:'Автозаброс',
+        autoFishUntil:d=>`Активно до ${d}`,
+        autoFishExtend:'Продлить ещё на месяц',
         waitingBite:'Ожидаем поклёвку…',
         catch:'Улов!',
         new:'Новая!',
@@ -307,6 +309,8 @@
         castRod:'Cast rod',
         hook:'Hook!',
         autoCast:'Auto cast',
+        autoFishUntil:d=>`Active until ${d}`,
+        autoFishExtend:'Extend for another month',
         waitingBite:'Waiting for a bite…',
         catch:'Catch!',
         new:'New!',
@@ -747,7 +751,7 @@
       );
     }
 
-    function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily}){
+    function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -886,6 +890,12 @@
               </div>
             )}
           </div>
+          {me.autoFish && (
+            <label className="absolute bottom-3 right-3 z-10 flex items-center gap-2 glass px-3 py-2 rounded-lg text-xs">
+              <input type="checkbox" className="w-4 h-4" checked={autoCast} onChange={e=>setAutoCast(e.target.checked)} />
+              <span>{t('autoCast')}</span>
+            </label>
+          )}
         </div>
       );
     }
@@ -929,6 +939,7 @@
       const [prizeHint,setPrizeHint] = React.useState(null);
       const [dailyOpen,setDailyOpen] = React.useState(false);
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
+      React.useEffect(()=>{ if(!me?.autoFish) setAutoCast(false); }, [me?.autoFish]);
       React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
 
       function tournamentFish(name, rarity){
@@ -1147,6 +1158,10 @@
                 if(meResp.ok){
                   setMe(await meResp.json());
                 }
+                const shopResp = await fetch(`/api/shop`,{credentials:'include'});
+                if(shopResp.ok){
+                  setShop(await shopResp.json());
+                }
               }catch(err){}
             }
           });
@@ -1264,6 +1279,7 @@
         setBiting(false);
         bitingRef.current = false;
         let caught=false;
+        let autoFishActive = me.autoFish;
         try{
           const r=await fetch(`/api/cast`,{
             method:'POST', credentials:'include',
@@ -1276,6 +1292,9 @@
           }
           const d=await r.json();
           caught=d.caught;
+          autoFishActive = d.autoFish;
+          setMe(p=>({...p,autoFish:d.autoFish}));
+          if(!d.autoFish) setAutoCast(false);
           if(d.caught){
             const c=d.catch;
             const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
@@ -1311,7 +1330,7 @@
         }finally{
           castingRef.current = false;
           setCasting(false);
-          if(caught && autoCast){
+          if(caught && autoCast && autoFishActive){
             setTimeout(()=>cast(),1000);
           }
         }
@@ -1368,7 +1387,7 @@
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} />
+                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} />
               </div>
 
               {/* Мобильный CTA под сценой */}
@@ -1384,12 +1403,6 @@
                   </div>
                 )}
               </div>
-
-              {/* Автозаброс */}
-              <label className="mt-2 flex items-center gap-2">
-                <input type="checkbox" className="w-4 h-4" checked={autoCast} onChange={e=>setAutoCast(e.target.checked)} />
-                <span className="text-sm">{t('autoCast')}</span>
-              </label>
 
               {/* Результат / Ошибка */}
               {result && (
@@ -1659,6 +1672,9 @@
                               <div>
                                 <div className="font-semibold">{item.name}</div>
                                 <div className="text-xs opacity-70">{item.desc}</div>
+                                {item.until && (
+                                  <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
+                                )}
                               </div>
                             </div>
                             <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
