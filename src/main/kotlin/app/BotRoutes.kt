@@ -563,7 +563,7 @@ fun Application.botRoutes(env: Env) {
                                     try {
                                         stars.refundStars(tgId, payment.telegramChargeId)
                                         PayService.markPaymentRefunded(payment.id)
-                                        fishing.disableAutoFish(req.userId)
+                                        fishing.removeAutoFishMonth(req.userId)
                                         PayService.updateSupportRequest(id, "refunded", null)
                                         try {
                                             bot.sendMessage(tgId, "Ваш запрос #$id одобрен, возврат будет выполнен")
@@ -596,10 +596,15 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "rejected", reason)
-                                try {
-                                    bot.sendMessage(req.userId, "Запрос #$id отклонен: $reason")
-                                } catch (e: Exception) {
-                                    log.error("sendMessage failed chatId={}", req.userId, e)
+                                val tgId = fishing.userTgId(req.userId)
+                                if (tgId != null) {
+                                    try {
+                                        bot.sendMessage(tgId, "Запрос #$id отклонен: $reason")
+                                    } catch (e: Exception) {
+                                        log.error("sendMessage failed chatId={}", tgId, e)
+                                    }
+                                } else {
+                                    log.warn("No tgId found for userId={} requestId={}", req.userId, id)
                                 }
                             }
                         }
@@ -612,14 +617,19 @@ fun Application.botRoutes(env: Env) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "info", question)
-                                try {
-                                    bot.sendMessage(
-                                        req.userId,
-                                        "Админ уточняет по запросу #$id: $question\n" +
-                                                "Ответьте командой /answer $id <ответ>"
-                                    )
-                                } catch (e: Exception) {
-                                    log.error("sendMessage failed chatId={}", req.userId, e)
+                                val tgId = fishing.userTgId(req.userId)
+                                if (tgId != null) {
+                                    try {
+                                        bot.sendMessage(
+                                            tgId,
+                                            "Админ уточняет по запросу #$id: $question\n" +
+                                                    "Ответьте командой /answer $id <ответ>"
+                                        )
+                                    } catch (e: Exception) {
+                                        log.error("sendMessage failed chatId={}", tgId, e)
+                                    }
+                                } else {
+                                    log.warn("No tgId found for userId={} requestId={}", req.userId, id)
                                 }
                             }
                         }
