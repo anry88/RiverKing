@@ -504,6 +504,26 @@ fun Application.botRoutes(env: Env) {
                         if (id != null) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
+                                val payment = PayService.latestPayment(req.userId)
+                                if (payment != null) {
+                                    try {
+                                        stars.refundStars(req.userId, payment.telegramChargeId)
+                                        PayService.markPaymentRefunded(payment.id)
+                                    } catch (e: Exception) {
+                                        log.error(
+                                            "refund failed userId={} chargeId={}",
+                                            req.userId,
+                                            payment.telegramChargeId,
+                                            e
+                                        )
+                                    }
+                                } else {
+                                    log.warn(
+                                        "No payment found for refund userId={} requestId={}",
+                                        req.userId,
+                                        id
+                                    )
+                                }
                                 fishing.disableAutoFish(req.userId)
                                 PayService.updateSupportRequest(id, "refunded", null)
                                 try {
