@@ -898,6 +898,11 @@
                 checked={autoCast}
                 onChange={e=>{
                   const checked = e.target.checked;
+                  autoCastRef.current = checked;
+                  if(!checked){
+                    clearTimeout(autoCastTimeoutRef.current);
+                    autoCastTimeoutRef.current = null;
+                  }
                   setAutoCast(checked);
                 }}
               />
@@ -947,7 +952,16 @@
       const [prizeHint,setPrizeHint] = React.useState(null);
       const [dailyOpen,setDailyOpen] = React.useState(false);
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
-      React.useEffect(()=>{ if(!me?.autoFish) setAutoCast(false); }, [me?.autoFish]);
+      const autoCastRef = React.useRef(autoCast);
+      const autoCastTimeoutRef = React.useRef(null);
+      React.useEffect(()=>{
+        autoCastRef.current = autoCast;
+        if(!me?.autoFish) setAutoCast(false);
+        if(!autoCast){
+          clearTimeout(autoCastTimeoutRef.current);
+          autoCastTimeoutRef.current = null;
+        }
+      }, [autoCast, me?.autoFish]);
       React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
 
       function tournamentFish(name, rarity){
@@ -1338,8 +1352,8 @@
         }finally{
           castingRef.current = false;
           setCasting(false);
-          if(caught && autoCast && autoFishActive){
-            setTimeout(()=>cast(),1000);
+          if(caught && autoCastRef.current && autoFishActive){
+            autoCastTimeoutRef.current = setTimeout(()=>cast(),1000);
           }
         }
       }
