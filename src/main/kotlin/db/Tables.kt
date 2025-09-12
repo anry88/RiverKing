@@ -402,6 +402,7 @@ object Users : LongIdTable() {
     val castLureId = reference("cast_lure_id", Lures).nullable()
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
+    val autoFishUntil = timestamp("auto_fish_until").nullable()
 }
 
 object Locations : LongIdTable() {

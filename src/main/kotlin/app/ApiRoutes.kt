@@ -23,6 +23,7 @@ import db.Users
 import service.PayService
 import service.StarsPaymentService
 import util.Metrics
+import java.time.Instant
 
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
@@ -178,6 +179,10 @@ fun Application.apiRoutes(env: Env) {
                 )
             }
             val caughtFishIds = fishing.caughtFishIds(uid)
+            val autoFish = transaction {
+                Users.select { Users.id eq uid }.single()[Users.autoFishUntil]
+                    ?.isAfter(Instant.now()) ?: false
+            }
 
             @Serializable
             data class MeResp(
@@ -193,6 +198,7 @@ fun Application.apiRoutes(env: Env) {
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
                 val dailyStreak: Int,
+                val autoFish: Boolean,
                 val language: String,
             )
             call.respond(
@@ -209,6 +215,7 @@ fun Application.apiRoutes(env: Env) {
                     recent,
                     dailyAvailable,
                     dailyStreak,
+                    autoFish,
                     language,
                 )
             )
