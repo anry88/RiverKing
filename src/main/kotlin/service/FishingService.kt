@@ -558,7 +558,7 @@ class FishingService {
                 ShopPackage(
                     "autofish",
                     "Автоловля",
-                    "Робот ловит за вас целый месяц",
+                    "Робот ловит за вас целый месяц и не упустит ни одной рыбы",
                     1,
                     emptyList()
                 ),
@@ -627,6 +627,10 @@ class FishingService {
                 )
             }
         Pair(lures, current)
+    }
+
+    fun disableAutoFish(userId: Long) = transaction {
+        Users.update({ Users.id eq userId }) { it[autoFishUntil] = null }
     }
 
     fun setLure(userId: Long, lureId: Long) = transaction {

@@ -751,7 +751,7 @@
       );
     }
 
-    function FishingStage({me, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast}){
+    function FishingStage({me, setMe, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -891,8 +891,19 @@
             )}
           </div>
           {me.autoFish && (
-            <label className="absolute bottom-3 right-3 z-10 flex items-center gap-2 glass px-3 py-2 rounded-lg text-xs">
-              <input type="checkbox" className="w-4 h-4" checked={autoCast} onChange={e=>setAutoCast(e.target.checked)} />
+            <label className="absolute bottom-3 right-3 z-10 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs">
+              <input
+                type="checkbox"
+                className="w-3 h-3 bg-transparent accent-emerald-500"
+                checked={autoCast}
+                onChange={e=>{
+                  const checked = e.target.checked;
+                  setAutoCast(checked);
+                  if(!checked){
+                    fetch('/api/autofish/disable',{method:'POST'}).then(()=>setMe(m=>({...m,autoFish:false}))).catch(()=>{});
+                  }
+                }}
+              />
               <span>{t('autoCast')}</span>
             </label>
           )}
@@ -1387,7 +1398,7 @@
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} />
+                <FishingStage me={me} setMe={setMe} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} />
               </div>
 
               {/* Мобильный CTA под сценой */}

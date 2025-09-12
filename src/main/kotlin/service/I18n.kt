@@ -122,7 +122,7 @@ object I18n {
         "10 морских простых: 5 мирных и 5 хищных" to "10 saltwater basics: 5 peaceful and 5 predator",
         "Подписки" to "Subscriptions",
         "Автоловля" to "Auto Catch",
-        "Робот ловит за вас целый месяц" to "Robot catches fish for you for a whole month",
+        "Робот ловит за вас целый месяц и не упустит ни одной рыбы" to "Robot catches fish for you for a whole month and won't miss any fish",
     )
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
