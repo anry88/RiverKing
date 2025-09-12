@@ -551,6 +551,19 @@ class FishingService {
                 ),
             )
         ),
+        ShopCategory(
+            "subscriptions",
+            "Подписки",
+            listOf(
+                ShopPackage(
+                    "autofish",
+                    "Автоловля",
+                    "Робот ловит за вас целый месяц",
+                    1,
+                    emptyList()
+                ),
+            )
+        ),
     )
 
     fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
@@ -569,6 +582,16 @@ class FishingService {
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
         val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
             ?: error("bad package")
+
+        if (packageId == "autofish") {
+            val row = Users.select { Users.id eq userId }.forUpdate().single()
+            val cur = row[Users.autoFishUntil]
+            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
+            Users.update({ Users.id eq userId }) {
+                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            }
+            return@transaction Pair(emptyList(), null)
+        }
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -728,9 +751,10 @@ class FishingService {
             return res
         }
 
-        if (reactionTime >= 5.0) return@transaction finish(CastResultDTO(false))
-        val catchChance = 1.0 - reactionTime / 5.0
-        if (rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false))
+        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false))
+        val catchChance = if (auto) 1.0 else 1.0 - reactionTime / 5.0
+        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false))
 
         val fishId = picked[Fish.id].value
         val fishName = picked[Fish.name]

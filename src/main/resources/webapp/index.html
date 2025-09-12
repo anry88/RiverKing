@@ -221,6 +221,7 @@
         selectFish:'Выбери рыбу',
         castRod:'Забросить удочку',
         hook:'Подсечь!',
+        autoCast:'Автозаброс',
         waitingBite:'Ожидаем поклёвку…',
         catch:'Улов!',
         new:'Новая!',
@@ -305,6 +306,7 @@
         selectFish:'Select fish',
         castRod:'Cast rod',
         hook:'Hook!',
+        autoCast:'Auto cast',
         waitingBite:'Waiting for a bite…',
         catch:'Catch!',
         new:'New!',
@@ -926,6 +928,8 @@
       const [prize,setPrize] = React.useState(null);
       const [prizeHint,setPrizeHint] = React.useState(null);
       const [dailyOpen,setDailyOpen] = React.useState(false);
+      const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
+      React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
 
       function tournamentFish(name, rarity){
         if(!rarity) return t('anyFish');
@@ -1259,6 +1263,7 @@
         clearTimeout(hookTimeoutRef.current);
         setBiting(false);
         bitingRef.current = false;
+        let caught=false;
         try{
           const r=await fetch(`/api/cast`,{
             method:'POST', credentials:'include',
@@ -1270,6 +1275,7 @@
             throw 0;
           }
           const d=await r.json();
+          caught=d.caught;
           if(d.caught){
             const c=d.catch;
             const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
@@ -1305,6 +1311,9 @@
         }finally{
           castingRef.current = false;
           setCasting(false);
+          if(caught && autoCast){
+            setTimeout(()=>cast(),1000);
+          }
         }
       }
 
@@ -1375,6 +1384,12 @@
                   </div>
                 )}
               </div>
+
+              {/* Автозаброс */}
+              <label className="mt-2 flex items-center gap-2">
+                <input type="checkbox" className="w-4 h-4" checked={autoCast} onChange={e=>setAutoCast(e.target.checked)} />
+                <span className="text-sm">{t('autoCast')}</span>
+              </label>
 
               {/* Результат / Ошибка */}
               {result && (
