@@ -592,7 +592,8 @@ class FishingService {
             val cur = row[Users.autoFishUntil]
             val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
             Users.update({ Users.id eq userId }) {
-                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMinutes(5).toInstant()
+//                    .plusMonths(1).toInstant()
             }
             return@transaction Pair(emptyList(), null)
         }
