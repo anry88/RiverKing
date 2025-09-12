@@ -77,6 +77,22 @@ object PayService {
             .singleOrNull()
     }
 
+    fun latestInfoRequest(userId: Long): SupportRequest? = transaction {
+        PaySupportRequests.select {
+            (PaySupportRequests.userId eq userId) and (PaySupportRequests.status eq "info")
+        }
+            .orderBy(PaySupportRequests.createdAt, SortOrder.DESC)
+            .limit(1)
+            .map {
+                SupportRequest(
+                    it[PaySupportRequests.id].value,
+                    it[PaySupportRequests.userId].value,
+                    it[PaySupportRequests.paymentId]?.value
+                )
+            }
+            .singleOrNull()
+    }
+
     data class Payment(val id: Long, val telegramChargeId: String)
 
     fun findPayment(id: Long): Payment? = transaction {

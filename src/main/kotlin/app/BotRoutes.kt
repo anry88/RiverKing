@@ -511,13 +511,19 @@ fun Application.botRoutes(env: Env) {
                 }
             } else if (text.startsWith("/answer")) {
                 val parts = text.split(" ", limit = 3)
-                val id = parts.getOrNull(1)?.toLongOrNull()
-                val answer = parts.getOrNull(2)
+                val uid = fishing.ensureUserByTgId(chatId)
+                var id = parts.getOrNull(1)?.toLongOrNull()
+                val answer: String? = if (id != null) {
+                    parts.getOrNull(2)
+                } else {
+                    id = PayService.latestInfoRequest(uid)?.id
+                    parts.getOrNull(1)
+                }
                 if (id != null && answer != null) {
-                    val uid = fishing.ensureUserByTgId(chatId)
-                    val req = PayService.findSupportRequest(id)
+                    val reqId = id
+                    val req = PayService.findSupportRequest(reqId)
                     if (req != null && req.userId == uid) {
-                        PayService.updateSupportRequest(id, "pending", answer)
+                        PayService.updateSupportRequest(reqId, "pending", answer)
                         if (env.adminTgId != 0L) {
                             try {
                                 bot.sendMessage(env.adminTgId, "Ответ по запросу #$id от $chatId: $answer")
