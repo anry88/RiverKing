@@ -213,7 +213,6 @@
         achievements:'Достижения',
         guide:'Справочник',
         shop:'Магазин',
-        autoCast:'Автозаброс',
         gift:'Подарок',
         personal:'Личные',
         global:'Глобальные',
@@ -277,7 +276,6 @@
         achievements:'Achievements',
         guide:'Guide',
         shop:'Shop',
-        autoCast:'Auto cast',
         gift:'Gift',
         personal:'Personal',
         global:'Global',
@@ -813,8 +811,6 @@
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
       const [nickOpen,setNickOpen] = React.useState(false);
-      const [autoFish, setAutoFish] = React.useState(false);
-      const autoCastIntervalRef = React.useRef(null);
 
       React.useEffect(()=>{
         try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
@@ -901,22 +897,6 @@
           setNickOpen(true);
         }
       },[me?.needsNickname]);
-
-      React.useEffect(()=>{
-        if(autoFish){
-          autoCastIntervalRef.current = setInterval(()=>{
-            if(!castingRef.current && !bitingRef.current){
-              cast();
-            }
-          },1000);
-        } else {
-          if(autoCastIntervalRef.current){
-            clearInterval(autoCastIntervalRef.current);
-            autoCastIntervalRef.current = null;
-          }
-        }
-        return ()=>{ if(autoCastIntervalRef.current) clearInterval(autoCastIntervalRef.current); };
-      },[autoFish]);
 
       async function claimDaily(){
         setError(null);
@@ -1150,13 +1130,6 @@
                     <div className="opacity-90">{t('waitingBite')}</div>
                   </div>
                 )}
-              </div>
-
-              <div className="mt-2 flex items-center">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={autoFish} onChange={e=>setAutoFish(e.target.checked)} />
-                  {t('autoCast')}
-                </label>
               </div>
 
               {/* Результат / Ошибка */}
