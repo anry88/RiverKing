@@ -75,7 +75,7 @@ fun Application.apiRoutes(env: Env) {
     data class CastReq(val wait: Int, val reaction: Double)
 
     @Serializable
-    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int)
+    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int, val until: String? = null)
 
     @Serializable
     data class ShopCategoryDTO(val id: String, val name: String, val packs: List<ShopPackageDTO>)
@@ -482,11 +482,17 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val autoUntil = transaction { Users.select { Users.id eq uid }.single()[Users.autoFishUntil] }
             val items = fishing.listShop(language).map { cat ->
                 ShopCategoryDTO(
                     cat.id,
                     cat.name,
-                    cat.packs.map { ShopPackageDTO(it.id, it.name, it.desc, it.price) }
+                    cat.packs.map { p ->
+                        val until = if (p.id == "autofish") {
+                            autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
+                        } else null
+                        ShopPackageDTO(p.id, p.name, p.desc, p.price, until)
+                    }
                 )
             }
             call.respond(items)
