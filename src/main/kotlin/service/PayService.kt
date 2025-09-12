@@ -14,6 +14,13 @@ object PayService {
         val currency: String = "XTR"
     )
 
+    data class UserPayment(
+        val id: Long,
+        val packageId: String,
+        val amount: Int,
+        val currency: String,
+    )
+
     fun recordPayment(userId: Long, packageId: String, info: PaymentInfo) = transaction {
         Payments.insert {
             it[Payments.userId] = userId
@@ -24,6 +31,19 @@ object PayService {
             it[Payments.currency] = info.currency
             it[Payments.createdAt] = Instant.now()
         }
+    }
+
+    fun listPayments(userId: Long): List<UserPayment> = transaction {
+        Payments.select { (Payments.userId eq userId) and (Payments.refunded eq false) }
+            .orderBy(Payments.createdAt, SortOrder.DESC)
+            .map {
+                UserPayment(
+                    it[Payments.id].value,
+                    it[Payments.packageId],
+                    it[Payments.amount],
+                    it[Payments.currency]
+                )
+            }
     }
 
     fun createSupportRequest(userId: Long, paymentId: Long?, reason: String): Long = transaction {
@@ -58,6 +78,12 @@ object PayService {
     }
 
     data class Payment(val id: Long, val telegramChargeId: String)
+
+    fun findPayment(id: Long): Payment? = transaction {
+        Payments.select { (Payments.id eq id) and (Payments.refunded eq false) }
+            .map { Payment(it[Payments.id].value, it[Payments.telegramChargeId]) }
+            .singleOrNull()
+    }
 
     fun latestPayment(userId: Long): Payment? = transaction {
         Payments.select { (Payments.userId eq userId) and (Payments.refunded eq false) }

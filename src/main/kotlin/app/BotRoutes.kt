@@ -459,25 +459,77 @@ fun Application.botRoutes(env: Env) {
                     log.error("sendMessage failed chatId={}", chatId, e)
                 }
             } else if (text.startsWith("/paysupport")) {
-                val reason = text.removePrefix("/paysupport").trim()
+                val args = text.removePrefix("/paysupport").trim()
                 val uid = fishing.ensureUserByTgId(chatId)
-                val reqId = PayService.createSupportRequest(uid, null, reason)
-                try {
-                    bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
-                } catch (e: Exception) {
-                    log.error("sendMessage failed chatId={}", chatId, e)
-                }
-                if (env.adminTgId != 0L) {
+                if (args.isEmpty()) {
+                    val payments = PayService.listPayments(uid)
+                    val reply = if (payments.isEmpty()) {
+                        "Покупок не найдено"
+                    } else {
+                        val list = payments.joinToString("\n") {
+                            "${it.id}: пакет ${it.packageId} на сумму ${it.amount} ${it.currency}"
+                        }
+                        "Выберите покупку для возврата, отправив /paysupport <ID> <причина>:\n$list"
+                    }
                     try {
-                        bot.sendMessage(
-                            env.adminTgId,
-                            "Запрос #$reqId от $chatId: $reason\n" +
-                            "/refund $reqId — одобрить возврат\n" +
-                            "/reject $reqId <причина> — отклонить\n" +
-                            "/ask $reqId <вопрос> — запросить информацию"
-                        )
+                        bot.sendMessage(chatId, reply)
                     } catch (e: Exception) {
-                        log.error("sendMessage failed chatId={}", env.adminTgId, e)
+                        log.error("sendMessage failed chatId={}", chatId, e)
+                    }
+                } else {
+                    val parts = args.split(" ", limit = 2)
+                    val paymentId = parts.getOrNull(0)?.toLongOrNull()
+                    val reason = parts.getOrNull(1) ?: ""
+                    if (paymentId != null) {
+                        val payment = PayService.listPayments(uid).find { it.id == paymentId }
+                        if (payment != null) {
+                            val reqId = PayService.createSupportRequest(uid, paymentId, reason)
+                            try {
+                                bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                            if (env.adminTgId != 0L) {
+                                val msg = "Запрос #$reqId от $chatId, платеж $paymentId: $reason\n" +
+                                        "/refund $reqId — одобрить возврат\n" +
+                                        "/reject $reqId <причина> — отклонить\n" +
+                                        "/ask $reqId <вопрос> — запросить информацию"
+                                try {
+                                    bot.sendMessage(env.adminTgId, msg)
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", env.adminTgId, e)
+                                }
+                            }
+                        } else {
+                            try {
+                                bot.sendMessage(chatId, "Покупка не найдена")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                        }
+                    }
+                }
+            } else if (text.startsWith("/answer")) {
+                val parts = text.split(" ", limit = 3)
+                val id = parts.getOrNull(1)?.toLongOrNull()
+                val answer = parts.getOrNull(2)
+                if (id != null && answer != null) {
+                    val uid = fishing.ensureUserByTgId(chatId)
+                    val req = PayService.findSupportRequest(id)
+                    if (req != null && req.userId == uid) {
+                        PayService.updateSupportRequest(id, "pending", answer)
+                        if (env.adminTgId != 0L) {
+                            try {
+                                bot.sendMessage(env.adminTgId, "Ответ по запросу #$id от $chatId: $answer")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", env.adminTgId, e)
+                            }
+                        }
+                        try {
+                            bot.sendMessage(chatId, "Ответ отправлен администрации")
+                        } catch (e: Exception) {
+                            log.error("sendMessage failed chatId={}", chatId, e)
+                        }
                     }
                 }
             } else if (text.startsWith("/buy")) {
@@ -504,7 +556,8 @@ fun Application.botRoutes(env: Env) {
                         if (id != null) {
                             val req = PayService.findSupportRequest(id)
                             if (req != null) {
-                                val payment = PayService.latestPayment(req.userId)
+                                val payment = req.paymentId?.let { PayService.findPayment(it) }
+                                    ?: PayService.latestPayment(req.userId)
                                 val tgId = fishing.userTgId(req.userId)
                                 if (payment != null && tgId != null) {
                                     try {
@@ -560,7 +613,11 @@ fun Application.botRoutes(env: Env) {
                             if (req != null) {
                                 PayService.updateSupportRequest(id, "info", question)
                                 try {
-                                    bot.sendMessage(req.userId, "Админ уточняет по запросу #$id: $question")
+                                    bot.sendMessage(
+                                        req.userId,
+                                        "Админ уточняет по запросу #$id: $question\n" +
+                                                "Ответьте командой /answer $id <ответ>"
+                                    )
                                 } catch (e: Exception) {
                                     log.error("sendMessage failed chatId={}", req.userId, e)
                                 }
