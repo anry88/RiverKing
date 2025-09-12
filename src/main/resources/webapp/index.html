@@ -751,7 +751,7 @@
       );
     }
 
-    function FishingStage({me, setMe, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast}){
+    function FishingStage({me, setMe, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -893,7 +893,7 @@
           {me.autoFish && (
             <button
               type="button"
-              className="fixed bottom-3 right-3 z-50 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer"
+              className="absolute bottom-3 right-3 z-10 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer"
               onClick={()=>{
                 const checked = !autoCastRef.current;
                 autoCastRef.current = checked;
@@ -1412,7 +1412,7 @@
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} setMe={setMe} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} />
+                <FishingStage me={me} setMe={setMe} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} autoCastRef={autoCastRef} autoCastTimeoutRef={autoCastTimeoutRef} />
               </div>
 
               {/* Мобильный CTA под сценой */}
