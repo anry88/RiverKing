@@ -637,6 +637,20 @@ class FishingService {
         Users.update({ Users.id eq userId }) { it[autoFishUntil] = null }
     }
 
+    fun removeAutoFishMonth(userId: Long) = transaction {
+        val row = Users.select { Users.id eq userId }.forUpdate().single()
+        val cur = row[Users.autoFishUntil]
+        val now = Instant.now()
+        if (cur != null && cur.isAfter(now)) {
+            val newUntil = cur.atZone(ZoneId.systemDefault()).minusMonths(1).toInstant()
+            Users.update({ Users.id eq userId }) {
+                it[autoFishUntil] = if (newUntil.isAfter(now)) newUntil else null
+            }
+        } else {
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = null }
+        }
+    }
+
     fun setLure(userId: Long, lureId: Long) = transaction {
         val casting = Users.select { Users.id eq userId }.single()[Users.isCasting]
         require(!casting) { "casting" }
