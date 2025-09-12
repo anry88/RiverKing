@@ -526,7 +526,13 @@ fun Application.botRoutes(env: Env) {
                         PayService.updateSupportRequest(reqId, "pending", answer)
                         if (env.adminTgId != 0L) {
                             try {
-                                bot.sendMessage(env.adminTgId, "Ответ по запросу #$id от $chatId: $answer")
+                                bot.sendMessage(
+                                    env.adminTgId,
+                                    "Ответ по запросу #$id от $chatId: $answer\n" +
+                                            "/refund $id — одобрить возврат\n" +
+                                            "/reject $id <причина> — отклонить\n" +
+                                            "/ask $id <вопрос> — запросить информацию"
+                                )
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", env.adminTgId, e)
                             }
