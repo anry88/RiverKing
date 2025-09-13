@@ -1755,9 +1755,7 @@
                         <div key={tn.id} className="p-4 rounded-xl glass text-left" onClick={()=>openPast(tn.id)}>
                           <div className="text-base font-semibold mb-1">{tn.name}</div>
                           <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
-                          {(tn.fish || tn.fishRarity) && (
-                            <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
-                          )}
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
                           <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                           <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
                           <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
