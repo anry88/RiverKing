@@ -243,7 +243,17 @@ class TournamentService {
                     "count" -> list.size.toDouble()
                     else -> chosen?.weight ?: 0.0
                 }
-                LeaderboardEntry(uid, name, value, 0, chosen?.fish, chosen?.fishId, chosen?.location, chosen?.at)
+                val hideFish = t.metric.lowercase() == "count" && t.fish == null
+                LeaderboardEntry(
+                    uid,
+                    name,
+                    value,
+                    0,
+                    fish = if (hideFish) null else chosen?.fish,
+                    fishId = if (hideFish) null else chosen?.fishId,
+                    location = if (hideFish) null else chosen?.location,
+                    at = if (hideFish) null else chosen?.at
+                )
             }
         val sorted = when (t.metric.lowercase()) {
             "smallest" -> grouped.sortedBy { it.value }
