@@ -218,6 +218,7 @@ class TournamentService {
         val rows = ((Catches leftJoin Users) innerJoin Fish)
             .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
             .select { cond }
+            .orderBy(Catches.createdAt, SortOrder.DESC)
             .map { row ->
                 CatchRow(
                     row[Catches.userId].value,
@@ -234,7 +235,7 @@ class TournamentService {
                 val name = list.first().user
                 val chosen = when (t.metric.lowercase()) {
                     "smallest" -> list.minByOrNull { it.weight }
-                    "count" -> list.maxByOrNull { it.at }
+                    "count" -> list.firstOrNull()
                     else -> list.maxByOrNull { it.weight }
                 }
                 val value = when (t.metric.lowercase()) {
