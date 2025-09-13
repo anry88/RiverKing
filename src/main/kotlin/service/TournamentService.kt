@@ -9,6 +9,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.sanitizeName
 import java.time.Instant
 
 data class Tournament(
@@ -179,6 +180,7 @@ class TournamentService {
         val value: Double,
         val rank: Int,
         val fish: String? = null,
+        val fishId: Long? = null,
         val location: String? = null,
         val at: Instant? = null,
     )
@@ -188,12 +190,13 @@ class TournamentService {
         val ln = row.getOrNull(Users.lastName)
         val un = row.getOrNull(Users.username)
         val nn = row.getOrNull(Users.nickname)
-        return when {
+        val raw = when {
             !nn.isNullOrBlank() -> nn
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
             else -> null
         }
+        return raw?.let { sanitizeName(it) }
     }
 
     fun leaderboard(t: Tournament, userId: Long, limit: Int = 10): Pair<List<LeaderboardEntry>, LeaderboardEntry?> = transaction {
@@ -207,6 +210,7 @@ class TournamentService {
             val userId: Long,
             val user: String?,
             val weight: Double,
+            val fishId: Long,
             val fish: String,
             val location: String,
             val at: Instant,
@@ -214,11 +218,13 @@ class TournamentService {
         val rows = ((Catches leftJoin Users) innerJoin Fish)
             .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
             .select { cond }
+            .orderBy(Catches.createdAt, SortOrder.DESC)
             .map { row ->
                 CatchRow(
                     row[Catches.userId].value,
                     rowUser(row),
                     row[Catches.weight],
+                    row[Fish.id].value,
                     row[Fish.name],
                     row[Locations.name],
                     row[Catches.createdAt],
@@ -229,7 +235,7 @@ class TournamentService {
                 val name = list.first().user
                 val chosen = when (t.metric.lowercase()) {
                     "smallest" -> list.minByOrNull { it.weight }
-                    "count" -> null
+                    "count" -> list.maxByOrNull { it.at }
                     else -> list.maxByOrNull { it.weight }
                 }
                 val value = when (t.metric.lowercase()) {
@@ -237,7 +243,17 @@ class TournamentService {
                     "count" -> list.size.toDouble()
                     else -> chosen?.weight ?: 0.0
                 }
-                LeaderboardEntry(uid, name, value, 0, chosen?.fish, chosen?.location, chosen?.at)
+                val hideFish = t.metric.lowercase() == "count" && t.fish == null
+                LeaderboardEntry(
+                    uid,
+                    name,
+                    value,
+                    0,
+                    fish = if (hideFish) null else chosen?.fish,
+                    fishId = if (hideFish) null else chosen?.fishId,
+                    location = if (hideFish) null else chosen?.location,
+                    at = if (hideFish) null else chosen?.at
+                )
             }
         val sorted = when (t.metric.lowercase()) {
             "smallest" -> grouped.sortedBy { it.value }
@@ -245,8 +261,8 @@ class TournamentService {
             else -> grouped.sortedByDescending { it.value }
         }
         val ranked = sorted.mapIndexed { index, e -> e.copy(rank = index + 1) }
-        val top = ranked.take(limit)
         val mine = ranked.find { it.userId == userId }
+        val top = ranked.take(limit)
         Pair(top, mine)
     }
 

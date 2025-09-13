@@ -30,7 +30,7 @@ import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
-internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
+internal fun parseInvoicePayload(payload: String, userId: Long): String? {
     return if ('=' in payload) {
         val parts = payload.split(';').mapNotNull {
             val p = it.split('=', limit = 2)
@@ -38,7 +38,7 @@ internal fun parseInvoicePayload(payload: String, chatId: Long): String? {
         }.toMap()
         val packId = parts["pack"]
         val payloadUser = parts["user"]?.toLongOrNull()
-        if (packId != null && payloadUser == chatId) packId else null
+        if (packId != null && payloadUser == userId) packId else null
     } else if (payload.startsWith("pack_")) {
         payload.removePrefix("pack_")
     } else {
@@ -211,8 +211,13 @@ fun Application.botRoutes(env: Env) {
 
             message.successfulPayment?.let { sp ->
                 val chatId = message.chat.id
+                val userId = message.from?.id
+                if (userId == null) {
+                    log.warn("successfulPayment with no user id: chatId={} payload={}", chatId, sp.invoicePayload)
+                    return@post call.respond(HttpStatusCode.OK)
+                }
                 val rawPayload = sp.invoicePayload
-                val packId = parseInvoicePayload(rawPayload, chatId)
+                val packId = parseInvoicePayload(rawPayload, userId)
                 if (packId == null) {
                     val parts = rawPayload.split(';').mapNotNull {
                         val p = it.split('=', limit = 2)
@@ -222,16 +227,16 @@ fun Application.botRoutes(env: Env) {
                     when {
                         parts["pack"] == null ->
                             log.warn("successfulPayment with no packId: chatId={} payload={}", chatId, rawPayload)
-                        payloadUser != null && payloadUser != chatId ->
+                        payloadUser != null && payloadUser != userId ->
                             log.warn(
-                                "successfulPayment payload user mismatch: chatId={} payloadUser={} payload={}",
-                                chatId,
+                                "successfulPayment payload user mismatch: userId={} payloadUser={} payload={}",
+                                userId,
                                 payloadUser,
                                 rawPayload
                             )
                     }
                 } else {
-                    val uid = fishing.ensureUserByTgId(chatId)
+                    val uid = fishing.ensureUserByTgId(userId)
                     try {
                         fishing.buyPackage(uid, packId)
                     } catch (e: Exception) {
@@ -256,9 +261,10 @@ fun Application.botRoutes(env: Env) {
             }
 
             val chatId = message.chat.id
+            val userId = message.from?.id ?: return@post call.respond(HttpStatusCode.OK)
             val text = message.text ?: ""
 
-            adminStates[chatId]?.let { draft ->
+            adminStates[userId]?.let { draft ->
                 when (draft.step) {
                     AdminStep.NAME_RU -> {
                         draft.nameRu = text
@@ -393,14 +399,14 @@ fun Application.botRoutes(env: Env) {
                                     log.error("tournament save failed", e)
                                 }
                             }
-                            adminStates.remove(chatId)
+                            adminStates.remove(userId)
                         }
                     }
                 }
                 return@post call.respond(HttpStatusCode.OK)
             }
 
-            broadcastStates[chatId]?.let { draft ->
+            broadcastStates[userId]?.let { draft ->
                 when (draft.step) {
                     BroadcastStep.TEXT_RU -> {
                         draft.textRu = text
@@ -409,7 +415,7 @@ fun Application.botRoutes(env: Env) {
                     }
                     BroadcastStep.TEXT_EN -> {
                         draft.textEn = text
-                        broadcastStates.remove(chatId)
+                        broadcastStates.remove(userId)
                         try { bot.sendMessage(chatId, "Начинаю рассылку") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         val users = transaction {
                             Users.slice(Users.tgId, Users.language).selectAll().map { it[Users.tgId] to it[Users.language] }
@@ -423,10 +429,16 @@ fun Application.botRoutes(env: Env) {
                             try {
                                 bot.sendMessage(uid, msg)
                             } catch (e: TelegramApiException) {
-                                if (e.code == 403) {
-                                    log.warn("User {} blocked bot; skipping broadcast", uid)
-                                } else {
-                                    log.error("sendMessage failed chatId={}", uid, e)
+                                when (e.code) {
+                                    403 -> log.warn("User {} blocked bot; skipping broadcast", uid)
+                                    400, 404 -> log.warn("Failed to deliver to {}: {}", uid, e.message)
+                                    else -> log.error(
+                                        "sendMessage failed chatId={} code={} message={}",
+                                        uid,
+                                        e.code,
+                                        e.message,
+                                        e
+                                    )
                                 }
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", uid, e)
@@ -441,7 +453,7 @@ fun Application.botRoutes(env: Env) {
             if (text.startsWith("/start")) {
                 val from = message.from
                 val uid = fishing.ensureUserByTgId(
-                    tgId = chatId,
+                    tgId = userId,
                     firstName = from?.first_name,
                     lastName = from?.last_name,
                     username = from?.username,
@@ -460,7 +472,7 @@ fun Application.botRoutes(env: Env) {
                 }
             } else if (text.startsWith("/paysupport")) {
                 val args = text.removePrefix("/paysupport").trim()
-                val uid = fishing.ensureUserByTgId(chatId)
+                val uid = fishing.ensureUserByTgId(userId)
                 if (args.isEmpty()) {
                     val payments = PayService.listPayments(uid)
                     val reply = if (payments.isEmpty()) {
@@ -511,7 +523,7 @@ fun Application.botRoutes(env: Env) {
                 }
             } else if (text.startsWith("/answer")) {
                 val parts = text.split(" ", limit = 3)
-                val uid = fishing.ensureUserByTgId(chatId)
+                val uid = fishing.ensureUserByTgId(userId)
                 var id = parts.getOrNull(1)?.toLongOrNull()
                 val answer: String? = if (id != null) {
                     parts.getOrNull(2)

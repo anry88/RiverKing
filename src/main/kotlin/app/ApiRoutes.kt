@@ -122,6 +122,7 @@ fun Application.apiRoutes(env: Env) {
         val user: String? = null,
         val value: Double,
         val fish: String? = null,
+        val fishId: Long? = null,
         val location: String? = null,
         val at: Long? = null,
         val prize: PrizeSpecDTO? = null,
@@ -260,7 +261,7 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val t = tournaments.currentTournament()
                 ?: return@get call.respond(HttpStatusCode.NoContent)
-            val (top, mine) = tournaments.leaderboard(t, uid)
+            val (top, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
             val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
@@ -283,6 +284,7 @@ fun Application.apiRoutes(env: Env) {
                         user = it.user,
                         value = it.value,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
                         prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
@@ -294,6 +296,7 @@ fun Application.apiRoutes(env: Env) {
                         user = it.user,
                         value = it.value,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
                         prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
@@ -314,7 +317,7 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val (top, mine) = tournaments.leaderboard(t, uid)
+            val (top, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
             val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
@@ -337,6 +340,7 @@ fun Application.apiRoutes(env: Env) {
                         user = it.user,
                         value = it.value,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
                         prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
@@ -348,6 +352,7 @@ fun Application.apiRoutes(env: Env) {
                         user = it.user,
                         value = it.value,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
+                        fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
                         prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
