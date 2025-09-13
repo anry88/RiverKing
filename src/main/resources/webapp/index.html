@@ -1510,7 +1510,7 @@
                                 <span>{e.rank}</span>
                                 {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                              {e.fish && (
+                              {e.fish ? (
                                 (me.caughtFishIds||[]).includes(e.fishId) ? (
                                   <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
                                 ) : (
@@ -1519,12 +1519,20 @@
                                     <span className="absolute">?</span>
                                   </div>
                                 )
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
+                                  <span className="text-lg opacity-20">🐟</span>
+                                </div>
                               )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{e.user||'-'}</bdi>
                                 </div>
-                                {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                                {e.fish ? (
+                                  <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
+                                ) : (
+                                  <div className="text-xs opacity-70 truncate">{t('anyFish')}</div>
+                                )}
                               </div>
                             </div>
                             <div className="w-12 text-right shrink-0">
@@ -1550,7 +1558,7 @@
                                 <span>{currentTournament.mine.rank}</span>
                                 {currentTournament.mine.prize && <img src={`/app/assets/baits/${currentTournament.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                              {currentTournament.mine.fish && (
+                              {currentTournament.mine.fish ? (
                                 (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
                                   <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
                                 ) : (
@@ -1559,12 +1567,20 @@
                                     <span className="absolute">?</span>
                                   </div>
                                 )
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
+                                  <span className="text-lg opacity-20">🐟</span>
+                                </div>
                               )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                                 </div>
-                                {currentTournament.mine.fish && <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
+                                {currentTournament.mine.fish ? (
+                                  <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
+                                ) : (
+                                  <div className="text-xs opacity-70 truncate">{t('anyFish')}</div>
+                                )}
                               </div>
                             </div>
                             <div className="w-12 text-right shrink-0">
@@ -1628,7 +1644,7 @@
                               <span>{e.rank}</span>
                               {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                            {e.fish && (
+                            {e.fish ? (
                               (me.caughtFishIds||[]).includes(e.fishId) ? (
                                 <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
                               ) : (
@@ -1637,12 +1653,20 @@
                                   <span className="absolute">?</span>
                                 </div>
                               )
+                            ) : (
+                              <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
+                                <span className="text-lg opacity-20">🐟</span>
+                              </div>
                             )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{e.user||'-'}</bdi>
                               </div>
-                              {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
+                              {e.fish ? (
+                                <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
+                              ) : (
+                                <div className="text-xs opacity-70 truncate">{t('anyFish')}</div>
+                              )}
                             </div>
                           </div>
                           <div className="w-12 text-right shrink-0">
@@ -1668,7 +1692,7 @@
                               <span>{pastResult.mine.rank}</span>
                               {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                            {pastResult.mine.fish && (
+                            {pastResult.mine.fish ? (
                               (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
                                 <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
                               ) : (
@@ -1677,12 +1701,20 @@
                                   <span className="absolute">?</span>
                                 </div>
                               )
+                            ) : (
+                              <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
+                                <span className="text-lg opacity-20">🐟</span>
+                              </div>
                             )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                               </div>
-                              {pastResult.mine.fish && <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>}
+                              {pastResult.mine.fish ? (
+                                <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>
+                              ) : (
+                                <div className="text-xs opacity-70 truncate">{t('anyFish')}</div>
+                              )}
                             </div>
                           </div>
                           <div className="w-12 text-right shrink-0">
