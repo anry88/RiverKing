@@ -1,10 +1,12 @@
 package service
 
 import app.Env
-import db.DB
+import db.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import java.time.Instant
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
 
 class TournamentServiceTest {
     @Test
@@ -130,5 +132,59 @@ class TournamentServiceTest {
         val past = svc.pastTournaments()
         assertEquals(1, past.size)
         assertEquals("Past", past[0].nameEn)
+    }
+
+    @Test
+    fun leaderboardCountShowsFish() {
+        val env = Env(
+            botToken = "",
+            telegramWebhookSecret = "",
+            publicBaseUrl = "http://localhost",
+            dbUrl = "jdbc:sqlite:file:testdb4?mode=memory&cache=shared",
+            dbUser = "",
+            dbPass = "",
+            port = 0,
+            devMode = true,
+            adminTgId = 0L,
+            providerToken = "",
+        )
+        DB.init(env)
+        val svc = TournamentService()
+        val now = Instant.now()
+        val tid = svc.createTournament(
+            nameRu = "Турнир",
+            nameEn = "Tournament",
+            start = now.minusSeconds(60),
+            end = now.plusSeconds(60),
+            fish = null,
+            location = null,
+            metric = "count",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+        val t = svc.getTournament(tid)!!
+        val uid = transaction {
+            Users.insertAndGetId {
+                it[tgId] = 1L
+                it[level] = 1
+                it[xp] = 0
+                it[createdAt] = now
+            }.value
+        }
+        val locId = transaction { Locations.select { Locations.name eq "Пруд" }.single()[Locations.id].value }
+        val fishId = transaction { Fish.select { Fish.name eq "Плотва" }.single()[Fish.id].value }
+        transaction {
+            Catches.insert {
+                it[Catches.userId] = uid
+                it[Catches.fishId] = fishId
+                it[Catches.weight] = 1.0
+                it[Catches.locationId] = locId
+                it[Catches.createdAt] = now
+            }
+        }
+        val (top, mine) = svc.leaderboard(t, uid)
+        assertEquals(1, top.size)
+        assertEquals("Плотва", top[0].fish)
+        assertEquals("Плотва", mine?.fish)
     }
 }
