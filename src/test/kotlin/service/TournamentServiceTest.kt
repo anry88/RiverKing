@@ -187,4 +187,60 @@ class TournamentServiceTest {
         assertEquals("Плотва", top[0].fish)
         assertEquals("Плотва", mine?.fish)
     }
+
+    @Test
+    fun leaderboardCountAggregatesCatches() {
+        val env = Env(
+            botToken = "",
+            telegramWebhookSecret = "",
+            publicBaseUrl = "http://localhost",
+            dbUrl = "jdbc:sqlite:file:testdb5?mode=memory&cache=shared",
+            dbUser = "",
+            dbPass = "",
+            port = 0,
+            devMode = true,
+            adminTgId = 0L,
+            providerToken = "",
+        )
+        DB.init(env)
+        val svc = TournamentService()
+        val now = Instant.now()
+        val tid = svc.createTournament(
+            nameRu = "Счёт",
+            nameEn = "Count",
+            start = now.minusSeconds(60),
+            end = now.plusSeconds(60),
+            fish = null,
+            location = null,
+            metric = "count",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+        val t = svc.getTournament(tid)!!
+        val uid = transaction {
+            Users.insertAndGetId {
+                it[tgId] = 1L
+                it[level] = 1
+                it[xp] = 0
+                it[createdAt] = now
+            }.value
+        }
+        val locId = transaction { Locations.select { Locations.name eq "Пруд" }.single()[Locations.id].value }
+        val fishId = transaction { Fish.select { Fish.name eq "Плотва" }.single()[Fish.id].value }
+        repeat(3) { idx ->
+            transaction {
+                Catches.insert {
+                    it[Catches.userId] = uid
+                    it[Catches.fishId] = fishId
+                    it[Catches.weight] = 1.0 + idx
+                    it[Catches.locationId] = locId
+                    it[Catches.createdAt] = now.plusSeconds(idx.toLong())
+                }
+            }
+        }
+        val (top, mine) = svc.leaderboard(t, uid)
+        assertEquals(1, top.size)
+        assertEquals(3.0, top[0].value)
+        assertEquals(3.0, mine?.value)
+    }
 }
