@@ -11,7 +11,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.sanitizeName
 import java.time.Instant
-import kotlin.math.max
 
 data class Tournament(
     val id: Long,
@@ -263,7 +262,7 @@ class TournamentService {
         }
         val ranked = sorted.mapIndexed { index, e -> e.copy(rank = index + 1) }
         val mine = ranked.find { it.userId == userId }
-        val top = ranked.take(max(limit, mine?.rank ?: 0))
+        val top = ranked.take(limit)
         Pair(top, mine)
     }
 
