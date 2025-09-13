@@ -238,8 +238,11 @@ class FishingService {
     fun canClaimDaily(userId: Long): Boolean = transaction {
         val tz = ZoneId.of("Europe/Belgrade")
         val today = LocalDate.now(tz)
-        val last = Users.selectAll().where { Users.id eq userId }.singleOrNull()?.get(Users.lastDailyAt)
-            ?.atZone(tz)?.toLocalDate()
+        val row = Users.selectAll().where { Users.id eq userId }.singleOrNull()
+        val last = row?.get(Users.lastDailyAt)?.atZone(tz)?.toLocalDate()
+        if (row != null && (last == null || last.isBefore(today.minusDays(1)))) {
+            Users.update({ Users.id eq userId }) { it[Users.dailyStreak] = 0 }
+        }
         last != today
     }
 
