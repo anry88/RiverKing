@@ -423,10 +423,16 @@ fun Application.botRoutes(env: Env) {
                             try {
                                 bot.sendMessage(uid, msg)
                             } catch (e: TelegramApiException) {
-                                if (e.code == 403) {
-                                    log.warn("User {} blocked bot; skipping broadcast", uid)
-                                } else {
-                                    log.error("sendMessage failed chatId={}", uid, e)
+                                when (e.code) {
+                                    403 -> log.warn("User {} blocked bot; skipping broadcast", uid)
+                                    400, 404 -> log.warn("Failed to deliver to {}: {}", uid, e.message)
+                                    else -> log.error(
+                                        "sendMessage failed chatId={} code={} message={}",
+                                        uid,
+                                        e.code,
+                                        e.message,
+                                        e
+                                    )
                                 }
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", uid, e)

@@ -4,6 +4,9 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class TelegramApiException(val code: Int, message: String) : IOException(message)
 
@@ -26,9 +29,18 @@ class TelegramBot(private val token: String) {
             connection.outputStream.use { it.write(data.toByteArray()) }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            stream?.buffered()?.use { it.readBytes() }
+            val body = stream?.bufferedReader()?.use { it.readText() }
             if (code !in 200..299) {
-                throw TelegramApiException(code, "HTTP $code")
+                val desc = try {
+                    Json.parseToJsonElement(body ?: "").jsonObject["description"]?.jsonPrimitive?.content
+                } catch (_: Exception) {
+                    null
+                }
+                val message = buildString {
+                    append("HTTP $code")
+                    if (!desc.isNullOrBlank()) append(": ").append(desc)
+                }
+                throw TelegramApiException(code, message)
             }
         } finally {
             connection.disconnect()
