@@ -163,16 +163,14 @@ class FishingService {
     }
 
     fun giveDailyBaits(userId: Long): Triple<List<LureDTO>, Long?, Int>? = transaction {
-        val today = LocalDate.now()
+        val tz = ZoneId.of("Europe/Belgrade")
+        val today = LocalDate.now(tz)
         val row = Users.selectAll().where { Users.id eq userId }.forUpdate().single()
-        val last = row[Users.lastDailyAt]?.atZone(ZoneId.systemDefault())?.toLocalDate()
+        val last = row[Users.lastDailyAt]?.atZone(tz)?.toLocalDate()
         var streak = row[Users.dailyStreak]
         if (last == today) return@transaction null
 
-        streak = when (last) {
-            today.minusDays(1) -> (streak % 7) + 1
-            else -> 1
-        }
+        streak = if (last == today.minusDays(1)) streak + 1 else 1
 
         val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
         val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
@@ -198,7 +196,9 @@ class FishingService {
             }
         }
 
-        when (streak) {
+        val rewardDay = streak.coerceAtMost(7)
+
+        when (rewardDay) {
             1 -> { add(freshId, 10); add(predId, 5) }
             2 -> { add(freshId, 10); add(predId, 10) }
             3 -> { add(freshId, 15); add(predId, 10) }
@@ -234,9 +234,10 @@ class FishingService {
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
-        val today = LocalDate.now()
+        val tz = ZoneId.of("Europe/Belgrade")
+        val today = LocalDate.now(tz)
         val last = Users.selectAll().where { Users.id eq userId }.singleOrNull()?.get(Users.lastDailyAt)
-            ?.atZone(ZoneId.systemDefault())?.toLocalDate()
+            ?.atZone(tz)?.toLocalDate()
         last != today
     }
 

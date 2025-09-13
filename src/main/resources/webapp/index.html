@@ -507,7 +507,8 @@
         [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5} ],
         [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5}, {name:'Пресная мирная+',qty:1}, {name:'Пресная хищная+',qty:1} ],
       ];
-      const current = available ? streak : streak - 1;
+      const day = Math.min(streak,7);
+      const current = available ? day : day - 1;
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
@@ -518,7 +519,7 @@
               <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
               <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
                 {rewards.map((items,i)=>{
-                  const done = i < streak;
+                  const done = i < day;
                   const isCurrent = i === current;
                   return (
                     <div key={i} className={`p-2 rounded-lg text-center ${done ? 'opacity-40' : 'bg-white/10'} ${isCurrent ? 'ring-2 ring-yellow-300' : ''}`}>
