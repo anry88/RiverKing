@@ -298,12 +298,13 @@ class TournamentServiceTest {
             }
         }
         val (top4, mine4) = svc.leaderboard(t, uids[3], t.prizePlaces)
-        assertEquals(4, top4.size)
+        assertEquals(3, top4.size)
         assertEquals(4, mine4?.rank)
-        assertEquals(uids[3], top4.last().userId)
+        assertEquals(false, top4.any { it.userId == uids[3] })
 
         val (top2, mine2) = svc.leaderboard(t, uids[1], t.prizePlaces)
         assertEquals(3, top2.size)
         assertEquals(2, mine2?.rank)
+        assertEquals(true, top2.any { it.userId == uids[1] })
     }
 }
