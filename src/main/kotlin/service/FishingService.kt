@@ -590,18 +590,22 @@ class FishingService {
     }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
-        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
-            ?: error("bad package")
-
-        if (packageId == "autofish") {
+        if (packageId == "autofish" || packageId == "autofish_week") {
             val row = Users.select { Users.id eq userId }.forUpdate().single()
             val cur = row[Users.autoFishUntil]
             val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
-            Users.update({ Users.id eq userId }) {
-                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            val newUntil = if (packageId == "autofish") {
+                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            } else {
+                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
             }
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
             return@transaction Pair(emptyList(), null)
         }
+
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
