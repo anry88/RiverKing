@@ -261,7 +261,7 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val t = tournaments.currentTournament()
                 ?: return@get call.respond(HttpStatusCode.NoContent)
-            val (top, mine) = tournaments.leaderboard(t, uid)
+            val (top, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
             val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
@@ -317,7 +317,7 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val (top, mine) = tournaments.leaderboard(t, uid)
+            val (top, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
             val fishName = t.fish?.takeUnless { it in rarityGroups }?.let { I18n.fish(it, language) }
