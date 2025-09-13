@@ -234,7 +234,7 @@ class TournamentService {
                 val name = list.first().user
                 val chosen = when (t.metric.lowercase()) {
                     "smallest" -> list.minByOrNull { it.weight }
-                    "count" -> null
+                    "count" -> list.maxByOrNull { it.at }
                     else -> list.maxByOrNull { it.weight }
                 }
                 val value = when (t.metric.lowercase()) {
