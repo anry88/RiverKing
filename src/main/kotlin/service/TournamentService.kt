@@ -218,7 +218,7 @@ class TournamentService {
         val rows = ((Catches leftJoin Users) innerJoin Fish)
             .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
             .select { cond }
-            .orderBy(Catches.createdAt, SortOrder.DESC)
+            .orderBy(Catches.createdAt, SortOrder.ASC)
             .map { row ->
                 CatchRow(
                     row[Catches.userId].value,
