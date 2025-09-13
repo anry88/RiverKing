@@ -1490,9 +1490,7 @@
                       <div className="p-4 rounded-xl glass text-left mb-4">
                         <div className="text-base font-semibold mb-1">{currentTournament.tournament.name}</div>
                         <div className="text-xs opacity-70">{new Date(currentTournament.tournament.startTime*1000).toLocaleString()} — {new Date(currentTournament.tournament.endTime*1000).toLocaleString()}</div>
-                          {(currentTournament.tournament.fish || currentTournament.tournament.fishRarity) && (
-                            <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(currentTournament.tournament.fish, currentTournament.tournament.fishRarity)}</div>
-                          )}
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(currentTournament.tournament.fish, currentTournament.tournament.fishRarity)}</div>
                         <div className="text-sm opacity-80">{t('locationLabel')} {currentTournament.tournament.location || t('anyLocation')}</div>
                         <div className="text-sm opacity-80">{t('conditionsLabel')} {t(currentTournament.tournament.metric)}</div>
                         <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
@@ -1634,9 +1632,7 @@
                     <div className="p-4 rounded-xl glass text-left mb-4">
                       <div className="text-base font-semibold mb-1">{pastResult.tournament.name}</div>
                       <div className="text-xs opacity-70">{new Date(pastResult.tournament.startTime*1000).toLocaleString()} — {new Date(pastResult.tournament.endTime*1000).toLocaleString()}</div>
-                        {(pastResult.tournament.fish || pastResult.tournament.fishRarity) && (
-                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(pastResult.tournament.fish, pastResult.tournament.fishRarity)}</div>
-                        )}
+                        <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(pastResult.tournament.fish, pastResult.tournament.fishRarity)}</div>
                       <div className="text-sm opacity-80">{t('locationLabel')} {pastResult.tournament.location || t('anyLocation')}</div>
                       <div className="text-sm opacity-80">{t('conditionsLabel')} {t(pastResult.tournament.metric)}</div>
                       <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
@@ -1759,9 +1755,7 @@
                         <div key={tn.id} className="p-4 rounded-xl glass text-left" onClick={()=>openPast(tn.id)}>
                           <div className="text-base font-semibold mb-1">{tn.name}</div>
                           <div className="text-xs opacity-70">{new Date(tn.startTime*1000).toLocaleString()} — {new Date(tn.endTime*1000).toLocaleString()}</div>
-                          {(tn.fish || tn.fishRarity) && (
-                            <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
-                          )}
+                          <div className="text-sm opacity-80">{t('fishLabel')} {tournamentFish(tn.fish, tn.fishRarity)}</div>
                           <div className="text-sm opacity-80">{t('locationLabel')} {tn.location || t('anyLocation')}</div>
                           <div className="text-sm opacity-80">{t('conditionsLabel')} {t(tn.metric)}</div>
                           <div className="text-sm opacity-80">{t('prizePlacesLabel')} {tn.prizePlaces}</div>
