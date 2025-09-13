@@ -8,6 +8,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
+import util.sanitizeName
 import java.time.*
 import org.jetbrains.exposed.sql.ResultRow
 
@@ -68,7 +69,7 @@ class FishingService {
     }
 
     fun setNickname(userId: Long, nickname: String) = transaction {
-        Users.update({ Users.id eq userId }) { it[Users.nickname] = nickname }
+        Users.update({ Users.id eq userId }) { it[Users.nickname] = sanitizeName(nickname) }
     }
 
     fun setLanguage(userId: Long, language: String) = transaction {
@@ -99,12 +100,13 @@ class FishingService {
         val ln = row.getOrNull(Users.lastName)
         val un = row.getOrNull(Users.username)
         val nn = row.getOrNull(Users.nickname)
-        return when {
+        val raw = when {
             !nn.isNullOrBlank() -> nn
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
             else -> null
         }
+        return raw?.let { sanitizeName(it) }
     }
 
     private fun catchUser(row: ResultRow): String? =

@@ -487,7 +487,7 @@
           <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 glass p-4 rounded-xl w-[90%] max-w-sm">
             <div className="text-lg font-semibold mb-3">{t('nickname')}</div>
-            <input value={value} onChange={e=>setValue(e.target.value)} className="w-full p-2 mb-4 rounded-lg bg-black/20 border border-white/10" />
+            <input value={value} maxLength={30} onChange={e=>setValue(e.target.value.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g,''))} className="w-full p-2 mb-4 rounded-lg bg-black/20 border border-white/10" />
             <div className="flex gap-2">
               <button onClick={onClose} className="flex-1 py-2 rounded-xl glass">{t('cancel')}</button>
               <button onClick={()=>onSave(value)} className="flex-1 py-2 rounded-xl bg-emerald-600">{t('save')}</button>
@@ -712,7 +712,7 @@
                       )}
                       <div>
                         <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                        <div className="text-xs opacity-70">{c.user} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                        <div className="text-xs opacity-70"><bdi>{c.user}</bdi> • {c.at?new Date(c.at).toLocaleString():''}</div>
                       </div>
                     </div>
                     <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
@@ -742,7 +742,7 @@
                       )}
                       <div>
                         <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                        <div className="text-xs opacity-70">{c.user} • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
+                        <div className="text-xs opacity-70"><bdi>{c.user}</bdi> • {c.location} • {c.at?new Date(c.at).toLocaleString():''}</div>
                       </div>
                     </div>
                     <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
@@ -1219,6 +1219,7 @@
       }
 
       function saveNickname(nick){
+        nick = (nick||'').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g,'').slice(0,30);
         if(!nick || nick===me?.username){
           setNickOpen(false);
           return;
@@ -1509,10 +1510,19 @@
                                 <span>{e.rank}</span>
                                 {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                              {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              {e.fish && (
+                                (me.caughtFishIds||[]).includes(e.fishId) ? (
+                                  <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                                    <span className="text-lg opacity-20">🐟</span>
+                                    <span className="absolute">?</span>
+                                  </div>
+                                )
+                              )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
-                                  <div className="truncate">{e.user||'-'}</div>
+                                  <bdi className="truncate">{e.user||'-'}</bdi>
                                 </div>
                                 {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
                               </div>
@@ -1540,10 +1550,19 @@
                                 <span>{currentTournament.mine.rank}</span>
                                 {currentTournament.mine.prize && <img src={`/app/assets/baits/${currentTournament.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                              {currentTournament.mine.fish && <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                              {currentTournament.mine.fish && (
+                                (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
+                                  <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                                    <span className="text-lg opacity-20">🐟</span>
+                                    <span className="absolute">?</span>
+                                  </div>
+                                )
+                              )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
-                                  <div className="truncate">{currentTournament.mine.user||t('you')}</div>
+                                  <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                                 </div>
                                 {currentTournament.mine.fish && <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>}
                               </div>
@@ -1609,10 +1628,19 @@
                               <span>{e.rank}</span>
                               {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                            {e.fish && <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            {e.fish && (
+                              (me.caughtFishIds||[]).includes(e.fishId) ? (
+                                <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                                  <span className="text-lg opacity-20">🐟</span>
+                                  <span className="absolute">?</span>
+                                </div>
+                              )
+                            )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
-                                <div className="truncate">{e.user||'-'}</div>
+                                <bdi className="truncate">{e.user||'-'}</bdi>
                               </div>
                               {e.fish && <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>}
                             </div>
@@ -1640,10 +1668,19 @@
                               <span>{pastResult.mine.rank}</span>
                               {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                            {pastResult.mine.fish && <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />}
+                            {pastResult.mine.fish && (
+                              (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
+                                <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                                  <span className="text-lg opacity-20">🐟</span>
+                                  <span className="absolute">?</span>
+                                </div>
+                              )
+                            )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
-                                <div className="truncate">{pastResult.mine.user||t('you')}</div>
+                                <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                               </div>
                               {pastResult.mine.fish && <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>}
                             </div>

@@ -9,6 +9,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.sanitizeName
 import java.time.Instant
 
 data class Tournament(
@@ -179,6 +180,7 @@ class TournamentService {
         val value: Double,
         val rank: Int,
         val fish: String? = null,
+        val fishId: Long? = null,
         val location: String? = null,
         val at: Instant? = null,
     )
@@ -188,12 +190,13 @@ class TournamentService {
         val ln = row.getOrNull(Users.lastName)
         val un = row.getOrNull(Users.username)
         val nn = row.getOrNull(Users.nickname)
-        return when {
+        val raw = when {
             !nn.isNullOrBlank() -> nn
             !fn.isNullOrBlank() || !ln.isNullOrBlank() -> listOfNotNull(fn, ln).joinToString(" ").trim()
             !un.isNullOrBlank() -> un
             else -> null
         }
+        return raw?.let { sanitizeName(it) }
     }
 
     fun leaderboard(t: Tournament, userId: Long, limit: Int = 10): Pair<List<LeaderboardEntry>, LeaderboardEntry?> = transaction {
@@ -207,6 +210,7 @@ class TournamentService {
             val userId: Long,
             val user: String?,
             val weight: Double,
+            val fishId: Long,
             val fish: String,
             val location: String,
             val at: Instant,
@@ -219,6 +223,7 @@ class TournamentService {
                     row[Catches.userId].value,
                     rowUser(row),
                     row[Catches.weight],
+                    row[Fish.id].value,
                     row[Fish.name],
                     row[Locations.name],
                     row[Catches.createdAt],
@@ -237,7 +242,7 @@ class TournamentService {
                     "count" -> list.size.toDouble()
                     else -> chosen?.weight ?: 0.0
                 }
-                LeaderboardEntry(uid, name, value, 0, chosen?.fish, chosen?.location, chosen?.at)
+                LeaderboardEntry(uid, name, value, 0, chosen?.fish, chosen?.fishId, chosen?.location, chosen?.at)
             }
         val sorted = when (t.metric.lowercase()) {
             "smallest" -> grouped.sortedBy { it.value }
