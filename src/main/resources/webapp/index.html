@@ -52,14 +52,23 @@
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --vh: 100dvh;
+      --ui-scale: 1;
+      --extra-top: 0px;
+      --extra-bottom: 0px;
     }
     html, body{ height: var(--vh); margin:0; }
     body{ background: var(--tg-bg); color: #fff; }
     #root{ height:100%; display:flex; flex-direction:column; }
-    .safe-top{ padding-top: var(--safe-top); }
-    .safe-bottom{ padding-bottom: var(--safe-bottom); }
+    .safe-top{ padding-top: calc(var(--safe-top) + var(--extra-top)); }
+    .safe-bottom{ padding-bottom: calc(var(--safe-bottom) + var(--extra-bottom)); }
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+    .btn-lg{
+      font-size: calc(16px * var(--ui-scale));
+      padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale));
+      border-radius: calc(12px * var(--ui-scale));
+    }
+    .pb-safe{ padding-bottom: calc(1rem + var(--safe-bottom) + var(--extra-bottom)); }
 
     @keyframes bob { 0%{ transform: translateY(0);} 50%{ transform: translateY(-6px);} 100%{ transform: translateY(0);} }
     @keyframes bite { 0%{ transform: translateY(0) rotate(0);} 25%{ transform: translateY(10px) rotate(-6deg);} 50%{ transform: translateY(-4px) rotate(6deg);} 75%{ transform: translateY(8px) rotate(-4deg);} 100%{ transform: translateY(0) rotate(0);} }
@@ -71,7 +80,6 @@
     .animate-pop{animation:pop .3s ease-out;}
 
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
-    .pb-safe{ padding-bottom: calc(1rem + var(--safe-bottom)); }
   </style>
 </head>
 <body>
@@ -79,21 +87,45 @@
 
 <script>
   const tg = window.Telegram?.WebApp;
-  function applyViewport(){
-    const h = tg?.viewportHeight || window.innerHeight;
-    document.documentElement.style.setProperty('--vh', h + 'px');
+
+  function applyViewport() {
+    const vh = tg?.viewportHeight || window.innerHeight;
+    document.documentElement.style.setProperty('--vh', vh + 'px');
+
     const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
-    if(!supportsEnv){
-      const approxBottom = Math.max(0, (screen.height - h));
-      document.documentElement.style.setProperty('--safe-bottom', approxBottom + 'px');
-      document.documentElement.style.setProperty('--safe-top', '0px');
-    }
+    const sh = window.screen?.height || vh;
+    const bottomGap = Math.max(0, sh - vh);
+    const OVERLAY_THRESHOLD = 40;
+    const isOverlay = (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
+
+    const uiScale = isOverlay ? 1.15 : 1.0;
+    const extraTop = isOverlay ? 10 : 0;
+    const extraBottom = isOverlay ? Math.min(20, bottomGap) : 0;
+
+    document.documentElement.style.setProperty('--ui-scale', uiScale);
+    document.documentElement.style.setProperty('--extra-top', extraTop + 'px');
+    document.documentElement.style.setProperty('--extra-bottom', extraBottom + 'px');
+
+    if (!isOverlay && tg && !tg.isExpanded) tg.expand();
   }
-  tg?.ready?.();
-  tg?.expand?.();
+
+  tg?.ready();
   applyViewport();
   tg?.onEvent?.('viewportChanged', applyViewport);
   window.addEventListener('resize', applyViewport);
+
+  tg?.setHeaderColor?.('secondary_bg_color');
+  tg?.setBottomBarColor?.('bg_color');
+
+  (function debugMode(){
+    const m = new URLSearchParams(location.search).get('mode');
+    if(!m) return;
+    const isOverlay = m === 'overlay';
+    const uiScale = isOverlay ? 1.15 : 1.0;
+    document.documentElement.style.setProperty('--ui-scale', uiScale);
+    document.documentElement.style.setProperty('--extra-top', isOverlay ? '10px' : '0px');
+    document.documentElement.style.setProperty('--extra-bottom', isOverlay ? '20px' : '0px');
+  })();
 </script>
 
 <script type="text/babel">
@@ -423,8 +455,8 @@
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
-        <div className="sticky top-0 z-40 -mx-4">
-          <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between" style={{paddingTop:'calc(var(--safe-top) + 0.75rem)'}}>
+        <div className="sticky top-0 z-40" style={{marginLeft:'calc(-16px * var(--ui-scale))', marginRight:'calc(-16px * var(--ui-scale))'}}>
+          <div className="backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between" style={{height:'calc(56px * var(--ui-scale) + var(--safe-top) + var(--extra-top))', padding:'12px calc(16px * var(--ui-scale))', paddingTop:'calc(var(--safe-top) + var(--extra-top))'}}>
             <div className="flex items-center gap-2">
               <span className="text-xl font-semibold">🎣 RiverKing</span>
               <span className="text-xs opacity-70">beta</span>
@@ -913,9 +945,9 @@
           {/* На десктопе CTA поверх сцены; на мобиле — ниже (см. ниже) */}
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
-              <button onClick={onCast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+              <button onClick={onCast} className="w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg btn-lg">{t('castRod')}</button>
             ) : biting ? (
-              <button onClick={onHook} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+              <button onClick={onHook} className="w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg btn-lg">{t('hook')}</button>
             ) : (
               <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
                 <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -1452,9 +1484,9 @@
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
-                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+                  <button onClick={cast} className="w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg btn-lg">{t('castRod')}</button>
                 ) : biting ? (
-                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+                  <button onClick={()=>hook(false)} className="w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg btn-lg">{t('hook')}</button>
                 ) : (
                   <div className="glass w-full py-4 rounded-2xl text-center">
                     <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -1852,13 +1884,13 @@
           }} />
 
           {/* Нижние вкладки */}
-          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 safe-bottom">
-            <div className="flex text-center text-xs">
-              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-                <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
+          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40" style={{height:'calc(56px * var(--ui-scale) + var(--safe-bottom) + var(--extra-bottom))', padding:'8px calc(16px * var(--ui-scale))', paddingBottom:'calc(var(--safe-bottom) + var(--extra-bottom))'}}>
+            <div className="flex text-center" style={{fontSize:'calc(12px * var(--ui-scale))'}}>
+              <button onClick={()=>setTab('fish')} className={`flex-1 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`} style={{padding:'calc(12px * var(--ui-scale)) 0'}}>{t('fishing')}</button>
+              <button onClick={()=>setTab('tournaments')} className={`flex-1 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`} style={{padding:'calc(12px * var(--ui-scale)) 0'}}>{t('tournaments')}</button>
+                <button onClick={()=>setTab('achievements')} className={`flex-1 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`} style={{padding:'calc(12px * var(--ui-scale)) 0'}}>{t('ratings')}</button>
+              <button onClick={()=>setTab('guide')} className={`flex-1 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`} style={{padding:'calc(12px * var(--ui-scale)) 0'}}>{t('guide')}</button>
+              <button onClick={()=>setTab('shop')} className={`flex-1 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`} style={{padding:'calc(12px * var(--ui-scale)) 0'}}>{t('shop')}</button>
             </div>
           </div>
         </div>
