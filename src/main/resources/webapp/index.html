@@ -49,7 +49,7 @@
     html,body{height:100%;margin:0;}
     :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); --tgvh:100dvh; --safe-top:0px; --safe-bottom:0px; }
     body{ background: var(--tg-bg); color: #fff; }
-    #root{ min-height:var(--tgvh); box-sizing:border-box; padding-top:max(var(--safe-top), env(safe-area-inset-top,0px)); padding-bottom:max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
+    #root{ min-height:var(--tgvh); box-sizing:border-box; }
 
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
@@ -64,6 +64,7 @@
     .animate-pop{animation:pop .3s ease-out;}
 
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
+    .pt-safe{ padding-top: max(var(--safe-top), env(safe-area-inset-top,0px)); }
     .pb-safe{ padding-bottom: calc(1rem + max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); }
     .sticky-safe{ margin-bottom: calc(-1 * max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); padding-bottom: max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
   </style>
@@ -74,11 +75,20 @@
 <script type="text/babel">
     const tg = window.Telegram?.WebApp;
     function applyViewport(){
-      const h = tg?.viewportHeight || tg?.viewportStableHeight || 0;
+      const h = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
       if(h) document.documentElement.style.setProperty('--tgvh', `${h}px`);
-      const s = tg?.safeAreaInset || {top:0,bottom:0,left:0,right:0};
-      document.documentElement.style.setProperty('--safe-top', `${s.top||0}px`);
-      document.documentElement.style.setProperty('--safe-bottom', `${s.bottom||0}px`);
+      let top = 0, bottom = 0;
+      if(tg?.safeAreaInset){
+        top = tg.safeAreaInset.top || 0;
+        bottom = tg.safeAreaInset.bottom || 0;
+      } else {
+        const ih = window.innerHeight;
+        const diff = Math.max(0, ih - h);
+        top = diff/2;
+        bottom = diff - top;
+      }
+      document.documentElement.style.setProperty('--safe-top', `${top}px`);
+      document.documentElement.style.setProperty('--safe-bottom', `${bottom}px`);
     }
     tg?.onEvent('viewport_changed', applyViewport);
     tg?.onEvent('safe_area_changed', applyViewport);
@@ -1485,7 +1495,8 @@
       }
 
       return (
-        <div className="min-h-screen w-full px-4 pb-20" onClick={()=>setPrizeHint(null)}>
+        <div className="min-h-screen w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
+          <div className="pb-24 pb-safe">
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
               <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1963,6 +1974,7 @@
                 : t('selectBaitFailed'));
             }
           }} />
+        </div>
 
           {/* Нижние вкладки */}
           <div className="sticky bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 sticky-safe">
