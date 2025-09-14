@@ -30,6 +30,7 @@ class FishingService {
         lastName: String? = null,
         username: String? = null,
         language: String? = null,
+        refToken: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
         if (existing == null) {
@@ -53,6 +54,9 @@ class FishingService {
                 it[InventoryLures.userId] = newId
                 it[InventoryLures.lureId] = predId
                 it[InventoryLures.qty] = 5
+            }
+            if (refToken != null) {
+                ReferralService.setReferrer(newId, refToken)
             }
             newId
         } else {
@@ -576,6 +580,8 @@ class FishingService {
         ),
     )
 
+    fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
+
     fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
         cat.copy(
             name = I18n.text(cat.name, lang),
@@ -624,6 +630,43 @@ class FishingService {
         }
         for ((name, qty) in pack.items) {
             val id = Lures.select { Lures.name eq name }.single()[Lures.id].value
+            add(id, qty)
+        }
+        val current = ensureCurrentLure(userId)
+        val lures = (InventoryLures innerJoin Lures)
+            .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
+            .select { InventoryLures.userId eq userId }
+            .map {
+                LureDTO(
+                    it[Lures.id].value,
+                    it[Lures.name],
+                    it[InventoryLures.qty],
+                    it[Lures.predator],
+                    it[Lures.water],
+                    it[Lures.rarityBonus],
+                )
+            }
+        Pair(lures, current)
+    }
+
+    fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
+        fun add(id: Long, qty: Int) {
+            val cur = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
+            }.singleOrNull()?.get(InventoryLures.qty)
+            if (cur == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = id
+                    it[InventoryLures.qty] = qty
+                }
+            } else {
+                InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                    it[InventoryLures.qty] = cur + qty
+                }
+            }
+        }
+        for ((id, qty) in items) {
             add(id, qty)
         }
         val current = ensureCurrentLure(userId)

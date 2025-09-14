@@ -243,6 +243,10 @@
         ratings:'Рейтинги',
         guide:'Справочник',
         shop:'Магазин',
+        invite:'Пригласить друзей',
+        generateLink:'Сгенерировать новую',
+        invitedFriends:'Приглашённые',
+        noInvited:'Пока никого',
         gift:'Подарок',
         personal:'Личные',
         global:'Глобальные',
@@ -332,6 +336,10 @@
         ratings:'Ratings',
         guide:'Guide',
         shop:'Shop',
+        invite:'Invite friends',
+        generateLink:'Generate new',
+        invitedFriends:'Invited friends',
+        noInvited:'No invited friends',
         gift:'Gift',
         personal:'Personal',
         global:'Global',
@@ -924,6 +932,7 @@
     function App(){
       const tg = window.Telegram?.WebApp;
       console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.platform);
+      const refToken = new URLSearchParams(window.location.search).get('ref');
       const tgParam = (()=>{
         try{
           const raw = window.location.search + window.location.hash;
@@ -959,6 +968,8 @@
       const [prize,setPrize] = React.useState(null);
       const [prizeHint,setPrizeHint] = React.useState(null);
       const [dailyOpen,setDailyOpen] = React.useState(false);
+      const [refOpen,setRefOpen] = React.useState(false);
+      const [refInfo,setRefInfo] = React.useState(null);
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
       const autoCastRef = React.useRef(autoCast);
       const autoCastTimeoutRef = React.useRef(null);
@@ -1009,7 +1020,7 @@
           try{
             const initData = tg?.initData || tgParam;
             if(initData){
-              await fetch(`/api/auth/telegram`, {
+              await fetch(`/api/auth/telegram${refToken?`?ref=${refToken}`:''}`, {
                 method:'POST',
                 headers:{'Telegram-Init-Data': initData},
                 credentials:'include'
@@ -1165,6 +1176,35 @@
 
       function openDaily(){
         setDailyOpen(true);
+      }
+
+      async function loadReferrals(){
+        try{
+          const r = await fetch(`/api/referrals`,{credentials:'include'});
+          if(r.ok) setRefInfo(await r.json());
+        }catch(e){}
+      }
+
+      async function generateRefLink(){
+        try{
+          const r = await fetch(`/api/referrals`,{method:'POST',credentials:'include'});
+          if(r.ok){
+            const d = await r.json();
+            setRefInfo(p=>({...p, token:d.token}));
+          }
+        }catch(e){}
+      }
+
+      async function copyRefLink(){
+        if(!refInfo) return;
+        const link = `${window.location.origin}/app?ref=${refInfo.token}`;
+        try{ await navigator.clipboard.writeText(link); }catch(e){}
+      }
+
+      function toggleRef(){
+        setRefOpen(o=>{
+          const n=!o; if(n && !refInfo) loadReferrals(); return n;
+        });
       }
 
       async function buyPack(id){
@@ -1772,6 +1812,21 @@
           )}
           {tab === 'shop' && (
             <div className="mt-6">
+              <div className="mb-4">
+                <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
+                {refOpen && (
+                  <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
+                    <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{refInfo?`${window.location.origin}/app?ref=${refInfo.token}`:''}</button>
+                    <button onClick={generateRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('generateLink')}</button>
+                    <div className="text-sm opacity-70">{t('invitedFriends')}</div>
+                    {refInfo && refInfo.invited.length>0 ? (
+                      <ul className="text-sm space-y-1">{refInfo.invited.map(n=><li key={n}>{n}</li>)}</ul>
+                    ) : (
+                      <div className="text-sm opacity-50">{t('noInvited')}</div>
+                    )}
+                  </div>
+                )}
+              </div>
               {shop.length===0 ? (
                 <div className="text-center opacity-70">{t('shopEmpty')}</div>
               ) : (
