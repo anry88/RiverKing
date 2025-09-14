@@ -157,8 +157,9 @@
     if (['ios', 'android'].includes(tg?.platform)) {
       tg?.requestFullscreen?.();
     }
-    applyViewport();
     scheduleViewport();
+    applyViewport();
+
     tg?.onEvent?.('viewportChanged', scheduleViewport);
     window.addEventListener('resize', scheduleViewport);
     tg?.onEvent?.('safeAreaChanged', scheduleViewport);
