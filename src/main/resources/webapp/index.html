@@ -110,9 +110,11 @@
     const tg = window.Telegram?.WebApp;
     const LAYOUT_DELAY = 300;
     function applyViewport(){
-      const vh = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
+      const rawVh = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
+      const ih = window.innerHeight || rawVh;
+      const vh = Math.min(rawVh, ih);
       document.documentElement.style.setProperty('--vh', `${vh}px`);
-      document.documentElement.style.setProperty('--tgvh', `${vh}px`);
+      document.documentElement.style.setProperty('--tgvh', `${rawVh}px`);
 
       const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
       let top = 0, bottom = 0;
@@ -120,20 +122,19 @@
         top = tg.safeAreaInset.top || 0;
         bottom = tg.safeAreaInset.bottom || 0;
       } else if(!supportsEnv){
-        const ih = window.innerHeight;
-        const diff = Math.max(0, ih - vh);
+        const diff = Math.max(0, rawVh - vh);
         top = diff/2;
         bottom = diff - top;
       }
       document.documentElement.style.setProperty('--safe-top', `${top}px`);
       document.documentElement.style.setProperty('--safe-bottom', `${bottom}px`);
 
-      const sh = window.screen?.height || vh;
+      const sh = window.screen?.height || rawVh;
       const bottomGap = Math.max(0, sh - vh);
       const OVERLAY_THRESHOLD = 40;
       const fullscreen = tg?.viewport?.fullscreen;
-      // Treat StartApp launches the same as any other; rely on fullscreen and gaps
-      const isOverlay = fullscreen || (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
+      const fromStartApp = Boolean(tg?.initDataUnsafe?.start_param || new URLSearchParams(location.search).get('tgWebAppStartParam'));
+      const isOverlay = fromStartApp || fullscreen || (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
 
       const uiScale = isOverlay ? 1.15 : 1.0;
       const extraTop = isOverlay ? 10 : 0;
