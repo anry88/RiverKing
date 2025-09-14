@@ -244,7 +244,9 @@
         guide:'Справочник',
         shop:'Магазин',
         invite:'Пригласить друзей',
+        refBonusInfo:'За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.',
         myRefLink:'Моя реферальная ссылка',
+        copyLink:'Скопировать ссылку',
         generateLink:'Сгенерировать новую',
         invitedFriends:'Приглашённые',
         noInvited:'Пока никого',
@@ -338,7 +340,9 @@
         guide:'Guide',
         shop:'Shop',
         invite:'Invite friends',
+        refBonusInfo:'When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.',
         myRefLink:'My referral link',
+        copyLink:'Copy link',
         generateLink:'Generate new',
         invitedFriends:'Invited friends',
         noInvited:'No invited friends',
@@ -1817,10 +1821,12 @@
                 <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
                 {refOpen && (
                   <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-sm opacity-70">{t('refBonusInfo')}</div>
                     {refInfo && (
                       <>
                         <div className="text-sm opacity-70">{t('myRefLink')}</div>
-                        <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{refInfo.link}</button>
+                        <div className="break-all text-xs px-3 py-1 rounded-xl bg-emerald-900/50">{refInfo.link}</div>
+                        <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('copyLink')}</button>
                       </>
                     )}
                     <button onClick={generateRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('generateLink')}</button>

@@ -569,7 +569,7 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val token = ReferralService.currentLink(uid) ?: ReferralService.generateLink(uid)
             val invited = ReferralService.invited(uid).mapNotNull { fishing.displayName(it) }
-            val link = "https://t.me/${env.botName}/app?startapp=$token"
+            val link = "https://t.me/${env.botName}?startapp=$token"
             @Serializable
             data class ReferralsResp(val token: String, val invited: List<String>, val link: String)
             call.respond(ReferralsResp(token, invited, link))
@@ -584,7 +584,7 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val token = ReferralService.generateLink(uid)
-            val link = "https://t.me/${env.botName}/app?startapp=$token"
+            val link = "https://t.me/${env.botName}?startapp=$token"
             @Serializable
             data class ReferralLinkResp(val token: String, val link: String)
             call.respond(ReferralLinkResp(token, link))

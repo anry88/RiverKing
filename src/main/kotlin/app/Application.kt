@@ -14,6 +14,8 @@ import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+import service.FishingService
 import util.Metrics
 
 fun main() {
@@ -35,11 +37,30 @@ fun main() {
         // Telegram bot webhook
         botRoutes(env)
 
+        val bot = TelegramBot(env.botToken)
+        val fishing = FishingService()
+        val log = LoggerFactory.getLogger("App")
+
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app", "webapp")
             get("/") {
-                val qs = call.request.rawQueryParameters.formUrlEncode()
+                val params = call.request.rawQueryParameters
+                params["tgId"]?.toLongOrNull()?.let { tgId ->
+                    try {
+                        val uid = fishing.ensureUserByTgId(tgId)
+                        val lang = fishing.userLanguage(uid)
+                        val text = if (lang == "ru") {
+                            "Для лучшего опыта запускайте игру через кнопку меню \"Open app\"."
+                        } else {
+                            "For the best experience, launch the game via the menu button labeled \"Open app\"."
+                        }
+                        bot.sendMessage(tgId, text)
+                    } catch (e: Exception) {
+                        log.error("start message failed tgId={}", tgId, e)
+                    }
+                }
+                val qs = params.formUrlEncode()
                 val target = if (qs.isBlank()) "/app" else "/app?$qs"
                 call.respondRedirect(target, permanent = false)
             }
