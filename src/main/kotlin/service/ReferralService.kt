@@ -4,6 +4,7 @@ import db.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
+import kotlin.math.ceil
 
 object ReferralService {
     fun generateLink(userId: Long): String = transaction {
@@ -48,8 +49,8 @@ object ReferralService {
     fun onPurchase(buyerId: Long, pack: FishingService.ShopPackage) = transaction {
         val ref = Users.select { Users.id eq buyerId }.single()[Users.referredBy]?.value ?: return@transaction
         for ((name, qty) in pack.items) {
-            val rewardQty = qty / 4
-            if (rewardQty > 0) {
+            if (qty > 0) {
+                val rewardQty = ceil(qty / 4.0).toInt().coerceAtLeast(1)
                 val lure = Lures.select { Lures.name eq name }.single()[Lures.id]
                 ReferralRewards.insert {
                     it[userId] = ref

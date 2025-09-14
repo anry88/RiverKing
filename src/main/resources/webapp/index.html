@@ -261,7 +261,10 @@
         shop:'Магазин',
         invite:'Пригласить друзей',
         refBonusInfo:'За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.',
-        referralBonus:'Ваш друг купил что-то в магазине и вам положен бонус:',
+        referralBonus:'Ваш друг присоединился по вашей ссылке и вы получили набор:',
+        referralPurchaseBonus:'Ваш друг купил что-то в магазине и вам положен бонус:',
+        welcomeBonus:'Вы присоединились по реферальной ссылке и получили приветственный набор:',
+        autofishWeek:'Автоловля (неделя)',
         myRefLink:'Моя реферальная ссылка',
         copyLink:'Скопировать ссылку',
         generateLink:'Сгенерировать новую',
@@ -358,7 +361,10 @@
         shop:'Shop',
         invite:'Invite friends',
         refBonusInfo:'When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.',
-        referralBonus:'Your friend bought something in the shop and you received a bonus:',
+        referralBonus:'Your friend joined via your link and you received a pack:',
+        referralPurchaseBonus:'Your friend bought something in the shop and you received a bonus:',
+        welcomeBonus:'You joined via a referral link and received a welcome pack:',
+        autofishWeek:'Auto Catch (week)',
         myRefLink:'My referral link',
         copyLink:'Copy link',
         generateLink:'Generate new',
@@ -1106,7 +1112,10 @@
                 const rr = await fetch(`/api/referrals/rewards`,{credentials:'include'});
                 if(rr.ok){
                   const rewardsList = await rr.json();
-                  if(rewardsList.length>0) setRefRewards(rewardsList);
+                  if(rewardsList.length>0){
+                    await loadReferrals();
+                    setRefRewards(rewardsList);
+                  }
                 }
               }catch(e){
                 if(e.message==='unauthorized'){
@@ -1495,10 +1504,19 @@
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
               <div className="glass p-6 rounded-xl text-center animate-pop">
                 <img src="/app/assets/riverking_bobber.svg" alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
-                <div className="mb-2">{t('referralBonus')}</div>
+                <div className="mb-2">{t(
+                  (!refInfo || refInfo.invited.length===0)
+                    ? 'welcomeBonus'
+                    : refRewards.some(r=>r.packageId==='bundle_starter')
+                      ? 'referralBonus'
+                      : 'referralPurchaseBonus'
+                )}</div>
                 {refRewards.map(r => (
                   <div key={r.packageId} className="text-lg font-semibold mb-1">
-                    {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name)||r.packageId} x{r.qty}
+                    {(
+                      shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name
+                      || (r.packageId==='autofish_week' ? t('autofishWeek') : r.packageId)
+                    )} x{r.qty}
                   </div>
                 ))}
                 <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
