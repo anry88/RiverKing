@@ -108,6 +108,7 @@
 
 <script type="text/babel">
     const tg = window.Telegram?.WebApp;
+    const LAYOUT_DELAY = 300;
     function applyViewport(){
       const vh = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
@@ -143,11 +144,17 @@
       if(!isOverlay && tg && !tg.isExpanded) tg.expand();
     }
 
+    function scheduleViewport(){
+      if(scheduleViewport._timer) clearTimeout(scheduleViewport._timer);
+      scheduleViewport._timer = setTimeout(applyViewport, LAYOUT_DELAY);
+    }
+
     tg?.ready?.();
     applyViewport();
-    tg?.onEvent?.('viewportChanged', applyViewport);
-    window.addEventListener('resize', applyViewport);
-    tg?.onEvent?.('safeAreaChanged', applyViewport);
+    scheduleViewport();
+    tg?.onEvent?.('viewportChanged', scheduleViewport);
+    window.addEventListener('resize', scheduleViewport);
+    tg?.onEvent?.('safeAreaChanged', scheduleViewport);
     tg?.postEvent?.('web_app_request_safe_area');
     tg?.setHeaderColor?.('secondary_bg_color');
     tg?.setBottomBarColor?.('bg_color');
