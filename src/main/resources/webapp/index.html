@@ -154,6 +154,9 @@
     }
 
     tg?.ready?.();
+    if (!['ios', 'android'].includes(tg?.platform)) {
+      tg?.requestFullscreen?.();
+    }
     applyViewport();
     scheduleViewport();
     tg?.onEvent?.('viewportChanged', scheduleViewport);
