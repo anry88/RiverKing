@@ -134,12 +134,11 @@
 
       const bottomGap = Math.max(0, maxVh - visibleVh);
       const OVERLAY_THRESHOLD = 40;
-      const fullscreen = tg?.viewport?.fullscreen;
-      const isOverlay = fromStartApp || fullscreen || (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
+      const isOverlay = fromStartApp || (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
 
       const uiScale = isOverlay ? 1.15 : 1.0;
       const extraTop = isOverlay ? 10 : 0;
-      const extraBottom = isOverlay ? (fullscreen ? 20 : Math.min(20, bottomGap)) : 0;
+      const extraBottom = isOverlay ? Math.min(20, bottomGap) : 0;
 
       document.documentElement.style.setProperty('--ui-scale', uiScale);
       document.documentElement.style.setProperty('--extra-top', `${extraTop}px`);
@@ -154,7 +153,7 @@
     }
 
     tg?.ready?.();
-    if (fromStartApp && ['ios', 'android'].includes(tg?.platform)) {
+    if (['ios', 'android'].includes(tg?.platform)) {
       tg?.requestFullscreen?.();
     }
     applyViewport();
