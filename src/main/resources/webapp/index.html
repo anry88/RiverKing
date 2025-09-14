@@ -1979,7 +1979,7 @@
         </div>
 
           {/* Нижние вкладки */}
-          <div className="sticky bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 sticky-safe">
+          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 sticky-safe">
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
