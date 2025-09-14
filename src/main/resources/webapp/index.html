@@ -938,7 +938,10 @@
     function App(){
       const tg = window.Telegram?.WebApp;
       console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.platform);
-      const refToken = new URLSearchParams(window.location.search).get('ref');
+      const params = new URLSearchParams(window.location.search);
+      const refToken = tg?.initDataUnsafe?.start_param
+        || params.get('tgWebAppStartParam')
+        || params.get('ref');
       const tgParam = (()=>{
         try{
           const raw = window.location.search + window.location.hash;
