@@ -261,6 +261,7 @@
         shop:'Магазин',
         invite:'Пригласить друзей',
         refBonusInfo:'За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.',
+        referralBonus:'Ваш друг купил что-то в магазине и вам положен бонус:',
         myRefLink:'Моя реферальная ссылка',
         copyLink:'Скопировать ссылку',
         generateLink:'Сгенерировать новую',
@@ -357,6 +358,7 @@
         shop:'Shop',
         invite:'Invite friends',
         refBonusInfo:'When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.',
+        referralBonus:'Your friend bought something in the shop and you received a bonus:',
         myRefLink:'My referral link',
         copyLink:'Copy link',
         generateLink:'Generate new',
@@ -995,6 +997,7 @@
       const [dailyOpen,setDailyOpen] = React.useState(false);
       const [refOpen,setRefOpen] = React.useState(false);
       const [refInfo,setRefInfo] = React.useState(null);
+      const [refRewards,setRefRewards] = React.useState(null);
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
       const autoCastRef = React.useRef(autoCast);
       const autoCastTimeoutRef = React.useRef(null);
@@ -1100,6 +1103,11 @@
                   const list = await pr.json();
                   if(list.length>0) setPrize(list[0]);
                 }
+                const rr = await fetch(`/api/referrals/rewards`,{credentials:'include'});
+                if(rr.ok){
+                  const rewardsList = await rr.json();
+                  if(rewardsList.length>0) setRefRewards(rewardsList);
+                }
               }catch(e){
                 if(e.message==='unauthorized'){
                   setError(t('authRequired'));
@@ -1163,6 +1171,16 @@
           if(r.ok) setMe(await r.json());
         }catch(e){}
         setPrize(null);
+      }
+
+      async function claimRefRewards(){
+        if(!refRewards) return;
+        try{
+          await fetch(`/api/referrals/rewards/claim`,{method:'POST',credentials:'include'});
+          const r = await fetch(`/api/me`,{credentials:'include'});
+          if(r.ok) setMe(await r.json());
+        }catch(e){}
+        setRefRewards(null);
       }
 
       async function openPast(id){
@@ -1469,6 +1487,20 @@
                     ) || prize.packageId
                   } x{prize.qty}
                 </div>
+                <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
+              </div>
+            </div>
+          )}
+        {refRewards && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
+              <div className="glass p-6 rounded-xl text-center animate-pop">
+                <img src="/app/assets/riverking_bobber.svg" alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+                <div className="mb-2">{t('referralBonus')}</div>
+                {refRewards.map(r => (
+                  <div key={r.packageId} className="text-lg font-semibold mb-1">
+                    {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name)||r.packageId} x{r.qty}
+                  </div>
+                ))}
                 <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
               </div>
             </div>

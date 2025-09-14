@@ -31,11 +31,16 @@ class ReferralServiceTest {
         val token = ReferralService.generateLink(inviterId)
         val newUserId = fishing.ensureUserByTgId(2, refToken = token)
 
+        transaction {
+            assertEquals(1, ReferralRewards.select { (ReferralRewards.userId eq inviterId) and (ReferralRewards.packageId eq "bundle_starter") }.count())
+            assertEquals(1, ReferralRewards.select { (ReferralRewards.userId eq newUserId) and (ReferralRewards.packageId eq "bundle_starter") }.count())
+        }
+
         val pack = fishing.findPack("fresh_topup_s")!!
         ReferralService.onPurchase(newUserId, pack)
 
         val rewards = transaction {
-            ReferralRewards.select { ReferralRewards.userId eq inviterId }.toList()
+            ReferralRewards.select { (ReferralRewards.userId eq inviterId) and (ReferralRewards.packageId neq "bundle_starter") }.toList()
         }
         assertEquals(2, rewards.size)
         assertTrue(rewards.all { it[ReferralRewards.qty] == 2 })
