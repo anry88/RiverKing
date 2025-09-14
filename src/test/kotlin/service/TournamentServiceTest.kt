@@ -22,6 +22,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()
@@ -55,6 +56,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()
@@ -103,6 +105,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()
@@ -147,6 +150,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()
@@ -201,6 +205,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()
@@ -257,6 +262,7 @@ class TournamentServiceTest {
             devMode = true,
             adminTgId = 0L,
             providerToken = "",
+            botName = "",
         )
         DB.init(env)
         val svc = TournamentService()

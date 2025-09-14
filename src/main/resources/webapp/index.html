@@ -244,6 +244,7 @@
         guide:'Справочник',
         shop:'Магазин',
         invite:'Пригласить друзей',
+        myRefLink:'Моя реферальная ссылка',
         generateLink:'Сгенерировать новую',
         invitedFriends:'Приглашённые',
         noInvited:'Пока никого',
@@ -337,6 +338,7 @@
         guide:'Guide',
         shop:'Shop',
         invite:'Invite friends',
+        myRefLink:'My referral link',
         generateLink:'Generate new',
         invitedFriends:'Invited friends',
         noInvited:'No invited friends',
@@ -1190,15 +1192,14 @@
           const r = await fetch(`/api/referrals`,{method:'POST',credentials:'include'});
           if(r.ok){
             const d = await r.json();
-            setRefInfo(p=>({invited:p?.invited || [], token:d.token}));
+            setRefInfo(p=>({invited:p?.invited || [], token:d.token, link:d.link}));
           }
         }catch(e){}
       }
 
       async function copyRefLink(){
         if(!refInfo) return;
-        const link = `${window.location.origin}/app?ref=${refInfo.token}`;
-        try{ await navigator.clipboard.writeText(link); }catch(e){}
+        try{ await navigator.clipboard.writeText(refInfo.link); }catch(e){}
       }
 
       function toggleRef(){
@@ -1817,7 +1818,10 @@
                 {refOpen && (
                   <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
                     {refInfo && (
-                      <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{`${window.location.origin}/app?ref=${refInfo.token}`}</button>
+                      <>
+                        <div className="text-sm opacity-70">{t('myRefLink')}</div>
+                        <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{refInfo.link}</button>
+                      </>
                     )}
                     <button onClick={generateRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('generateLink')}</button>
                     <div className="text-sm opacity-70">{t('invitedFriends')}</div>

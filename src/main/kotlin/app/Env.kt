@@ -13,6 +13,7 @@ data class Env(
     val devMode: Boolean,
     val adminTgId: Long,
     val providerToken: String,
+    val botName: String,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -33,6 +34,7 @@ data class Env(
                 devMode = props.getProperty("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
                 adminTgId = props.getProperty("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,
                 providerToken = props.getProperty("PROVIDER_TOKEN") ?: "stars",
+                botName = props.getProperty("BOT_NAME") ?: error("BOT_NAME required"),
             )
         }
     }
