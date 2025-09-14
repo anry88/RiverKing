@@ -260,7 +260,7 @@
         guide:'Справочник',
         shop:'Магазин',
         invite:'Пригласить друзей',
-        refBonusInfo:'За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.',
+        refBonusInfo: name => `Пригласите друзей — вы оба получите ${name}. За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.`,
         referralBonus:'Ваш друг присоединился по вашей ссылке и вы получили набор:',
         referralPurchaseBonus:'Ваш друг купил что-то в магазине и вам положен бонус:',
         welcomeBonus:'Вы присоединились по реферальной ссылке и получили приветственный набор:',
@@ -360,7 +360,7 @@
         guide:'Guide',
         shop:'Shop',
         invite:'Invite friends',
-        refBonusInfo:'When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.',
+        refBonusInfo: name => `Invite friends — you both get ${name}. When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.`,
         referralBonus:'Your friend joined via your link and you received a pack:',
         referralPurchaseBonus:'Your friend bought something in the shop and you received a bonus:',
         welcomeBonus:'You joined via a referral link and received a welcome pack:',
@@ -992,6 +992,9 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
+      const starterPackName = React.useMemo(() => (
+        shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id==='bundle_starter')?.name || 'bundle_starter'
+      ), [shop]);
       const [currentTournament,setCurrentTournament] = React.useState(null);
       const [upcomingTournaments,setUpcomingTournaments] = React.useState([]);
       const [pastTournaments,setPastTournaments] = React.useState([]);
@@ -1514,7 +1517,8 @@
                 {refRewards.map(r => (
                   <div key={r.packageId} className="text-lg font-semibold mb-1">
                     {(
-                      shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name
+                      r.name
+                      || shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name
                       || (r.packageId==='autofish_week' ? t('autofishWeek') : r.packageId)
                     )} x{r.qty}
                   </div>
@@ -1890,7 +1894,7 @@
                 <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
                 {refOpen && (
                   <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
-                    <div className="text-sm opacity-70">{t('refBonusInfo')}</div>
+                    <div className="text-sm opacity-70">{t('refBonusInfo', starterPackName)}</div>
                     {refInfo && (
                       <>
                         <div className="text-sm opacity-70">{t('myRefLink')}</div>

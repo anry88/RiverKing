@@ -105,7 +105,7 @@ fun Application.apiRoutes(env: Env) {
     data class PrizeSpecDTO(val packageId: String, val qty: Int)
 
     @Serializable
-    data class ReferralRewardDTO(val packageId: String, val qty: Int)
+    data class ReferralRewardDTO(val packageId: String, val qty: Int, val name: String)
 
     @Serializable
     data class TournamentDTO(
@@ -597,8 +597,13 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val rewards = ReferralService.pendingRewardsSimple(uid)
-                .map { ReferralRewardDTO(it.packageId, it.qty) }
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val shopItems = fishing.listShop(language).flatMap { it.packs }
+            val rewards = ReferralService.pendingRewardsSimple(uid).map {
+                val name = shopItems.find { p -> p.id == it.packageId }?.name
+                    ?: I18n.lure(it.packageId, language)
+                ReferralRewardDTO(it.packageId, it.qty, name)
+            }
             call.respond(rewards)
         }
 
