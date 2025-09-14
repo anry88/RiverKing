@@ -487,6 +487,7 @@ fun Application.apiRoutes(env: Env) {
             fishing.ensureUserByTgId(tgUser.id)
             val url = try { stars.createInvoiceLink(tgUser.id, req.productId) }
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
+            Metrics.counter("create_invoice_total", mapOf("pack" to req.productId))
             call.respond(InvoiceResp(url))
         }
 
@@ -559,6 +560,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/referrals") {
+            Metrics.counter("referrals_get_total")
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -575,6 +577,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/referrals") {
+            Metrics.counter("referrals_post_total")
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -590,6 +593,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/referrals/rewards") {
+            Metrics.counter("referral_rewards_get_total")
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -610,6 +614,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/referrals/rewards/claim") {
+            Metrics.counter("referral_rewards_claim_total")
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
