@@ -93,8 +93,10 @@
     tg?.onEvent('viewportChanged', applyViewport);
     tg?.onEvent('safeAreaChanged', applyViewport);
     tg?.postEvent?.('web_app_request_safe_area');
-    tg?.expand?.();
+    // Telegram recommends calling `ready()` before `expand()` to ensure the
+    // webview fully occupies the screen when launched via /startapp.
     tg?.ready?.();
+    tg?.expand?.();
     applyViewport();
     const API_URL = ""; // same origin
 
