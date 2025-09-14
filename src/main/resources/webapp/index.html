@@ -90,8 +90,8 @@
       document.documentElement.style.setProperty('--safe-top', `${top}px`);
       document.documentElement.style.setProperty('--safe-bottom', `${bottom}px`);
     }
-    tg?.onEvent('viewport_changed', applyViewport);
-    tg?.onEvent('safe_area_changed', applyViewport);
+    tg?.onEvent('viewportChanged', applyViewport);
+    tg?.onEvent('safeAreaChanged', applyViewport);
     tg?.postEvent?.('web_app_request_safe_area');
     tg?.expand?.();
     tg?.ready?.();
