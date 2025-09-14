@@ -46,10 +46,23 @@
   <link rel="preload" as="image" href="/app/assets/fish/taymen.png">
 
   <style>
-    html,body{height:100%;margin:0;}
-    :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); --tgvh:100dvh; --safe-top:0px; --safe-bottom:0px; }
+    :root{
+      --tg-bg:#0e0f13;
+      --overlay: rgba(0,0,0,.35);
+      /* базовые safe-area */
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      /* динамика от JS */
+      --vh: 100dvh;
+      --ui-scale: 1;
+      --extra-top: 0px;
+      --extra-bottom: 0px;
+      /* legacy */
+      --tgvh: var(--vh);
+    }
+    html,body{height:var(--vh);margin:0;}
     body{ background: var(--tg-bg); color: #fff; }
-    #root{ height:var(--tgvh); box-sizing:border-box; overflow:auto; }
+    #root{ height:100%; box-sizing:border-box; overflow:auto; display:flex; flex-direction:column; }
 
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
@@ -64,9 +77,30 @@
     .animate-pop{animation:pop .3s ease-out;}
 
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
-    .pt-safe{ padding-top: max(var(--safe-top), env(safe-area-inset-top,0px)); }
-    .pb-safe{ padding-bottom: calc(1rem + max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); }
-    .sticky-safe{ padding-bottom: max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
+    .pt-safe{ padding-top: calc(var(--safe-top) + var(--extra-top)); }
+    .pb-safe{ padding-bottom: calc(1rem + var(--safe-bottom) + var(--extra-bottom)); }
+    .sticky-safe{ padding-bottom: calc(var(--safe-bottom) + var(--extra-bottom)); }
+
+    /* overlay-aware UI pieces */
+    .app-header{
+      height: calc(56px * var(--ui-scale) + var(--safe-top) + var(--extra-top));
+      padding: 12px calc(16px * var(--ui-scale));
+      padding-top: calc(var(--safe-top) + var(--extra-top));
+      display:flex; align-items:center; gap:12px;
+    }
+    .app-content{ flex:1; min-height:0; overflow:auto; }
+    .app-tabbar{
+      position:sticky; bottom:0; z-index:10;
+      height: calc(56px * var(--ui-scale) + var(--safe-bottom) + var(--extra-bottom));
+      padding: 8px calc(16px * var(--ui-scale));
+      padding-bottom: calc(var(--safe-bottom) + var(--extra-bottom));
+      display:flex; align-items:center; justify-content:space-around;
+    }
+    .btn-lg{
+      font-size: calc(16px * var(--ui-scale));
+      padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale));
+      border-radius: calc(12px * var(--ui-scale));
+    }
   </style>
 </head>
 <body>
@@ -75,29 +109,59 @@
 <script type="text/babel">
     const tg = window.Telegram?.WebApp;
     function applyViewport(){
-      const h = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
-      if(h) document.documentElement.style.setProperty('--tgvh', `${h}px`);
+      const vh = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      document.documentElement.style.setProperty('--tgvh', `${vh}px`);
+
+      const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
       let top = 0, bottom = 0;
       if(tg?.safeAreaInset){
         top = tg.safeAreaInset.top || 0;
         bottom = tg.safeAreaInset.bottom || 0;
-      } else {
+      } else if(!supportsEnv){
         const ih = window.innerHeight;
-        const diff = Math.max(0, ih - h);
+        const diff = Math.max(0, ih - vh);
         top = diff/2;
         bottom = diff - top;
       }
       document.documentElement.style.setProperty('--safe-top', `${top}px`);
       document.documentElement.style.setProperty('--safe-bottom', `${bottom}px`);
+
+      const sh = window.screen?.height || vh;
+      const bottomGap = Math.max(0, sh - vh);
+      const OVERLAY_THRESHOLD = 40;
+      const isOverlay = (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
+
+      const uiScale = isOverlay ? 1.15 : 1.0;
+      const extraTop = isOverlay ? 10 : 0;
+      const extraBottom = isOverlay ? Math.min(20, bottomGap) : 0;
+
+      document.documentElement.style.setProperty('--ui-scale', uiScale);
+      document.documentElement.style.setProperty('--extra-top', `${extraTop}px`);
+      document.documentElement.style.setProperty('--extra-bottom', `${extraBottom}px`);
+
+      if(!isOverlay && tg && !tg.isExpanded) tg.expand();
     }
-    tg?.onEvent('viewportChanged', applyViewport);
-    tg?.onEvent('safeAreaChanged', applyViewport);
-    tg?.postEvent?.('web_app_request_safe_area');
-    // Telegram recommends calling `ready()` before `expand()` to ensure the
-    // webview fully occupies the screen when launched via /startapp.
+
     tg?.ready?.();
-    tg?.expand?.();
     applyViewport();
+    tg?.onEvent?.('viewportChanged', applyViewport);
+    window.addEventListener('resize', applyViewport);
+    tg?.onEvent?.('safeAreaChanged', applyViewport);
+    tg?.postEvent?.('web_app_request_safe_area');
+    tg?.setHeaderColor?.('secondary_bg_color');
+    tg?.setBottomBarColor?.('bg_color');
+
+    // Ручное форсирование режима для тестов: ?mode=overlay|wrapped
+    (function debugMode(){
+      const m = new URLSearchParams(location.search).get('mode');
+      if(!m) return;
+      const isOverlay = m === 'overlay';
+      const uiScale = isOverlay ? 1.15 : 1.0;
+      document.documentElement.style.setProperty('--ui-scale', uiScale);
+      document.documentElement.style.setProperty('--extra-top', isOverlay ? '10px' : '0px');
+      document.documentElement.style.setProperty('--extra-bottom', isOverlay ? '20px' : '0px');
+    })();
     const API_URL = ""; // same origin
 
     // ====== Assets & UI constants ======
@@ -447,7 +511,7 @@
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
         <div className="sticky top-0 z-40 -mx-4">
-          <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between">
+          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between gap-0">
             <div className="flex items-center gap-2">
               <span className="text-xl font-semibold">🎣 RiverKing</span>
               <span className="text-xs opacity-70">beta</span>
@@ -936,9 +1000,9 @@
           {/* На десктопе CTA поверх сцены; на мобиле — ниже (см. ниже) */}
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
-              <button onClick={onCast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+              <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
             ) : biting ? (
-              <button onClick={onHook} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+              <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
             ) : (
               <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
                 <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -1476,7 +1540,7 @@
 
       if(loading){
         return (
-          <div className="min-h-[var(--tgvh)] flex items-center justify-center">
+          <div className="app-content flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{loadingHint}</div>
@@ -1487,7 +1551,7 @@
 
       if(!me){
         return (
-          <div className="min-h-[var(--tgvh)] flex items-center justify-center">
+          <div className="app-content flex items-center justify-center">
             <div className="text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{error || t('loadFailed')}</div>
@@ -1497,7 +1561,7 @@
       }
 
       return (
-        <div className="min-h-[var(--tgvh)] w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
+        <div className="app-content w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
           <div className="pb-24 pb-safe">
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
@@ -1556,9 +1620,9 @@
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
-                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+                  <button onClick={cast} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
                 ) : biting ? (
-                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+                  <button onClick={()=>hook(false)} className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
                 ) : (
                   <div className="glass w-full py-4 rounded-2xl text-center">
                     <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -1979,15 +2043,13 @@
         </div>
 
           {/* Нижние вкладки */}
-          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 sticky-safe">
-            <div className="flex text-center text-xs">
-              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-                <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
-            </div>
-          </div>
+          <nav className="app-tabbar fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 text-center text-xs">
+            <button onClick={()=>setTab('fish')} className={`flex-1 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+            <button onClick={()=>setTab('tournaments')} className={`flex-1 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+            <button onClick={()=>setTab('achievements')} className={`flex-1 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
+            <button onClick={()=>setTab('guide')} className={`flex-1 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+            <button onClick={()=>setTab('shop')} className={`flex-1 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
+          </nav>
         </div>
       );
     }
