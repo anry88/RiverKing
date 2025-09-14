@@ -461,9 +461,9 @@ fun Application.botRoutes(env: Env) {
                 )
                 val lang = fishing.userLanguage(uid)
                 val reply = if (lang == "ru") {
-                    "Чтобы запустить игру, нажмите кнопку меню слева с надписью Open app"
+                    "Для лучшего опыта запускайте игру через кнопку меню \"Open app\"."
                 } else {
-                    "To launch the game, press the menu button on the left labeled Open app"
+                    "For the best experience, launch the game via the menu button labeled \"Open app\"."
                 }
                 try {
                     bot.sendMessage(chatId, reply)
