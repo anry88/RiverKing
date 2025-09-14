@@ -154,7 +154,7 @@
     }
 
     tg?.ready?.();
-    if (!['ios', 'android'].includes(tg?.platform)) {
+    if (['ios', 'android'].includes(tg?.platform)) {
       tg?.requestFullscreen?.();
     }
     applyViewport();
