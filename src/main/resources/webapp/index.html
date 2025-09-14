@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>RiverKing — Mini App (Fishing-first)</title>
 
   <!-- Telegram + libs -->
@@ -65,7 +65,7 @@
     .pb-safe{ padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
   </style>
 </head>
-<body class="min-h-screen">
+<body style="min-height: var(--tg-viewport-height, 100vh)">
 <div id="root"></div>
 
 <script type="text/babel">
@@ -1824,7 +1824,7 @@
           }} />
 
           {/* Нижние вкладки */}
-          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">
+          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40" style={{paddingBottom:'env(safe-area-inset-bottom)'}}>
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
