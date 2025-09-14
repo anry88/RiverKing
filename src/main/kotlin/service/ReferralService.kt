@@ -32,6 +32,16 @@ object ReferralService {
         val inviter = link[ReferralLinks.userId].value
         if (inviter != newUserId) {
             Users.update({ Users.id eq newUserId }) { it[referredBy] = inviter }
+            ReferralRewards.insert {
+                it[userId] = inviter
+                it[packageId] = "bundle_starter"
+                it[qty] = 1
+            }
+            ReferralRewards.insert {
+                it[userId] = newUserId
+                it[packageId] = "bundle_starter"
+                it[qty] = 1
+            }
         }
     }
 
@@ -59,6 +69,8 @@ object ReferralService {
 
     data class Reward(val id: Long, val packageId: String, val qty: Int)
 
+    data class RewardSimple(val packageId: String, val qty: Int)
+
     fun pendingRewards(userId: Long): List<Reward> = transaction {
         ReferralRewards.select { (ReferralRewards.userId eq userId) and (ReferralRewards.claimed eq false) }
             .map {
@@ -68,21 +80,45 @@ object ReferralService {
             }
     }
 
-    fun claimReward(userId: Long, rewardId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {
-        val reward = transaction {
-            val row = ReferralRewards.select {
-                (ReferralRewards.id eq rewardId) and (ReferralRewards.userId eq userId) and (ReferralRewards.claimed eq false)
-            }.singleOrNull() ?: error("not found")
-            ReferralRewards.update({ ReferralRewards.id eq rewardId }) { it[claimed] = true }
-            Triple(row[ReferralRewards.lureId]?.value, row[ReferralRewards.packageId], row[ReferralRewards.qty])
+    fun pendingRewardsSimple(userId: Long): List<RewardSimple> = transaction {
+        ReferralRewards.select { (ReferralRewards.userId eq userId) and (ReferralRewards.claimed eq false) }
+            .map {
+                val pkg = it[ReferralRewards.packageId] ?: Lures.select { Lures.id eq it[ReferralRewards.lureId]!!.value }
+                    .single()[Lures.name]
+                RewardSimple(pkg, it[ReferralRewards.qty])
+            }
+            .groupBy { it.packageId }
+            .map { RewardSimple(it.key, it.value.sumOf { r -> r.qty }) }
+    }
+
+    fun claimAllRewards(userId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {
+        data class Raw(val lureId: Long?, val packageId: String?, val qty: Int)
+        val rewards = transaction {
+            val rows = ReferralRewards.select {
+                (ReferralRewards.userId eq userId) and (ReferralRewards.claimed eq false)
+            }.map {
+                Raw(it[ReferralRewards.lureId]?.value, it[ReferralRewards.packageId], it[ReferralRewards.qty])
+            }
+            ReferralRewards.update({ (ReferralRewards.userId eq userId) and (ReferralRewards.claimed eq false) }) {
+                it[claimed] = true
+            }
+            rows
         }
-        return if (reward.first != null) {
-            fishing.addLures(userId, listOf(reward.first!! to reward.third))
-        } else if (reward.second != null) {
-            var res: Pair<List<FishingService.LureDTO>, Long?>? = null
-            repeat(reward.third) { res = fishing.buyPackage(userId, reward.second!!) }
-            res!!
-        } else error("bad reward")
+        if (rewards.isEmpty()) return Pair(emptyList(), null)
+        val lureItems = mutableListOf<Pair<Long, Int>>()
+        val packages = mutableListOf<Pair<String, Int>>()
+        for (r in rewards) {
+            if (r.lureId != null) lureItems.add(r.lureId to r.qty)
+            else if (r.packageId != null) packages.add(r.packageId to r.qty)
+        }
+        var res: Pair<List<FishingService.LureDTO>, Long?>? = null
+        if (lureItems.isNotEmpty()) {
+            res = fishing.addLures(userId, lureItems)
+        }
+        for ((pkg, qty) in packages) {
+            repeat(qty) { res = fishing.buyPackage(userId, pkg) }
+        }
+        return res ?: Pair(emptyList(), null)
     }
 }
 
