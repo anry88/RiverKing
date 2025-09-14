@@ -66,7 +66,7 @@
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
     .pt-safe{ padding-top: max(var(--safe-top), env(safe-area-inset-top,0px)); }
     .pb-safe{ padding-bottom: calc(1rem + max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); }
-    .sticky-safe{ margin-bottom: calc(-1 * max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); padding-bottom: max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
+    .sticky-safe{ padding-bottom: max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
   </style>
 </head>
 <body>
