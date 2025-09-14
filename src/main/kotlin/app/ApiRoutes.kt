@@ -19,6 +19,7 @@ import service.FishingService.CatchDTO
 import service.TournamentService
 import service.I18n
 import service.PrizeSpec
+import service.ReferralService
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -143,7 +144,15 @@ fun Application.apiRoutes(env: Env) {
             val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
             call.sessions.set(AppSession(tgUser.id))
-            fishing.ensureUserByTgId(tgUser.id, tgUser.firstName, tgUser.lastName, tgUser.username, tgUser.languageCode)
+            val ref = call.request.queryParameters["ref"]
+            fishing.ensureUserByTgId(
+                tgUser.id,
+                tgUser.firstName,
+                tgUser.lastName,
+                tgUser.username,
+                tgUser.languageCode,
+                ref,
+            )
             call.respond(HttpStatusCode.OK)
         }
 
@@ -426,7 +435,8 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank) }
-            call.respond(prizes)
+            val rewards = ReferralService.pendingRewards(uid).map { PrizeDTO(it.id, it.packageId, it.qty, 0) }
+            call.respond(prizes + rewards)
         }
 
         post("/api/prizes/{id}/claim") {
@@ -438,8 +448,12 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val uid = fishing.ensureUserByTgId(tgId)
-            val (lures, current) = try { tournaments.claimPrize(uid, id, fishing) }
-            catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
+            val (lures, current) = try {
+                tournaments.claimPrize(uid, id, fishing)
+            } catch (_: Exception) {
+                try { ReferralService.claimReward(uid, id, fishing) }
+                catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
+            }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
             call.respond(ShopBuyResp(lures2, current))
@@ -537,9 +551,37 @@ fun Application.apiRoutes(env: Env) {
                     )
                 )
             }
+            fishing.findPack(id)?.let { pack ->
+                ReferralService.onPurchase(uid, pack)
+            }
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
+        }
+
+        get("/api/referrals") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val token = ReferralService.currentLink(uid) ?: ReferralService.generateLink(uid)
+            val invited = ReferralService.invited(uid).mapNotNull { fishing.displayName(it) }
+            call.respond(mapOf("token" to token, "invited" to invited))
+        }
+
+        post("/api/referrals") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val token = ReferralService.generateLink(uid)
+            call.respond(mapOf("token" to token))
         }
 
         post("/api/autofish/disable") {

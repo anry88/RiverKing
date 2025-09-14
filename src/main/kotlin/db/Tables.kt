@@ -26,6 +26,8 @@ object DB {
                 PaySupportRequests,
                 Tournaments,
                 UserPrizes,
+                ReferralLinks,
+                ReferralRewards,
             )
             seedIfEmpty()
         }
@@ -403,6 +405,7 @@ object Users : LongIdTable() {
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
     val autoFishUntil = timestamp("auto_fish_until").nullable()
+    val referredBy = reference("referred_by", Users).nullable()
 }
 
 object Locations : LongIdTable() {
@@ -500,6 +503,20 @@ object UserPrizes : LongIdTable() {
     val userId = reference("user_id", Users)
     val tournamentId = reference("tournament_id", Tournaments)
     val packageId = varchar("package_id", 100)
+    val qty = integer("qty").default(1)
+    val claimed = bool("claimed").default(false)
+}
+
+object ReferralLinks : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val token = varchar("token", 100).uniqueIndex()
+    val createdAt = timestamp("created_at")
+}
+
+object ReferralRewards : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val lureId = reference("lure_id", Lures).nullable()
+    val packageId = varchar("package_id", 100).nullable()
     val qty = integer("qty").default(1)
     val claimed = bool("claimed").default(false)
 }
