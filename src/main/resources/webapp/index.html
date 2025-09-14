@@ -49,7 +49,7 @@
     html,body{height:100%;margin:0;}
     :root{ --tg-bg:#0e0f13; --overlay: rgba(0,0,0,.35); --tgvh:100dvh; --safe-top:0px; --safe-bottom:0px; }
     body{ background: var(--tg-bg); color: #fff; }
-    #root{ min-height:var(--tgvh); box-sizing:border-box; }
+    #root{ height:var(--tgvh); box-sizing:border-box; overflow:auto; }
 
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
@@ -1476,7 +1476,7 @@
 
       if(loading){
         return (
-          <div className="min-h-screen flex items-center justify-center">
+          <div className="min-h-[var(--tgvh)] flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{loadingHint}</div>
@@ -1487,7 +1487,7 @@
 
       if(!me){
         return (
-          <div className="min-h-screen flex items-center justify-center">
+          <div className="min-h-[var(--tgvh)] flex items-center justify-center">
             <div className="text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{error || t('loadFailed')}</div>
@@ -1497,7 +1497,7 @@
       }
 
       return (
-        <div className="min-h-screen w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
+        <div className="min-h-[var(--tgvh)] w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
           <div className="pb-24 pb-safe">
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
