@@ -65,6 +65,7 @@
 
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
     .pb-safe{ padding-bottom: calc(1rem + max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); }
+    .sticky-safe{ margin-bottom: calc(-1 * max(var(--safe-bottom), env(safe-area-inset-bottom,0px))); padding-bottom: max(var(--safe-bottom), env(safe-area-inset-bottom,0px)); }
   </style>
 </head>
 <body>
@@ -1964,7 +1965,7 @@
           }} />
 
           {/* Нижние вкладки */}
-          <div className="sticky bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40">
+          <div className="sticky bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 sticky-safe">
             <div className="flex text-center text-xs">
               <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
               <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
