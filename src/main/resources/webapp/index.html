@@ -1190,7 +1190,7 @@
           const r = await fetch(`/api/referrals`,{method:'POST',credentials:'include'});
           if(r.ok){
             const d = await r.json();
-            setRefInfo(p=>({...p, token:d.token}));
+            setRefInfo(p=>({invited:p?.invited || [], token:d.token}));
           }
         }catch(e){}
       }
@@ -1816,7 +1816,9 @@
                 <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
                 {refOpen && (
                   <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
-                    <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{refInfo?`${window.location.origin}/app?ref=${refInfo.token}`:''}</button>
+                    {refInfo && (
+                      <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{`${window.location.origin}/app?ref=${refInfo.token}`}</button>
+                    )}
                     <button onClick={generateRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('generateLink')}</button>
                     <div className="text-sm opacity-70">{t('invitedFriends')}</div>
                     {refInfo && refInfo.invited.length>0 ? (
