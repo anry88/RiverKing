@@ -601,7 +601,9 @@ fun Application.apiRoutes(env: Env) {
             val shopItems = fishing.listShop(language).flatMap { it.packs }
             val rewards = ReferralService.pendingRewardsSimple(uid).map {
                 val name = shopItems.find { p -> p.id == it.packageId }?.name
-                    ?: I18n.lure(it.packageId, language)
+                    ?: if (it.packageId == "autofish_week") {
+                        if (language == "en") "Auto Catch (week)" else "Автоловля (неделя)"
+                    } else I18n.lure(it.packageId, language)
                 ReferralRewardDTO(it.packageId, it.qty, name)
             }
             call.respond(rewards)
