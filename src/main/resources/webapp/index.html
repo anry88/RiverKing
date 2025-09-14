@@ -49,8 +49,8 @@
       :root{
         --tg-bg:#0e0f13;
         --vh: 100dvh;
-        --safe-top: env(safe-area-inset-top, 0px);
-        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-top: 0px;
+        --safe-bottom: 0px;
         --bottom-gap: 0px;
         --overlay: 0;
         --ui-scale: calc(1 + 0.15 * var(--overlay));
@@ -85,10 +85,11 @@
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
       .app-tabbar{
-        position:sticky; bottom:0; z-index:10;
+        position:fixed; left:0; right:0; z-index:10;
         --pad-bottom: max(var(--safe-bottom), var(--bottom-gap));
-        height: calc(56px * var(--ui-scale) + var(--pad-bottom));
-        padding: 8px calc(16px * var(--ui-scale)) calc(var(--pad-bottom));
+        bottom: var(--pad-bottom);
+        height: calc(56px * var(--ui-scale));
+        padding: 8px calc(16px * var(--ui-scale));
         display:flex; align-items:center; justify-content:space-around;
       }
       .btn-lg{
@@ -105,23 +106,33 @@
     const tg = window.Telegram?.WebApp;
 
     function applyInsets() {
+      const tg = window.Telegram?.WebApp;
+
       const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty('--vh', vh + 'px');
+
+      const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
       const sh = window.screen?.height || vh;
       const bottomGap = Math.max(0, Math.round(sh - vh));
-      const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
       const isOverlay = (!supportsEnv && bottomGap > 0) || bottomGap >= 40;
 
-      tg?.requestFullscreen?.();
-      tg?.expand?.();
+      if (supportsEnv) {
+        document.documentElement.style.setProperty('--safe-top', 'env(safe-area-inset-top)');
+        document.documentElement.style.setProperty('--safe-bottom', 'env(safe-area-inset-bottom)');
+      } else {
+        document.documentElement.style.setProperty('--safe-top', '0px');
+        document.documentElement.style.setProperty('--safe-bottom', '0px');
+      }
 
-      document.documentElement.style.setProperty('--vh', vh + 'px');
-      document.documentElement.style.setProperty('--overlay', isOverlay ? '1' : '0');
       document.documentElement.style.setProperty('--bottom-gap', bottomGap + 'px');
+      document.documentElement.style.setProperty('--overlay', isOverlay ? '1' : '0');
+
+      if (typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+      else if (typeof tg?.expand === 'function') tg.expand();
     }
 
     tg?.ready?.();
     applyInsets();
-    tg?.onEvent?.('viewport_changed', applyInsets);
     tg?.onEvent?.('viewportChanged', applyInsets);
     window.addEventListener('resize', applyInsets);
     tg?.setHeaderColor?.('secondary_bg_color');
@@ -928,7 +939,7 @@
 
       return (
         <div className="relative rounded-2xl overflow-hidden border border-white/10" ref={stageRef}
-             style={{height:'56vh'}}>
+             style={{height:'calc(var(--vh) * 0.56)'}}>
           {/* Фон локации */}
           <div
             className="absolute inset-0 transition-opacity duration-200"
