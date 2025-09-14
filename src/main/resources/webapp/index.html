@@ -1510,7 +1510,7 @@
                                 <span>{e.rank}</span>
                                 {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                                {currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity ? (
+                                {currentTournament.tournament.metric==='count' ? (
                                   <div className="w-8 h-8"></div>
                                 ) : e.fish ? (
                                   (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -1530,7 +1530,7 @@
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{e.user||'-'}</bdi>
                                 </div>
-                                  {!(currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity) && (
+                                  {currentTournament.tournament.metric!=='count' && (
                                     e.fish ? (
                                       <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                                     ) : (
@@ -1562,7 +1562,7 @@
                                 <span>{currentTournament.mine.rank}</span>
                                 {currentTournament.mine.prize && <img src={`/app/assets/baits/${currentTournament.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                                {currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity ? (
+                                {currentTournament.tournament.metric==='count' ? (
                                   <div className="w-8 h-8"></div>
                                 ) : currentTournament.mine.fish ? (
                                   (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
@@ -1582,7 +1582,7 @@
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                                 </div>
-                                  {!(currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity) && (
+                                  {currentTournament.tournament.metric!=='count' && (
                                     currentTournament.mine.fish ? (
                                       <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
                                     ) : (
@@ -1652,7 +1652,7 @@
                               <span>{e.rank}</span>
                               {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                              {pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity ? (
+                              {pastResult.tournament.metric==='count' ? (
                                 <div className="w-8 h-8"></div>
                               ) : e.fish ? (
                                 (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -1672,7 +1672,7 @@
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{e.user||'-'}</bdi>
                               </div>
-                                {!(pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity) && (
+                                {pastResult.tournament.metric!=='count' && (
                                   e.fish ? (
                                     <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                                   ) : (
@@ -1704,7 +1704,7 @@
                               <span>{pastResult.mine.rank}</span>
                               {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                              {pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity ? (
+                              {pastResult.tournament.metric==='count' ? (
                                 <div className="w-8 h-8"></div>
                               ) : pastResult.mine.fish ? (
                                 (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
@@ -1724,7 +1724,7 @@
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                               </div>
-                                {!(pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity) && (
+                                {pastResult.tournament.metric!=='count' && (
                                   pastResult.mine.fish ? (
                                     <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>
                                   ) : (
