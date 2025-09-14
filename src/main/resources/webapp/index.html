@@ -109,6 +109,7 @@
 <script type="text/babel">
     const tg = window.Telegram?.WebApp;
     const LAYOUT_DELAY = 300;
+    const fromStartApp = Boolean(tg?.initDataUnsafe?.start_param || new URLSearchParams(location.search).get('tgWebAppStartParam'));
     function applyViewport(){
       const rawVh = tg?.viewportHeight || tg?.viewportStableHeight || window.innerHeight;
       const sh = window.screen?.height || rawVh;
@@ -134,7 +135,6 @@
       const bottomGap = Math.max(0, maxVh - visibleVh);
       const OVERLAY_THRESHOLD = 40;
       const fullscreen = tg?.viewport?.fullscreen;
-      const fromStartApp = Boolean(tg?.initDataUnsafe?.start_param || new URLSearchParams(location.search).get('tgWebAppStartParam'));
       const isOverlay = fromStartApp || fullscreen || (!supportsEnv && bottomGap > 0) || bottomGap >= OVERLAY_THRESHOLD;
 
       const uiScale = isOverlay ? 1.15 : 1.0;
@@ -154,7 +154,7 @@
     }
 
     tg?.ready?.();
-    if (['ios', 'android'].includes(tg?.platform)) {
+    if (fromStartApp && ['ios', 'android'].includes(tg?.platform)) {
       tg?.requestFullscreen?.();
     }
     applyViewport();
