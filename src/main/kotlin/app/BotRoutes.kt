@@ -16,6 +16,7 @@ import kotlinx.serialization.json.int
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
+import service.ReferralService
 import service.TournamentService
 import service.PrizeSpec
 import java.time.Instant
@@ -255,6 +256,13 @@ fun Application.botRoutes(env: Env) {
                         )
                     } catch (e: Exception) {
                         log.error("recordPayment failed uid={} packId={}", uid, packId, e)
+                    }
+                    try {
+                        fishing.findPack(packId)?.let { pack ->
+                            ReferralService.onPurchase(uid, pack)
+                        }
+                    } catch (e: Exception) {
+                        log.error("referral reward failed uid={} packId={}", uid, packId, e)
                     }
                 }
                 return@post call.respond(HttpStatusCode.OK)
