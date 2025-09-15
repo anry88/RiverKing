@@ -19,6 +19,7 @@ import service.StarsPaymentService
 import service.ReferralService
 import service.TournamentService
 import service.PrizeSpec
+import service.I18n
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -122,11 +123,20 @@ fun Application.botRoutes(env: Env) {
             }
 
             update.inlineQuery?.let { iq ->
+                val from = iq.from
+                val uid = fishing.ensureUserByTgId(
+                    tgId = from.id,
+                    firstName = from.first_name,
+                    lastName = from.last_name,
+                    username = from.username,
+                    language = from.language_code
+                )
+                val lang = fishing.userLanguage(uid)
                 val link = "https://t.me/${env.botName}?startapp"
                 val results = mutableListOf(
                     InlineQueryResultArticle(
                         id = "start",
-                        title = "Открыть игру",
+                        title = if (lang == "ru") "Открыть игру" else "Open game",
                         inputMessageContent = InputTextMessageContent(link),
                         description = link
                     )
@@ -135,21 +145,24 @@ fun Application.botRoutes(env: Env) {
                 if (q == "/tournament" || q == "tournament") {
                     val t = tournaments.currentTournament()
                     val text = if (t != null) {
+                        val tName = if (lang == "ru") t.nameRu else t.nameEn
                         val (list, _) = tournaments.leaderboard(t, iq.from.id, 10)
+                        val header = "$tName\n"
                         if (list.isEmpty()) {
-                            "Список пуст"
+                            header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                         } else {
-                            list.joinToString("\n") { e ->
+                            header + list.joinToString("\n") { e ->
                                 val weight = "%.2f".format(Locale.US, e.value)
-                                "${e.rank}. ${e.user ?: "-"} — ${e.fish ?: "-"} $weight"
+                                val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                "${e.rank}. ${e.user ?: "-"} — $fishName $weight"
                             }
                         }
                     } else {
-                        "Сейчас нет активного турнира"
+                        if (lang == "ru") "Сейчас нет активного турнира" else "No active tournament"
                     }
                     results += InlineQueryResultArticle(
                         id = "tournament",
-                        title = "Топ турнира",
+                        title = if (lang == "ru") "Топ турнира" else "Tournament top",
                         inputMessageContent = InputTextMessageContent(text)
                     )
                 }
@@ -527,19 +540,31 @@ fun Application.botRoutes(env: Env) {
                     log.error("sendMessage failed chatId={}", chatId, e)
                 }
             } else if (text.startsWith("/tournament")) {
+                val from = message.from
+                val uid = fishing.ensureUserByTgId(
+                    tgId = userId,
+                    firstName = from?.first_name,
+                    lastName = from?.last_name,
+                    username = from?.username,
+                    language = from?.language_code
+                )
+                val lang = fishing.userLanguage(uid)
                 val t = tournaments.currentTournament()
                 val reply = if (t != null) {
+                    val tName = if (lang == "ru") t.nameRu else t.nameEn
                     val (list, _) = tournaments.leaderboard(t, userId, 10)
+                    val header = "$tName\n"
                     if (list.isEmpty()) {
-                        "Список пуст"
+                        header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                     } else {
-                        list.joinToString("\n") { e ->
+                        header + list.joinToString("\n") { e ->
                             val weight = "%.2f".format(Locale.US, e.value)
-                            "${e.rank}. ${e.user ?: "-"} — ${e.fish ?: "-"} $weight"
+                            val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
+                            "${e.rank}. ${e.user ?: "-"} — $fishName $weight"
                         }
                     }
                 } else {
-                    "Сейчас нет активного турнира"
+                    if (lang == "ru") "Сейчас нет активного турнира" else "No active tournament"
                 }
                 try {
                     bot.sendMessage(chatId, reply)

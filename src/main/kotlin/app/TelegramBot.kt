@@ -85,7 +85,7 @@ class TelegramBot(private val token: String) {
 
     fun answerInlineQuery(id: String, results: List<InlineQueryResultArticle>) {
         val url = URL("https://api.telegram.org/bot$token/answerInlineQuery")
-        val payload = Json.encodeToString(AnswerInlineQueryRequest(id, results))
+        val payload = Json { encodeDefaults = true }.encodeToString(AnswerInlineQueryRequest(id, results))
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
