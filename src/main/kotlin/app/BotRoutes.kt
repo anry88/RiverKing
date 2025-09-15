@@ -153,9 +153,8 @@ fun Application.botRoutes(env: Env) {
                         inputMessageContent = InputTextMessageContent(text)
                     )
                 }
-                val json = Json.encodeToString(results)
                 try {
-                    bot.answerInlineQuery(iq.id, json)
+                    bot.answerInlineQuery(iq.id, results)
                 } catch (e: Exception) {
                     log.error("answerInlineQuery failed id={}", iq.id, e)
                 }
@@ -521,6 +520,26 @@ fun Application.botRoutes(env: Env) {
                     "Для запуска игры нажми кнопку меню слева ⬅️"
                 } else {
                     "To start the game, press the menu button on the left ⬅️"
+                }
+                try {
+                    bot.sendMessage(chatId, reply)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            } else if (text.startsWith("/tournament")) {
+                val t = tournaments.currentTournament()
+                val reply = if (t != null) {
+                    val (list, _) = tournaments.leaderboard(t, userId, 10)
+                    if (list.isEmpty()) {
+                        "Список пуст"
+                    } else {
+                        list.joinToString("\n") { e ->
+                            val weight = "%.2f".format(Locale.US, e.value)
+                            "${e.rank}. ${e.user ?: "-"} — ${e.fish ?: "-"} $weight"
+                        }
+                    }
+                } else {
+                    "Сейчас нет активного турнира"
                 }
                 try {
                     bot.sendMessage(chatId, reply)
