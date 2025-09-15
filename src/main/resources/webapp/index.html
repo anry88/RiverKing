@@ -517,7 +517,7 @@
             <button onClick={onEditNickname} className="text-sm hover:underline">
               {me.username || '—'}
             </button>
-            <div className="relative flex items-center gap-2">
+            <div className="relative flex items-end gap-2">
               <button onClick={onToggleLanguage} className="text-sm hover:underline">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
               </button>
@@ -527,7 +527,7 @@
                 </svg>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-40 glass rounded-xl p-2 flex flex-col">
+                <div className="absolute right-0 top-full mt-2 w-40 glass rounded-xl p-2 flex flex-col">
                   <button onClick={()=>{setTab('fish'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
                   <button onClick={()=>{setTab('tournaments'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
                   <button onClick={()=>{setTab('achievements'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
