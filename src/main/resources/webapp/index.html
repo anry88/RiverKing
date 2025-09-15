@@ -100,14 +100,6 @@
         display:flex; align-items:center; gap:12px;
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
-      .app-tabbar{
-        position:fixed; left:0; right:0; z-index:10;
-        bottom: 0; /* ВАЖНО: оставляем 0 */
-        --pad-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + 10px);
-        height: calc(56px * var(--ui-scale));
-        padding: 8px calc(16px * var(--ui-scale)) var(--pad-bottom);
-        display:flex; align-items:center; justify-content:space-around;
-      }
       .btn-lg{
         font-size: calc(16px * var(--ui-scale));
         padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale));
@@ -514,24 +506,31 @@
       );
     }
 
-    function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
+    function Header({me,lang,tab,setTab,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
+      const [menuOpen,setMenuOpen] = React.useState(false);
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
-          <div className="sticky z-40 -mx-4" style={{ top: 'var(--safe-top-ui)' }}>
-          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between gap-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-semibold">🎣 RiverKing</span>
-              <span className="text-xs opacity-70">beta</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={onEditNickname} className="text-sm hover:underline">
-                {me.username || '—'}
-              </button>
+          <div className="-mx-4">
+          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between gap-2">
+            <button onClick={onEditNickname} className="text-sm hover:underline">
+              {me.username || '—'}
+            </button>
+            <div className="relative flex items-center gap-2">
               <button onClick={onToggleLanguage} className="text-sm hover:underline">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
               </button>
+              <button onClick={()=>setMenuOpen(o=>!o)} className="p-1 rounded hover:bg-white/10">☰</button>
+              {menuOpen && (
+                <div className="absolute right-0 mt-2 w-40 glass rounded-xl p-2 flex flex-col">
+                  <button onClick={()=>{setTab('fish'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+                  <button onClick={()=>{setTab('tournaments'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+                  <button onClick={()=>{setTab('achievements'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
+                  <button onClick={()=>{setTab('guide'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+                  <button onClick={()=>{setTab('shop'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
+                </div>
+              )}
             </div>
           </div>
           <div className="px-4 py-2 bg-black/20 border-b border-white/10">
@@ -1574,8 +1573,8 @@
       }
 
       return (
-        <div className="app-content w-full px-4 pt-safe" onClick={()=>setPrizeHint(null)}>
-          <div className="pb-24 pb-safe">
+        <div className="app-content w-full px-4" onClick={()=>setPrizeHint(null)}>
+          <div className="pb-safe">
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
               <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1619,7 +1618,7 @@
             </div>
           )}
         {/* prizeHint tooltip handled per-card */}
-          <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
+          <Header me={me} lang={me.language} tab={tab} setTab={setTab} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
           {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
@@ -2033,13 +2032,13 @@
               )}
             </div>
           )}
-          {tab === 'guide' && (
-            <Guide me={me} />
-          )}
+            {tab === 'guide' && (
+              <Guide me={me} />
+            )}
 
-          {/* Шторка локаций */}
-          <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
-          <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
+            {/* Шторка локаций */}
+            <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
+            <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
             try{
               const r = await fetch(`/api/lure/`+id,{method:'POST',credentials:'include'});
               if(!r.ok){
@@ -2052,20 +2051,10 @@
                 ? t('authRequired')
                 : t('selectBaitFailed'));
             }
-          }} />
-        </div>
-
-          {/* Нижние вкладки */}
-          <nav className="app-tabbar fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 text-center text-xs">
-            <button onClick={()=>setTab('fish')} className={`flex-1 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-            <button onClick={()=>setTab('tournaments')} className={`flex-1 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-            <button onClick={()=>setTab('achievements')} className={`flex-1 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-            <button onClick={()=>setTab('guide')} className={`flex-1 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-            <button onClick={()=>setTab('shop')} className={`flex-1 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
-          </nav>
-        </div>
-      );
-    }
+            }} />
+          </div>
+        );
+      }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
