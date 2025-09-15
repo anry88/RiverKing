@@ -23,6 +23,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.selectAll
@@ -117,6 +118,47 @@ fun Application.botRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
             val update = try { call.receive<TgUpdate>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
+            update.inlineQuery?.let { iq ->
+                val link = "https://t.me/${env.botName}?startapp"
+                val results = mutableListOf(
+                    InlineQueryResultArticle(
+                        id = "start",
+                        title = "Открыть игру",
+                        inputMessageContent = InputTextMessageContent(link),
+                        description = link
+                    )
+                )
+                val q = iq.query.trim().lowercase()
+                if (q == "/tournament" || q == "tournament") {
+                    val t = tournaments.currentTournament()
+                    val text = if (t != null) {
+                        val (list, _) = tournaments.leaderboard(t, iq.from.id, 10)
+                        if (list.isEmpty()) {
+                            "Список пуст"
+                        } else {
+                            list.joinToString("\n") { e ->
+                                val weight = "%.2f".format(Locale.US, e.value)
+                                "${e.rank}. ${e.user ?: "-"} — ${e.fish ?: "-"} $weight"
+                            }
+                        }
+                    } else {
+                        "Сейчас нет активного турнира"
+                    }
+                    results += InlineQueryResultArticle(
+                        id = "tournament",
+                        title = "Топ турнира",
+                        inputMessageContent = InputTextMessageContent(text)
+                    )
+                }
+                val json = Json.encodeToString(results)
+                try {
+                    bot.answerInlineQuery(iq.id, json)
+                } catch (e: Exception) {
+                    log.error("answerInlineQuery failed id={}", iq.id, e)
+                }
                 return@post call.respond(HttpStatusCode.OK)
             }
 
@@ -458,7 +500,14 @@ fun Application.botRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.OK)
             }
 
-            if (text.startsWith("/start")) {
+            if (text.startsWith("/startapp")) {
+                val link = "https://t.me/${env.botName}?startapp"
+                try {
+                    bot.sendMessage(chatId, link)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            } else if (text.startsWith("/start")) {
                 val from = message.from
                 val uid = fishing.ensureUserByTgId(
                     tgId = userId,
@@ -469,9 +518,9 @@ fun Application.botRoutes(env: Env) {
                 )
                 val lang = fishing.userLanguage(uid)
                 val reply = if (lang == "ru") {
-                    "Для лучшего опыта запускайте игру через кнопку меню \"Open app\"."
+                    "Для запуска игры нажми кнопку меню слева ⬅️"
                 } else {
-                    "For the best experience, launch the game via the menu button labeled \"Open app\"."
+                    "To start the game, press the menu button on the left ⬅️"
                 }
                 try {
                     bot.sendMessage(chatId, reply)
@@ -676,6 +725,7 @@ fun Application.botRoutes(env: Env) {
 @Serializable
 private data class TgUpdate(
     val message: TgMessage? = null,
+    @SerialName("inline_query") val inlineQuery: TgInlineQuery? = null,
     @SerialName("pre_checkout_query") val preCheckoutQuery: TgPreCheckoutQuery? = null,
     @SerialName("callback_query") val callbackQuery: TgCallbackQuery? = null,
 )
@@ -707,6 +757,13 @@ private data class TgCallbackQuery(
     val from: TgUser,
     val message: TgMessage? = null,
     val data: String? = null,
+)
+
+@Serializable
+private data class TgInlineQuery(
+    val id: String,
+    val from: TgUser,
+    val query: String,
 )
 
 @Serializable

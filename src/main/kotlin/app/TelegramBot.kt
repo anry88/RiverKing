@@ -72,4 +72,21 @@ class TelegramBot(private val token: String) {
             disconnect()
         }
     }
+
+    fun answerInlineQuery(id: String, results: String) {
+        val url = URL("https://api.telegram.org/bot$token/answerInlineQuery")
+        val data = listOf(
+            "inline_query_id=" + URLEncoder.encode(id, "UTF-8"),
+            "results=" + URLEncoder.encode(results, "UTF-8"),
+            "cache_time=0"
+        ).joinToString("&")
+        (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            outputStream.use { it.write(data.toByteArray()) }
+            inputStream.buffered().use { it.readBytes() }
+            disconnect()
+        }
+    }
 }
