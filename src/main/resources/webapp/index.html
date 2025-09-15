@@ -97,6 +97,7 @@
         padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px));
         height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px));
         padding: 12px calc(16px * var(--ui-scale));
+        padding-bottom: 0;
         display:flex; align-items:flex-end; gap:12px;
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
@@ -516,14 +517,14 @@
       return (
           <div className="-mx-4">
           <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex justify-between gap-2">
-            <button onClick={onEditNickname} className="text-sm hover:underline">
+            <button onClick={onEditNickname} className="text-sm hover:underline pb-0.5 leading-none">
               {me.username || '—'}
             </button>
             <div className="flex items-end gap-2">
-              <button onClick={onToggleLanguage} className="text-sm hover:underline">
+              <button onClick={onToggleLanguage} className="text-sm hover:underline pb-0.5 leading-none">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
               </button>
-              <button onClick={()=>setMenuOpen(true)} className="text-sm hover:underline">
+              <button onClick={()=>setMenuOpen(true)} className="text-sm hover:underline pb-0.5 leading-none">
                 {t('menu')}
               </button>
             </div>
@@ -612,16 +613,16 @@
           <div
               className={`absolute right-0 inset-y-0 w-[88%] sm:w-[260px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
               style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px))'}}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">{t('menu')}</div>
-              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+            <div className="flex items-end justify-between mb-3 pb-1">
+              <div className="text-lg font-semibold leading-none">{t('menu')}</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
-            <div className="space-y-2 overflow-y-auto pr-1">
-              <button onClick={()=>{setTab('fish'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-              <button onClick={()=>{setTab('tournaments'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-              <button onClick={()=>{setTab('achievements'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-              <button onClick={()=>{setTab('guide'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-              <button onClick={()=>{setTab('shop'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
+            <div className="space-y-2 overflow-y-auto pr-1 pt-1">
+              <button onClick={()=>{setTab('fish'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+              <button onClick={()=>{setTab('tournaments'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+              <button onClick={()=>{setTab('achievements'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
+              <button onClick={()=>{setTab('guide'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+              <button onClick={()=>{setTab('shop'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
           </div>
         </div>
