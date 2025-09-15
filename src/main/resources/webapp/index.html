@@ -95,9 +95,9 @@
       /* overlay-aware UI pieces */
       .app-header{
         padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px));
-        height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px));
+        height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px) + 5px);
         padding: 12px calc(16px * var(--ui-scale));
-        padding-bottom: 0;
+        padding-bottom: 5px;
         display:flex; align-items:flex-end; gap:12px;
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
@@ -553,7 +553,7 @@
               style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px))'}}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-lg font-semibold">{t('locations')}</div>
-              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
               {me.locations.map(l=> (
@@ -584,7 +584,7 @@
               style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px))'}}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-lg font-semibold">{t('baits')}</div>
-              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
               {me.lures.map(l=> (
@@ -613,7 +613,7 @@
           <div
               className={`absolute right-0 inset-y-0 w-[88%] sm:w-[260px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
               style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px))'}}>
-            <div className="flex items-end justify-between mb-3 pb-1">
+            <div className="flex items-center justify-between mb-3">
               <div className="text-lg font-semibold leading-none">{t('menu')}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
