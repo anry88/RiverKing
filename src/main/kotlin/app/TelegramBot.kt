@@ -4,11 +4,21 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class TelegramApiException(val code: Int, message: String) : IOException(message)
+
+@Serializable
+private data class AnswerInlineQueryRequest(
+    @SerialName("inline_query_id") val inlineQueryId: String,
+    val results: List<InlineQueryResultArticle>,
+    @SerialName("cache_time") val cacheTime: Int = 0,
+)
 
 class TelegramBot(private val token: String) {
     fun sendMessage(chatId: Long, text: String, replyMarkup: String? = null) {
@@ -73,19 +83,29 @@ class TelegramBot(private val token: String) {
         }
     }
 
-    fun answerInlineQuery(id: String, results: String) {
+    fun answerInlineQuery(id: String, results: List<InlineQueryResultArticle>) {
         val url = URL("https://api.telegram.org/bot$token/answerInlineQuery")
-        val data = listOf(
-            "inline_query_id=" + URLEncoder.encode(id, "UTF-8"),
-            "results=" + URLEncoder.encode(results, "UTF-8"),
-            "cache_time=0"
-        ).joinToString("&")
+        val payload = Json.encodeToString(AnswerInlineQueryRequest(id, results))
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
-            setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-            outputStream.use { it.write(data.toByteArray()) }
-            inputStream.buffered().use { it.readBytes() }
+            setRequestProperty("Content-Type", "application/json")
+            outputStream.use { it.write(payload.toByteArray()) }
+            val code = responseCode
+            val stream = if (code in 200..299) inputStream else errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() }
+            if (code !in 200..299) {
+                val desc = try {
+                    Json.parseToJsonElement(body ?: "").jsonObject["description"]?.jsonPrimitive?.content
+                } catch (_: Exception) {
+                    null
+                }
+                val message = buildString {
+                    append("HTTP $code")
+                    if (!desc.isNullOrBlank()) append(": ").append(desc)
+                }
+                throw TelegramApiException(code, message)
+            }
             disconnect()
         }
     }
