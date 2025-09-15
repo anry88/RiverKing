@@ -97,7 +97,7 @@
         padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px));
         height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px));
         padding: 12px calc(16px * var(--ui-scale));
-        display:flex; align-items:center; gap:12px;
+        display:flex; align-items:flex-end; gap:12px;
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
       .btn-lg{
@@ -513,7 +513,7 @@
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
           <div className="-mx-4">
-          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between gap-2">
+          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex justify-between gap-2">
             <button onClick={onEditNickname} className="text-sm hover:underline">
               {me.username || '—'}
             </button>
@@ -521,7 +521,11 @@
               <button onClick={onToggleLanguage} className="text-sm hover:underline">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
               </button>
-              <button onClick={()=>setMenuOpen(o=>!o)} className="p-1 rounded hover:bg-white/10">☰</button>
+              <button onClick={()=>setMenuOpen(o=>!o)} className="p-2 rounded hover:bg-white/10">
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+              </button>
               {menuOpen && (
                 <div className="absolute right-0 mt-2 w-40 glass rounded-xl p-2 flex flex-col">
                   <button onClick={()=>{setTab('fish'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
