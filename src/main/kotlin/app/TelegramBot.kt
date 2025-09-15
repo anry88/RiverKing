@@ -85,7 +85,9 @@ class TelegramBot(private val token: String) {
 
     fun answerInlineQuery(id: String, results: List<InlineQueryResultArticle>) {
         val url = URL("https://api.telegram.org/bot$token/answerInlineQuery")
-        val payload = Json { encodeDefaults = true }.encodeToString(AnswerInlineQueryRequest(id, results))
+        // omit null fields (e.g. description) while still sending defaults like cache_time
+        val payload = Json { encodeDefaults = true; explicitNulls = false }
+            .encodeToString(AnswerInlineQueryRequest(id, results))
         (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
