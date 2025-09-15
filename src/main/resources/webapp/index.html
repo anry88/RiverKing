@@ -337,6 +337,7 @@
         ratings:'Рейтинги',
         guide:'Справочник',
         shop:'Магазин',
+        menu:'Меню',
         invite:'Пригласить друзей',
         refBonusInfo: name => `Пригласите друзей — вы оба получите ${name}. За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.`,
         referralBonus:'Ваш друг присоединился по вашей ссылке и вы получили набор:',
@@ -437,6 +438,7 @@
         ratings:'Ratings',
         guide:'Guide',
         shop:'Shop',
+        menu:'Menu',
         invite:'Invite friends',
         refBonusInfo: name => `Invite friends — you both get ${name}. When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.`,
         referralBonus:'Your friend joined via your link and you received a pack:',
@@ -517,24 +519,13 @@
             <button onClick={onEditNickname} className="text-sm hover:underline">
               {me.username || '—'}
             </button>
-            <div className="relative flex items-end gap-2">
+            <div className="flex items-end gap-2">
               <button onClick={onToggleLanguage} className="text-sm hover:underline">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
               </button>
-              <button onClick={()=>setMenuOpen(o=>!o)} className="p-2 rounded hover:bg-white/10">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M3 6h18M3 12h18M3 18h18" />
-                </svg>
+              <button onClick={()=>setMenuOpen(true)} className="text-sm hover:underline">
+                {t('menu')}
               </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-40 glass rounded-xl p-2 flex flex-col">
-                  <button onClick={()=>{setTab('fish'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-                  <button onClick={()=>{setTab('tournaments'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-                  <button onClick={()=>{setTab('achievements'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-                  <button onClick={()=>{setTab('guide'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-                  <button onClick={()=>{setTab('shop'); setMenuOpen(false);}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
-                </div>
-              )}
             </div>
           </div>
           <div className="px-4 py-2 bg-black/20 border-b border-white/10">
@@ -545,6 +536,9 @@
               <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
             </div>
           </div>
+          {menuOpen && (
+            <MenuDrawer open={menuOpen} onClose={()=>setMenuOpen(false)} tab={tab} setTab={setTab} />
+          )}
         </div>
       );
     }
@@ -605,6 +599,29 @@
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MenuDrawer({open,onClose,tab,setTab}){
+      return (
+        <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
+          <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
+          <div
+              className={`absolute right-0 inset-y-0 w-[88%] sm:w-[260px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+              style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px))'}}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-semibold">{t('menu')}</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+            </div>
+            <div className="space-y-2 overflow-y-auto pr-1">
+              <button onClick={()=>{setTab('fish'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+              <button onClick={()=>{setTab('tournaments'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+              <button onClick={()=>{setTab('achievements'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
+              <button onClick={()=>{setTab('guide'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+              <button onClick={()=>{setTab('shop'); onClose();}} className={`w-full text-left px-3 py-1 rounded hover:bg-white/10 ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
           </div>
         </div>
