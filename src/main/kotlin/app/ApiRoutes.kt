@@ -19,6 +19,7 @@ import service.FishingService.CatchDTO
 import service.TournamentService
 import service.I18n
 import service.PrizeSpec
+import service.ReferralService
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -104,6 +105,9 @@ fun Application.apiRoutes(env: Env) {
     data class PrizeSpecDTO(val packageId: String, val qty: Int)
 
     @Serializable
+    data class ReferralRewardDTO(val packageId: String, val qty: Int, val name: String)
+
+    @Serializable
     data class TournamentDTO(
         val id: Long,
         val name: String,
@@ -143,7 +147,15 @@ fun Application.apiRoutes(env: Env) {
             val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
             call.sessions.set(AppSession(tgUser.id))
-            fishing.ensureUserByTgId(tgUser.id, tgUser.firstName, tgUser.lastName, tgUser.username, tgUser.languageCode)
+            val ref = call.request.queryParameters["ref"]
+            fishing.ensureUserByTgId(
+                tgUser.id,
+                tgUser.firstName,
+                tgUser.lastName,
+                tgUser.username,
+                tgUser.languageCode,
+                ref,
+            )
             call.respond(HttpStatusCode.OK)
         }
 
@@ -438,8 +450,9 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val uid = fishing.ensureUserByTgId(tgId)
-            val (lures, current) = try { tournaments.claimPrize(uid, id, fishing) }
-            catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
+            val (lures, current) = try {
+                tournaments.claimPrize(uid, id, fishing)
+            } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
             call.respond(ShopBuyResp(lures2, current))
@@ -474,6 +487,7 @@ fun Application.apiRoutes(env: Env) {
             fishing.ensureUserByTgId(tgUser.id)
             val url = try { stars.createInvoiceLink(tgUser.id, req.productId) }
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
+            Metrics.counter("create_invoice_total", mapOf("pack" to req.productId))
             call.respond(InvoiceResp(url))
         }
 
@@ -537,9 +551,81 @@ fun Application.apiRoutes(env: Env) {
                     )
                 )
             }
+            fishing.findPack(id)?.let { pack ->
+                ReferralService.onPurchase(uid, pack)
+            }
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
+        }
+
+        get("/api/referrals") {
+            Metrics.counter("referrals_get_total")
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val token = ReferralService.currentLink(uid) ?: ReferralService.generateLink(uid)
+            val invited = ReferralService.invited(uid).mapNotNull { fishing.displayName(it) }
+            val link = "https://t.me/${env.botName}?startapp=$token"
+            @Serializable
+            data class ReferralsResp(val token: String, val invited: List<String>, val link: String)
+            call.respond(ReferralsResp(token, invited, link))
+        }
+
+        post("/api/referrals") {
+            Metrics.counter("referrals_post_total")
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val token = ReferralService.generateLink(uid)
+            val link = "https://t.me/${env.botName}?startapp=$token"
+            @Serializable
+            data class ReferralLinkResp(val token: String, val link: String)
+            call.respond(ReferralLinkResp(token, link))
+        }
+
+        get("/api/referrals/rewards") {
+            Metrics.counter("referral_rewards_get_total")
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val shopItems = fishing.listShop(language).flatMap { it.packs }
+            val rewards = ReferralService.pendingRewardsSimple(uid).map {
+                val name = shopItems.find { p -> p.id == it.packageId }?.name
+                    ?: if (it.packageId == "autofish_week") {
+                        if (language == "en") "Auto Catch (week)" else "Автоловля (неделя)"
+                    } else I18n.lure(it.packageId, language)
+                ReferralRewardDTO(it.packageId, it.qty, name)
+            }
+            call.respond(rewards)
+        }
+
+        post("/api/referrals/rewards/claim") {
+            Metrics.counter("referral_rewards_claim_total")
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val (lures, current) = ReferralService.claimAllRewards(uid, fishing)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            call.respond(ShopBuyResp(lures2, current))
         }
 
         post("/api/autofish/disable") {

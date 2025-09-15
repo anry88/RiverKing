@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import util.sanitizeName
@@ -30,6 +31,7 @@ class FishingService {
         lastName: String? = null,
         username: String? = null,
         language: String? = null,
+        refToken: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
         if (existing == null) {
@@ -53,6 +55,9 @@ class FishingService {
                 it[InventoryLures.userId] = newId
                 it[InventoryLures.lureId] = predId
                 it[InventoryLures.qty] = 5
+            }
+            if (refToken != null) {
+                ReferralService.setReferrer(newId, refToken)
             }
             newId
         } else {
@@ -576,6 +581,8 @@ class FishingService {
         ),
     )
 
+    fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
+
     fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
         cat.copy(
             name = I18n.text(cat.name, lang),
@@ -590,18 +597,22 @@ class FishingService {
     }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
-        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
-            ?: error("bad package")
-
-        if (packageId == "autofish") {
+        if (packageId == "autofish" || packageId == "autofish_week") {
             val row = Users.select { Users.id eq userId }.forUpdate().single()
             val cur = row[Users.autoFishUntil]
             val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
-            Users.update({ Users.id eq userId }) {
-                it[autoFishUntil] = base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            val newUntil = if (packageId == "autofish") {
+                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            } else {
+                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
             }
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
             return@transaction Pair(emptyList(), null)
         }
+
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -620,6 +631,43 @@ class FishingService {
         }
         for ((name, qty) in pack.items) {
             val id = Lures.select { Lures.name eq name }.single()[Lures.id].value
+            add(id, qty)
+        }
+        val current = ensureCurrentLure(userId)
+        val lures = (InventoryLures innerJoin Lures)
+            .slice(Lures.id, Lures.name, InventoryLures.qty, Lures.predator, Lures.water, Lures.rarityBonus)
+            .select { InventoryLures.userId eq userId }
+            .map {
+                LureDTO(
+                    it[Lures.id].value,
+                    it[Lures.name],
+                    it[InventoryLures.qty],
+                    it[Lures.predator],
+                    it[Lures.water],
+                    it[Lures.rarityBonus],
+                )
+            }
+        Pair(lures, current)
+    }
+
+    fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
+        fun add(id: Long, qty: Int) {
+            val cur = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
+            }.singleOrNull()?.get(InventoryLures.qty)
+            if (cur == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = id
+                    it[InventoryLures.qty] = qty
+                }
+            } else {
+                InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id) }) {
+                    it[InventoryLures.qty] = cur + qty
+                }
+            }
+        }
+        for ((id, qty) in items) {
             add(id, qty)
         }
         val current = ensureCurrentLure(userId)
@@ -738,6 +786,12 @@ class FishingService {
         else -> 1.0
     }
 
+    internal fun baseEscapeChance(locId: Long): Double {
+        val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
+        val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
+        return (0.05 * rank).coerceAtMost(0.5)
+    }
+
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
@@ -781,7 +835,10 @@ class FishingService {
 
         val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
         if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
-        val catchChance = if (auto) 1.0 else 1.0 - reactionTime / 5.0
+        val catchChance = if (auto) 1.0 else {
+            val minEscape = baseEscapeChance(locId)
+            (1.0 - minEscape) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
+        }
         if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
 
         val fishId = picked[Fish.id].value

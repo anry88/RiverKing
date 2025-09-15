@@ -16,12 +16,15 @@ import kotlinx.serialization.json.int
 import service.FishingService
 import service.PayService
 import service.StarsPaymentService
+import service.ReferralService
 import service.TournamentService
 import service.PrizeSpec
+import service.I18n
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.selectAll
@@ -116,6 +119,58 @@ fun Application.botRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.Forbidden)
             }
             val update = try { call.receive<TgUpdate>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.OK)
+            }
+
+            update.inlineQuery?.let { iq ->
+                val from = iq.from
+                val uid = fishing.ensureUserByTgId(
+                    tgId = from.id,
+                    firstName = from.first_name,
+                    lastName = from.last_name,
+                    username = from.username,
+                    language = from.language_code
+                )
+                val lang = fishing.userLanguage(uid)
+                val link = "https://t.me/${env.botName}?startapp"
+                val results = mutableListOf(
+                    InlineQueryResultArticle(
+                        id = "start",
+                        title = if (lang == "ru") "Открыть игру" else "Open game",
+                        inputMessageContent = InputTextMessageContent(link),
+                        description = link
+                    )
+                )
+                val q = iq.query.trim().lowercase()
+                if (q == "/tournament" || q == "tournament") {
+                    val t = tournaments.currentTournament()
+                    val text = if (t != null) {
+                        val tName = if (lang == "ru") t.nameRu else t.nameEn
+                        val (list, _) = tournaments.leaderboard(t, iq.from.id, 10)
+                        val header = "$tName\n"
+                        if (list.isEmpty()) {
+                            header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
+                        } else {
+                            header + list.joinToString("\n") { e ->
+                                val weight = "%.2f".format(Locale.US, e.value)
+                                val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                "${e.rank}. ${e.user ?: "-"} — $fishName $weight"
+                            }
+                        }
+                    } else {
+                        if (lang == "ru") "Сейчас нет активного турнира" else "No active tournament"
+                    }
+                    results += InlineQueryResultArticle(
+                        id = "tournament",
+                        title = if (lang == "ru") "Топ турнира" else "Tournament top",
+                        inputMessageContent = InputTextMessageContent(text)
+                    )
+                }
+                try {
+                    bot.answerInlineQuery(iq.id, results)
+                } catch (e: Exception) {
+                    log.error("answerInlineQuery failed id={}", iq.id, e)
+                }
                 return@post call.respond(HttpStatusCode.OK)
             }
 
@@ -255,6 +310,13 @@ fun Application.botRoutes(env: Env) {
                         )
                     } catch (e: Exception) {
                         log.error("recordPayment failed uid={} packId={}", uid, packId, e)
+                    }
+                    try {
+                        fishing.findPack(packId)?.let { pack ->
+                            ReferralService.onPurchase(uid, pack)
+                        }
+                    } catch (e: Exception) {
+                        log.error("referral reward failed uid={} packId={}", uid, packId, e)
                     }
                 }
                 return@post call.respond(HttpStatusCode.OK)
@@ -450,7 +512,14 @@ fun Application.botRoutes(env: Env) {
                 return@post call.respond(HttpStatusCode.OK)
             }
 
-            if (text.startsWith("/start")) {
+            if (text.startsWith("/startapp")) {
+                val link = "https://t.me/${env.botName}?startapp"
+                try {
+                    bot.sendMessage(chatId, link)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            } else if (text.startsWith("/start")) {
                 val from = message.from
                 val uid = fishing.ensureUserByTgId(
                     tgId = userId,
@@ -461,9 +530,41 @@ fun Application.botRoutes(env: Env) {
                 )
                 val lang = fishing.userLanguage(uid)
                 val reply = if (lang == "ru") {
-                    "Чтобы запустить игру, нажмите кнопку меню слева с надписью Open app"
+                    "Для запуска игры нажми кнопку меню слева ⬅️"
                 } else {
-                    "To launch the game, press the menu button on the left labeled Open app"
+                    "To start the game, press the menu button on the left ⬅️"
+                }
+                try {
+                    bot.sendMessage(chatId, reply)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            } else if (text.startsWith("/tournament")) {
+                val from = message.from
+                val uid = fishing.ensureUserByTgId(
+                    tgId = userId,
+                    firstName = from?.first_name,
+                    lastName = from?.last_name,
+                    username = from?.username,
+                    language = from?.language_code
+                )
+                val lang = fishing.userLanguage(uid)
+                val t = tournaments.currentTournament()
+                val reply = if (t != null) {
+                    val tName = if (lang == "ru") t.nameRu else t.nameEn
+                    val (list, _) = tournaments.leaderboard(t, userId, 10)
+                    val header = "$tName\n"
+                    if (list.isEmpty()) {
+                        header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
+                    } else {
+                        header + list.joinToString("\n") { e ->
+                            val weight = "%.2f".format(Locale.US, e.value)
+                            val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
+                            "${e.rank}. ${e.user ?: "-"} — $fishName $weight"
+                        }
+                    }
+                } else {
+                    if (lang == "ru") "Сейчас нет активного турнира" else "No active tournament"
                 }
                 try {
                     bot.sendMessage(chatId, reply)
@@ -668,6 +769,7 @@ fun Application.botRoutes(env: Env) {
 @Serializable
 private data class TgUpdate(
     val message: TgMessage? = null,
+    @SerialName("inline_query") val inlineQuery: TgInlineQuery? = null,
     @SerialName("pre_checkout_query") val preCheckoutQuery: TgPreCheckoutQuery? = null,
     @SerialName("callback_query") val callbackQuery: TgCallbackQuery? = null,
 )
@@ -699,6 +801,13 @@ private data class TgCallbackQuery(
     val from: TgUser,
     val message: TgMessage? = null,
     val data: String? = null,
+)
+
+@Serializable
+private data class TgInlineQuery(
+    val id: String,
+    val from: TgUser,
+    val query: String,
 )
 
 @Serializable

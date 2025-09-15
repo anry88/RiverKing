@@ -46,18 +46,35 @@
   <link rel="preload" as="image" href="/app/assets/fish/taymen.png">
 
   <style>
-    :root{
-      --tg-bg:#0e0f13;
-      --overlay: rgba(0,0,0,.35);
-      --safe-top: env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --vh: 100dvh;
-    }
-    html, body{ height: var(--vh); margin:0; }
+      :root{
+        --tg-bg:#0e0f13;
+        --vh: 100dvh;
+        --safe-top: 0px;
+        --safe-bottom: 0px;
+        --safe-top-fb: 0px;     /* visualViewport fallback */
+        --safe-bottom-fb: 0px;  /* visualViewport fallback */
+        --bottom-gap: 0px;
+        --overlay: 0;
+        --ui-scale: calc(1 + 0.15 * var(--overlay));
+        --tg-topbar: 0px; /* высота верхнего бара Telegram, если не удаётся вычислить иначе */
+
+        /* удобные «максимумы» */
+        --safe-top-max: max(env(safe-area-inset-top, 0px), var(--safe-top-fb));
+        --safe-bottom-max: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-fb));
+        --safe-top-ui: calc(var(--safe-top-max) + var(--tg-topbar));
+      }
+
+      /* старый iOS (constant) — на всякий случай */
+      @supports (padding: constant(safe-area-inset-top)) {
+        :root{
+          --safe-top-max: max(constant(safe-area-inset-top), var(--safe-top-fb));
+          --safe-bottom-max: max(constant(safe-area-inset-bottom), var(--safe-bottom-fb));
+        }
+      }
+    html,body{height:var(--vh);margin:0;}
     body{ background: var(--tg-bg); color: #fff; }
-    #root{ height:100%; display:flex; flex-direction:column; }
-    .safe-top{ padding-top: var(--safe-top); }
-    .safe-bottom{ padding-bottom: var(--safe-bottom); }
+    #root{ height:100%; box-sizing:border-box; overflow:auto; display:flex; flex-direction:column; }
+
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
 
@@ -71,32 +88,82 @@
     .animate-pop{animation:pop .3s ease-out;}
 
     .glass{ background: linear-gradient( to bottom, rgba(255,255,255,.08), rgba(255,255,255,.04) ); box-shadow: 0 10px 30px rgba(0,0,0,.25); backdrop-filter: blur(8px); border:1px solid rgba(255,255,255,.12); }
-    .pb-safe{ padding-bottom: calc(1rem + var(--safe-bottom)); }
+      .pt-safe{ padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px)); }
+      .pb-safe{ padding-bottom: calc(1rem + max(var(--safe-bottom-max), var(--bottom-gap))); }
+      .sticky-safe{ padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap))); }
+
+      /* overlay-aware UI pieces */
+      .app-header{
+        padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px));
+        height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px) + 5px);
+        padding: 12px calc(16px * var(--ui-scale));
+        padding-bottom: 5px;
+        display:flex; align-items:flex-end; gap:12px;
+      }
+      .app-content{ flex:1; min-height:0; overflow:auto; }
+      .btn-lg{
+        font-size: calc(16px * var(--ui-scale));
+        padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale));
+        border-radius: calc(12px * var(--ui-scale));
+      }
   </style>
 </head>
 <body>
 <div id="root"></div>
 
-<script>
-  const tg = window.Telegram?.WebApp;
-  function applyViewport(){
-    const h = tg?.viewportHeight || window.innerHeight;
-    document.documentElement.style.setProperty('--vh', h + 'px');
-    const supportsEnv = CSS.supports('padding-bottom: env(safe-area-inset-bottom)');
-    if(!supportsEnv){
-      const approxBottom = Math.max(0, (screen.height - h));
-      document.documentElement.style.setProperty('--safe-bottom', approxBottom + 'px');
-      document.documentElement.style.setProperty('--safe-top', '0px');
-    }
-  }
-  tg?.ready?.();
-  tg?.expand?.();
-  applyViewport();
-  tg?.onEvent?.('viewportChanged', applyViewport);
-  window.addEventListener('resize', applyViewport);
-</script>
+<script type="text/babel" data-presets="env,react">
+    const tg = window.Telegram?.WebApp;
 
-<script type="text/babel">
+    function applyInsets() {
+      const tg = window.Telegram?.WebApp;
+
+      const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty('--vh', vh + 'px');
+
+      // visualViewport даёт реальные «врезы» сверху/снизу
+      const vv = window.visualViewport;
+      const layoutH = window.innerHeight || vh;
+      const vvH = vv?.height || layoutH;
+      const vvTop = vv?.offsetTop || 0;
+
+      const safeTopFB = Math.max(0, Math.round(vvTop));
+      const safeBottomFB = Math.max(0, Math.round(layoutH - (vvTop + vvH)));
+
+      document.documentElement.style.setProperty('--safe-top-fb', safeTopFB + 'px');
+      document.documentElement.style.setProperty('--safe-bottom-fb', safeBottomFB + 'px');
+
+      // запасной "пробел снизу" (жестовая полоска/оверлеи/клавиатура)
+      const sh = window.screen?.height || vh;
+      const bottomGapLegacy = Math.max(0, Math.round(sh - vh));
+      const bottomGap = Math.max(safeBottomFB, bottomGapLegacy);
+      document.documentElement.style.setProperty('--bottom-gap', bottomGap + 'px');
+
+      const isOverlay = (bottomGap >= 8) || (safeTopFB >= 8);
+      document.documentElement.style.setProperty('--overlay', isOverlay ? '1' : '0');
+
+      // --- ФОЛБЭК для верхнего бара Telegram ---
+      // Если safeTopFB практически нулевой и это мобильный Telegram,
+      // добавляем типичную высоту верхней панели клиента, чтобы увести UI ниже.
+      const plat = (tg?.platform || '').toLowerCase();
+      const isMobileTG = plat === 'android' || plat === 'ios';
+      const needTGTopbarFallback = isMobileTG && safeTopFB < 4;
+      const tgTopbarGuess = needTGTopbarFallback
+        ? (plat === 'ios' ? 54 : 48)
+        : 0;
+      document.documentElement.style.setProperty('--tg-topbar', tgTopbarGuess + 'px');
+
+      if (typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+      else if (typeof tg?.expand === 'function') tg.expand();
+    }
+
+    tg?.ready?.();
+    applyInsets();
+    tg?.onEvent?.('viewportChanged', applyInsets);
+    window.addEventListener('resize', applyInsets);
+    window.visualViewport?.addEventListener('resize', applyInsets);
+    window.visualViewport?.addEventListener('scroll', applyInsets);
+    tg?.setHeaderColor?.('secondary_bg_color');
+    tg?.setBottomBarColor?.('bg_color');
     const API_URL = ""; // same origin
 
     // ====== Assets & UI constants ======
@@ -271,6 +338,18 @@
         ratings:'Рейтинги',
         guide:'Справочник',
         shop:'Магазин',
+        menu:'Меню',
+        invite:'Пригласить друзей',
+        refBonusInfo: name => `Пригласите друзей — вы оба получите ${name}. За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.`,
+        referralBonus:'Ваш друг присоединился по вашей ссылке и вы получили набор:',
+        referralPurchaseBonus:'Ваш друг купил что-то в магазине и вам положен бонус:',
+        welcomeBonus:'Вы присоединились по реферальной ссылке и получили приветственный набор:',
+        autofishWeek:'Автоловля (неделя)',
+        myRefLink:'Моя реферальная ссылка',
+        copyLink:'Скопировать ссылку',
+        generateLink:'Сгенерировать новую',
+        invitedFriends:'Приглашённые',
+        noInvited:'Пока никого',
         gift:'Подарок',
         personal:'Личные',
         global:'Глобальные',
@@ -360,6 +439,18 @@
         ratings:'Ratings',
         guide:'Guide',
         shop:'Shop',
+        menu:'Menu',
+        invite:'Invite friends',
+        refBonusInfo: name => `Invite friends — you both get ${name}. When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.`,
+        referralBonus:'Your friend joined via your link and you received a pack:',
+        referralPurchaseBonus:'Your friend bought something in the shop and you received a bonus:',
+        welcomeBonus:'You joined via a referral link and received a welcome pack:',
+        autofishWeek:'Auto Catch (week)',
+        myRefLink:'My referral link',
+        copyLink:'Copy link',
+        generateLink:'Generate new',
+        invitedFriends:'Invited friends',
+        noInvited:'No invited friends',
         gift:'Gift',
         personal:'Personal',
         global:'Global',
@@ -418,23 +509,23 @@
       );
     }
 
-    function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
+    function Header({me,lang,tab,setTab,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
+      const [menuOpen,setMenuOpen] = React.useState(false);
       const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
       const curLure = me.lures.find(l=>l.id===me.currentLureId);
       const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
       return (
-        <div className="sticky top-0 z-40 -mx-4">
-          <div className="px-4 py-3 backdrop-blur bg-black/30 border-b border-white/10 flex items-center justify-between" style={{paddingTop:'calc(var(--safe-top) + 0.75rem)'}}>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-semibold">🎣 RiverKing</span>
-              <span className="text-xs opacity-70">beta</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={onEditNickname} className="text-sm hover:underline">
-                {me.username || '—'}
-              </button>
-              <button onClick={onToggleLanguage} className="text-sm hover:underline">
+          <div className="-mx-4">
+          <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex justify-between gap-2">
+            <button onClick={onEditNickname} className="text-sm hover:underline pb-0.5 leading-none">
+              {me.username || '—'}
+            </button>
+            <div className="flex items-end gap-2">
+              <button onClick={onToggleLanguage} className="text-sm hover:underline pb-0.5 leading-none">
                 {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
+              </button>
+              <button onClick={()=>setMenuOpen(true)} className="text-sm hover:underline pb-0.5 leading-none">
+                {t('menu')}
               </button>
             </div>
           </div>
@@ -446,6 +537,9 @@
               <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
             </div>
           </div>
+          {menuOpen && (
+            <MenuDrawer open={menuOpen} onClose={()=>setMenuOpen(false)} tab={tab} setTab={setTab} />
+          )}
         </div>
       );
     }
@@ -454,10 +548,12 @@
       return (
         <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
           <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
-          <div className={`absolute right-0 top-0 h-full w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} p-4 flex flex-col`}>
+          <div
+              className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+              style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-lg font-semibold">{t('locations')}</div>
-              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
               {me.locations.map(l=> (
@@ -483,10 +579,12 @@
       return (
         <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
           <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
-          <div className={`absolute right-0 top-0 h-full w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} p-4 flex flex-col`}>
+          <div
+              className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+              style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
             <div className="flex items-center justify-between mb-3">
               <div className="text-lg font-semibold">{t('baits')}</div>
-              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10">✕</button>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
             <div className="space-y-2 overflow-y-auto pr-1">
               {me.lures.map(l=> (
@@ -502,6 +600,29 @@
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MenuDrawer({open,onClose,tab,setTab}){
+      return (
+        <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
+          <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
+          <div
+              className={`absolute right-0 inset-y-0 w-[88%] sm:w-[260px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+              style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-semibold leading-none">{t('menu')}</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+            </div>
+            <div className="space-y-2 overflow-y-auto pr-1 pt-1">
+              <button onClick={()=>{setTab('fish'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
+              <button onClick={()=>{setTab('tournaments'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
+              <button onClick={()=>{setTab('achievements'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
+              <button onClick={()=>{setTab('guide'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
+              <button onClick={()=>{setTab('shop'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
             </div>
           </div>
         </div>
@@ -913,9 +1034,9 @@
           {/* На десктопе CTA поверх сцены; на мобиле — ниже (см. ниже) */}
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
-              <button onClick={onCast} className="w-full md:w-1/2 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+              <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
             ) : biting ? (
-              <button onClick={onHook} className="w-full md:w-1/2 py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+              <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
             ) : (
               <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
                 <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -952,6 +1073,10 @@
     function App(){
       const tg = window.Telegram?.WebApp;
       console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.platform);
+      const params = new URLSearchParams(window.location.search);
+      const refToken = tg?.initDataUnsafe?.start_param
+        || params.get('tgWebAppStartParam')
+        || params.get('ref');
       const tgParam = (()=>{
         try{
           const raw = window.location.search + window.location.hash;
@@ -978,6 +1103,9 @@
       const [baitsOpen, setBaitsOpen] = React.useState(false);
       const [tab, setTab] = React.useState('fish');
       const [shop,setShop] = React.useState([]);
+      const starterPackName = React.useMemo(() => (
+        shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id==='bundle_starter')?.name || 'bundle_starter'
+      ), [shop]);
       const [currentTournament,setCurrentTournament] = React.useState(null);
       const [upcomingTournaments,setUpcomingTournaments] = React.useState([]);
       const [pastTournaments,setPastTournaments] = React.useState([]);
@@ -987,6 +1115,9 @@
       const [prize,setPrize] = React.useState(null);
       const [prizeHint,setPrizeHint] = React.useState(null);
       const [dailyOpen,setDailyOpen] = React.useState(false);
+      const [refOpen,setRefOpen] = React.useState(false);
+      const [refInfo,setRefInfo] = React.useState(null);
+      const [refRewards,setRefRewards] = React.useState(null);
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
       const autoCastRef = React.useRef(autoCast);
       const autoCastTimeoutRef = React.useRef(null);
@@ -1037,7 +1168,7 @@
           try{
             const initData = tg?.initData || tgParam;
             if(initData){
-              await fetch(`/api/auth/telegram`, {
+              await fetch(`/api/auth/telegram${refToken?`?ref=${refToken}`:''}`, {
                 method:'POST',
                 headers:{'Telegram-Init-Data': initData},
                 credentials:'include'
@@ -1091,6 +1222,14 @@
                 if(pr.ok){
                   const list = await pr.json();
                   if(list.length>0) setPrize(list[0]);
+                }
+                const rr = await fetch(`/api/referrals/rewards`,{credentials:'include'});
+                if(rr.ok){
+                  const rewardsList = await rr.json();
+                  if(rewardsList.length>0){
+                    await loadReferrals();
+                    setRefRewards(rewardsList);
+                  }
                 }
               }catch(e){
                 if(e.message==='unauthorized'){
@@ -1157,6 +1296,16 @@
         setPrize(null);
       }
 
+      async function claimRefRewards(){
+        if(!refRewards) return;
+        try{
+          await fetch(`/api/referrals/rewards/claim`,{method:'POST',credentials:'include'});
+          const r = await fetch(`/api/me`,{credentials:'include'});
+          if(r.ok) setMe(await r.json());
+        }catch(e){}
+        setRefRewards(null);
+      }
+
       async function openPast(id){
         setPastResult(null);
         try{
@@ -1193,6 +1342,34 @@
 
       function openDaily(){
         setDailyOpen(true);
+      }
+
+      async function loadReferrals(){
+        try{
+          const r = await fetch(`/api/referrals`,{credentials:'include'});
+          if(r.ok) setRefInfo(await r.json());
+        }catch(e){}
+      }
+
+      async function generateRefLink(){
+        try{
+          const r = await fetch(`/api/referrals`,{method:'POST',credentials:'include'});
+          if(r.ok){
+            const d = await r.json();
+            setRefInfo(p=>({invited:p?.invited || [], token:d.token, link:d.link}));
+          }
+        }catch(e){}
+      }
+
+      async function copyRefLink(){
+        if(!refInfo) return;
+        try{ await navigator.clipboard.writeText(refInfo.link); }catch(e){}
+      }
+
+      function toggleRef(){
+        setRefOpen(o=>{
+          const n=!o; if(n && !refInfo) loadReferrals(); return n;
+        });
       }
 
       async function buyPack(id){
@@ -1397,7 +1574,7 @@
 
       if(loading){
         return (
-          <div className="flex items-center justify-center" style={{minHeight:'var(--vh)'}}>
+          <div className="app-content flex items-center justify-center">
             <div className="animate-pulse text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{loadingHint}</div>
@@ -1408,7 +1585,7 @@
 
       if(!me){
         return (
-          <div className="flex items-center justify-center" style={{minHeight:'var(--vh)'}}>
+          <div className="app-content flex items-center justify-center">
             <div className="text-center">
               <div className="text-2xl font-semibold">RiverKing</div>
               <div className="opacity-70 mt-2">{error || t('loadFailed')}</div>
@@ -1418,7 +1595,8 @@
       }
 
       return (
-        <div className="w-full px-4" style={{minHeight:'var(--vh)', paddingBottom:'calc(5rem + var(--safe-bottom))'}} onClick={()=>setPrizeHint(null)}>
+        <div className="app-content w-full px-4" onClick={()=>setPrizeHint(null)}>
+          <div className="pb-safe">
         {prize && (
             <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
               <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1437,8 +1615,32 @@
               </div>
             </div>
           )}
+        {refRewards && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
+              <div className="glass p-6 rounded-xl text-center animate-pop">
+                <img src="/app/assets/riverking_bobber.svg" alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+                <div className="mb-2">{t(
+                  (!refInfo || refInfo.invited.length===0)
+                    ? 'welcomeBonus'
+                    : refRewards.some(r=>r.packageId==='bundle_starter')
+                      ? 'referralBonus'
+                      : 'referralPurchaseBonus'
+                )}</div>
+                {refRewards.map(r => (
+                  <div key={r.packageId} className="text-lg font-semibold mb-1">
+                    {(
+                      r.name
+                      || shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===r.packageId)?.name
+                      || (r.packageId==='autofish_week' ? t('autofishWeek') : r.packageId)
+                    )} x{r.qty}
+                  </div>
+                ))}
+                <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
+              </div>
+            </div>
+          )}
         {/* prizeHint tooltip handled per-card */}
-          <Header me={me} lang={me.language} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
+          <Header me={me} lang={me.language} tab={tab} setTab={setTab} onEditNickname={()=>setNickOpen(true)} onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined} onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined} onToggleLanguage={toggleLanguage} />
           {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
           {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
@@ -1452,9 +1654,9 @@
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
-                  <button onClick={cast} className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-lg font-semibold shadow-lg">{t('castRod')}</button>
+                  <button onClick={cast} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
                 ) : biting ? (
-                  <button onClick={()=>hook(false)} className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-lg font-semibold shadow-lg">{t('hook')}</button>
+                  <button onClick={()=>hook(false)} className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
                 ) : (
                   <div className="glass w-full py-4 rounded-2xl text-center">
                     <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
@@ -1538,7 +1740,7 @@
                                 <span>{e.rank}</span>
                                 {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                                {currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity ? (
+                                {currentTournament.tournament.metric==='count' ? (
                                   <div className="w-8 h-8"></div>
                                 ) : e.fish ? (
                                   (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -1558,7 +1760,7 @@
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{e.user||'-'}</bdi>
                                 </div>
-                                  {!(currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity) && (
+                                  {currentTournament.tournament.metric!=='count' && (
                                     e.fish ? (
                                       <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                                     ) : (
@@ -1590,7 +1792,7 @@
                                 <span>{currentTournament.mine.rank}</span>
                                 {currentTournament.mine.prize && <img src={`/app/assets/baits/${currentTournament.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                               </div>
-                                {currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity ? (
+                                {currentTournament.tournament.metric==='count' ? (
                                   <div className="w-8 h-8"></div>
                                 ) : currentTournament.mine.fish ? (
                                   (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
@@ -1610,7 +1812,7 @@
                                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                                   <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                                 </div>
-                                  {!(currentTournament.tournament.metric==='count' && !currentTournament.tournament.fish && !currentTournament.tournament.fishRarity) && (
+                                  {currentTournament.tournament.metric!=='count' && (
                                     currentTournament.mine.fish ? (
                                       <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
                                     ) : (
@@ -1680,7 +1882,7 @@
                               <span>{e.rank}</span>
                               {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                              {pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity ? (
+                              {pastResult.tournament.metric==='count' ? (
                                 <div className="w-8 h-8"></div>
                               ) : e.fish ? (
                                 (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -1700,7 +1902,7 @@
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{e.user||'-'}</bdi>
                               </div>
-                                {!(pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity) && (
+                                {pastResult.tournament.metric!=='count' && (
                                   e.fish ? (
                                     <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                                   ) : (
@@ -1732,7 +1934,7 @@
                               <span>{pastResult.mine.rank}</span>
                               {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                             </div>
-                              {pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity ? (
+                              {pastResult.tournament.metric==='count' ? (
                                 <div className="w-8 h-8"></div>
                               ) : pastResult.mine.fish ? (
                                 (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
@@ -1752,7 +1954,7 @@
                               <div className="flex items-center gap-1 flex-wrap min-w-0">
                                 <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                               </div>
-                                {!(pastResult.tournament.metric==='count' && !pastResult.tournament.fish && !pastResult.tournament.fishRarity) && (
+                                {pastResult.tournament.metric!=='count' && (
                                   pastResult.mine.fish ? (
                                     <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>
                                   ) : (
@@ -1800,6 +2002,28 @@
           )}
           {tab === 'shop' && (
             <div className="mt-6">
+              <div className="mb-4">
+                <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
+                {refOpen && (
+                  <div className="mt-2 p-3 rounded-xl border border-white/10 space-y-2">
+                    <div className="text-sm opacity-70">{t('refBonusInfo', starterPackName)}</div>
+                    {refInfo && (
+                      <>
+                        <div className="text-sm opacity-70">{t('myRefLink')}</div>
+                        <div className="break-all text-xs px-3 py-1 rounded-xl bg-emerald-900/50">{refInfo.link}</div>
+                        <button onClick={copyRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('copyLink')}</button>
+                      </>
+                    )}
+                    <button onClick={generateRefLink} className="w-full px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{t('generateLink')}</button>
+                    <div className="text-sm opacity-70">{t('invitedFriends')}</div>
+                    {refInfo && refInfo.invited.length>0 ? (
+                      <ul className="text-sm space-y-1">{refInfo.invited.map(n=><li key={n}>{n}</li>)}</ul>
+                    ) : (
+                      <div className="text-sm opacity-50">{t('noInvited')}</div>
+                    )}
+                  </div>
+                )}
+              </div>
               {shop.length===0 ? (
                 <div className="text-center opacity-70">{t('shopEmpty')}</div>
               ) : (
@@ -1830,13 +2054,13 @@
               )}
             </div>
           )}
-          {tab === 'guide' && (
-            <Guide me={me} />
-          )}
+            {tab === 'guide' && (
+              <Guide me={me} />
+            )}
 
-          {/* Шторка локаций */}
-          <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
-          <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
+            {/* Шторка локаций */}
+            <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
+            <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
             try{
               const r = await fetch(`/api/lure/`+id,{method:'POST',credentials:'include'});
               if(!r.ok){
@@ -1849,21 +2073,11 @@
                 ? t('authRequired')
                 : t('selectBaitFailed'));
             }
-          }} />
-
-          {/* Нижние вкладки */}
-          <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/50 backdrop-blur z-40 safe-bottom">
-            <div className="flex text-center text-xs">
-              <button onClick={()=>setTab('fish')} className={`flex-1 py-3 whitespace-nowrap ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-              <button onClick={()=>setTab('tournaments')} className={`flex-1 py-3 whitespace-nowrap ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-                <button onClick={()=>setTab('achievements')} className={`flex-1 py-3 whitespace-nowrap ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-              <button onClick={()=>setTab('guide')} className={`flex-1 py-3 whitespace-nowrap ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-              <button onClick={()=>setTab('shop')} className={`flex-1 py-3 whitespace-nowrap ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
-            </div>
+            }} />
           </div>
         </div>
-      );
-    }
+        );
+      }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
