@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Rng
 import util.sanitizeName
@@ -788,6 +789,12 @@ class FishingService {
         else -> 1.0
     }
 
+    internal fun baseEscapeChance(locId: Long): Double {
+        val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
+        val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
+        return (0.05 * rank).coerceAtMost(0.5)
+    }
+
     fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
@@ -831,7 +838,10 @@ class FishingService {
 
         val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
         if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
-        val catchChance = if (auto) 1.0 else 1.0 - reactionTime / 5.0
+        val catchChance = if (auto) 1.0 else {
+            val minEscape = baseEscapeChance(locId)
+            (1.0 - minEscape) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
+        }
         if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
 
         val fishId = picked[Fish.id].value
