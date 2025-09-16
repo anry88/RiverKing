@@ -221,6 +221,7 @@
 
     const TAP_CHALLENGE_GOAL = 10;
     const TAP_CHALLENGE_DURATION_MS = 5000;
+    const CAST_READY_DELAY_MS = 3000;
 
     const FISH_TRANSLATIONS = {
       'Плотва':'Roach','Окунь':'Perch','Карась':'Crucian Carp','Лещ':'Bream','Щука':'Pike','Карп':'Carp','Сом':'Catfish','Осётр':'Sturgeon','Уклейка':'Bleak','Линь':'Tench','Ротан':'Rotan','Судак':'Zander','Чехонь':'Sabrefish','Хариус':'Grayling','Форель ручьевая':'Brook Trout','Таймень':'Taimen','Налим':'Burbot','Сиг':'Whitefish','Голавль':'Chub','Жерех':'Asp','Толстолобик':'Bighead Carp','Белый амур':'Grass Carp','Угорь европейский':'European Eel','Стерлядь':'Sterlet','Кефаль':'Mullet','Камбала':'Flounder','Сельдь':'Herring','Ставрида':'Horse Mackerel','Треска':'Cod','Сайда':'Pollock','Морская форель':'Sea Trout','Палтус':'Halibut','Корюшка':'Smelt','Лосось атлантический':'Atlantic Salmon','Лаврак':'Sea Bass','Скумбрия атлантическая':'Atlantic Mackerel','Белуга':'Beluga','Ёрш':'Ruffe','Пескарь':'Gudgeon','Густера':'Blue Bream','Краснопёрка':'Rudd','Елец':'Dace','Верхоплавка':'Topmouth Gudgeon','Язь':'Ide','Бычок':'Goby','Килька':'Sprat','Мойва':'Capelin','Дорадо':'Dorado','Ваху':'Wahoo','Парусник':'Sailfish','Рыба-меч':'Swordfish','Марлин синий':'Blue Marlin','Тунец синеперый':'Bluefin Tuna','Акула мако':'Mako Shark'
@@ -346,6 +347,7 @@
         castRod:'Забросить удочку',
         hook:'Подсечь!',
         autoCast:'Автозаброс',
+        castCooldown:'Готовим снасти…',
         autoFishUntil:d=>`Активно до ${d}`,
         autoFishExtend:'Продлить ещё на месяц',
         tapButton:'Тащи!!!',
@@ -451,6 +453,7 @@
         castRod:'Cast rod',
         hook:'Hook!',
         autoCast:'Auto cast',
+        castCooldown:'Preparing the rod…',
         autoFishUntil:d=>`Active until ${d}`,
         autoFishExtend:'Extend for another month',
         tapButton:'Reel it in!!!',
@@ -973,7 +976,7 @@
       );
     }
 
-    function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
+    function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -1102,7 +1105,14 @@
           {/* На десктопе CTA поверх сцены; на мобиле — ниже (см. ниже) */}
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
-              <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+              castReady ? (
+                <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+              ) : (
+                <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
+                  <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
+                  <div className="opacity-90">{t('castCooldown')}</div>
+                </div>
+              )
             ) : tapping ? (
               <TapChallengeButton
                 count={tapCount}
@@ -1197,6 +1207,9 @@
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
       const autoCastRef = React.useRef(autoCast);
       const autoCastTimeoutRef = React.useRef(null);
+      const [castReady,setCastReady] = React.useState(true);
+      const castReadyRef = React.useRef(true);
+      const castReadyTimeoutRef = React.useRef(null);
       const [tapActive,setTapActive] = React.useState(false);
       const tapActiveRef = React.useRef(false);
       const [tapCount,setTapCount] = React.useState(0);
@@ -1215,6 +1228,26 @@
         }
       }, [autoCast, me?.autoFish]);
       React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
+
+      React.useEffect(()=>()=>{
+        if(castReadyTimeoutRef.current){
+          clearTimeout(castReadyTimeoutRef.current);
+          castReadyTimeoutRef.current = null;
+        }
+      }, []);
+
+      function startCastCooldown(){
+        castReadyRef.current = false;
+        setCastReady(false);
+        if(castReadyTimeoutRef.current){
+          clearTimeout(castReadyTimeoutRef.current);
+        }
+        castReadyTimeoutRef.current = setTimeout(()=>{
+          castReadyRef.current = true;
+          setCastReady(true);
+          castReadyTimeoutRef.current = null;
+        }, CAST_READY_DELAY_MS);
+      }
 
       React.useEffect(()=>{ tapActiveRef.current = tapActive; }, [tapActive]);
       React.useEffect(()=>{ tapCountRef.current = tapCount; }, [tapCount]);
@@ -1629,10 +1662,11 @@
         }finally{
           castingRef.current = false;
           setCasting(false);
+          startCastCooldown();
           tapFinishingRef.current = false;
           tapReactionRef.current = 0;
           if(caught && autoCastRef.current && autoFishActive){
-            autoCastTimeoutRef.current = setTimeout(()=>cast(),1000);
+            autoCastTimeoutRef.current = setTimeout(()=>cast(true), CAST_READY_DELAY_MS);
           }
         }
       }
@@ -1674,7 +1708,8 @@
         }
       }
 
-      async function cast(){
+      async function cast(auto=false){
+        if(!auto && !castReadyRef.current) return;
         if(castingRef.current) return; if(!me) return;
         const curId = me.currentLureId;
         const curLure = me.lures.find(l=>l.id===curId);
@@ -1741,6 +1776,7 @@
             setError(t('fishEscaped'));
             castingRef.current = false;
             setCasting(false);
+            startCastCooldown();
             tapActiveRef.current = false;
             setTapActive(false);
             tapFinishingRef.current = false;
@@ -1762,6 +1798,7 @@
             : t('castOften'));
           castingRef.current = false;
           setCasting(false);
+          startCastCooldown();
           tapActiveRef.current = false;
           setTapActive(false);
           tapFinishingRef.current = false;
@@ -1862,7 +1899,8 @@
                   tapCount={tapCount}
                   tapGoal={TAP_CHALLENGE_GOAL}
                   tapTimeLeft={tapTimeLeft}
-                  onCast={cast}
+                  castReady={castReady}
+                  onCast={()=>cast(false)}
                   onHook={()=>hook(false)}
                   onTap={handleTap}
                   onClaimDaily={openDaily}
@@ -1876,7 +1914,14 @@
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
-                  <button onClick={cast} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+                  castReady ? (
+                    <button onClick={()=>cast(false)} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+                  ) : (
+                    <div className="glass w-full py-4 rounded-2xl text-center">
+                      <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
+                      <div className="opacity-90">{t('castCooldown')}</div>
+                    </div>
+                  )
                 ) : tapActive ? (
                   <TapChallengeButton
                     count={tapCount}
