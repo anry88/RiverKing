@@ -126,6 +126,13 @@
         padding-bottom: 5px;
         display:flex; align-items:flex-end; gap:12px;
       }
+      .app-footer{
+        padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px));
+        height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px) + 5px);
+        padding: 8px calc(16px * var(--ui-scale));
+        padding-top: 5px;
+        display:flex; align-items:stretch; gap:12px;
+      }
       .app-content{ flex:1; min-height:0; overflow:auto; }
       .btn-lg{
         font-size: calc(16px * var(--ui-scale));
