@@ -13,6 +13,14 @@ const tgParam = (()=>{
   }catch{ return null; }
 })();
 
+const WAIT_MIN_MS = 5000;
+const WAIT_MAX_MS = 25000;
+const TAP_CHANCE = 0.22;
+const TAP_REACTION_MIN = 0.6;
+const TAP_REACTION_MAX = 2.6;
+const DEFAULT_REACTION_WINDOW_MS = 5000;
+const FAIL_REACTION_SECONDS = 5.1;
+
 function App(){
   const [me,setMe] = React.useState(null);
   const [loading,setLoading] = React.useState(true);
@@ -432,18 +440,100 @@ function App(){
     }catch(e){}
   }
 
-  async function finalizeCatch(reaction, success){
-    let caught = false;
+  function finishCast(caught, autoFishActive){
+    if(hookTimeoutRef.current){
+      clearTimeout(hookTimeoutRef.current);
+      hookTimeoutRef.current = null;
+    }
+    if(tapTimerRef.current){
+      cancelAnimationFrame(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
+    tapFinishingRef.current = false;
+    tapReactionRef.current = 0;
+    tapActiveRef.current = false;
+    setTapActive(false);
+    setTapCount(0);
+    setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+    bitingRef.current = false;
+    setBiting(false);
+    castingRef.current = false;
+    setCasting(false);
+    if(autoCastTimeoutRef.current){
+      clearTimeout(autoCastTimeoutRef.current);
+      autoCastTimeoutRef.current = null;
+    }
+    waitRef.current = 0;
+    startCastCooldown();
+    if(caught && autoCastRef.current && autoFishActive){
+      autoCastTimeoutRef.current = setTimeout(()=>cast(true), CAST_READY_DELAY_MS);
+    }
+  }
+
+  async function finalizeCatch(reactionSeconds){
+    const waitSeconds = Math.max(5, Math.round(waitRef.current || 0));
+    let hookSuccess = false;
     let autoFishActive = me.autoFish;
+    try{
+      const hookRes = await fetch(`/api/hook`,{
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wait:waitSeconds, reaction:reactionSeconds})
+      });
+      if(!hookRes.ok){
+        if(hookRes.status===401) throw new Error('unauthorized');
+        if(hookRes.status===429){
+          setError(t('castOften'));
+          finishCast(false, autoFishActive);
+          return;
+        }
+        let msg;
+        try{ msg = (await hookRes.json())?.error; }catch(e){}
+        if(msg === 'No suitable fish') setError(t('noSuitableFish'));
+        else if(msg === 'No baits') setError(t('noBaits'));
+        else if(msg === 'No lure selected') setError(t('selectBaitFailed'));
+        else if(msg === 'locked') setError(t('locationLocked'));
+        else setError(t('castFailed'));
+        finishCast(false, autoFishActive);
+        return;
+      }
+      const hookData = await hookRes.json();
+      hookSuccess = hookData.success;
+      autoFishActive = hookData.autoFish;
+      if(!hookSuccess){
+        setError(t('fishEscaped'));
+        finishCast(false, autoFishActive);
+        return;
+      }
+    }catch(e){
+      setError(e.message==='unauthorized' ? t('authRequired') : t('castFailed'));
+      finishCast(false, autoFishActive);
+      return;
+    }
+
+    let caught = false;
     try{
       const r = await fetch(`/api/cast`,{
         method:'POST', credentials:'include',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({wait:waitRef.current, reaction, success})
+        body:JSON.stringify({wait:waitSeconds, reaction:reactionSeconds, success:hookSuccess})
       });
       if(!r.ok){
         if(r.status===401) throw new Error('unauthorized');
-        throw 0;
+        if(r.status===429){
+          setError(t('castOften'));
+          finishCast(false, autoFishActive);
+          return;
+        }
+        let msg;
+        try{ msg = (await r.json())?.error; }catch(e){}
+        if(msg === 'No suitable fish') setError(t('noSuitableFish'));
+        else if(msg === 'No baits') setError(t('noBaits'));
+        else if(msg === 'No lure selected') setError(t('selectBaitFailed'));
+        else setError(t('castFailed'));
+        finishCast(false, autoFishActive);
+        return;
       }
       const d = await r.json();
       caught = d.caught;
@@ -483,14 +573,7 @@ function App(){
         ? t('authRequired')
         : t('castOften'));
     }finally{
-      castingRef.current = false;
-      setCasting(false);
-      startCastCooldown();
-      tapFinishingRef.current = false;
-      tapReactionRef.current = 0;
-      if(caught && autoCastRef.current && autoFishActive){
-        autoCastTimeoutRef.current = setTimeout(()=>cast(true), CAST_READY_DELAY_MS);
-      }
+      finishCast(caught, autoFishActive);
     }
   }
 
@@ -518,7 +601,10 @@ function App(){
       tapTimerRef.current = null;
     }
     setTapActive(false);
-    finalizeCatch(tapReactionRef.current || 5.1, success);
+    const reaction = success
+      ? (tapReactionRef.current || 1.5)
+      : FAIL_REACTION_SECONDS;
+    finalizeCatch(reaction);
   }
 
   function handleTap(){
@@ -548,7 +634,24 @@ function App(){
         throw 0;
       }
       const d = await r.json();
-      waitRef.current = d.wait;
+      const nextCurrentId = d.currentLureId;
+      const hasNextCurrent = nextCurrentId !== undefined && nextCurrentId !== null;
+      setMe(p=>{
+        if(!p) return p;
+        const updatedLures = (p.lures||[]).map(l=> l.id===curId ? {...l, qty: Math.max(0, l.qty-1)} : l);
+        return {
+          ...p,
+          lures: updatedLures,
+          currentLureId: hasNextCurrent ? nextCurrentId : p.currentLureId
+        };
+      });
+      const waitMs = Math.round(WAIT_MIN_MS + Math.random() * (WAIT_MAX_MS - WAIT_MIN_MS));
+      const waitSeconds = Math.max(5, Math.round(waitMs / 1000));
+      waitRef.current = waitSeconds;
+      const hasTapChallenge = Math.random() < TAP_CHANCE;
+      const tapReaction = hasTapChallenge
+        ? TAP_REACTION_MIN + Math.random() * (TAP_REACTION_MAX - TAP_REACTION_MIN)
+        : null;
       bitingRef.current = false;
       setBiting(false);
       castingRef.current = true;
@@ -558,14 +661,15 @@ function App(){
         bitingRef.current = true;
         setBiting(true);
         biteTimeRef.current = Date.now();
-        if(d.tap){
-          startTapChallenge(d.tapReaction);
+        hookTimeoutRef.current = null;
+        if(hasTapChallenge && tapReaction!=null){
+          startTapChallenge(tapReaction);
         } else {
           hookTimeoutRef.current = setTimeout(()=>{
-            finalizeCatch(10, true);
-          }, d.reactionWindow || 5000);
+            finalizeCatch(FAIL_REACTION_SECONDS);
+          }, DEFAULT_REACTION_WINDOW_MS);
         }
-      }, d.wait);
+      }, waitMs);
     }catch(e){
       setError(e.message==='unauthorized'
         ? t('authRequired')
@@ -587,8 +691,8 @@ function App(){
       setError(t('wrongLure'));
       return;
     }
-    const reaction = (Date.now() - biteTimeRef.current) / 1000;
-    finalizeCatch(reaction, true);
+    const reaction = Math.max(0, (Date.now() - biteTimeRef.current) / 1000);
+    finalizeCatch(reaction);
   }
 
   React.useEffect(()=>()=>{
