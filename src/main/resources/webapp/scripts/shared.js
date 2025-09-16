@@ -74,7 +74,7 @@
   const CAST_READY_DELAY_MS = 3000;
 
   const FISH_TRANSLATIONS = {
-    'Плотва': 'Roach','Окунь': 'Perch','Карась': 'Crucian Carp','Лещ': 'Bream','Щука': 'Pike','Карп': 'Carp','Сом': 'Catfish','Осётр': 'Sturgeon','Уклейка': 'Bleak','Линь': 'Tench','Ротан': 'Rotan','Судак': 'Zander','Чехонь': 'Sabrefish','Хариус': 'Grayling','Форель ручьевая': 'Brook Trout','Таймень': 'Taimen','Налим': 'Burbot','Сиг': 'Whitefish','Голавль': 'Chub','Жерех': 'Asp','Толстолобик': 'Bighead Carp','Белый амур': 'Grass Carp','Угорь европейский': 'European Eel','Стерлядь': 'Sterlet','Кефаль': 'Mullet','Камбала': 'Flounder','Сельдь': 'Herring','Ставрида': 'Horse Mackerel','Треска': 'Cod','Сайда': 'Pollock','Морская форель': 'Sea Trout','Палтус': 'Halibut','Корюшка': 'Smelt','Лосось атлантический': 'Atlantic Salmon','Лаврак': 'Sea Bass','Скумбрия атлантическая': 'Atlantic Mackerel','Белуга': 'Beluga','Ёрш': 'Ruffe','Пескарь': 'Gudgeon','Густера': 'Blue Bream','Краснопёрка': 'Rudd','Елец': 'Dace','Верхоплавка': 'Topmouth Gudgeon','Язь': 'Ide','Бычок': 'Goby','Килька': 'Sprat','Мойва': 'Capelin','Дорадо': 'Dorado','Ваху': 'Wahoo','Парусник': 'Sailfish','Рыба-меч': 'Swordfish','Марлин синий': 'Blue Marlin','Тунец синеперый': 'Bluefin Tuna','Акула мако': 'Mako Shark'
+    'Плотва': 'Roach','Окунь': 'Perch','Карась': 'Crucian Carp','Лещ': 'Bream','Щука': 'Pike','Карп': 'Carp','Сом': 'Catfish','Осётр': 'Sturgeon','Уклейка': 'Bleak','Линь': 'Tench','Ротан': 'Rotan','Судак': 'Zander','Чехонь': 'Sabrefish','Хариус': 'Grayling','Форель ручьевая': 'Brook Trout','Таймень': 'Taimen','Налим': 'Burbot','Сиг': 'Whitefish','Голавль': 'Chub','Жерех': 'Asp','Толстолобик': 'Bighead Carp','Белый амур': 'Grass Carp','Угорь европейский': 'European Eel','Стерлядь': 'Sterlet','Кефаль': 'Mullet','Камбала': 'Flounder','Сельдь': 'Herring','Ставрида': 'Horse Mackerel','Треска': 'Cod','Сайда': 'Pollock','Морская форель': 'Sea Trout','Палтус': 'Halibut','Корюшка': 'Smelt','Лосось атлантический': 'Atlantic Salmon','Лаврак': 'Sea Bass','Скумбрия атлантическая': 'Atlantic Mackerel','Белуга': 'Beluga','Ёрш': 'Ruffe','Пескарь': 'Gudgeon','Густера': 'Blue Bream','Краснопёрка': 'Rudd','Елец': 'Dace','Верхоплавка': 'Topmouth Gudgeon','Гольян': 'Minnow','Язь': 'Ide','Бычок': 'Goby','Килька': 'Sprat','Мойва': 'Capelin','Сардина': 'Sardine','Анчоус': 'Anchovy','Дорадо': 'Dorado','Ваху': 'Wahoo','Парусник': 'Sailfish','Рыба-меч': 'Swordfish','Марлин синий': 'Blue Marlin','Тунец синеперый': 'Bluefin Tuna','Акула мако': 'Mako Shark'
   };
   const LURE_TRANSLATIONS = {
     'Пресная мирная': 'Freshwater Peaceful',
@@ -133,10 +133,13 @@
     'Краснопёрка': '/app/assets/fish/krasnopyorka.png',
     'Елец': '/app/assets/fish/elets.png',
     'Верхоплавка': '/app/assets/fish/verhoplavka.png',
+    'Гольян': '/app/assets/fish/golyan.png',
     'Язь': '/app/assets/fish/yaz.png',
     'Бычок': '/app/assets/fish/bychyok.png',
     'Килька': '/app/assets/fish/kilka.png',
     'Мойва': '/app/assets/fish/mojva.png',
+    'Сардина': '/app/assets/fish/sardina.png',
+    'Анчоус': '/app/assets/fish/anchous.png',
     'Дорадо': '/app/assets/fish/dorado.png',
     'Ваху': '/app/assets/fish/vahu.png',
     'Парусник': '/app/assets/fish/parusnik.png',
