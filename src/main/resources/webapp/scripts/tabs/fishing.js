@@ -34,10 +34,11 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const {w,h} = useResizeObserver(stageRef);
 
   const WATER_TOP_REL = 0.48;
-  const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
-  const [floatRel, setFloatRel] = React.useState(shorePosRel);
+  const defaultHomeRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
+  const [floatRel, setFloatRel] = React.useState(defaultHomeRel);
   const [tension, setTension] = React.useState(0.2);
 
+  const clamp = (value, min=0, max=1)=> Math.min(max, Math.max(min, value));
   const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
   const floatPx = toPx(floatRel);
 
@@ -61,6 +62,14 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
 
   const tipX = rodLeft + rodW * ROD_TIP_ANCHOR.x;
   const tipY = rodTop  + rodH * ROD_TIP_ANCHOR.y;
+
+  const rodHomeRel = React.useMemo(()=>{
+    if(!w || !h) return defaultHomeRel;
+    const offset = isSmall ? 0.07 : (isTablet ? 0.085 : 0.1);
+    const x = clamp((tipX / w) - offset, 0.05, 0.82);
+    const y = clamp(WATER_TOP_REL + (isSmall ? 0.015 : 0.025), 0, 1);
+    return {x, y};
+  }, [defaultHomeRel, isSmall, isTablet, tipX, w, h]);
 
   const ctrl = {
     x: (tipX + floatPx.x) / 2 - (isSmall ? 24 : 40),
@@ -92,10 +101,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       setTension(0.15 + Math.random() * 0.25);
       tweenTo(target, 650);
     } else {
-      setFloatRel(shorePosRel);
+      setFloatRel(rodHomeRel);
       setTension(0.18);
     }
-  }, [casting, shorePosRel, tipX, w]);
+  }, [casting, rodHomeRel]);
 
   const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
   const [bgLoaded, setBgLoaded] = React.useState(false);
@@ -177,7 +186,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
           />
         </div>
 
-        <div className="p-3 flex justify-end text-xs opacity-80">
+        <div className="p-3 hidden md:flex justify-end text-xs opacity-80">
           {castReady ? (
             tapping ? (
               <div className="px-3 py-1 rounded-full glass">{t('tapPrompt', tapGoal)}</div>
