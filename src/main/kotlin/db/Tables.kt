@@ -184,6 +184,7 @@ object DB {
         val fBel= upsertFish("Белуга","legendary", 40.0,20.0,true,"salt")
 
         // Морская мирная «мелочь» (расширение пула)
+        val fBy2 = upsertFish("Бычок", "common", 0.12, 0.06, true, "salt")
         val fKi2 = upsertFish("Килька",   "common", 0.03,0.01,false,"salt")
         val fMo2 = upsertFish("Мойва",    "common", 0.04,0.015,false,"salt")
         val fSar = upsertFish("Сардина",  "common", 0.12,0.05,false,"salt")   // НОВОЕ
