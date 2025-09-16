@@ -94,6 +94,7 @@ class FishingService {
     }
 
     fun resetCasting(userId: Long) = transaction {
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
         Users.update({ Users.id eq userId }) {
             it[Users.isCasting] = false
             it[Users.castLureId] = null
@@ -179,12 +180,14 @@ class FishingService {
 
         streak = if (last == today.minusDays(1)) streak + 1 else 1
 
-        val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
-        val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
-        val saltFreshId = Lures.select { Lures.name eq "Морская мирная" }.single()[Lures.id].value
-        val saltPredId = Lures.select { Lures.name eq "Морская хищная" }.single()[Lures.id].value
-        val freshPlusId = Lures.select { Lures.name eq "Пресная мирная+" }.single()[Lures.id].value
-        val predPlusId = Lures.select { Lures.name eq "Пресная хищная+" }.single()[Lures.id].value
+        val freshId       = Lures.select { Lures.name eq "Пресная мирная"     }.single()[Lures.id].value
+        val predId        = Lures.select { Lures.name eq "Пресная хищная"     }.single()[Lures.id].value
+        val saltFreshId   = Lures.select { Lures.name eq "Морская мирная"     }.single()[Lures.id].value
+        val saltPredId    = Lures.select { Lures.name eq "Морская хищная"     }.single()[Lures.id].value
+        val freshPlusId   = Lures.select { Lures.name eq "Пресная мирная+"    }.single()[Lures.id].value
+        val predPlusId    = Lures.select { Lures.name eq "Пресная хищная+"    }.single()[Lures.id].value
+        val saltPredPlusId= Lures.select { Lures.name eq "Морская хищная+"    }.single()[Lures.id].value
+        // (saltFreshPlusId не нужен в новом плане)
 
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
@@ -204,17 +207,16 @@ class FishingService {
         }
 
         val rewardDay = streak.coerceAtMost(7)
-
         when (rewardDay) {
             1 -> { add(freshId, 10); add(predId, 5) }
             2 -> { add(freshId, 10); add(predId, 10) }
-            3 -> { add(freshId, 15); add(predId, 10) }
-            4 -> { add(freshId, 15); add(predId, 15) }
-            5 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5) }
-            6 -> { add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5) }
+            3 -> { add(freshId, 12); add(predId, 12); add(saltPredId, 3) }
+            4 -> { add(freshId, 12); add(predId, 15); add(saltPredId, 5) }
+            5 -> { add(freshId, 15); add(predId, 15); add(saltPredId, 6); add(saltFreshId, 2) }
+            6 -> { add(freshId, 15); add(predId, 18); add(saltPredId, 8); add(saltFreshId, 2) }
             7 -> {
-                add(freshId, 15); add(predId, 15); add(saltFreshId, 5); add(saltPredId, 5)
-                add(freshPlusId, 1); add(predPlusId, 1)
+                add(freshId, 15); add(predId, 18); add(saltPredId, 10)
+                add(freshPlusId, 1); add(predPlusId, 2); add(saltPredPlusId, 1) // упор на хищных
             }
         }
 
@@ -386,33 +388,21 @@ class FishingService {
     )
 
     private val shopCategories = listOf(
+        // --- Пресные простые (без изменений) ---
         ShopCategory(
             "fresh_basic",
             "Пресные простые",
             listOf(
-                ShopPackage(
-                    "fresh_topup_s",
-                    "Пополнение S",
-                    "20 пресных простых: 10 мирных и 10 хищных",
-                    39,
-                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10)
-                ),
-                ShopPackage(
-                    "fresh_stock_m",
-                    "Запас M",
-                    "50 пресных простых: 25 мирных и 25 хищных",
-                    89,
-                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25)
-                ),
-                ShopPackage(
-                    "fresh_crate_l",
-                    "Ящик L",
-                    "120 пресных простых: 60 мирных и 60 хищных",
-                    199,
-                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60)
-                ),
+                ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 мирных и 10 хищных",39,
+                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10)),
+                ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 мирных и 25 хищных",89,
+                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25)),
+                ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 мирных и 60 хищных",199,
+                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60)),
             )
         ),
+
+        // --- Морские простые: перекос в сторону хищных ---
         ShopCategory(
             "salt_basic",
             "Морские простые",
@@ -420,53 +410,42 @@ class FishingService {
                 ShopPackage(
                     "salt_topup_s",
                     "Пополнение S",
-                    "20 морских простых: 10 мирных и 10 хищных",
+                    "20 морских простых: 6 мирных и 14 хищных",
                     55,
-                    listOf("Морская мирная" to 10, "Морская хищная" to 10)
+                    listOf("Морская мирная" to 6, "Морская хищная" to 14)
                 ),
                 ShopPackage(
                     "salt_stock_m",
                     "Запас M",
-                    "50 морских простых: 25 мирных и 25 хищных",
+                    "50 морских простых: 15 мирных и 35 хищных",
                     129,
-                    listOf("Морская мирная" to 25, "Морская хищная" to 25)
+                    listOf("Морская мирная" to 15, "Морская хищная" to 35)
                 ),
                 ShopPackage(
                     "salt_crate_l",
                     "Ящик L",
-                    "120 морских простых: 60 мирных и 60 хищных",
+                    "120 морских простых: 40 мирных и 80 хищных",
                     299,
-                    listOf("Морская мирная" to 60, "Морская хищная" to 60)
+                    listOf("Морская мирная" to 40, "Морская хищная" to 80)
                 ),
             )
         ),
+
+        // --- Пресные улучшенные (без изменений) ---
         ShopCategory(
             "fresh_boost",
             "Пресные улучшенные",
             listOf(
-                ShopPackage(
-                    "fresh_boost_s",
-                    "Буст S",
-                    "10 пресных улучшенных: 5 мирных и 5 хищных",
-                    69,
-                    listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)
-                ),
-                ShopPackage(
-                    "fresh_boost_m",
-                    "Буст M",
-                    "25 пресных улучшенных: 12 мирных и 13 хищных",
-                    159,
-                    listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)
-                ),
-                ShopPackage(
-                    "fresh_boost_l",
-                    "Буст L",
-                    "60 пресных улучшенных: 30 мирных и 30 хищных",
-                    349,
-                    listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)
-                ),
+                ShopPackage("fresh_boost_s","Буст S","10 пресных улучшенных: 5 мирных и 5 хищных",69,
+                    listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)),
+                ShopPackage("fresh_boost_m","Буст M","25 пресных улучшенных: 12 мирных и 13 хищных",159,
+                    listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)),
+                ShopPackage("fresh_boost_l","Буст L","60 пресных улучшенных: 30 мирных и 30 хищных",349,
+                    listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)),
             )
         ),
+
+        // --- Морские улучшенные: больше хищных+ ---
         ShopCategory(
             "salt_boost",
             "Морские улучшенные",
@@ -474,26 +453,28 @@ class FishingService {
                 ShopPackage(
                     "salt_boost_s",
                     "Буст S",
-                    "10 морских улучшенных: 5 мирных и 5 хищных",
+                    "10 морских улучшенных: 4 мирные+ и 6 хищные+",
                     99,
-                    listOf("Морская мирная+" to 5, "Морская хищная+" to 5)
+                    listOf("Морская мирная+" to 4, "Морская хищная+" to 6)
                 ),
                 ShopPackage(
                     "salt_boost_m",
                     "Буст M",
-                    "25 морских улучшенных: 12 мирных и 13 хищных",
+                    "25 морских улучшенных: 9 мирных+ и 16 хищных+",
                     239,
-                    listOf("Морская мирная+" to 12, "Морская хищная+" to 13)
+                    listOf("Морская мирная+" to 9, "Морская хищная+" to 16)
                 ),
                 ShopPackage(
                     "salt_boost_l",
                     "Буст L",
-                    "60 морских улучшенных: 30 мирных и 30 хищных",
+                    "60 морских улучшенных: 20 мирных+ и 40 хищных+",
                     549,
-                    listOf("Морская мирная+" to 30, "Морская хищная+" to 30)
+                    listOf("Морская мирная+" to 20, "Морская хищная+" to 40)
                 ),
             )
         ),
+
+        // --- Смешанные: морские позиции смещены к хищным ---
         ShopCategory(
             "mixed",
             "Смешанные",
@@ -501,13 +482,13 @@ class FishingService {
                 ShopPackage(
                     "bundle_starter",
                     "Стартовый набор",
-                    "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (10 мирных и 10 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)",
+                    "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (6 мирных и 14 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)",
                     129,
                     listOf(
                         "Пресная мирная" to 20,
                         "Пресная хищная" to 20,
-                        "Морская мирная" to 10,
-                        "Морская хищная" to 10,
+                        "Морская мирная" to 6,
+                        "Морская хищная" to 14,
                         "Пресная мирная+" to 3,
                         "Пресная хищная+" to 2,
                     )
@@ -515,37 +496,39 @@ class FishingService {
                 ShopPackage(
                     "bundle_pro",
                     "Профи рыболов",
-                    "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (20 мирных и 20 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (3 мирные+ и 2 хищные+)",
+                    "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (12 мирных и 28 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (1 мирная+ и 4 хищные+)",
                     319,
                     listOf(
                         "Пресная мирная" to 40,
                         "Пресная хищная" to 40,
-                        "Морская мирная" to 20,
-                        "Морская хищная" to 20,
+                        "Морская мирная" to 12,
+                        "Морская хищная" to 28,
                         "Пресная мирная+" to 8,
                         "Пресная хищная+" to 7,
-                        "Морская мирная+" to 3,
-                        "Морская хищная+" to 2,
+                        "Морская мирная+" to 1,
+                        "Морская хищная+" to 4,
                     )
                 ),
                 ShopPackage(
                     "bundle_whale",
                     "Китовый ящик",
-                    "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (60 мирных и 60 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (10 мирных+ и 10 хищных+)",
+                    "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (40 мирных и 80 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (6 мирных+ и 14 хищных+)",
                     869,
                     listOf(
                         "Пресная мирная" to 100,
                         "Пресная хищная" to 100,
-                        "Морская мирная" to 60,
-                        "Морская хищная" to 60,
+                        "Морская мирная" to 40,
+                        "Морская хищная" to 80,
                         "Пресная мирная+" to 20,
                         "Пресная хищная+" to 20,
-                        "Морская мирная+" to 10,
-                        "Морская хищная+" to 10,
+                        "Морская мирная+" to 6,
+                        "Морская хищная+" to 14,
                     )
                 ),
             )
         ),
+
+        // --- Стартовые: морской старт теперь 3/7 ---
         ShopCategory(
             "starter",
             "Стартовые",
@@ -560,12 +543,14 @@ class FishingService {
                 ShopPackage(
                     "micro_salt_starter",
                     "Морской старт",
-                    "10 морских простых: 5 мирных и 5 хищных",
+                    "10 морских простых: 3 мирных и 7 хищных",
                     25,
-                    listOf("Морская мирная" to 5, "Морская хищная" to 5)
+                    listOf("Морская мирная" to 3, "Морская хищная" to 7)
                 ),
             )
         ),
+
+        // --- Подписки (без изменений) ---
         ShopCategory(
             "subscriptions",
             "Подписки",
@@ -731,6 +716,7 @@ class FishingService {
     fun startCast(userId: Long): Long? = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(!userRow[Users.isCasting]) { "casting" }
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
         val lureId = userRow[Users.currentLureId]?.value
             ?: error("No lure selected")
         val lureRow = (InventoryLures innerJoin Lures)
@@ -775,6 +761,9 @@ class FishingService {
     )
 
     @Serializable
+    data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
+
+    @Serializable
     data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null, val autoFish: Boolean = false)
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -792,11 +781,10 @@ class FishingService {
         return (0.05 * rank).coerceAtMost(0.5)
     }
 
-    fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
+    fun hook(userId: Long, waitSeconds: Int, reactionTime: Double): HookResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
-        val lureId = userRow[Users.castLureId]?.value
-            ?: error("No lure selected")
+        val lureId = userRow[Users.castLureId]?.value ?: error("No lure selected")
         val lureRow = Lures.select { Lures.id eq lureId }.single()
 
         val lurePred = lureRow[Lures.predator]
@@ -804,12 +792,12 @@ class FishingService {
         val rarityBonus = lureRow[Lures.rarityBonus]
 
         val total = totalKg(userId)
-        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
+        val locId = userRow[Users.currentLocationId]?.value
             ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
         val locRow = Locations.select { Locations.id eq locId }.single()
         require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
-            .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
+            .slice(Fish.id, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
             .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
             .toList()
         require(pool.isNotEmpty()) { "No suitable fish" }
@@ -824,27 +812,74 @@ class FishingService {
             roll <= 0.0
         }
 
-        fun finish(res: CastResultDTO): CastResultDTO {
+        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+
+        fun escape(): HookResultDTO {
+            PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
                 it[Users.isCasting] = false
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return res
+            return HookResultDTO(false, auto)
         }
 
-        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
-        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
+        if (!auto && reactionTime >= 5.0) return@transaction escape()
+
         val catchChance = if (auto) 1.0 else {
             val minEscape = baseEscapeChance(locId)
             (1.0 - minEscape) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
         }
-        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
+        if (!auto && rnd.nextDouble() > catchChance) return@transaction escape()
 
         val fishId = picked[Fish.id].value
-        val fishName = picked[Fish.name]
-        val rarity = picked[Fish.rarity]
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
+
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+        PendingCatches.insert {
+            it[PendingCatches.userId] = userId
+            it[PendingCatches.fishId] = fishId
+            it[PendingCatches.weight] = weight
+            it[PendingCatches.locationId] = locId
+            it[PendingCatches.lureId] = lureId
+            it[PendingCatches.waitSeconds] = wait
+            it[PendingCatches.reactionTime] = reactionTime
+            it[PendingCatches.autoCatch] = auto
+            it[PendingCatches.createdAt] = Instant.now()
+        }
+
+        HookResultDTO(true, auto)
+    }
+
+    fun cast(userId: Long, _waitSeconds: Int, _reactionTime: Double, success: Boolean): CastResultDTO = transaction {
+        val userRow = Users.select { Users.id eq userId }.single()
+        require(userRow[Users.isCasting]) { "no cast" }
+        val pending = PendingCatches.select { PendingCatches.userId eq userId }.singleOrNull()
+        val autoCatch = pending?.get(PendingCatches.autoCatch) ?: false
+        val autoActive = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+
+        fun finish(caught: Boolean, catch: CatchDTO? = null): CastResultDTO {
+            PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+            Users.update({ Users.id eq userId }) {
+                it[Users.isCasting] = false
+                it[Users.castLureId] = null
+                it[Users.lastCastAt] = Instant.now()
+            }
+            return CastResultDTO(caught, catch, autoActive)
+        }
+
+        if (pending == null) return@transaction finish(false)
+        if (!autoCatch && !success) return@transaction finish(false)
+
+        val fishId = pending[PendingCatches.fishId].value
+        val weight = pending[PendingCatches.weight]
+        val locId = pending[PendingCatches.locationId].value
+
+        val fishRow = Fish.select { Fish.id eq fishId }.single()
+        val fishName = fishRow[Fish.name]
+        val rarity = fishRow[Fish.rarity]
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        val locName = locRow[Locations.name]
 
         Catches.insert {
             it[Catches.userId] = userId
@@ -853,19 +888,16 @@ class FishingService {
             it[Catches.locationId] = locId
             it[Catches.createdAt] = Instant.now()
         }
-        val locName = locRow[Locations.name]
+
         finish(
-            CastResultDTO(
-                true,
-                CatchDTO(
-                    fishName,
-                    weight,
-                    locName,
-                    rarity,
-                    userId = null,
-                    fishId = fishId,
-                ),
-                auto
+            true,
+            CatchDTO(
+                fishName,
+                weight,
+                locName,
+                rarity,
+                userId = null,
+                fishId = fishId,
             )
         )
     }
