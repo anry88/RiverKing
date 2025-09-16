@@ -84,6 +84,11 @@
     .ripple::before,.ripple::after{ content:""; position:absolute; inset:-6px; border-radius:9999px; border:2px solid rgba(255,255,255,.35); animation:ripple 2.2s linear infinite; }
     .ripple::after{ animation-delay:1.1s; }
 
+    @keyframes tapPulse { 0%{ opacity:0.45; transform:scale(0.75);} 100%{ opacity:0; transform:scale(1.6);} }
+    .tap-hint{ position:absolute; inset:-12px; pointer-events:none; z-index:5; }
+    .tap-hint::before,.tap-hint::after{ content:""; position:absolute; inset:0; border-radius:9999px; border:2px solid rgba(255,255,255,.45); animation:tapPulse .45s ease-out infinite; }
+    .tap-hint::after{ animation-delay:.22s; }
+
     @keyframes pop {0%{transform:scale(.5);opacity:0;}80%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);}}
     .animate-pop{animation:pop .3s ease-out;}
 
@@ -192,6 +197,9 @@
     // Новые пожелания:
     const ROD_SIZE_MULT = 1.5;       // УВЕЛИЧИТЬ в 1.5 раза от предыдущей логики
     const ROD_BASE_X_FRACTION = 2/3; // Начинать примерно в 2/3 ширины сцены
+
+    const TAP_CHALLENGE_GOAL = 10;
+    const TAP_CHALLENGE_DURATION_MS = 5000;
 
     const FISH_TRANSLATIONS = {
       'Плотва':'Roach','Окунь':'Perch','Карась':'Crucian Carp','Лещ':'Bream','Щука':'Pike','Карп':'Carp','Сом':'Catfish','Осётр':'Sturgeon','Уклейка':'Bleak','Линь':'Tench','Ротан':'Rotan','Судак':'Zander','Чехонь':'Sabrefish','Хариус':'Grayling','Форель ручьевая':'Brook Trout','Таймень':'Taimen','Налим':'Burbot','Сиг':'Whitefish','Голавль':'Chub','Жерех':'Asp','Толстолобик':'Bighead Carp','Белый амур':'Grass Carp','Угорь европейский':'European Eel','Стерлядь':'Sterlet','Кефаль':'Mullet','Камбала':'Flounder','Сельдь':'Herring','Ставрида':'Horse Mackerel','Треска':'Cod','Сайда':'Pollock','Морская форель':'Sea Trout','Палтус':'Halibut','Корюшка':'Smelt','Лосось атлантический':'Atlantic Salmon','Лаврак':'Sea Bass','Скумбрия атлантическая':'Atlantic Mackerel','Белуга':'Beluga','Ёрш':'Ruffe','Пескарь':'Gudgeon','Густера':'Blue Bream','Краснопёрка':'Rudd','Елец':'Dace','Верхоплавка':'Topmouth Gudgeon','Язь':'Ide','Бычок':'Goby','Килька':'Sprat','Мойва':'Capelin','Дорадо':'Dorado','Ваху':'Wahoo','Парусник':'Sailfish','Рыба-меч':'Swordfish','Марлин синий':'Blue Marlin','Тунец синеперый':'Bluefin Tuna','Акула мако':'Mako Shark'
@@ -319,6 +327,10 @@
         autoCast:'Автозаброс',
         autoFishUntil:d=>`Активно до ${d}`,
         autoFishExtend:'Продлить ещё на месяц',
+        tapPrompt: goal=>`Тапай ${goal} раз!`,
+        tapCountdown: secs=>`Осталось ${secs}с`,
+        tapCount: ({count,goal})=>`${count}/${goal}`,
+        tapAutoHelp:'Автоловля поймает рыбу, даже если ты не успеешь',
         waitingBite:'Ожидаем поклёвку…',
         catch:'Улов!',
         new:'Новая!',
@@ -420,6 +432,10 @@
         autoCast:'Auto cast',
         autoFishUntil:d=>`Active until ${d}`,
         autoFishExtend:'Extend for another month',
+        tapPrompt: goal=>`Tap ${goal} times!`,
+        tapCountdown: secs=>`${secs}s left`,
+        tapCount: ({count,goal})=>`${count}/${goal}`,
+        tapAutoHelp:'Auto catch will land the fish even if you miss',
         waitingBite:'Waiting for a bite…',
         catch:'Catch!',
         new:'New!',
@@ -905,7 +921,29 @@
       );
     }
 
-    function FishingStage({me, setMe, casting, biting, onCast, onHook, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
+    function TapChallengeButton({count, goal, timeLeft, onTap, className='', hint}){
+      const timeLabel = Math.max(0, timeLeft).toFixed(1);
+      return (
+        <div className={`flex flex-col items-center ${className}`}>
+          <div className="relative w-full">
+            <button
+              onClick={onTap}
+              className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg relative overflow-hidden"
+            >
+              <div className="flex flex-col items-center leading-tight">
+                <span className="text-sm uppercase tracking-wide">{t('tapPrompt', goal)}</span>
+                <span className="text-2xl font-bold mt-1">{t('tapCount', {count, goal})}</span>
+                <span className="text-xs opacity-80 mt-1">{t('tapCountdown', timeLabel)}</span>
+              </div>
+            </button>
+            <div className="tap-hint"></div>
+          </div>
+          {hint && <div className="text-xs text-emerald-300 text-center mt-2 max-w-[220px]">{hint}</div>}
+        </div>
+      );
+    }
+
+    function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
       const stageRef = React.useRef(null);
       const {w,h} = useResizeObserver(stageRef);
 
@@ -1035,6 +1073,15 @@
           <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
             {!casting ? (
               <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+            ) : tapping ? (
+              <TapChallengeButton
+                count={tapCount}
+                goal={tapGoal}
+                timeLeft={tapTimeLeft}
+                onTap={onTap}
+                className="w-full md:w-1/2"
+                hint={me.autoFish ? t('tapAutoHelp') : undefined}
+              />
             ) : biting ? (
               <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
             ) : (
@@ -1121,6 +1168,15 @@
       const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
       const autoCastRef = React.useRef(autoCast);
       const autoCastTimeoutRef = React.useRef(null);
+      const [tapActive,setTapActive] = React.useState(false);
+      const tapActiveRef = React.useRef(false);
+      const [tapCount,setTapCount] = React.useState(0);
+      const tapCountRef = React.useRef(0);
+      const [tapTimeLeft,setTapTimeLeft] = React.useState(TAP_CHALLENGE_DURATION_MS/1000);
+      const tapDeadlineRef = React.useRef(0);
+      const tapReactionRef = React.useRef(0);
+      const tapTimerRef = React.useRef(null);
+      const tapFinishingRef = React.useRef(false);
       React.useEffect(()=>{
         autoCastRef.current = autoCast;
         if(!me?.autoFish) setAutoCast(false);
@@ -1130,6 +1186,31 @@
         }
       }, [autoCast, me?.autoFish]);
       React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
+
+      React.useEffect(()=>{ tapActiveRef.current = tapActive; }, [tapActive]);
+      React.useEffect(()=>{ tapCountRef.current = tapCount; }, [tapCount]);
+      React.useEffect(()=>{
+        if(!tapActive) return;
+        tapActiveRef.current = true;
+        const tick = ()=>{
+          if(!tapActiveRef.current) return;
+          const remaining = tapDeadlineRef.current - Date.now();
+          const clamped = Math.max(0, remaining);
+          setTapTimeLeft(clamped / 1000);
+          if(clamped <= 0){
+            finishTap(tapCountRef.current >= TAP_CHALLENGE_GOAL);
+            return;
+          }
+          tapTimerRef.current = requestAnimationFrame(tick);
+        };
+        tapTimerRef.current = requestAnimationFrame(tick);
+        return ()=>{
+          if(tapTimerRef.current){
+            cancelAnimationFrame(tapTimerRef.current);
+            tapTimerRef.current = null;
+          }
+        };
+      }, [tapActive]);
 
       function tournamentFish(name, rarity){
         if(!rarity) return t('anyFish');
@@ -1466,6 +1547,104 @@
         }catch(e){}
       }
 
+      async function finalizeCatch(reaction, success){
+        let caught = false;
+        let autoFishActive = me.autoFish;
+        try{
+          const r = await fetch(`/api/cast`,{
+            method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({wait:waitRef.current, reaction: success ? reaction : 5.1})
+          });
+          if(!r.ok){
+            if(r.status===401) throw new Error('unauthorized');
+            throw 0;
+          }
+          const d = await r.json();
+          caught = d.caught;
+          autoFishActive = d.autoFish;
+          setMe(p=>({...p,autoFish:d.autoFish}));
+          if(!d.autoFish) setAutoCast(false);
+          if(d.caught){
+            const c = d.catch;
+            const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
+            const newTotal = (me.totalWeight||0)+c.weight;
+            const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
+            setResult({...c,newFish:isNewFish,newLocations:newLocs});
+            setMe(p=>{
+              const tot = (p.totalWeight||0)+c.weight;
+              return {
+                ...p,
+                totalWeight:tot,
+                todayWeight:(p.todayWeight||0)+c.weight,
+                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
+                caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
+              };
+            });
+            try{
+              const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
+              if(ct.status===200){
+                setCurrentTournament(await ct.json());
+              } else {
+                setCurrentTournament(null);
+              }
+            }catch(e){}
+          } else {
+            setError(t('fishEscaped'));
+          }
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? t('authRequired')
+            : t('castOften'));
+        }finally{
+          castingRef.current = false;
+          setCasting(false);
+          tapFinishingRef.current = false;
+          tapReactionRef.current = 0;
+          if(caught && autoCastRef.current && autoFishActive){
+            autoCastTimeoutRef.current = setTimeout(()=>cast(),1000);
+          }
+        }
+      }
+
+      function startTapChallenge(reaction){
+        tapFinishingRef.current = false;
+        tapReactionRef.current = reaction;
+        tapDeadlineRef.current = Date.now() + TAP_CHALLENGE_DURATION_MS;
+        tapCountRef.current = 0;
+        if(tapTimerRef.current){
+          cancelAnimationFrame(tapTimerRef.current);
+          tapTimerRef.current = null;
+        }
+        tapActiveRef.current = true;
+        setTapCount(0);
+        setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+        setTapActive(true);
+      }
+
+      function finishTap(success){
+        if(tapFinishingRef.current) return;
+        tapFinishingRef.current = true;
+        tapActiveRef.current = false;
+        if(tapTimerRef.current){
+          cancelAnimationFrame(tapTimerRef.current);
+          tapTimerRef.current = null;
+        }
+        setTapActive(false);
+        finalizeCatch(tapReactionRef.current || 5.1, success);
+      }
+
+      function handleTap(){
+        if(!tapActiveRef.current) return;
+        const next = tapCountRef.current + 1;
+        tapCountRef.current = next;
+        setTapCount(next);
+        if(next >= TAP_CHALLENGE_GOAL){
+          finishTap(true);
+        }
+      }
+
       async function cast(){
         if(castingRef.current) return; if(!me) return;
         const curId = me.currentLureId;
@@ -1512,64 +1691,16 @@
         if(!bitingRef.current) return;
         const reaction = auto ? 5.1 : (Date.now()-biteTimeRef.current)/1000;
         clearTimeout(hookTimeoutRef.current);
+        hookTimeoutRef.current = null;
         setBiting(false);
         bitingRef.current = false;
-        let caught=false;
-        let autoFishActive = me.autoFish;
-        try{
-          const r=await fetch(`/api/cast`,{
-            method:'POST', credentials:'include',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({wait:waitRef.current,reaction})
-          });
-          if(!r.ok){
-            if(r.status===401) throw new Error('unauthorized');
-            throw 0;
-          }
-          const d=await r.json();
-          caught=d.caught;
-          autoFishActive = d.autoFish;
-          setMe(p=>({...p,autoFish:d.autoFish}));
-          if(!d.autoFish) setAutoCast(false);
-          if(d.caught){
-            const c=d.catch;
-            const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
-            const newTotal = (me.totalWeight||0)+c.weight;
-            const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
-            setResult({...c,newFish:isNewFish,newLocations:newLocs});
-            setMe(p=>{
-              const tot=(p.totalWeight||0)+c.weight;
-              return {
-                ...p,
-                totalWeight:tot,
-                todayWeight:(p.todayWeight||0)+c.weight,
-                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
-                recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
-                caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
-              };
-            });
-            try{
-              const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
-              if(ct.status===200){
-                setCurrentTournament(await ct.json());
-              } else {
-                setCurrentTournament(null);
-              }
-            }catch(e){}
-          } else {
-            setError(t('fishEscaped'));
-          }
-        }catch(e){
-          setError(e.message==='unauthorized'
-            ? t('authRequired')
-            : t('castOften'));
-        }finally{
-          castingRef.current = false;
-          setCasting(false);
-          if(caught && autoCastRef.current && autoFishActive){
-            autoCastTimeoutRef.current = setTimeout(()=>cast(),1000);
-          }
+        if(auto && !me.autoFish){
+          tapActiveRef.current = false;
+          setTapActive(false);
+          tapFinishingRef.current = false;
+          return finalizeCatch(reaction, false);
         }
+        startTapChallenge(reaction);
       }
 
       if(loading){
@@ -1648,13 +1779,39 @@
             <>
               {/* Сцена */}
               <div className="mt-4">
-                <FishingStage me={me} setMe={setMe} casting={casting} biting={biting} onCast={cast} onHook={()=>hook(false)} onClaimDaily={openDaily} autoCast={autoCast} setAutoCast={setAutoCast} autoCastRef={autoCastRef} autoCastTimeoutRef={autoCastTimeoutRef} />
+                <FishingStage
+                  me={me}
+                  setMe={setMe}
+                  casting={casting}
+                  biting={biting}
+                  tapping={tapActive}
+                  tapCount={tapCount}
+                  tapGoal={TAP_CHALLENGE_GOAL}
+                  tapTimeLeft={tapTimeLeft}
+                  onCast={cast}
+                  onHook={()=>hook(false)}
+                  onTap={handleTap}
+                  onClaimDaily={openDaily}
+                  autoCast={autoCast}
+                  setAutoCast={setAutoCast}
+                  autoCastRef={autoCastRef}
+                  autoCastTimeoutRef={autoCastTimeoutRef}
+                />
               </div>
 
               {/* Мобильный CTA под сценой */}
               <div className="md:hidden mt-3">
                 {!casting ? (
                   <button onClick={cast} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+                ) : tapActive ? (
+                  <TapChallengeButton
+                    count={tapCount}
+                    goal={TAP_CHALLENGE_GOAL}
+                    timeLeft={tapTimeLeft}
+                    onTap={handleTap}
+                    className="w-full"
+                    hint={me.autoFish ? t('tapAutoHelp') : undefined}
+                  />
                 ) : biting ? (
                   <button onClick={()=>hook(false)} className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
                 ) : (
