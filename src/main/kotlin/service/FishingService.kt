@@ -94,6 +94,7 @@ class FishingService {
     }
 
     fun resetCasting(userId: Long) = transaction {
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
         Users.update({ Users.id eq userId }) {
             it[Users.isCasting] = false
             it[Users.castLureId] = null
@@ -731,6 +732,7 @@ class FishingService {
     fun startCast(userId: Long): Long? = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(!userRow[Users.isCasting]) { "casting" }
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
         val lureId = userRow[Users.currentLureId]?.value
             ?: error("No lure selected")
         val lureRow = (InventoryLures innerJoin Lures)
@@ -775,6 +777,9 @@ class FishingService {
     )
 
     @Serializable
+    data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
+
+    @Serializable
     data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null, val autoFish: Boolean = false)
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -792,11 +797,10 @@ class FishingService {
         return (0.05 * rank).coerceAtMost(0.5)
     }
 
-    fun cast(userId: Long, waitSeconds: Int, reactionTime: Double): CastResultDTO = transaction {
+    fun hook(userId: Long, waitSeconds: Int, reactionTime: Double): HookResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
-        val lureId = userRow[Users.castLureId]?.value
-            ?: error("No lure selected")
+        val lureId = userRow[Users.castLureId]?.value ?: error("No lure selected")
         val lureRow = Lures.select { Lures.id eq lureId }.single()
 
         val lurePred = lureRow[Lures.predator]
@@ -804,12 +808,12 @@ class FishingService {
         val rarityBonus = lureRow[Lures.rarityBonus]
 
         val total = totalKg(userId)
-        val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
+        val locId = userRow[Users.currentLocationId]?.value
             ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
         val locRow = Locations.select { Locations.id eq locId }.single()
         require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
-            .slice(Fish.id, Fish.name, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
+            .slice(Fish.id, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
             .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
             .toList()
         require(pool.isNotEmpty()) { "No suitable fish" }
@@ -824,27 +828,74 @@ class FishingService {
             roll <= 0.0
         }
 
-        fun finish(res: CastResultDTO): CastResultDTO {
+        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+
+        fun escape(): HookResultDTO {
+            PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
                 it[Users.isCasting] = false
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return res
+            return HookResultDTO(false, auto)
         }
 
-        val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
-        if (!auto && reactionTime >= 5.0) return@transaction finish(CastResultDTO(false, autoFish = auto))
+        if (!auto && reactionTime >= 5.0) return@transaction escape()
+
         val catchChance = if (auto) 1.0 else {
             val minEscape = baseEscapeChance(locId)
             (1.0 - minEscape) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
         }
-        if (!auto && rnd.nextDouble() > catchChance) return@transaction finish(CastResultDTO(false, autoFish = auto))
+        if (!auto && rnd.nextDouble() > catchChance) return@transaction escape()
 
         val fishId = picked[Fish.id].value
-        val fishName = picked[Fish.name]
-        val rarity = picked[Fish.rarity]
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
+
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+        PendingCatches.insert {
+            it[PendingCatches.userId] = userId
+            it[PendingCatches.fishId] = fishId
+            it[PendingCatches.weight] = weight
+            it[PendingCatches.locationId] = locId
+            it[PendingCatches.lureId] = lureId
+            it[PendingCatches.waitSeconds] = wait
+            it[PendingCatches.reactionTime] = reactionTime
+            it[PendingCatches.autoCatch] = auto
+            it[PendingCatches.createdAt] = Instant.now()
+        }
+
+        HookResultDTO(true, auto)
+    }
+
+    fun cast(userId: Long, _waitSeconds: Int, _reactionTime: Double, success: Boolean): CastResultDTO = transaction {
+        val userRow = Users.select { Users.id eq userId }.single()
+        require(userRow[Users.isCasting]) { "no cast" }
+        val pending = PendingCatches.select { PendingCatches.userId eq userId }.singleOrNull()
+        val autoCatch = pending?.get(PendingCatches.autoCatch) ?: false
+        val autoActive = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+
+        fun finish(caught: Boolean, catch: CatchDTO? = null): CastResultDTO {
+            PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+            Users.update({ Users.id eq userId }) {
+                it[Users.isCasting] = false
+                it[Users.castLureId] = null
+                it[Users.lastCastAt] = Instant.now()
+            }
+            return CastResultDTO(caught, catch, autoActive)
+        }
+
+        if (pending == null) return@transaction finish(false)
+        if (!autoCatch && !success) return@transaction finish(false)
+
+        val fishId = pending[PendingCatches.fishId].value
+        val weight = pending[PendingCatches.weight]
+        val locId = pending[PendingCatches.locationId].value
+
+        val fishRow = Fish.select { Fish.id eq fishId }.single()
+        val fishName = fishRow[Fish.name]
+        val rarity = fishRow[Fish.rarity]
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        val locName = locRow[Locations.name]
 
         Catches.insert {
             it[Catches.userId] = userId
@@ -853,19 +904,16 @@ class FishingService {
             it[Catches.locationId] = locId
             it[Catches.createdAt] = Instant.now()
         }
-        val locName = locRow[Locations.name]
+
         finish(
-            CastResultDTO(
-                true,
-                CatchDTO(
-                    fishName,
-                    weight,
-                    locName,
-                    rarity,
-                    userId = null,
-                    fishId = fishId,
-                ),
-                auto
+            true,
+            CatchDTO(
+                fishName,
+                weight,
+                locName,
+                rarity,
+                userId = null,
+                fishId = fishId,
             )
         )
     }
