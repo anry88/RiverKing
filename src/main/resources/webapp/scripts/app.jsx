@@ -688,7 +688,7 @@ function App(){
 
   return (
     <div className="app-content w-full px-4" onClick={()=>setPrizeHint(null)}>
-      <div className="pb-safe">
+      <div className="flex flex-col min-h-full">
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -734,8 +734,6 @@ function App(){
         <Header
           me={me}
           lang={me.language}
-          tab={tab}
-          setTab={setTab}
           onEditNickname={()=>setNickOpen(true)}
           onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
           onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
@@ -744,63 +742,67 @@ function App(){
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
         {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
-        {tab === 'fish' && (
-          <FishingTab
-            me={me}
-            setMe={setMe}
-            casting={casting}
-            biting={biting}
-            tapActive={tapActive}
-            tapCount={tapCount}
-            tapTimeLeft={tapTimeLeft}
-            castReady={castReady}
-            onCast={()=>cast(false)}
-            onHook={()=>hook(false)}
-            onTap={handleTap}
-            result={result}
-            error={error}
-            onClaimDaily={openDaily}
-            autoCast={autoCast}
-            setAutoCast={setAutoCast}
-            autoCastRef={autoCastRef}
-            autoCastTimeoutRef={autoCastTimeoutRef}
-          />
-        )}
+        <div className="flex-1 flex flex-col">
+          {tab === 'fish' && (
+            <FishingTab
+              me={me}
+              setMe={setMe}
+              casting={casting}
+              biting={biting}
+              tapActive={tapActive}
+              tapCount={tapCount}
+              tapTimeLeft={tapTimeLeft}
+              castReady={castReady}
+              onCast={()=>cast(false)}
+              onHook={()=>hook(false)}
+              onTap={handleTap}
+              result={result}
+              error={error}
+              onClaimDaily={openDaily}
+              autoCast={autoCast}
+              setAutoCast={setAutoCast}
+              autoCastRef={autoCastRef}
+              autoCastTimeoutRef={autoCastTimeoutRef}
+            />
+          )}
 
-        {tab === 'tournaments' && (
-          <TournamentsTab
-            me={me}
-            tournamentTab={tournamentTab}
-            setTournamentTab={setTournamentTab}
-            currentTournament={currentTournament}
-            upcomingTournaments={upcomingTournaments}
-            pastTournaments={pastTournaments}
-            pastResult={pastResult}
-            openPast={openPast}
-            setPastResult={setPastResult}
-            prizeHint={prizeHint}
-            setPrizeHint={setPrizeHint}
-            shop={shop}
-          />
-        )}
-        {tab === 'achievements' && (
-          <Achievements me={me} setMe={setMe} />
-        )}
-        {tab === 'shop' && (
-          <ShopTab
-            shop={shop}
-            toggleRef={toggleRef}
-            refOpen={refOpen}
-            refInfo={refInfo}
-            copyRefLink={copyRefLink}
-            generateRefLink={generateRefLink}
-            starterPackName={starterPackName}
-            buyPack={buyPack}
-          />
-        )}
-        {tab === 'guide' && (
-          <Guide me={me} />
-        )}
+          {tab === 'tournaments' && (
+            <TournamentsTab
+              me={me}
+              tournamentTab={tournamentTab}
+              setTournamentTab={setTournamentTab}
+              currentTournament={currentTournament}
+              upcomingTournaments={upcomingTournaments}
+              pastTournaments={pastTournaments}
+              pastResult={pastResult}
+              openPast={openPast}
+              setPastResult={setPastResult}
+              prizeHint={prizeHint}
+              setPrizeHint={setPrizeHint}
+              shop={shop}
+            />
+          )}
+          {tab === 'achievements' && (
+            <Achievements me={me} setMe={setMe} />
+          )}
+          {tab === 'shop' && (
+            <ShopTab
+              shop={shop}
+              toggleRef={toggleRef}
+              refOpen={refOpen}
+              refInfo={refInfo}
+              copyRefLink={copyRefLink}
+              generateRefLink={generateRefLink}
+              starterPackName={starterPackName}
+              buyPack={buyPack}
+            />
+          )}
+          {tab === 'guide' && (
+            <Guide me={me} />
+          )}
+        </div>
+
+        <BottomNav tab={tab} setTab={setTab} />
 
         <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
         <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{

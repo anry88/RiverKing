@@ -11,8 +11,7 @@ function StatChip({icon,label,value,active=false,onClick}){
   );
 }
 
-function Header({me,lang,tab,setTab,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
-  const [menuOpen,setMenuOpen] = React.useState(false);
+function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
   const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
   const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
@@ -22,14 +21,9 @@ function Header({me,lang,tab,setTab,onEditNickname,onOpenLocations,onOpenBaits,o
         <button onClick={onEditNickname} className="text-sm hover:underline pb-0.5 leading-none">
           {me.username || '—'}
         </button>
-        <div className="flex items-end gap-2">
-          <button onClick={onToggleLanguage} className="text-sm hover:underline pb-0.5 leading-none">
-            {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
-          </button>
-          <button onClick={()=>setMenuOpen(true)} className="text-sm hover:underline pb-0.5 leading-none">
-            {t('menu')}
-          </button>
-        </div>
+        <button onClick={onToggleLanguage} className="text-sm hover:underline pb-0.5 leading-none">
+          {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
+        </button>
       </div>
       <div className="px-4 py-2 bg-black/20 border-b border-white/10">
         <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
@@ -39,9 +33,34 @@ function Header({me,lang,tab,setTab,onEditNickname,onOpenLocations,onOpenBaits,o
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
         </div>
       </div>
-      {menuOpen && (
-        <MenuDrawer open={menuOpen} onClose={()=>setMenuOpen(false)} tab={tab} setTab={setTab} />
-      )}
+    </div>
+  );
+}
+
+function BottomNav({tab,setTab}){
+  const items = [
+    {id:'fish', label:t('fishing'), icon:'/app/assets/menu/fishing.png'},
+    {id:'tournaments', label:t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
+    {id:'achievements', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
+    {id:'guide', label:t('guide'), icon:'/app/assets/menu/guide.png'},
+    {id:'shop', label:t('shop'), icon:'/app/assets/menu/shop.png'},
+  ];
+  return (
+    <div className="-mx-4 sticky bottom-0 z-20">
+      <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2" aria-label={t('menu')}>
+        {items.map(item=>(
+          <button
+            key={item.id}
+            type="button"
+            onClick={()=>setTab(item.id)}
+            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+            aria-current={tab===item.id ? 'page' : undefined}
+          >
+            <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+            <span className="leading-tight text-center">{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -102,29 +121,6 @@ function BaitsDrawer({open,onClose,me,onSelect}){
               </div>
             </button>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MenuDrawer({open,onClose,tab,setTab}){
-  return (
-    <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
-      <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
-      <div
-          className={`absolute right-0 inset-y-0 w-[88%] sm:w-[260px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-lg font-semibold leading-none">{t('menu')}</div>
-          <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
-        </div>
-        <div className="space-y-2 overflow-y-auto pr-1 pt-1">
-          <button onClick={()=>{setTab('fish'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='fish'?'text-emerald-400':''}`}>{t('fishing')}</button>
-          <button onClick={()=>{setTab('tournaments'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='tournaments'?'text-emerald-400':''}`}>{t('tournaments')}</button>
-          <button onClick={()=>{setTab('achievements'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='achievements'?'text-emerald-400':''}`}>{t('ratings')}</button>
-          <button onClick={()=>{setTab('guide'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='guide'?'text-emerald-400':''}`}>{t('guide')}</button>
-          <button onClick={()=>{setTab('shop'); onClose();}} className={`w-full text-left px-3 pt-1 pb-0.5 rounded hover:bg-white/10 leading-none ${tab==='shop'?'text-emerald-400':''}`}>{t('shop')}</button>
         </div>
       </div>
     </div>
