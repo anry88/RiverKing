@@ -73,7 +73,10 @@ fun Application.apiRoutes(env: Env) {
     }
 
     @Serializable
-    data class CastReq(val wait: Int, val reaction: Double)
+    data class CastReq(val wait: Int, val reaction: Double, val success: Boolean)
+
+    @Serializable
+    data class HookReq(val wait: Int, val reaction: Double)
 
     @Serializable
     data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int, val until: String? = null)
@@ -693,7 +696,33 @@ fun Application.apiRoutes(env: Env) {
             }
         }
 
-        // Cast result / hook
+        // Hook result: determine if fish can be caught
+        post("/api/hook") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val req = call.receive<HookReq>()
+            val res = try { fishing.hook(uid, req.wait, req.reaction) } catch (e: Exception) {
+                log.warn(
+                    "hook failed tgId={} wait={} reaction={} err={}",
+                    tgId,
+                    req.wait,
+                    req.reaction,
+                    e.message
+                )
+                return@post call.respond(
+                    HttpStatusCode.TooManyRequests,
+                    mapOf("error" to (e.message ?: "rate limit"))
+                )
+            }
+            call.respond(res)
+        }
+
+        // Cast result / finalize catch
         post("/api/cast") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
@@ -704,7 +733,7 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<CastReq>()
-            val res = try { fishing.cast(uid, req.wait, req.reaction) } catch (e: Exception) {
+            val res = try { fishing.cast(uid, req.wait, req.reaction, req.success) } catch (e: Exception) {
                 log.warn(
                     "cast failed tgId={} wait={} reaction={} err={}",
                     tgId,

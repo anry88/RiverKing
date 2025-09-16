@@ -21,6 +21,7 @@ object DB {
                 InventoryLures,
                 InventoryRods,
                 Catches,
+                PendingCatches,
                 LocationFishWeights,
                 Payments,
                 PaySupportRequests,
@@ -458,6 +459,19 @@ object Catches : LongIdTable() {
     val weight = double("weight")
     val locationId = reference("location_id", Locations)
     val createdAt = timestamp("created_at")
+}
+
+object PendingCatches : Table() {
+    val userId = reference("user_id", Users)
+    val fishId = reference("fish_id", Fish)
+    val weight = double("weight")
+    val locationId = reference("location_id", Locations)
+    val lureId = reference("lure_id", Lures)
+    val waitSeconds = integer("wait_seconds")
+    val reactionTime = double("reaction_time")
+    val autoCatch = bool("auto_catch")
+    val createdAt = timestamp("created_at")
+    override val primaryKey = PrimaryKey(userId)
 }
 
 object LocationFishWeights : Table() {

@@ -348,6 +348,7 @@
         autoCast:'Автозаброс',
         autoFishUntil:d=>`Активно до ${d}`,
         autoFishExtend:'Продлить ещё на месяц',
+        tapButton:'Тащи!!!',
         tapPrompt: goal=>`Тапай ${goal} раз!`,
         tapCountdown: secs=>`Осталось ${secs}с`,
         tapCount: ({count,goal})=>`${count}/${goal}`,
@@ -452,6 +453,7 @@
         autoCast:'Auto cast',
         autoFishUntil:d=>`Active until ${d}`,
         autoFishExtend:'Extend for another month',
+        tapButton:'Reel it in!!!',
         tapPrompt: goal=>`Tap ${goal} times!`,
         tapCountdown: secs=>`${secs}s left`,
         tapCount: ({count,goal})=>`${count}/${goal}`,
@@ -952,6 +954,12 @@
               aria-label={ariaLabel}
             >
               <span className="sr-only">{ariaLabel}</span>
+              <span
+                className="absolute inset-0 flex items-center justify-center text-2xl font-extrabold tracking-wider uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]"
+                aria-hidden="true"
+              >
+                {t('tapButton')}
+              </span>
               <div className="tap-visual" aria-hidden="true">
                 <span className="tap-visual__ring"></span>
                 <span className="tap-visual__ring tap-visual__ring--delay1"></span>
@@ -1575,7 +1583,7 @@
           const r = await fetch(`/api/cast`,{
             method:'POST', credentials:'include',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({wait:waitRef.current, reaction: success ? reaction : 5.1})
+            body:JSON.stringify({wait:waitRef.current, reaction, success})
           });
           if(!r.ok){
             if(r.status===401) throw new Error('unauthorized');
@@ -1715,13 +1723,58 @@
         hookTimeoutRef.current = null;
         setBiting(false);
         bitingRef.current = false;
-        if(auto && !me.autoFish){
+        setError(null);
+        try{
+          const resp = await fetch(`/api/hook`,{
+            method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({wait:waitRef.current, reaction})
+          });
+          if(!resp.ok){
+            if(resp.status===401) throw new Error('unauthorized');
+            throw 0;
+          }
+          const data = await resp.json();
+          setMe(p=>({...p, autoFish:data.autoFish}));
+          if(!data.autoFish) setAutoCast(false);
+          if(!data.success){
+            setError(t('fishEscaped'));
+            castingRef.current = false;
+            setCasting(false);
+            tapActiveRef.current = false;
+            setTapActive(false);
+            tapFinishingRef.current = false;
+            tapReactionRef.current = 0;
+            tapDeadlineRef.current = 0;
+            tapCountRef.current = 0;
+            setTapCount(0);
+            setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+            if(tapTimerRef.current){
+              cancelAnimationFrame(tapTimerRef.current);
+              tapTimerRef.current = null;
+            }
+            return;
+          }
+          startTapChallenge(reaction);
+        }catch(e){
+          setError(e.message==='unauthorized'
+            ? t('authRequired')
+            : t('castOften'));
+          castingRef.current = false;
+          setCasting(false);
           tapActiveRef.current = false;
           setTapActive(false);
           tapFinishingRef.current = false;
-          return finalizeCatch(reaction, false);
+          tapReactionRef.current = 0;
+          tapDeadlineRef.current = 0;
+          tapCountRef.current = 0;
+          setTapCount(0);
+          setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+          if(tapTimerRef.current){
+            cancelAnimationFrame(tapTimerRef.current);
+            tapTimerRef.current = null;
+          }
         }
-        startTapChallenge(reaction);
       }
 
       if(loading){
