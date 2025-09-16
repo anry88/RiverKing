@@ -89,6 +89,27 @@
     .tap-hint::before,.tap-hint::after{ content:""; position:absolute; inset:0; border-radius:9999px; border:2px solid rgba(255,255,255,.45); animation:tapPulse .45s ease-out infinite; }
     .tap-hint::after{ animation-delay:.22s; }
 
+    @keyframes tapWave { 0%{ opacity:0.55; transform:scale(0.65);} 100%{ opacity:0; transform:scale(1.7);} }
+    .tap-visual{ position:relative; height:72px; width:100%; display:flex; align-items:center; justify-content:center; }
+    .tap-visual__ring{
+      position:absolute;
+      width:74px;
+      height:74px;
+      border-radius:9999px;
+      border:3px solid rgba(255,255,255,.45);
+      opacity:0;
+      animation:tapWave .75s ease-out infinite;
+    }
+    .tap-visual__ring--delay1{ animation-delay:.18s; }
+    .tap-visual__ring--delay2{ animation-delay:.36s; }
+    .tap-visual__dot{
+      width:20px;
+      height:20px;
+      border-radius:9999px;
+      background:rgba(255,255,255,.55);
+      box-shadow:0 0 0 12px rgba(255,255,255,.14);
+    }
+
     @keyframes pop {0%{transform:scale(.5);opacity:0;}80%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);}}
     .animate-pop{animation:pop .3s ease-out;}
 
@@ -330,7 +351,6 @@
         tapPrompt: goal=>`Тапай ${goal} раз!`,
         tapCountdown: secs=>`Осталось ${secs}с`,
         tapCount: ({count,goal})=>`${count}/${goal}`,
-        tapAutoHelp:'Автоловля поймает рыбу, даже если ты не успеешь',
         waitingBite:'Ожидаем поклёвку…',
         catch:'Улов!',
         new:'Новая!',
@@ -435,7 +455,6 @@
         tapPrompt: goal=>`Tap ${goal} times!`,
         tapCountdown: secs=>`${secs}s left`,
         tapCount: ({count,goal})=>`${count}/${goal}`,
-        tapAutoHelp:'Auto catch will land the fish even if you miss',
         waitingBite:'Waiting for a bite…',
         catch:'Catch!',
         new:'New!',
@@ -921,24 +940,27 @@
       );
     }
 
-    function TapChallengeButton({count, goal, timeLeft, onTap, className='', hint}){
+    function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
       const timeLabel = Math.max(0, timeLeft).toFixed(1);
+      const ariaLabel = `${t('tapPrompt', goal)} ${t('tapCount', {count, goal})}. ${t('tapCountdown', timeLabel)}`;
       return (
         <div className={`flex flex-col items-center ${className}`}>
           <div className="relative w-full">
             <button
               onClick={onTap}
-              className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg relative overflow-hidden"
+              className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg relative overflow-hidden flex items-center justify-center"
+              aria-label={ariaLabel}
             >
-              <div className="flex flex-col items-center leading-tight">
-                <span className="text-sm uppercase tracking-wide">{t('tapPrompt', goal)}</span>
-                <span className="text-2xl font-bold mt-1">{t('tapCount', {count, goal})}</span>
-                <span className="text-xs opacity-80 mt-1">{t('tapCountdown', timeLabel)}</span>
+              <span className="sr-only">{ariaLabel}</span>
+              <div className="tap-visual" aria-hidden="true">
+                <span className="tap-visual__ring"></span>
+                <span className="tap-visual__ring tap-visual__ring--delay1"></span>
+                <span className="tap-visual__ring tap-visual__ring--delay2"></span>
+                <span className="tap-visual__dot"></span>
               </div>
             </button>
             <div className="tap-hint"></div>
           </div>
-          {hint && <div className="text-xs text-emerald-300 text-center mt-2 max-w-[220px]">{hint}</div>}
         </div>
       );
     }
@@ -1080,7 +1102,6 @@
                 timeLeft={tapTimeLeft}
                 onTap={onTap}
                 className="w-full md:w-1/2"
-                hint={me.autoFish ? t('tapAutoHelp') : undefined}
               />
             ) : biting ? (
               <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
@@ -1810,7 +1831,6 @@
                     timeLeft={tapTimeLeft}
                     onTap={handleTap}
                     className="w-full"
-                    hint={me.autoFish ? t('tapAutoHelp') : undefined}
                   />
                 ) : biting ? (
                   <button onClick={()=>hook(false)} className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
