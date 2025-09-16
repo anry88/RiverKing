@@ -34,11 +34,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const {w,h} = useResizeObserver(stageRef);
 
   const WATER_TOP_REL = 0.48;
-  const defaultHomeRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
-  const [floatRel, setFloatRel] = React.useState(defaultHomeRel);
+  const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
+  const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [tension, setTension] = React.useState(0.2);
 
-  const clamp = (value, min=0, max=1)=> Math.min(max, Math.max(min, value));
   const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
   const floatPx = toPx(floatRel);
 
@@ -62,14 +61,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
 
   const tipX = rodLeft + rodW * ROD_TIP_ANCHOR.x;
   const tipY = rodTop  + rodH * ROD_TIP_ANCHOR.y;
-
-  const rodHomeRel = React.useMemo(()=>{
-    if(!w || !h) return defaultHomeRel;
-    const offset = isSmall ? 0.07 : (isTablet ? 0.085 : 0.1);
-    const x = clamp((tipX / w) - offset, 0.05, 0.82);
-    const y = clamp(WATER_TOP_REL + (isSmall ? 0.015 : 0.025), 0, 1);
-    return {x, y};
-  }, [defaultHomeRel, isSmall, isTablet, tipX, w, h]);
 
   const ctrl = {
     x: (tipX + floatPx.x) / 2 - (isSmall ? 24 : 40),
@@ -101,10 +92,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       setTension(0.15 + Math.random() * 0.25);
       tweenTo(target, 650);
     } else {
-      setFloatRel(rodHomeRel);
+      setFloatRel(shorePosRel);
       setTension(0.18);
     }
-  }, [casting, rodHomeRel]);
+  }, [casting, shorePosRel, tipX, w]);
 
   const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
   const [bgLoaded, setBgLoaded] = React.useState(false);
@@ -129,81 +120,79 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       {me.dailyAvailable && (
         <button
           onClick={onClaimDaily}
-          className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right hover:scale-105 transition"
+          className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[1.33]"
         >
-          🎁 {t('gift')}
+          <span>🎁</span>
+          <span>{t('gift')}</span>
         </button>
       )}
 
-      <div className="absolute inset-0 flex flex-col justify-between">
-        <div className="p-3 flex items-center justify-between text-sm">
-          <div className="px-3 py-1 rounded-full glass flex items-center gap-2">
-            <span>📍</span>
-            <span>{(me.locations.find(x=>x.id===me.locationId)||{}).name||'—'}</span>
-          </div>
-          {me.autoFish && (
-            <label className="flex items-center gap-2 text-xs bg-black/40 px-3 py-1 rounded-full">
-              <input
-                type="checkbox"
-                checked={autoCast}
-                onChange={e=>{
-                  const v=e.target.checked;
-                  setAutoCast(v);
-                  autoCastRef.current = v;
-                  if(!v && autoCastTimeoutRef.current){
-                    clearTimeout(autoCastTimeoutRef.current);
-                    autoCastTimeoutRef.current = null;
-                  }
-                }}
-              />
-              {t('autoCast')}
-            </label>
-          )}
-        </div>
+      <img
+        src={ROD_IMG}
+        alt="rod"
+        className="absolute select-none pointer-events-none"
+        style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
+        loading="eager"
+        decoding="async"
+      />
+      <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        <path d={linePath} stroke="#e6e6e6" strokeWidth="2" fill="none" opacity="0.95"/>
+      </svg>
 
-        <div className="relative flex-1">
-          <div className="absolute inset-x-0" style={{top:`${WATER_TOP_REL*100}%`}}>
-            <div className="h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
-          </div>
-
-          <div className={`absolute transition-all duration-500 ${casting ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}`} style={{left:`${Math.max(0,Math.min(1,floatRel.x))*100}%`, top:`${Math.max(0,Math.min(1,floatRel.y))*100}%`}}>
-            <div className={`relative w-10 h-10 -translate-x-1/2 -translate-y-1/2 ${bobberAnim}`}>
-              <img src="/app/assets/riverking_bobber.svg" alt="bobber" className="w-full h-full" />
-              {showRipple && <div className="absolute inset-0 ripple"></div>}
-              {tapping && <TapChallengeButton count={tapCount} goal={tapGoal} timeLeft={tapTimeLeft} onTap={onTap} />}
-            </div>
-          </div>
-
-          <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%">
-            <path d={linePath} stroke="#fff" strokeWidth="2" fill="none" strokeDasharray="4 2" strokeLinecap="round" opacity="0.8" />
-          </svg>
-
-          <img
-            src={ROD_IMG}
-            alt="rod"
-            className="absolute select-none"
-            style={{left: `${rodLeft}px`, top: `${rodTop}px`, width: `${rodW}px`, height: `${rodH}px`, transformOrigin:'top left'}}
-          />
-        </div>
-
-        <div className="p-3 hidden md:flex justify-end text-xs opacity-80">
-          {castReady ? (
-            tapping ? (
-              <div className="px-3 py-1 rounded-full glass">{t('tapPrompt', tapGoal)}</div>
-            ) : biting ? (
-              <div className="px-3 py-1 rounded-full glass animate-pulse">{t('hook')}</div>
-            ) : casting ? (
-              <div className="px-3 py-1 rounded-full glass">{t('waitingBite')}</div>
-            ) : (
-              <button onClick={onCast} className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm">
-                {t('castRod')}
-              </button>
-            )
-          ) : (
-            <div className="px-3 py-1 rounded-full glass animate-pulse">{t('castCooldown')}</div>
-          )}
-        </div>
+      <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
+        <img src="/app/assets/riverking_bobber.svg" alt="bobber" className={`relative w-6 h-6 drop-shadow ${bobberAnim}`}/>
+        {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
+
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
+        {!casting ? (
+          castReady ? (
+            <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+          ) : (
+            <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
+              <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
+              <div className="opacity-90">{t('castCooldown')}</div>
+            </div>
+          )
+        ) : tapping ? (
+          <TapChallengeButton
+            count={tapCount}
+            goal={tapGoal}
+            timeLeft={tapTimeLeft}
+            onTap={onTap}
+            className="w-full md:w-1/2"
+          />
+        ) : biting ? (
+          <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
+        ) : (
+          <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
+            <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
+            <div className="opacity-90">{t('waitingBite')}</div>
+          </div>
+        )}
+      </div>
+      {me.autoFish && (
+        <button
+          type="button"
+          className="absolute bottom-3 right-3 z-10 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer"
+          onClick={()=>{
+            const checked = !autoCastRef.current;
+            autoCastRef.current = checked;
+            if(!checked){
+              clearTimeout(autoCastTimeoutRef.current);
+              autoCastTimeoutRef.current = null;
+            }
+            setAutoCast(checked);
+          }}
+        >
+          <span className={"w-3 h-3 rounded-sm border border-white/50 bg-transparent flex items-center justify-center " + (autoCast ? "bg-emerald-500" : "") }>
+            <svg viewBox="0 0 14 14" className={"w-2 h-2 text-black " + (autoCast ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 7 6 10 11 4" />
+            </svg>
+          </span>
+          <span>{t('autoCast')}</span>
+        </button>
+      )}
     </div>
   );
 }
