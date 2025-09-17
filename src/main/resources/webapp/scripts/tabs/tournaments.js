@@ -93,9 +93,6 @@ function TournamentsTab({
                 <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
               </div>
               <div className="space-y-2">
-                <div className="text-sm opacity-70">
-                  {t('prizePlayersCount', { count: currentPrizeCount, total: currentTournament.tournament.prizePlaces })}
-                </div>
                 {currentPrizeLeaderboard.map(e=> {
                   const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
                   return (
@@ -230,10 +227,7 @@ function TournamentsTab({
               <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
             </div>
             <div className="space-y-2">
-              <div className="text-sm opacity-70">
-                {t('prizePlayersCount', { count: pastPrizeCount, total: pastResult.tournament.prizePlaces })}
-              </div>
-              {pastPrizeLeaderboard.map(e=> {
+                {pastPrizeLeaderboard.map(e=> {
                 const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
                 return (
                 <div
