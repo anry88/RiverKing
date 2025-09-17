@@ -37,10 +37,21 @@ function TournamentsTab({
     }
   },[pastResult]);
 
+  const getPrizeName = React.useCallback((packageId) => {
+    const pack = shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===packageId);
+    if(pack?.name) return pack.name;
+    if(packageId==='autofish_week') return t('autofishWeek');
+    return packageId;
+  }, [shop]);
+
+  const getPrizeImg = React.useCallback((packageId) => (
+    packageId==='autofish_week' ? '/app/assets/baits/autofish.png' : `/app/assets/baits/${packageId}.png`
+  ), []);
+
   const renderPrizeHint = (rank, prize) => (
     prizeHint?.rank===rank && (
       <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
-        {(shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===prize.packageId)?.name)||prize.packageId} x{prize.qty}
+        {getPrizeName(prize.packageId)} x{prize.qty}
       </div>
     )
   );
@@ -77,7 +88,7 @@ function TournamentsTab({
                     <div className="flex items-center gap-2 w-full min-w-0">
                       <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                         <span>{e.rank}</span>
-                        {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                        {e.prize && <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                       </div>
                       {currentTournament.tournament.metric==='count' ? (
                         <div className="w-8 h-8"></div>
@@ -164,7 +175,7 @@ function TournamentsTab({
                   <div className="flex items-center gap-2 w-full min-w-0">
                     <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                       <span>{e.rank}</span>
-                      {e.prize && <img src={`/app/assets/baits/${e.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                      {e.prize && <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                     </div>
                     {pastResult.tournament.metric==='count' ? (
                       <div className="w-8 h-8"></div>
@@ -212,7 +223,7 @@ function TournamentsTab({
                   <div className="flex items-center gap-2 w-full min-w-0">
                     <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                       <span>{pastResult.mine.rank}</span>
-                      {pastResult.mine.prize && <img src={`/app/assets/baits/${pastResult.mine.prize.packageId}.png`} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                      {pastResult.mine.prize && <img src={getPrizeImg(pastResult.mine.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
                     </div>
                     {pastResult.tournament.metric==='count' ? (
                       <div className="w-8 h-8"></div>
