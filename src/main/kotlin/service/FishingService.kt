@@ -180,14 +180,13 @@ class FishingService {
 
         streak = if (last == today.minusDays(1)) streak + 1 else 1
 
-        val freshId       = Lures.select { Lures.name eq "Пресная мирная"     }.single()[Lures.id].value
-        val predId        = Lures.select { Lures.name eq "Пресная хищная"     }.single()[Lures.id].value
-        val saltFreshId   = Lures.select { Lures.name eq "Морская мирная"     }.single()[Lures.id].value
-        val saltPredId    = Lures.select { Lures.name eq "Морская хищная"     }.single()[Lures.id].value
-        val freshPlusId   = Lures.select { Lures.name eq "Пресная мирная+"    }.single()[Lures.id].value
-        val predPlusId    = Lures.select { Lures.name eq "Пресная хищная+"    }.single()[Lures.id].value
-        val saltPredPlusId= Lures.select { Lures.name eq "Морская хищная+"    }.single()[Lures.id].value
-        // (saltFreshPlusId не нужен в новом плане)
+        val freshId        = Lures.select { Lures.name eq "Пресная мирная"   }.single()[Lures.id].value
+        val predId         = Lures.select { Lures.name eq "Пресная хищная"   }.single()[Lures.id].value
+        val saltFreshId    = Lures.select { Lures.name eq "Морская мирная"   }.single()[Lures.id].value
+        val saltPredId     = Lures.select { Lures.name eq "Морская хищная"   }.single()[Lures.id].value
+        val freshPlusId    = Lures.select { Lures.name eq "Пресная мирная+"  }.single()[Lures.id].value
+        val predPlusId     = Lures.select { Lures.name eq "Пресная хищная+"  }.single()[Lures.id].value
+        val saltPredPlusId = Lures.select { Lures.name eq "Морская хищная+"  }.single()[Lures.id].value
 
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
@@ -206,17 +205,32 @@ class FishingService {
             }
         }
 
-        val rewardDay = streak.coerceAtMost(7)
-        when (rewardDay) {
-            1 -> { add(freshId, 10); add(predId, 5) }
-            2 -> { add(freshId, 10); add(predId, 10) }
-            3 -> { add(freshId, 12); add(predId, 12); add(saltPredId, 3) }
-            4 -> { add(freshId, 12); add(predId, 15); add(saltPredId, 5) }
-            5 -> { add(freshId, 15); add(predId, 15); add(saltPredId, 6); add(saltFreshId, 2) }
-            6 -> { add(freshId, 15); add(predId, 18); add(saltPredId, 8); add(saltFreshId, 2) }
-            7 -> {
-                add(freshId, 15); add(predId, 18); add(saltPredId, 10)
-                add(freshPlusId, 1); add(predPlusId, 2); add(saltPredPlusId, 1) // упор на хищных
+        val unlockedKg = totalKg(userId)
+        val hasSaltUnlocked = (LocationFishWeights innerJoin Locations innerJoin Fish)
+            .select { (Locations.unlockKg lessEq unlockedKg) and (Fish.water eq "salt") }
+            .limit(1).any()
+
+        val day = streak.coerceAtMost(7)
+
+        if (!hasSaltUnlocked) {
+            when (day) {
+                1 -> { add(freshId, 8);  add(predId, 4) }
+                2 -> { add(freshId, 10); add(predId, 6) }
+                3 -> { add(freshId, 12); add(predId, 6) }
+                4 -> { add(freshId, 12); add(predId, 8) }
+                5 -> { add(freshId, 12); add(predId, 8); add(freshPlusId, 1) }
+                6 -> { add(freshId, 12); add(predId, 10) }
+                7 -> { add(freshId, 12); add(predId, 12); add(predPlusId, 1) }
+            }
+        } else {
+            when (day) {
+                1 -> { add(freshId, 6);  add(predId, 6);  add(saltPredId, 4) }
+                2 -> { add(freshId, 8);  add(predId, 8);  add(saltPredId, 5) }
+                3 -> { add(freshId, 8);  add(predId, 8);  add(saltPredId, 6) }
+                4 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 6) }
+                5 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 6); add(saltFreshId, 2) }
+                6 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 8); add(saltFreshId, 2) }
+                7 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 8); add(predPlusId, 1); add(saltPredPlusId, 1) }
             }
         }
 
@@ -546,6 +560,13 @@ class FishingService {
                     "10 морских простых: 3 мирных и 7 хищных",
                     25,
                     listOf("Морская мирная" to 3, "Морская хищная" to 7)
+                ),
+                ShopPackage(
+                    "micro_salt_pred_refill",
+                    "Морской хищный запас",
+                    "20 морских хищных",
+                    49,
+                    listOf("Морская хищная" to 20)
                 ),
             )
         ),
