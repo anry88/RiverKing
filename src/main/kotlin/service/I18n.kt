@@ -103,6 +103,7 @@ object I18n {
         "Китовый ящик" to "Whale Crate",
         "Пополнение пресных хищных" to "Predator Top-up",
         "Морской старт" to "Sea Start",
+        "Морской хищный запас" to "Saltwater Predator Stock",
         "20 пресных простых: 10 мирных и 10 хищных" to "20 freshwater basics: 10 peaceful and 10 predator",
         "50 пресных простых: 25 мирных и 25 хищных" to "50 freshwater basics: 25 peaceful and 25 predator",
         "120 пресных простых: 60 мирных и 60 хищных" to "120 freshwater basics: 60 peaceful and 60 predator",
@@ -122,6 +123,7 @@ object I18n {
         "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (60 мирных и 60 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (10 мирных+ и 10 хищных+)" to
             "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (60 peaceful and 60 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (10 peaceful+ and 10 predator+)",
         "15 пресных хищных" to "15 freshwater predator",
+        "20 морских хищных" to "20 saltwater predator",
         "10 морских простых: 5 мирных и 5 хищных" to "10 saltwater basics: 5 peaceful and 5 predator",
         "Подписки" to "Subscriptions",
         "Автоловля" to "Auto Catch",
