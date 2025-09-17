@@ -5,6 +5,11 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -77,6 +82,8 @@ private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+
+private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
 
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
@@ -482,30 +489,34 @@ fun Application.botRoutes(env: Env) {
                         val users = transaction {
                             Users.slice(Users.tgId, Users.language).selectAll().map { it[Users.tgId] to it[Users.language] }
                         }
-                        for ((uid, lang) in users) {
-                            val msg = when (lang) {
-                                "ru" -> draft.textRu
-                                "en" -> draft.textEn
-                                else -> draft.textRu + "\n" + draft.textEn
-                            }
-                            try {
-                                bot.sendMessage(uid, msg)
-                            } catch (e: TelegramApiException) {
-                                when (e.code) {
-                                    403 -> log.warn("User {} blocked bot; skipping broadcast", uid)
-                                    400, 404 -> log.warn("Failed to deliver to {}: {}", uid, e.message)
-                                    else -> log.error(
-                                        "sendMessage failed chatId={} code={} message={}",
-                                        uid,
-                                        e.code,
-                                        e.message,
-                                        e
-                                    )
+                        broadcastScope.launch {
+                            users.forEachIndexed { index, (uid, lang) ->
+                                val msg = when (lang) {
+                                    "ru" -> draft.textRu
+                                    "en" -> draft.textEn
+                                    else -> draft.textRu + "\n" + draft.textEn
                                 }
-                            } catch (e: Exception) {
-                                log.error("sendMessage failed chatId={}", uid, e)
+                                try {
+                                    bot.sendMessage(uid, msg)
+                                } catch (e: TelegramApiException) {
+                                    when (e.code) {
+                                        403 -> log.warn("User {} blocked bot; skipping broadcast", uid)
+                                        400, 404 -> log.warn("Failed to deliver to {}: {}", uid, e.message)
+                                        else -> log.error(
+                                            "sendMessage failed chatId={} code={} message={}",
+                                            uid,
+                                            e.code,
+                                            e.message,
+                                            e
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", uid, e)
+                                }
+                                if (index < users.lastIndex) {
+                                    delay(30_000L)
+                                }
                             }
-                            Thread.sleep(1000)
                         }
                     }
                 }
