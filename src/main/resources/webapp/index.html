@@ -120,11 +120,10 @@
 
       /* overlay-aware UI pieces */
       .app-header{
-        padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px));
-        height: calc(56px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px) + 5px);
-        padding: 12px calc(16px * var(--ui-scale));
+        height: calc(28px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px) + 13px);
+        padding: 0 calc(16px * var(--ui-scale));
+        padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px) + 8px);
         padding-bottom: 5px;
-        display:flex; align-items:flex-end; gap:12px;
       }
       .app-footer{
         padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px));
@@ -132,6 +131,10 @@
         padding: 8px calc(16px * var(--ui-scale));
         padding-top: 5px;
         display:flex; align-items:stretch; gap:12px;
+      }
+      .app-footer-placeholder{
+        height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px));
+        background: var(--tg-bg);
       }
       .app-content{ flex:1; min-height:0; overflow:auto; }
       .btn-lg{

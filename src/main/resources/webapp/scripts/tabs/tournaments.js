@@ -56,6 +56,23 @@ function TournamentsTab({
     )
   );
 
+  const currentPrizeLeaderboard = React.useMemo(() => {
+    if (!currentTournament) return [];
+    const list = currentTournament.leaderboard || [];
+    const limit = currentTournament.tournament.prizePlaces || 0;
+    return limit > 0 ? list.slice(0, limit) : list;
+  }, [currentTournament]);
+
+  const pastPrizeLeaderboard = React.useMemo(() => {
+    if (!pastResult) return [];
+    const list = pastResult.leaderboard || [];
+    const limit = pastResult.tournament.prizePlaces || 0;
+    return limit > 0 ? list.slice(0, limit) : list;
+  }, [pastResult]);
+
+  const currentPrizeCount = currentPrizeLeaderboard.length;
+  const pastPrizeCount = pastPrizeLeaderboard.length;
+
   return (
     <div className="mt-6">
       <div className="flex mb-4">
@@ -76,7 +93,7 @@ function TournamentsTab({
                 <div className="text-sm opacity-80">{t('prizePlacesLabel')} {currentTournament.tournament.prizePlaces}</div>
               </div>
               <div className="space-y-2">
-                {(currentTournament.leaderboard || []).map(e=> {
+                {currentPrizeLeaderboard.map(e=> {
                   const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
                   return (
                   <div
@@ -123,10 +140,57 @@ function TournamentsTab({
                       <div>{currentTournament.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
                       {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                     </div>
-                    {renderPrizeHint(e.rank, e.prize)}
-                  </div>
-                  );
+                  {renderPrizeHint(e.rank, e.prize)}
+                </div>
+                );
                 })}
+                {currentTournament.mine && currentTournament.mine.rank>currentPrizeCount && (
+                  <div
+                    id="current-tournament-mine"
+                    className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===currentTournament.mine.rank ? 'z-10' : ''} border border-emerald-400`}
+                    onClick={ev=>{ev.stopPropagation(); if(currentTournament.mine.prize) setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}
+                  >
+                    <div className="flex items-center gap-2 w-full min-w-0">
+                      <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+                        <span>{currentTournament.mine.rank}</span>
+                        {currentTournament.mine.prize && <img src={getPrizeImg(currentTournament.mine.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                      </div>
+                      {currentTournament.tournament.metric==='count' ? (
+                        <div className="w-8 h-8"></div>
+                      ) : currentTournament.mine.fish ? (
+                        (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
+                          <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                            <span className="text-lg opacity-20">🐟</span>
+                            <span className="absolute">?</span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
+                          <span className="text-lg opacity-20">🐟</span>
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap min-w-0">
+                          <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
+                        </div>
+                        {currentTournament.tournament.metric!=='count' && (
+                          currentTournament.mine.fish ? (
+                            <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
+                          ) : (
+                            <div className="text-xs opacity-70 truncate">{t('anyFish')}</div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                    <div className="w-12 text-right shrink-0">
+                      <div>{currentTournament.tournament.metric==='count'? Number(currentTournament.mine.value).toFixed(0) : Number(currentTournament.mine.value).toFixed(2)}</div>
+                      {currentTournament.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
+                    </div>
+                    {renderPrizeHint(currentTournament.mine.rank, currentTournament.mine.prize)}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -163,7 +227,7 @@ function TournamentsTab({
               <div className="text-sm opacity-80">{t('prizePlacesLabel')} {pastResult.tournament.prizePlaces}</div>
             </div>
             <div className="space-y-2">
-              {(pastResult.leaderboard || []).map(e=> {
+                {pastPrizeLeaderboard.map(e=> {
                 const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
                 return (
                 <div
@@ -210,14 +274,14 @@ function TournamentsTab({
                     <div>{pastResult.tournament.metric==='count'? Number(e.value).toFixed(0) : Number(e.value).toFixed(2)}</div>
                     {pastResult.tournament.metric!=='count' && <div className="text-xs">{t('kg')}</div>}
                   </div>
-                  {renderPrizeHint(e.rank, e.prize)}
-                </div>
-                );
+                {renderPrizeHint(e.rank, e.prize)}
+              </div>
+              );
               })}
-              {pastResult.mine && pastResult.mine.rank>(pastResult.leaderboard?.length || 0) && (
+              {pastResult.mine && pastResult.mine.rank>pastPrizeCount && (
                 <div
                   id="past-tournament-mine"
-                  className={`p-3 rounded-xl glass flex items-center justify-between mt-2 relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''} border border-emerald-400`}
+                  className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''} border border-emerald-400`}
                   onClick={ev=>{ev.stopPropagation(); if(pastResult.mine.prize) setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}
                 >
                   <div className="flex items-center gap-2 w-full min-w-0">

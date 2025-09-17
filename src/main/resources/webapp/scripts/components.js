@@ -15,14 +15,28 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLang
   const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
   const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+  const languages = [
+    {code:'ru', label:'🇷🇺 RU'},
+    {code:'en', label:'🇺🇸 EN'},
+  ];
   return (
       <div className="-mx-4">
-      <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex justify-between gap-2">
-        <button onClick={onEditNickname} className="text-sm hover:underline pb-0.5 leading-none">
+      <div className="app-header backdrop-blur bg-black/30 border-b border-white/10 flex flex-col items-center justify-center gap-1 text-center">
+        <div className="flex items-center gap-2 text-[11px] font-medium">
+          {languages.map(option=>(
+            <button
+              key={option.code}
+              type="button"
+              onClick={()=>{ if(lang!==option.code) onToggleLanguage?.(); }}
+              className={`px-2 py-1 rounded-md transition-colors ${lang===option.code ? 'bg-white/15 text-white' : 'text-white/60 hover:text-white/80'}`}
+              aria-pressed={lang===option.code}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onEditNickname} className="text-sm font-medium hover:underline leading-tight mb-5">
           {me.username || '—'}
-        </button>
-        <button onClick={onToggleLanguage} className="text-sm hover:underline pb-0.5 leading-none">
-          {lang==='ru'? '🇷🇺 RU' : '🇺🇸 EN'}
         </button>
       </div>
       <div className="px-4 py-2 bg-black/20 border-b border-white/10">
@@ -45,6 +59,7 @@ function BottomNav({tab,setTab}){
     {id:'guide', label:t('guide'), icon:'/app/assets/menu/guide.png'},
     {id:'shop', label:t('shop'), icon:'/app/assets/menu/shop.png'},
   ];
+  const isAndroid = (window.Telegram?.WebApp?.platform || '').toLowerCase() === 'android';
   return (
     <div className="-mx-4 sticky bottom-0 z-20">
       <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2" aria-label={t('menu')}>
@@ -61,6 +76,7 @@ function BottomNav({tab,setTab}){
           </button>
         ))}
       </nav>
+      {isAndroid && <div className="app-footer-placeholder" aria-hidden="true"></div>}
     </div>
   );
 }
