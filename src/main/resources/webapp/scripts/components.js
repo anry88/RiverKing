@@ -35,7 +35,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLang
             </button>
           ))}
         </div>
-        <button onClick={onEditNickname} className="text-sm font-medium hover:underline leading-tight">
+        <button onClick={onEditNickname} className="text-sm font-medium hover:underline leading-tight mb-1">
           {me.username || '—'}
         </button>
       </div>
