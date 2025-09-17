@@ -700,7 +700,7 @@ function App(){
                     shop
                       .reduce((acc, c) => acc.concat(c.packs), [])
                       .find(p => p.id === prize.packageId)?.name
-                  ) || prize.packageId
+                  ) || (prize.packageId === 'autofish_week' ? t('autofishWeek') : prize.packageId)
                 } x{prize.qty}
               </div>
               <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
