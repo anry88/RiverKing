@@ -4,6 +4,7 @@ import db.*
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
@@ -202,6 +203,15 @@ class FishingService {
         Catches.slice(Catches.weight.sum()).selectAll()
             .where { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
+    }
+
+    fun totalCaughtCount(userId: Long): Long = transaction {
+        Catches.select { Catches.userId eq userId }.count()
+    }
+
+    fun todayCaughtCount(userId: Long): Long = transaction {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        Catches.select { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }.count()
     }
 
     fun fishRarity(name: String): String? = transaction {
@@ -852,7 +862,12 @@ class FishingService {
     data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
 
     @Serializable
-    data class CastResultDTO(val caught: Boolean, val catch: CatchDTO? = null, val autoFish: Boolean = false)
+    data class CastResultDTO(
+        val caught: Boolean,
+        val catch: CatchDTO? = null,
+        val autoFish: Boolean = false,
+        val unlockedLocations: List<String> = emptyList(),
+    )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
         "common" -> 1.0 - 0.7 * factor
@@ -946,14 +961,18 @@ class FishingService {
         val autoCatch = pending?.get(PendingCatches.autoCatch) ?: false
         val autoActive = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
 
-        fun finish(caught: Boolean, catch: CatchDTO? = null): CastResultDTO {
+        fun finish(
+            caught: Boolean,
+            catch: CatchDTO? = null,
+            unlockedLocations: List<String> = emptyList(),
+        ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
                 it[Users.isCasting] = false
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return CastResultDTO(caught, catch, autoActive)
+            return CastResultDTO(caught, catch, autoActive, unlockedLocations)
         }
 
         if (pending == null) return@transaction finish(false)
@@ -968,6 +987,16 @@ class FishingService {
         val rarity = fishRow[Fish.rarity]
         val locRow = Locations.select { Locations.id eq locId }.single()
         val locName = locRow[Locations.name]
+
+        val totalBefore = totalKg(userId)
+        val totalAfter = totalBefore + weight
+        val unlockedLocations = if (totalAfter > totalBefore) {
+            Locations.select {
+                (Locations.unlockKg greater totalBefore) and (Locations.unlockKg lessEq totalAfter)
+            }.orderBy(Locations.unlockKg).map { it[Locations.name] }
+        } else {
+            emptyList()
+        }
 
         Catches.insert {
             it[Catches.userId] = userId
@@ -986,7 +1015,8 @@ class FishingService {
                 rarity,
                 userId = null,
                 fishId = fishId,
-            )
+            ),
+            unlockedLocations = unlockedLocations,
         )
     }
 

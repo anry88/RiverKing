@@ -26,6 +26,7 @@ import service.TournamentService
 import service.PrizeSpec
 import service.I18n
 import util.Metrics
+import util.sanitizeName
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -617,11 +618,13 @@ fun Application.botRoutes(env: Env) {
 /startapp — открыть игру
 /tournament — топ-10 текущего турнира
 /daily — получить ежедневную награду
+/stats — статистика по пойманной рыбе
 /language — выбрать язык
 /bait — сменить приманку
 /cast — забросить снасть
 /shop — купить приманки за звёзды
-/location — сменить локацию""".trimIndent()
+/location — сменить локацию
+/nickname — сменить ник""".trimIndent()
                         } else {
                             """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands.
 
@@ -629,11 +632,13 @@ Available commands:
 /startapp — open the game
 /tournament — see the current tournament top 10
 /daily — claim your daily reward
+/stats — your fishing stats
 /language — choose your language
 /bait — change your bait
 /cast — cast your line
 /shop — buy baits with Stars
-/location — change your location""".trimIndent()
+/location — change your location
+/nickname — change your nickname""".trimIndent()
                         }
                         trySend(chatId, message, replyToMessageId = replyTo)
                         return true
@@ -711,6 +716,22 @@ Available commands:
                             }
                             trySend(chatId, text, replyToMessageId = replyTo)
                         }
+                        return true
+                    }
+                    "/stats" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val total = fishing.totalCaughtCount(uid)
+                        val today = fishing.todayCaughtCount(uid)
+                        val reply = if (lang == "ru") {
+                            """🐟 Всего поймано: $total
+📅 За сегодня: $today""".trimIndent()
+                        } else {
+                            """🐟 Total fish caught: $total
+📅 Today: $today""".trimIndent()
+                        }
+                        logCommandMetric("stats", mapOf("result" to "shown"), source)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
                     "/shop" -> {
@@ -818,6 +839,17 @@ Available commands:
                                 } else {
                                     ""
                                 }
+                                val unlockedLine = if (castRes.unlockedLocations.isNotEmpty()) {
+                                    val localized = castRes.unlockedLocations.map { I18n.location(it, lang) }
+                                    val prefix = if (lang == "ru") {
+                                        if (localized.size > 1) "\n📍 Открыты новые локации: " else "\n📍 Открыта новая локация: "
+                                    } else {
+                                        if (localized.size > 1) "\n📍 New locations unlocked: " else "\n📍 New location unlocked: "
+                                    }
+                                    prefix + localized.joinToString(", ")
+                                } else {
+                                    ""
+                                }
                                 val caption = buildString {
                                     append("🐟 ")
                                     append(fishName)
@@ -832,6 +864,7 @@ Available commands:
                                     append(": ")
                                     append(locationName)
                                     append(newLine)
+                                    append(unlockedLine)
                                 }
                                 val image = loadFishImage(catch.fish, catch.location)
                                 if (image != null) {
@@ -974,6 +1007,107 @@ Available commands:
                                 }
                             }
                         }
+                        return true
+                    }
+                    "/nickname" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        if (arg.isNullOrBlank()) {
+                            logCommandMetric("nickname", mapOf("result" to "missing_arg"), source)
+                            val reply = if (lang == "ru") {
+                                "Укажи новый ник после команды, например: /nickname Рыбак"
+                            } else {
+                                "Provide a new nickname after the command, e.g. /nickname Fisher"
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val sanitized = sanitizeName(arg).replace('\n', ' ').trim()
+                        if (sanitized.isEmpty()) {
+                            logCommandMetric("nickname", mapOf("result" to "invalid"), source)
+                            val reply = if (lang == "ru") {
+                                "Ник не может быть пустым и должен быть короче 30 символов."
+                            } else {
+                                "Nickname can't be empty and must be under 30 characters."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val currentNickname = transaction {
+                            Users.select { Users.id eq uid }.single()[Users.nickname]
+                        }
+                        if (currentNickname != null && currentNickname == sanitized) {
+                            logCommandMetric("nickname", mapOf("result" to "same"), source)
+                            val reply = if (lang == "ru") {
+                                "Этот ник уже установлен."
+                            } else {
+                                "This nickname is already set."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val currentLabel = fishing.displayName(uid)
+                            ?.takeIf { it.isNotBlank() }
+                            ?: if (lang == "ru") "не установлен" else "not set"
+                        val confirmText = if (lang == "ru") {
+                            "Вы хотите изменить имя с \"$currentLabel\" на \"$sanitized\"?"
+                        } else {
+                            "Do you want to change your name from \"$currentLabel\" to \"$sanitized\"?"
+                        }
+                        val prompt = if (lang == "ru") {
+                            "$confirmText\nПодтвердите действие кнопкой ниже."
+                        } else {
+                            "$confirmText\nConfirm the action using the buttons below."
+                        }
+                        val confirmLabel = if (lang == "ru") "✅ Да" else "✅ Yes"
+                        val cancelLabel = if (lang == "ru") "❌ Нет" else "❌ No"
+                        val markup = Json.encodeToString(
+                            InlineKeyboardMarkup(
+                                listOf(
+                                    listOf(InlineKeyboardButton(confirmLabel, "/nickname_confirm $sanitized")),
+                                    listOf(InlineKeyboardButton(cancelLabel, "/nickname_cancel")),
+                                )
+                            )
+                        )
+                        logCommandMetric("nickname", mapOf("result" to "prompt"), source)
+                        trySend(chatId, prompt, markup, replyTo)
+                        return true
+                    }
+                    "/nickname_confirm" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val newName = arg?.let { sanitizeName(it).replace('\n', ' ').trim() } ?: ""
+                        if (newName.isEmpty()) {
+                            logCommandMetric("nickname", mapOf("result" to "invalid_confirm"), source)
+                            val reply = if (lang == "ru") {
+                                "Не удалось изменить ник. Попробуй ещё раз."
+                            } else {
+                                "Couldn't update the nickname. Please try again."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        fishing.setNickname(uid, newName)
+                        logCommandMetric("nickname", mapOf("result" to "updated"), source)
+                        val updated = fishing.displayName(uid) ?: newName
+                        val reply = if (lang == "ru") {
+                            "Ник изменён на \"$updated\"."
+                        } else {
+                            "Nickname changed to \"$updated\"."
+                        }
+                        trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/nickname_cancel" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("nickname", mapOf("result" to "cancel"), source)
+                        val reply = if (lang == "ru") {
+                            "Изменение ника отменено."
+                        } else {
+                            "Nickname change cancelled."
+                        }
+                        trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
                 }
