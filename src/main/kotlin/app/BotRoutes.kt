@@ -679,34 +679,46 @@ fun Application.botRoutes(env: Env) {
                             """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота.
 
 Доступные команды:
-/startapp — открыть игру
-/tournament — таблица текущего турнира и твоя позиция
-/prizes — получить призы за турниры
+/cast — забросить снасть
+/bait — сменить приманку
+/location — сменить локацию
 /daily — получить ежедневную награду
+/shop — купить приманки за звёзды
+/tournament — таблица текущего турнира и твоя позиция
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
-/bait — сменить приманку
-/cast — забросить снасть
-/shop — купить приманки за звёзды
-/location — сменить локацию
 /nickname — сменить ник""".trimIndent()
                         } else {
                             """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands.
 
 Available commands:
-/startapp — open the game
-/tournament — view the current tournament leaderboard and your rank
-/prizes — claim tournament prizes
+/cast — cast your line
+/bait — change your bait
+/location — change your location
 /daily — claim your daily reward
+/shop — buy baits with Stars
+/tournament — view the current tournament leaderboard and your rank
 /stats — your fishing stats
 /language — choose your language
-/bait — change your bait
-/cast — cast your line
-/shop — buy baits with Stars
-/location — change your location
 /nickname — change your nickname""".trimIndent()
                         }
-                        trySend(chatId, message, replyToMessageId = replyTo)
+                        val openButtonText = if (lang == "ru") "Открыть игру" else "Open game"
+                        val channelButtonText = if (lang == "ru") "Присоединиться к каналу" else "Join the channel"
+                        val gameLink = "https://t.me/${env.botName}?startapp"
+                        val channelLink = if (lang == "ru") {
+                            "https://t.me/riverking_ru"
+                        } else {
+                            "https://t.me/riverking_en"
+                        }
+                        val markup = Json.encodeToString(
+                            mapOf(
+                                "inline_keyboard" to listOf(
+                                    listOf(mapOf("text" to openButtonText, "url" to gameLink)),
+                                    listOf(mapOf("text" to channelButtonText, "url" to channelLink)),
+                                )
+                            )
+                        )
+                        trySend(chatId, message, markup, replyTo)
                         return true
                     }
                     "/tournament" -> {
