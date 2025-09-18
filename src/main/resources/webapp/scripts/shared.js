@@ -83,6 +83,8 @@
     'Морская хищная': 'Saltwater Predator',
     'Пресная мирная+': 'Freshwater Peaceful+',
     'Пресная хищная+': 'Freshwater Predator+',
+    'Морская мирная+': 'Saltwater Peaceful+',
+    'Морская хищная+': 'Saltwater Predator+',
   };
   const FISH_IMG = {};
   const translateLure = n => {
