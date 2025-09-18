@@ -581,10 +581,15 @@ fun Application.botRoutes(env: Env) {
                 val text = rawText.trim()
                 val parts = text.split(" ", limit = 2)
                 val command = parts[0]
+                val commandTarget = command.substringAfter('@', "").takeIf { it.isNotEmpty() }
+                if (commandTarget != null && !commandTarget.equals(env.botName, ignoreCase = true)) {
+                    return false
+                }
+                val commandName = command.substringBefore('@')
                 val arg = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
                 val source = if (isCallback) "callback" else "message"
                 val replyTo = messageId
-                when (command) {
+                when (commandName) {
                     "/startapp" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
