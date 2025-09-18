@@ -290,51 +290,89 @@ fun Application.botRoutes(env: Env) {
                     language = from.language_code
                 )
                 val lang = fishing.userLanguage(uid)
-                val link = "https://t.me/${env.botName}?startapp"
-                val results = mutableListOf(
-                    InlineQueryResultArticle(
-                        id = "start",
-                        title = if (lang == "ru") "Открыть игру" else "Open game",
-                        inputMessageContent = InputTextMessageContent(link),
-                        description = link
-                    )
+                data class InlineCommandInfo(
+                    val name: String,
+                    val ruDescription: String,
+                    val enDescription: String,
+                    val messageText: (String) -> String
                 )
-                val q = iq.query.trim().lowercase()
-                if (q == "/tournament" || q == "tournament") {
-                    val t = tournaments.currentTournament()
-                    val text = if (t != null) {
-                        val tName = if (lang == "ru") t.nameRu else t.nameEn
-                        val (list, _) = tournaments.leaderboard(t, iq.from.id, 10)
-                        val header = "$tName\n"
-                        if (list.isEmpty()) {
-                            header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
-                        } else {
-                            val metric = t.metric.lowercase()
-                            val showFish = metric != "count"
-                            header + list.joinToString("\n") { e ->
-                                val valueText = if (metric == "count") {
-                                    e.value.toInt().toString()
-                                } else {
-                                    "%.2f".format(Locale.US, e.value)
-                                }
-                                val info = if (showFish) {
-                                    val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
-                                    "$fishName $valueText"
-                                } else {
-                                    valueText
-                                }
-                                "${e.rank}. ${e.user ?: "-"} — $info"
-                            }
-                        }
-                    } else {
-                        if (lang == "ru") "Сейчас нет активного турнира" else "No active tournament"
-                    }
-                    results += InlineQueryResultArticle(
-                        id = "tournament",
-                        title = if (lang == "ru") "Топ турнира" else "Tournament top",
-                        inputMessageContent = InputTextMessageContent(text)
+
+                val inlineCommands = listOf(
+                    InlineCommandInfo(
+                        name = "start",
+                        ruDescription = "Приветственное сообщение и список команд",
+                        enDescription = "Welcome message and command list"
+                    ) { "/start" },
+                    InlineCommandInfo(
+                        name = "startapp",
+                        ruDescription = "Открыть игру",
+                        enDescription = "Open the game"
+                    ) { "/startapp" },
+                    InlineCommandInfo(
+                        name = "cast",
+                        ruDescription = "Забросить снасть",
+                        enDescription = "Cast your line"
+                    ) { "/cast" },
+                    InlineCommandInfo(
+                        name = "bait",
+                        ruDescription = "Сменить приманку",
+                        enDescription = "Change your bait"
+                    ) { "/bait" },
+                    InlineCommandInfo(
+                        name = "location",
+                        ruDescription = "Сменить локацию",
+                        enDescription = "Change your location"
+                    ) { "/location" },
+                    InlineCommandInfo(
+                        name = "daily",
+                        ruDescription = "Получить ежедневную награду",
+                        enDescription = "Claim your daily reward"
+                    ) { "/daily" },
+                    InlineCommandInfo(
+                        name = "prizes",
+                        ruDescription = "Забрать призы турнира",
+                        enDescription = "Claim tournament prizes"
+                    ) { "/prizes" },
+                    InlineCommandInfo(
+                        name = "shop",
+                        ruDescription = "Купить приманки за звёзды",
+                        enDescription = "Buy baits with Stars"
+                    ) { "/shop" },
+                    InlineCommandInfo(
+                        name = "tournament",
+                        ruDescription = "Таблица текущего турнира и твоя позиция",
+                        enDescription = "View the current tournament leaderboard and your rank"
+                    ) { "/tournament" },
+                    InlineCommandInfo(
+                        name = "stats",
+                        ruDescription = "Статистика по пойманной рыбе",
+                        enDescription = "Your fishing stats"
+                    ) { "/stats" },
+                    InlineCommandInfo(
+                        name = "language",
+                        ruDescription = "Выбрать язык",
+                        enDescription = "Choose your language"
+                    ) { "/language" },
+                    InlineCommandInfo(
+                        name = "nickname",
+                        ruDescription = "Сменить ник",
+                        enDescription = "Change your nickname"
+                    ) { "/nickname" }
+                )
+
+                val query = iq.query.trim()
+                val normalized = query.lowercase().removePrefix("/")
+                val matched = inlineCommands.filter { normalized.isEmpty() || it.name.startsWith(normalized) }
+                    .ifEmpty { inlineCommands }
+                val results = matched.map { info ->
+                    InlineQueryResultArticle(
+                        id = info.name,
+                        title = info.name,
+                        description = if (lang == "ru") info.ruDescription else info.enDescription,
+                        inputMessageContent = InputTextMessageContent(info.messageText(lang))
                     )
                 }
+
                 try {
                     bot.answerInlineQuery(iq.id, results)
                 } catch (e: Exception) {
@@ -676,26 +714,28 @@ fun Application.botRoutes(env: Env) {
                         val params = arg?.let { mapOf("payload" to it) } ?: emptyMap()
                         logCommandMetric("start", params, source)
                         val message = if (lang == "ru") {
-                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота.
+                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
 
 Доступные команды:
 /cast — забросить снасть
 /bait — сменить приманку
 /location — сменить локацию
 /daily — получить ежедневную награду
+/prizes — забрать призы турнира
 /shop — купить приманки за звёзды
 /tournament — таблица текущего турнира и твоя позиция
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
                         } else {
-                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands.
+                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands. Bot commands also work in group chats if you add the bot and allow it to access messages.
 
 Available commands:
 /cast — cast your line
 /bait — change your bait
 /location — change your location
 /daily — claim your daily reward
+/prizes — claim tournament prizes
 /shop — buy baits with Stars
 /tournament — view the current tournament leaderboard and your rank
 /stats — your fishing stats
