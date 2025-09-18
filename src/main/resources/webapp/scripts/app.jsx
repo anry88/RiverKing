@@ -245,7 +245,7 @@ function App(){
               {id:3,name:'Озеро',unlockKg:50,unlocked:false},
             ],
             caughtFishIds:[],
-            recent:[], dailyAvailable:true, dailyStreak:0,
+            recent:[], dailyAvailable:true, dailyStreak:0, dailyRewards:[],
           });
           setShop([]);
         }
@@ -740,7 +740,7 @@ function App(){
           onToggleLanguage={toggleLanguage}
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
-        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
+        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
 
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (

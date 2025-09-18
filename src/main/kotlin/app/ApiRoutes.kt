@@ -179,6 +179,13 @@ fun Application.apiRoutes(env: Env) {
             val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
             val dailyAvailable = fishing.canClaimDaily(uid)
             val dailyStreak = transaction { Users.select { Users.id eq uid }.single()[Users.dailyStreak] }
+
+            @Serializable
+            data class DailyRewardItemDTO(val name: String, val qty: Int)
+
+            val dailyRewards = fishing.dailyRewardSchedule(uid).map { day ->
+                day.map { DailyRewardItemDTO(I18n.lure(it.name, language), it.qty) }
+            }
             val displayName = fishing.displayName(uid)
             val storedLoc = transaction {
                 Users.selectAll().where { Users.id eq uid }.single()[Users.currentLocationId]?.value
@@ -214,6 +221,7 @@ fun Application.apiRoutes(env: Env) {
                 val recent: List<RecentDTO>,
                 val dailyAvailable: Boolean,
                 val dailyStreak: Int,
+                val dailyRewards: List<List<DailyRewardItemDTO>>,
                 val autoFish: Boolean,
                 val language: String,
             )
@@ -231,6 +239,7 @@ fun Application.apiRoutes(env: Env) {
                     recent,
                     dailyAvailable,
                     dailyStreak,
+                    dailyRewards,
                     autoFish,
                     language,
                 )

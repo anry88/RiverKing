@@ -25,6 +25,79 @@ data class LocationDTO(
 data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
 
 class FishingService {
+    data class DailyReward(val name: String, val qty: Int)
+
+    private val freshDailyRewards: List<List<DailyReward>> = listOf(
+        listOf(DailyReward("Пресная мирная", 8), DailyReward("Пресная хищная", 4)),
+        listOf(DailyReward("Пресная мирная", 10), DailyReward("Пресная хищная", 6)),
+        listOf(DailyReward("Пресная мирная", 12), DailyReward("Пресная хищная", 6)),
+        listOf(DailyReward("Пресная мирная", 12), DailyReward("Пресная хищная", 8)),
+        listOf(
+            DailyReward("Пресная мирная", 12),
+            DailyReward("Пресная хищная", 8),
+            DailyReward("Пресная мирная+", 1),
+        ),
+        listOf(DailyReward("Пресная мирная", 12), DailyReward("Пресная хищная", 10)),
+        listOf(
+            DailyReward("Пресная мирная", 12),
+            DailyReward("Пресная хищная", 12),
+            DailyReward("Пресная хищная+", 1),
+        ),
+    )
+
+    private val saltDailyRewards: List<List<DailyReward>> = listOf(
+        listOf(
+            DailyReward("Пресная мирная", 6),
+            DailyReward("Пресная хищная", 6),
+            DailyReward("Морская хищная", 4),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 8),
+            DailyReward("Морская хищная", 5),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 8),
+            DailyReward("Морская хищная", 6),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 10),
+            DailyReward("Морская хищная", 6),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 10),
+            DailyReward("Морская хищная", 6),
+            DailyReward("Морская мирная", 2),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 10),
+            DailyReward("Морская хищная", 8),
+            DailyReward("Морская мирная", 2),
+        ),
+        listOf(
+            DailyReward("Пресная мирная", 8),
+            DailyReward("Пресная хищная", 10),
+            DailyReward("Морская хищная", 8),
+            DailyReward("Пресная хищная+", 1),
+            DailyReward("Морская хищная+", 1),
+        ),
+    )
+
+    private val allDailyRewardLureNames: List<String> =
+        (freshDailyRewards + saltDailyRewards).flatten().map { it.name }.distinct()
+
+    private fun rewardPlan(hasSaltUnlocked: Boolean) =
+        if (hasSaltUnlocked) saltDailyRewards else freshDailyRewards
+
+    private fun hasSaltUnlocked(unlockedKg: Double) =
+        (LocationFishWeights innerJoin Locations innerJoin Fish)
+            .select { (Locations.unlockKg lessEq unlockedKg) and (Fish.water eq "salt") }
+            .limit(1).any()
+
     fun ensureUserByTgId(
         tgId: Long,
         firstName: String? = null,
@@ -180,13 +253,8 @@ class FishingService {
 
         streak = if (last == today.minusDays(1)) streak + 1 else 1
 
-        val freshId        = Lures.select { Lures.name eq "Пресная мирная"   }.single()[Lures.id].value
-        val predId         = Lures.select { Lures.name eq "Пресная хищная"   }.single()[Lures.id].value
-        val saltFreshId    = Lures.select { Lures.name eq "Морская мирная"   }.single()[Lures.id].value
-        val saltPredId     = Lures.select { Lures.name eq "Морская хищная"   }.single()[Lures.id].value
-        val freshPlusId    = Lures.select { Lures.name eq "Пресная мирная+"  }.single()[Lures.id].value
-        val predPlusId     = Lures.select { Lures.name eq "Пресная хищная+"  }.single()[Lures.id].value
-        val saltPredPlusId = Lures.select { Lures.name eq "Морская хищная+"  }.single()[Lures.id].value
+        val nameToId = Lures.select { Lures.name inList allDailyRewardLureNames }
+            .associate { it[Lures.name] to it[Lures.id].value }
 
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
@@ -205,34 +273,17 @@ class FishingService {
             }
         }
 
+        fun addByName(name: String, qty: Int) {
+            val id = nameToId[name]
+            if (id != null) add(id, qty)
+        }
+
         val unlockedKg = totalKg(userId)
-        val hasSaltUnlocked = (LocationFishWeights innerJoin Locations innerJoin Fish)
-            .select { (Locations.unlockKg lessEq unlockedKg) and (Fish.water eq "salt") }
-            .limit(1).any()
+        val hasSaltUnlocked = hasSaltUnlocked(unlockedKg)
 
         val day = streak.coerceAtMost(7)
-
-        if (!hasSaltUnlocked) {
-            when (day) {
-                1 -> { add(freshId, 8);  add(predId, 4) }
-                2 -> { add(freshId, 10); add(predId, 6) }
-                3 -> { add(freshId, 12); add(predId, 6) }
-                4 -> { add(freshId, 12); add(predId, 8) }
-                5 -> { add(freshId, 12); add(predId, 8); add(freshPlusId, 1) }
-                6 -> { add(freshId, 12); add(predId, 10) }
-                7 -> { add(freshId, 12); add(predId, 12); add(predPlusId, 1) }
-            }
-        } else {
-            when (day) {
-                1 -> { add(freshId, 6);  add(predId, 6);  add(saltPredId, 4) }
-                2 -> { add(freshId, 8);  add(predId, 8);  add(saltPredId, 5) }
-                3 -> { add(freshId, 8);  add(predId, 8);  add(saltPredId, 6) }
-                4 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 6) }
-                5 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 6); add(saltFreshId, 2) }
-                6 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 8); add(saltFreshId, 2) }
-                7 -> { add(freshId, 8);  add(predId, 10); add(saltPredId, 8); add(predPlusId, 1); add(saltPredPlusId, 1) }
-            }
-        }
+        val dayRewards = rewardPlan(hasSaltUnlocked)[day - 1]
+        dayRewards.forEach { addByName(it.name, it.qty) }
 
         Users.update({ Users.id eq userId }) {
             it[lastDailyAt] = Instant.now()
@@ -254,6 +305,12 @@ class FishingService {
                 )
             }
         Triple(lures, current, streak)
+    }
+
+    fun dailyRewardSchedule(userId: Long): List<List<DailyReward>> = transaction {
+        val unlockedKg = totalKg(userId)
+        val hasSaltUnlocked = hasSaltUnlocked(unlockedKg)
+        rewardPlan(hasSaltUnlocked).map { day -> day.map { it.copy() } }
     }
 
     fun canClaimDaily(userId: Long): Boolean = transaction {
