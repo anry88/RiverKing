@@ -742,6 +742,7 @@ Available commands:
                         return true
                     }
                     "/buy" -> {
+                        val buyerTgId = from?.id ?: return false
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
                         if (arg.isNullOrBlank()) {
@@ -755,7 +756,7 @@ Available commands:
                             return true
                         }
                         try {
-                            stars.sendPackageInvoice(chatId, arg)
+                            stars.sendPackageInvoice(chatId, buyerTgId, arg)
                             logCommandMetric("buy", mapOf("result" to "sent", "pack" to arg), source)
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, arg, e)
