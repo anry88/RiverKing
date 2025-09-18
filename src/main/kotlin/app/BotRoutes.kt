@@ -36,6 +36,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.random.Random
+import kotlin.math.max
+import kotlin.math.roundToInt
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.select
@@ -170,18 +172,65 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Акула мако" to "webapp/assets/fish/akula_mako.png",
 )
 
-private fun loadFishImage(name: String): ByteArray? {
+private val LOCATION_BACKGROUNDS = run {
+    val base = mapOf(
+        "Пруд" to "webapp/assets/originals/riverking_bg_pond_1600x900.png",
+        "Река" to "webapp/assets/originals/riverking_bg_river_1600x900.png",
+        "Озеро" to "webapp/assets/originals/riverking_bg_lake_1600x900.png",
+        "Болото" to "webapp/assets/originals/riverking_bg_swamp_1600x900.png",
+        "Горная река" to "webapp/assets/originals/riverking_bg_mountain_river_1600x900.png",
+        "Водохранилище" to "webapp/assets/originals/riverking_bg_reservoir_1600x900.png",
+        "Дельта реки" to "webapp/assets/originals/riverking_bg_river_delta_1600x900.png",
+        "Прибрежье моря" to "webapp/assets/originals/riverking_bg_sea_coast_1600x900.png",
+        "Фьорд" to "webapp/assets/originals/riverking_bg_fjord_1600x900.png",
+        "Открытый океан" to "webapp/assets/originals/riverking_bg_open_ocean_1600x900.png",
+    )
+    base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
+}
+
+private fun loadFishImage(name: String, location: String): ByteArray? {
     val path = FISH_IMAGE_PATHS[name] ?: return null
-    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(path) ?: return null
-    stream.use {
-        val image = ImageIO.read(it) ?: return null
-        val scaled = BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB)
-        val g2d = scaled.createGraphics()
+    val classLoader = Thread.currentThread().contextClassLoader
+    val originalPath = path.replace("webapp/assets/fish/", "webapp/assets/originals/fish/")
+    val fishStream = classLoader.getResourceAsStream(originalPath) ?: return null
+    fishStream.use { stream ->
+        val fishImage = ImageIO.read(stream) ?: return null
+        val size = 1024
+        val finalImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        val g2d = finalImage.createGraphics()
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-        g2d.drawImage(image, 0, 0, 256, 256, null)
+
+        LOCATION_BACKGROUNDS[location]?.let { bgPath ->
+            classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
+                val bgImage = ImageIO.read(bgStream)
+                if (bgImage != null) {
+                    val scale = max(size.toDouble() / bgImage.width, size.toDouble() / bgImage.height)
+                    val newWidth = (bgImage.width * scale).roundToInt()
+                    val newHeight = (bgImage.height * scale).roundToInt()
+                    val offsetX = ((size - newWidth) / 2.0).roundToInt()
+                    val offsetY = ((size - newHeight) / 2.0).roundToInt()
+                    g2d.drawImage(
+                        bgImage,
+                        offsetX,
+                        offsetY,
+                        offsetX + newWidth,
+                        offsetY + newHeight,
+                        0,
+                        0,
+                        bgImage.width,
+                        bgImage.height,
+                        null,
+                    )
+                }
+            }
+        }
+
+        val fishX = ((size - fishImage.width) / 2.0).roundToInt()
+        val fishY = ((size - fishImage.height) / 2.0).roundToInt()
+        g2d.drawImage(fishImage, fishX, fishY, null)
         g2d.dispose()
         val baos = ByteArrayOutputStream()
-        ImageIO.write(scaled, "png", baos)
+        ImageIO.write(finalImage, "png", baos)
         return baos.toByteArray()
     }
 }
@@ -464,7 +513,64 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun processUserCommand(
+            fun sendShopMenu(
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val shop = fishing.listShop(lang)
+                if (shop.isEmpty()) {
+                    val emptyText = if (lang == "ru") {
+                        "Магазин пока пуст."
+                    } else {
+                        "The shop is empty right now."
+                    }
+                    trySend(chatId, emptyText, replyToMessageId = replyToMessageId)
+                    return
+                }
+                val header = if (lang == "ru") {
+                    "Магазин приманок за звёзды. Выберите набор:"
+                } else {
+                    "Star shop. Choose a bundle:"
+                }
+                val footer = if (lang == "ru") {
+                    "Нажми на кнопку, чтобы получить счёт в звёздах."
+                } else {
+                    "Tap a button to receive a Stars invoice."
+                }
+                val text = buildString {
+                    append(header)
+                    shop.forEach { category ->
+                        append("\n\n")
+                        append(category.name)
+                        category.packs.forEach { pack ->
+                            append("\n• ")
+                            append(pack.name)
+                            append(" — ")
+                            append(pack.price)
+                            append('⭐')
+                            if (pack.desc.isNotBlank()) {
+                                append("\n  ")
+                                append(pack.desc)
+                            }
+                        }
+                    }
+                    append("\n\n")
+                    append(footer)
+                }.trim()
+
+                val buttons = shop.flatMap { category ->
+                    category.packs.map { pack ->
+                        val label = "${pack.name} — ${pack.price}⭐"
+                        InlineKeyboardButton(label, "/buy ${pack.id}")
+                    }
+                }.chunked(2)
+
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun processUserCommand(
                 rawText: String,
                 from: TgUser?,
                 chatId: Long,
@@ -508,6 +614,8 @@ fun Application.botRoutes(env: Env) {
 /daily — получить ежедневную награду
 /language — выбрать язык
 /bait — сменить приманку
+/cast — забросить снасть
+/shop — купить приманки за звёзды
 /location — сменить локацию""".trimIndent()
                         } else {
                             """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands.
@@ -518,6 +626,8 @@ Available commands:
 /daily — claim your daily reward
 /language — choose your language
 /bait — change your bait
+/cast — cast your line
+/shop — buy baits with Stars
 /location — change your location""".trimIndent()
                         }
                         trySend(chatId, message, replyToMessageId = replyTo)
@@ -595,6 +705,41 @@ Available commands:
                                 }
                             }
                             trySend(chatId, text, replyToMessageId = replyTo)
+                        }
+                        return true
+                    }
+                    "/shop" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("shop", mapOf("action" to "show"), source)
+                        sendShopMenu(chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/buy" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        if (arg.isNullOrBlank()) {
+                            logCommandMetric("buy", mapOf("result" to "missing_arg"), source)
+                            val reply = if (lang == "ru") {
+                                "Укажи набор или воспользуйся командой /shop."
+                            } else {
+                                "Specify a bundle id or use /shop."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        try {
+                            stars.sendPackageInvoice(chatId, arg)
+                            logCommandMetric("buy", mapOf("result" to "sent", "pack" to arg), source)
+                        } catch (e: Exception) {
+                            log.error("sendInvoice failed chatId={} pack={}", chatId, arg, e)
+                            logCommandMetric("buy", mapOf("result" to "error", "pack" to arg), source)
+                            val reply = if (lang == "ru") {
+                                "Не удалось отправить счёт. Попробуй ещё раз позже."
+                            } else {
+                                "Failed to send the invoice. Please try again later."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
                         }
                         return true
                     }
@@ -683,7 +828,7 @@ Available commands:
                                     append(locationName)
                                     append(newLine)
                                 }
-                                val image = loadFishImage(catch.fish)
+                                val image = loadFishImage(catch.fish, catch.location)
                                 if (image != null) {
                                     try {
                                         bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)
@@ -1259,19 +1404,6 @@ Available commands:
                         }
                         try {
                             bot.sendMessage(chatId, "Ответ отправлен администрации")
-                        } catch (e: Exception) {
-                            log.error("sendMessage failed chatId={}", chatId, e)
-                        }
-                    }
-                }
-            } else if (text.startsWith("/buy")) {
-                val packId = text.split(" ").getOrNull(1)
-                if (packId != null) {
-                    try {
-                        stars.sendPackageInvoice(chatId, packId)
-                    } catch (_: Exception) {
-                        try {
-                            bot.sendMessage(chatId, "Пакет не найден")
                         } catch (e: Exception) {
                             log.error("sendMessage failed chatId={}", chatId, e)
                         }
