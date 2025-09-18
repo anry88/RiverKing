@@ -21,7 +21,12 @@ private data class AnswerInlineQueryRequest(
 )
 
 class TelegramBot(private val token: String) {
-    fun sendMessage(chatId: Long, text: String, replyMarkup: String? = null) {
+    fun sendMessage(
+        chatId: Long,
+        text: String,
+        replyMarkup: String? = null,
+        replyToMessageId: Long? = null,
+    ) {
         val url = URL("https://api.telegram.org/bot$token/sendMessage")
         val params = mutableListOf(
             "chat_id=$chatId",
@@ -30,6 +35,9 @@ class TelegramBot(private val token: String) {
         if (replyMarkup != null) {
             params += "reply_markup=" + URLEncoder.encode(replyMarkup, "UTF-8")
         }
+        if (replyToMessageId != null) {
+            params += "reply_to_message_id=$replyToMessageId"
+        }
         val data = params.joinToString("&")
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
@@ -37,6 +45,63 @@ class TelegramBot(private val token: String) {
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
         try {
             connection.outputStream.use { it.write(data.toByteArray()) }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() }
+            if (code !in 200..299) {
+                val desc = try {
+                    Json.parseToJsonElement(body ?: "").jsonObject["description"]?.jsonPrimitive?.content
+                } catch (_: Exception) {
+                    null
+                }
+                val message = buildString {
+                    append("HTTP $code")
+                    if (!desc.isNullOrBlank()) append(": ").append(desc)
+                }
+                throw TelegramApiException(code, message)
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    fun sendPhoto(
+        chatId: Long,
+        photo: ByteArray,
+        caption: String? = null,
+        replyMarkup: String? = null,
+        replyToMessageId: Long? = null,
+    ) {
+        val boundary = "----RiverKing${System.currentTimeMillis()}"
+        val url = URL("https://api.telegram.org/bot$token/sendPhoto")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+        val newline = "\r\n"
+        val boundaryPrefix = "--$boundary"
+        try {
+            connection.outputStream.buffered().use { os ->
+                fun writeField(name: String, value: String) {
+                    os.write((boundaryPrefix + newline).toByteArray())
+                    os.write("Content-Disposition: form-data; name=\"$name\"$newline".toByteArray())
+                    os.write(newline.toByteArray())
+                    os.write(value.toByteArray())
+                    os.write(newline.toByteArray())
+                }
+                writeField("chat_id", chatId.toString())
+                if (caption != null) writeField("caption", caption)
+                if (replyMarkup != null) writeField("reply_markup", replyMarkup)
+                if (replyToMessageId != null) writeField("reply_to_message_id", replyToMessageId.toString())
+                os.write((boundaryPrefix + newline).toByteArray())
+                os.write(
+                    "Content-Disposition: form-data; name=\"photo\"; filename=\"catch.png\"$newline".toByteArray()
+                )
+                os.write("Content-Type: image/png$newline$newline".toByteArray())
+                os.write(photo)
+                os.write(newline.toByteArray())
+                os.write((boundaryPrefix + "--$newline").toByteArray())
+            }
             val code = connection.responseCode
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val body = stream?.bufferedReader()?.use { it.readText() }

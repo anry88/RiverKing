@@ -826,6 +826,16 @@ class FishingService {
         newLure
     }
 
+    fun locationEscapeChance(userId: Long): Pair<Long, Double> = transaction {
+        val userRow = Users.select { Users.id eq userId }.single()
+        val total = totalKg(userId)
+        val locId = userRow[Users.currentLocationId]?.value
+            ?: Locations.select { Locations.unlockKg lessEq total }
+                .orderBy(Locations.unlockKg)
+                .first()[Locations.id].value
+        locId to baseEscapeChance(locId)
+    }
+
     @Serializable
     data class CatchDTO(
         val fish: String,
