@@ -175,6 +175,43 @@ class FishingService {
         }
     }
 
+    fun restoreCastingLuresOnStartup(): Int = transaction {
+        val fallbackLureId = Lures.select { Lures.name eq "Пресная хищная+" }
+            .single()[Lures.id].value
+        val castingUsers = Users.select { Users.isCasting eq true }.toList()
+        var restored = 0
+        castingUsers.forEach { row ->
+            val userId = row[Users.id].value
+            val lastLureId = row.getOrNull(Users.castLureId)?.value
+                ?: PendingCatches.select { PendingCatches.userId eq userId }
+                    .singleOrNull()?.get(PendingCatches.lureId)?.value
+                ?: fallbackLureId
+            val existingQty = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lastLureId)
+            }.singleOrNull()?.get(InventoryLures.qty)
+            if (existingQty == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = lastLureId
+                    it[InventoryLures.qty] = 1
+                }
+            } else {
+                InventoryLures.update({
+                    (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lastLureId)
+                }) {
+                    it[InventoryLures.qty] = existingQty + 1
+                }
+            }
+            PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+            Users.update({ Users.id eq userId }) {
+                it[Users.isCasting] = false
+                it[Users.castLureId] = null
+            }
+            restored += 1
+        }
+        restored
+    }
+
     private fun nameFromRow(row: ResultRow): String? {
         val fn = row.getOrNull(Users.firstName)
         val ln = row.getOrNull(Users.lastName)
