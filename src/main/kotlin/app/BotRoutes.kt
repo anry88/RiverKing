@@ -23,6 +23,7 @@ import service.PayService
 import service.StarsPaymentService
 import service.ReferralService
 import service.TournamentService
+import service.UserPrize
 import service.PrizeSpec
 import service.I18n
 import util.Metrics
@@ -514,6 +515,69 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
+            fun sendPrizes(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prizes: List<UserPrize>? = null,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val actual = prizes ?: run {
+                    tournaments.distributePrizes()
+                    tournaments.pendingPrizes(uid)
+                }
+                val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
+                fun displayName(prize: UserPrize): String {
+                    val name = packNames[prize.packageId]
+                    if (name != null) return name
+                    val lureName = I18n.lure(prize.packageId, lang)
+                    if (lureName != prize.packageId) return lureName
+                    return prize.packageId.replace('_', ' ')
+                }
+                val body = if (actual.isEmpty()) {
+                    if (lang == "ru") {
+                        "Нет призов для получения."
+                    } else {
+                        "No prizes to claim."
+                    }
+                } else {
+                    val header = if (lang == "ru") {
+                        "Призы, которые можно получить:"
+                    } else {
+                        "Prizes you can claim:"
+                    }
+                    val lines = actual.joinToString("\n") { prize ->
+                        val name = displayName(prize)
+                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                        val place = if (prize.rank > 0) {
+                            if (lang == "ru") " (место #${prize.rank})" else " (place #${prize.rank})"
+                        } else ""
+                        "• $name$qty$place"
+                    }
+                    "$header\n$lines"
+                }
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix.trim())
+                        if (body.isNotBlank()) append("\n\n")
+                    }
+                    append(body)
+                }
+                val markup = if (actual.isEmpty()) {
+                    null
+                } else {
+                    val buttons = actual.map { prize ->
+                        val name = displayName(prize)
+                        val short = if (name.length > 32) name.take(29) + "…" else name
+                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                        listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${prize.id}"))
+                    }
+                    Json.encodeToString(InlineKeyboardMarkup(buttons))
+                }
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
             fun sendShopMenu(
                 chatId: Long,
                 lang: String,
@@ -616,7 +680,8 @@ fun Application.botRoutes(env: Env) {
 
 Доступные команды:
 /startapp — открыть игру
-/tournament — топ-10 текущего турнира
+/tournament — таблица текущего турнира и твоя позиция
+/prizes — получить призы за турниры
 /daily — получить ежедневную награду
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
@@ -630,7 +695,8 @@ fun Application.botRoutes(env: Env) {
 
 Available commands:
 /startapp — open the game
-/tournament — see the current tournament top 10
+/tournament — view the current tournament leaderboard and your rank
+/prizes — claim tournament prizes
 /daily — claim your daily reward
 /stats — your fishing stats
 /language — choose your language
@@ -707,6 +773,15 @@ Available commands:
                         val params = t?.let { mapOf("metric" to it.metric.lowercase()) } ?: emptyMap()
                         logCommandMetric("tournament", params, source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/prizes" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        tournaments.distributePrizes()
+                        val prizes = tournaments.pendingPrizes(uid)
+                        logCommandMetric("prizes", mapOf("count" to prizes.size.toString()), source)
+                        sendPrizes(uid, chatId, lang, prizes = prizes, replyToMessageId = replyTo)
                         return true
                     }
                     "/daily" -> {
@@ -1155,6 +1230,82 @@ Available commands:
                             "Nickname change cancelled."
                         }
                         trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/prizeclaim" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val prizeId = arg?.toLongOrNull()
+                        if (prizeId == null) {
+                            logCommandMetric("prizes_claim", mapOf("result" to "invalid_id"), source)
+                            val reply = if (lang == "ru") {
+                                "Неверный идентификатор приза."
+                            } else {
+                                "Invalid prize identifier."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        tournaments.distributePrizes()
+                        val pending = tournaments.pendingPrizes(uid)
+                        val prize = pending.find { it.id == prizeId }
+                        if (prize == null) {
+                            logCommandMetric("prizes_claim", mapOf("result" to "not_found"), source)
+                            val reply = if (lang == "ru") {
+                                "Приз не найден или уже получен."
+                            } else {
+                                "Prize not found or already claimed."
+                            }
+                            sendPrizes(uid, chatId, lang, prizes = pending, prefix = reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val pack = fishing.findPack(prize.packageId)
+                        val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
+                        val displayName = packNames[prize.packageId]
+                            ?: pack?.name?.let { I18n.text(it, lang) }
+                            ?: prize.packageId.replace('_', ' ')
+                        val success = try {
+                            tournaments.claimPrize(uid, prizeId, fishing)
+                            logCommandMetric(
+                                "prizes_claim",
+                                mapOf(
+                                    "result" to "claimed",
+                                    "pack" to prize.packageId,
+                                    "qty" to prize.qty.toString()
+                                ),
+                                source
+                            )
+                            val items = pack?.items.orEmpty()
+                            val header = if (lang == "ru") {
+                                val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
+                                "Приз \"$label\" получен."
+                            } else {
+                                val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
+                                "Prize \"$label\" claimed."
+                            }
+                            if (items.isEmpty()) {
+                                header
+                            } else {
+                                val lines = items.joinToString("\n") { (lure, qty) ->
+                                    val lureName = I18n.lure(lure, lang)
+                                    val total = qty * prize.qty
+                                    "• $lureName x$total"
+                                }
+                                "$header\n$lines"
+                            }
+                        } catch (e: Exception) {
+                            logCommandMetric(
+                                "prizes_claim",
+                                mapOf("result" to "error", "pack" to prize.packageId),
+                                source
+                            )
+                            if (lang == "ru") {
+                                "Не удалось получить приз. Попробуй ещё раз позже."
+                            } else {
+                                "Couldn't claim the prize. Please try again later."
+                            }
+                        }
+                        sendPrizes(uid, chatId, lang, prefix = success, replyToMessageId = replyTo)
                         return true
                     }
                 }
