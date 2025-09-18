@@ -41,6 +41,11 @@ fun main() {
         val fishing = FishingService()
         val log = LoggerFactory.getLogger("App")
 
+        val restored = fishing.restoreCastingLuresOnStartup()
+        if (restored > 0) {
+            log.info("Restored lost lures for {} casting users on startup", restored)
+        }
+
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app", "webapp")
