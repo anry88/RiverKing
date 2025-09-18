@@ -214,6 +214,24 @@ class FishingService {
         Catches.select { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }.count()
     }
 
+    data class RarityCatchStats(val rarity: String, val count: Long, val weight: Double)
+
+    fun catchStatsByRarity(userId: Long): List<RarityCatchStats> = transaction {
+        val countExpr = Catches.id.count()
+        val weightExpr = Catches.weight.sum()
+        (Catches innerJoin Fish)
+            .slice(Fish.rarity, countExpr, weightExpr)
+            .select { Catches.userId eq userId }
+            .groupBy(Fish.rarity)
+            .map { row ->
+                val rarity = row[Fish.rarity]
+                val count = row[countExpr] ?: 0L
+                val weight = row[weightExpr] ?: 0.0
+                RarityCatchStats(rarity, count, weight)
+            }
+            .sortedByDescending { rarityRank(it.rarity) }
+    }
+
     fun fishRarity(name: String): String? = transaction {
         Fish.select { Fish.name eq name }.singleOrNull()?.get(Fish.rarity)
     }

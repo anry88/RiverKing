@@ -496,8 +496,9 @@ fun Application.apiRoutes(env: Env) {
             }
             val tgUser = try { TgWebAppAuth.verifyAndExtractUser(req.initData, env.botToken) }
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized) }
-            fishing.ensureUserByTgId(tgUser.id)
-            val url = try { stars.createInvoiceLink(tgUser.id, req.productId) }
+            val uid = fishing.ensureUserByTgId(tgUser.id)
+            val language = fishing.userLanguage(uid)
+            val url = try { stars.createInvoiceLink(tgUser.id, req.productId, language) }
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
             Metrics.counter("create_invoice_total", mapOf("pack" to req.productId))
             call.respond(InvoiceResp(url))

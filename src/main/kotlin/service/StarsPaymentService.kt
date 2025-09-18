@@ -44,8 +44,14 @@ class StarsPaymentService(
     )
 
     /** Send invoice for lure package purchase to chat. */
-    suspend fun sendPackageInvoice(chatId: Long, buyerId: Long, packageId: String) = withContext(Dispatchers.IO) {
-        val pack = fishing.listShop("ru").flatMap { it.packs }.find { it.id == packageId }
+    suspend fun sendPackageInvoice(
+        chatId: Long,
+        buyerId: Long,
+        packageId: String,
+        language: String,
+    ) = withContext(Dispatchers.IO) {
+        val pack = fishing.listShop(language).flatMap { it.packs }.find { it.id == packageId }
+            ?: fishing.listShop("ru").flatMap { it.packs }.find { it.id == packageId }
             ?: throw IllegalArgumentException("Unknown package")
 
         val invoice = Invoice(
@@ -74,8 +80,9 @@ class StarsPaymentService(
     }
 
     /** Create invoice link for package purchase to be used in a Mini App. */
-    suspend fun createInvoiceLink(userId: Long, packageId: String): String = withContext(Dispatchers.IO) {
-        val pack = fishing.listShop("ru").flatMap { it.packs }.find { it.id == packageId }
+    suspend fun createInvoiceLink(userId: Long, packageId: String, language: String): String = withContext(Dispatchers.IO) {
+        val pack = fishing.listShop(language).flatMap { it.packs }.find { it.id == packageId }
+            ?: fishing.listShop("ru").flatMap { it.packs }.find { it.id == packageId }
             ?: throw IllegalArgumentException("Unknown package")
 
         val req = InvoiceLinkReq(
