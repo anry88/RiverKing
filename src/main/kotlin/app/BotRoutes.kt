@@ -26,11 +26,16 @@ import service.TournamentService
 import service.PrizeSpec
 import service.I18n
 import util.Metrics
+import java.awt.RenderingHints
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import javax.imageio.ImageIO
+import kotlin.random.Random
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.select
@@ -86,7 +91,100 @@ private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["cou
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+private val RARITY_LABELS = mapOf(
+    "ru" to mapOf(
+        "common" to "Простая",
+        "uncommon" to "Необычная",
+        "rare" to "Редкая",
+        "epic" to "Эпическая",
+        "legendary" to "Легендарная",
+    ),
+    "en" to mapOf(
+        "common" to "Common",
+        "uncommon" to "Uncommon",
+        "rare" to "Rare",
+        "epic" to "Epic",
+        "legendary" to "Legendary",
+    ),
+)
+
+private val FISH_IMAGE_PATHS = mapOf(
+    "Плотва" to "webapp/assets/fish/plotva.png",
+    "Окунь" to "webapp/assets/fish/okun.png",
+    "Карась" to "webapp/assets/fish/karas.png",
+    "Лещ" to "webapp/assets/fish/lesch.png",
+    "Щука" to "webapp/assets/fish/schuka.png",
+    "Карп" to "webapp/assets/fish/karp.png",
+    "Сом" to "webapp/assets/fish/som.png",
+    "Осётр" to "webapp/assets/fish/osetr.png",
+    "Уклейка" to "webapp/assets/fish/ukleyka.png",
+    "Линь" to "webapp/assets/fish/lin.png",
+    "Ротан" to "webapp/assets/fish/rotan.png",
+    "Судак" to "webapp/assets/fish/sudak.png",
+    "Чехонь" to "webapp/assets/fish/chehon.png",
+    "Хариус" to "webapp/assets/fish/harius.png",
+    "Форель ручьевая" to "webapp/assets/fish/forel_ruchevaya.png",
+    "Таймень" to "webapp/assets/fish/taymen.png",
+    "Налим" to "webapp/assets/fish/nalim.png",
+    "Сиг" to "webapp/assets/fish/sig.png",
+    "Голавль" to "webapp/assets/fish/golavl.png",
+    "Жерех" to "webapp/assets/fish/zhereh.png",
+    "Толстолобик" to "webapp/assets/fish/tolstolobik.png",
+    "Белый амур" to "webapp/assets/fish/beliy_amur.png",
+    "Угорь европейский" to "webapp/assets/fish/ugor_evropeyskiy.png",
+    "Стерлядь" to "webapp/assets/fish/sterlyad.png",
+    "Кефаль" to "webapp/assets/fish/kefal.png",
+    "Камбала" to "webapp/assets/fish/kambala.png",
+    "Сельдь" to "webapp/assets/fish/seld.png",
+    "Ставрида" to "webapp/assets/fish/stavrida.png",
+    "Треска" to "webapp/assets/fish/treska.png",
+    "Сайда" to "webapp/assets/fish/sayda.png",
+    "Морская форель" to "webapp/assets/fish/morskaya_forel.png",
+    "Палтус" to "webapp/assets/fish/paltus.png",
+    "Корюшка" to "webapp/assets/fish/koryushka.png",
+    "Лосось атлантический" to "webapp/assets/fish/losos_atlanticheskiy.png",
+    "Лаврак" to "webapp/assets/fish/lavrak.png",
+    "Скумбрия атлантическая" to "webapp/assets/fish/skumbriya_atlanticheskaya.png",
+    "Белуга" to "webapp/assets/fish/beluga.png",
+    "Ёрш" to "webapp/assets/fish/yorsh.png",
+    "Пескарь" to "webapp/assets/fish/peskar.png",
+    "Густера" to "webapp/assets/fish/gustera.png",
+    "Краснопёрка" to "webapp/assets/fish/krasnopyorka.png",
+    "Елец" to "webapp/assets/fish/elets.png",
+    "Верхоплавка" to "webapp/assets/fish/verhoplavka.png",
+    "Гольян" to "webapp/assets/fish/golyan.png",
+    "Язь" to "webapp/assets/fish/yaz.png",
+    "Бычок" to "webapp/assets/fish/bychyok.png",
+    "Килька" to "webapp/assets/fish/kilka.png",
+    "Мойва" to "webapp/assets/fish/mojva.png",
+    "Сардина" to "webapp/assets/fish/sardina.png",
+    "Анчоус" to "webapp/assets/fish/anchous.png",
+    "Дорадо" to "webapp/assets/fish/dorado.png",
+    "Ваху" to "webapp/assets/fish/vahu.png",
+    "Парусник" to "webapp/assets/fish/parusnik.png",
+    "Рыба-меч" to "webapp/assets/fish/ryba_mech.png",
+    "Марлин синий" to "webapp/assets/fish/marlin_siniy.png",
+    "Тунец синеперый" to "webapp/assets/fish/tunets_sineperiy.png",
+    "Акула мако" to "webapp/assets/fish/akula_mako.png",
+)
+
+private fun loadFishImage(name: String): ByteArray? {
+    val path = FISH_IMAGE_PATHS[name] ?: return null
+    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(path) ?: return null
+    stream.use {
+        val image = ImageIO.read(it) ?: return null
+        val scaled = BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB)
+        val g2d = scaled.createGraphics()
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        g2d.drawImage(image, 0, 0, 256, 256, null)
+        g2d.dispose()
+        val baos = ByteArrayOutputStream()
+        ImageIO.write(scaled, "png", baos)
+        return baos.toByteArray()
+    }
+}
 
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
@@ -219,15 +317,25 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun trySend(chatId: Long, text: String, replyMarkup: String? = null) {
+            fun trySend(
+                chatId: Long,
+                text: String,
+                replyMarkup: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
                 try {
-                    bot.sendMessage(chatId, text, replyMarkup)
+                    bot.sendMessage(chatId, text, replyMarkup, replyToMessageId)
                 } catch (e: Exception) {
                     log.error("sendMessage failed chatId={}", chatId, e)
                 }
             }
 
-            fun sendLanguageMenu(chatId: Long, lang: String, prefix: String? = null) {
+            fun sendLanguageMenu(
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
                 val ruLabel = if (lang == "ru") "Русский ✅" else "Русский"
                 val enLabel = if (lang == "en") "English ✅" else "English"
                 val body = if (lang == "ru") {
@@ -250,10 +358,16 @@ fun Application.botRoutes(env: Env) {
                         )
                     )
                 )
-                trySend(chatId, text, markup)
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendBaitMenu(uid: Long, chatId: Long, lang: String, prefix: String? = null) {
+            fun sendBaitMenu(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
                 val lures = fishing.listLures(uid).filter { it.qty > 0 }
                 val currentId = transaction {
                     Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
@@ -280,7 +394,7 @@ fun Application.botRoutes(env: Env) {
                     append(prompt)
                 }
                 if (sorted.isEmpty()) {
-                    trySend(chatId, text)
+                    trySend(chatId, text, replyToMessageId = replyToMessageId)
                     return
                 }
                 val buttons = sorted.map { lure ->
@@ -291,13 +405,19 @@ fun Application.botRoutes(env: Env) {
                         append(")")
                         if (lure.id == currentId) append(" ✅")
                     }
-                    InlineKeyboardButton(title, "/bait ${lure.id}")
+                        InlineKeyboardButton(title, "/bait ${lure.id}")
                 }.chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
-                trySend(chatId, text, markup)
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendLocationMenu(uid: Long, chatId: Long, lang: String, prefix: String? = null) {
+            fun sendLocationMenu(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
                 val locations = fishing.locations(uid)
                 val unlocked = locations.filter { it.unlocked }
                 val stored = transaction {
@@ -327,7 +447,7 @@ fun Application.botRoutes(env: Env) {
                     append(prompt)
                 }
                 if (unlocked.isEmpty()) {
-                    trySend(chatId, text)
+                    trySend(chatId, text, replyToMessageId = replyToMessageId)
                     return
                 }
                 val buttons = unlocked
@@ -341,16 +461,23 @@ fun Application.botRoutes(env: Env) {
                     }
                     .chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
-                trySend(chatId, text, markup)
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun processUserCommand(rawText: String, from: TgUser?, chatId: Long, isCallback: Boolean = false): Boolean {
+            fun processUserCommand(
+                rawText: String,
+                from: TgUser?,
+                chatId: Long,
+                isCallback: Boolean = false,
+                messageId: Long? = null,
+            ): Boolean {
                 if (!rawText.startsWith("/")) return false
                 val text = rawText.trim()
                 val parts = text.split(" ", limit = 2)
                 val command = parts[0]
                 val arg = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
                 val source = if (isCallback) "callback" else "message"
+                val replyTo = messageId
                 when (command) {
                     "/startapp" -> {
                         val uid = ensureUserId(from) ?: return false
@@ -364,7 +491,7 @@ fun Application.botRoutes(env: Env) {
                         }
                         val buttonText = if (lang == "ru") "Открыть игру" else "Open game"
                         val markup = """{"inline_keyboard":[[{"text":"$buttonText","url":"$link"}]]}"""
-                        trySend(chatId, responseText, markup)
+                        trySend(chatId, responseText, markup, replyTo)
                         return true
                     }
                     "/start" -> {
@@ -393,7 +520,7 @@ Available commands:
 /bait — change your bait
 /location — change your location""".trimIndent()
                         }
-                        trySend(chatId, message)
+                        trySend(chatId, message, replyToMessageId = replyTo)
                         return true
                     }
                     "/tournament" -> {
@@ -429,7 +556,7 @@ Available commands:
                         }
                         val params = t?.let { mapOf("metric" to it.metric.lowercase()) } ?: emptyMap()
                         logCommandMetric("tournament", params, source)
-                        trySend(chatId, reply)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
                     "/daily" -> {
@@ -444,7 +571,7 @@ Available commands:
                             } else {
                                 "Your next daily reward is not ready yet"
                             }
-                            trySend(chatId, reply)
+                            trySend(chatId, reply, replyToMessageId = replyTo)
                         } else {
                             val streak = res.third
                             val params = mapOf("result" to "claimed", "streak" to streak.toString())
@@ -467,7 +594,122 @@ Available commands:
                                     append(lines.joinToString("\n"))
                                 }
                             }
-                            trySend(chatId, text)
+                            trySend(chatId, text, replyToMessageId = replyTo)
+                        }
+                        return true
+                    }
+                    "/cast" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val knownFish = fishing.caughtFishIds(uid)
+                        try {
+                            fishing.startCast(uid)
+                        } catch (e: Exception) {
+                            val reason = e.message ?: "error"
+                            val text = when (reason) {
+                                "casting" -> if (lang == "ru") "Заброс уже выполняется." else "You are already casting."
+                                "No lure selected" -> if (lang == "ru") "Сначала выберите приманку." else "Select a bait first."
+                                "No baits" -> if (lang == "ru") "Приманки закончились." else "You have no baits left."
+                                "No suitable fish" -> if (lang == "ru") {
+                                    "На выбранной локации нет подходящей рыбы для этой приманки."
+                                } else {
+                                    "No suitable fish at this location for the selected bait."
+                                }
+                                else -> if (lang == "ru") "Не удалось забросить снасть." else "Failed to start the cast."
+                            }
+                            logCommandMetric("cast", mapOf("result" to "error", "stage" to "start", "reason" to reason), source)
+                            trySend(chatId, text, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val waitMessage = if (lang == "ru") {
+                            "Забросили снасть. Ждём поклёвку..."
+                        } else {
+                            "The line is in the water. Waiting for a bite..."
+                        }
+                        trySend(chatId, waitMessage, replyToMessageId = replyTo)
+                        castScope.launch {
+                            val waitSeconds = 5 + Random.nextInt(26)
+                            delay(waitSeconds * 1000L)
+                            try {
+                                val (locId, baseEscape) = fishing.locationEscapeChance(uid)
+                                val reactionTime = ((1.5 / (1.0 - baseEscape))).coerceAtMost(5.0)
+                                val hookRes = fishing.hook(uid, waitSeconds, reactionTime)
+                                if (!hookRes.success) {
+                                    val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
+                                    trySend(chatId, escapedText, replyToMessageId = replyTo)
+                                    logCommandMetric(
+                                        "cast",
+                                        mapOf("result" to "escaped", "location" to locId.toString()),
+                                        source,
+                                    )
+                                    return@launch
+                                }
+                                val castRes = fishing.cast(uid, waitSeconds, reactionTime, true)
+                                val catch = castRes.catch
+                                if (catch == null) {
+                                    val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
+                                    trySend(chatId, escapedText, replyToMessageId = replyTo)
+                                    logCommandMetric(
+                                        "cast",
+                                        mapOf("result" to "escaped", "location" to locId.toString(), "stage" to "final"),
+                                        source,
+                                    )
+                                    return@launch
+                                }
+                                val fishName = I18n.fish(catch.fish, lang)
+                                val rarityText = RARITY_LABELS[lang]?.get(catch.rarity) ?: catch.rarity
+                                val locationName = I18n.location(catch.location, lang)
+                                val weightText = "%.2f".format(Locale.US, catch.weight)
+                                val unit = if (lang == "ru") "кг" else "kg"
+                                val locationLabel = if (lang == "ru") "Локация" else "Location"
+                                val isNew = catch.fishId?.let { it !in knownFish } == true
+                                val newLine = if (isNew) {
+                                    if (lang == "ru") "\n✨ Новая рыба!" else "\n✨ New fish!"
+                                } else {
+                                    ""
+                                }
+                                val caption = buildString {
+                                    append("🐟 ")
+                                    append(fishName)
+                                    append(" (")
+                                    append(rarityText)
+                                    append(") — ")
+                                    append(weightText)
+                                    append(' ')
+                                    append(unit)
+                                    append("\n")
+                                    append(locationLabel)
+                                    append(": ")
+                                    append(locationName)
+                                    append(newLine)
+                                }
+                                val image = loadFishImage(catch.fish)
+                                if (image != null) {
+                                    try {
+                                        bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)
+                                    } catch (e: Exception) {
+                                        log.error("sendPhoto failed chatId={} fish={}", chatId, catch.fish, e)
+                                        trySend(chatId, caption, replyToMessageId = replyTo)
+                                    }
+                                } else {
+                                    trySend(chatId, caption, replyToMessageId = replyTo)
+                                }
+                                logCommandMetric(
+                                    "cast",
+                                    mapOf("result" to "caught", "rarity" to catch.rarity, "location" to locId.toString()),
+                                    source,
+                                )
+                            } catch (e: Exception) {
+                                log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
+                                fishing.resetCasting(uid)
+                                val errorText = if (lang == "ru") "Не удалось завершить заброс." else "Failed to finish the cast."
+                                trySend(chatId, errorText, replyToMessageId = replyTo)
+                                logCommandMetric(
+                                    "cast",
+                                    mapOf("result" to "error", "stage" to "final"),
+                                    source,
+                                )
+                            }
                         }
                         return true
                     }
@@ -476,7 +718,7 @@ Available commands:
                         var lang = fishing.userLanguage(uid)
                         if (arg == null) {
                             logCommandMetric("language", mapOf("action" to "show"), source)
-                            sendLanguageMenu(chatId, lang)
+                            sendLanguageMenu(chatId, lang, replyToMessageId = replyTo)
                         } else {
                             val normalized = arg.lowercase()
                             if (normalized in setOf("ru", "en")) {
@@ -489,7 +731,7 @@ Available commands:
                                 } else {
                                     "Language switched to English"
                                 }
-                                sendLanguageMenu(chatId, lang, prefix)
+                                sendLanguageMenu(chatId, lang, prefix, replyTo)
                             } else {
                                 val params = mapOf("language" to normalized, "result" to "invalid")
                                 logCommandMetric("language", params, source)
@@ -498,7 +740,7 @@ Available commands:
                                 } else {
                                     "Unknown language. Please use the buttons below."
                                 }
-                                sendLanguageMenu(chatId, lang, prefix)
+                                sendLanguageMenu(chatId, lang, prefix, replyTo)
                             }
                         }
                         return true
@@ -508,13 +750,13 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         if (arg == null) {
                             logCommandMetric("bait", mapOf("action" to "show"), source)
-                            sendBaitMenu(uid, chatId, lang)
+                            sendBaitMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         } else {
                             val lureId = arg.toLongOrNull()
                             if (lureId == null) {
                                 logCommandMetric("bait", mapOf("result" to "invalid", "value" to arg), source)
                                 val reply = if (lang == "ru") "Неверный формат приманки" else "Invalid bait value"
-                                trySend(chatId, reply)
+                                trySend(chatId, reply, replyToMessageId = replyTo)
                             } else {
                                 try {
                                     fishing.setLure(uid, lureId)
@@ -524,7 +766,7 @@ Available commands:
                                         source
                                     )
                                     val prefix = if (lang == "ru") "Приманка обновлена" else "Bait updated"
-                                    sendBaitMenu(uid, chatId, lang, prefix)
+                                    sendBaitMenu(uid, chatId, lang, prefix, replyTo)
                                 } catch (e: Exception) {
                                     val reason = e.message ?: "error"
                                     logCommandMetric(
@@ -537,7 +779,7 @@ Available commands:
                                         "no lure" -> if (lang == "ru") "Эта приманка недоступна" else "This bait is not available"
                                         else -> if (lang == "ru") "Не удалось сменить приманку" else "Failed to change bait"
                                     }
-                                    trySend(chatId, msg)
+                                    trySend(chatId, msg, replyToMessageId = replyTo)
                                 }
                             }
                         }
@@ -548,13 +790,13 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         if (arg == null) {
                             logCommandMetric("location", mapOf("action" to "show"), source)
-                            sendLocationMenu(uid, chatId, lang)
+                            sendLocationMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         } else {
                             val locId = arg.toLongOrNull()
                             if (locId == null) {
                                 logCommandMetric("location", mapOf("result" to "invalid", "value" to arg), source)
                                 val reply = if (lang == "ru") "Неверный формат локации" else "Invalid location value"
-                                trySend(chatId, reply)
+                                trySend(chatId, reply, replyToMessageId = replyTo)
                             } else {
                                 try {
                                     fishing.setLocation(uid, locId)
@@ -564,7 +806,7 @@ Available commands:
                                         source
                                     )
                                     val prefix = if (lang == "ru") "Локация обновлена" else "Location updated"
-                                    sendLocationMenu(uid, chatId, lang, prefix)
+                                    sendLocationMenu(uid, chatId, lang, prefix, replyTo)
                                 } catch (e: Exception) {
                                     val reason = e.message ?: "error"
                                     logCommandMetric(
@@ -578,7 +820,7 @@ Available commands:
                                         "bad location" -> if (lang == "ru") "Локация не найдена" else "Location not found"
                                         else -> if (lang == "ru") "Не удалось сменить локацию" else "Failed to change location"
                                     }
-                                    trySend(chatId, msg)
+                                    trySend(chatId, msg, replyToMessageId = replyTo)
                                 }
                             }
                         }
@@ -591,7 +833,14 @@ Available commands:
             update.callbackQuery?.let { cq ->
                 val data = cq.data
                 val chatId = cq.message?.chat?.id ?: cq.from.id
-                if (data != null && processUserCommand(data, cq.from, chatId, isCallback = true)) {
+                if (data != null && processUserCommand(
+                        data,
+                        cq.from,
+                        chatId,
+                        isCallback = true,
+                        messageId = cq.message?.message_id,
+                    )
+                ) {
                     try { bot.answerCallbackQuery(cq.id) } catch (_: Exception) {}
                     return@post call.respond(HttpStatusCode.OK)
                 }
@@ -927,7 +1176,7 @@ Available commands:
                 return@post call.respond(HttpStatusCode.OK)
             }
 
-            if (processUserCommand(text, message.from, chatId)) {
+            if (processUserCommand(text, message.from, chatId, messageId = message.message_id)) {
                 return@post call.respond(HttpStatusCode.OK)
             } else if (text.startsWith("/paysupport")) {
                 val args = text.removePrefix("/paysupport").trim()
