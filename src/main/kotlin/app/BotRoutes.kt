@@ -649,14 +649,14 @@ Available commands:
                         val t = tournaments.currentTournament()
                         val reply = if (t != null) {
                             val tName = if (lang == "ru") t.nameRu else t.nameEn
-                            val (list, _) = tournaments.leaderboard(t, uid, 10)
+                            val (list, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
+                            val metric = t.metric.lowercase()
+                            val showFish = metric != "count"
                             val header = "$tName\n"
-                            if (list.isEmpty()) {
-                                header + if (lang == "ru") "Список пуст" else "Leaderboard is empty"
+                            val body = if (list.isEmpty()) {
+                                if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                             } else {
-                                val metric = t.metric.lowercase()
-                                val showFish = metric != "count"
-                                header + list.joinToString("\n") { e ->
+                                list.joinToString("\n") { e ->
                                     val valueText = if (metric == "count") {
                                         e.value.toInt().toString()
                                     } else {
@@ -669,6 +669,36 @@ Available commands:
                                         valueText
                                     }
                                     "${e.rank}. ${e.user ?: "-"} — $info"
+                                }
+                            }
+                            val mineLine = if (mine != null && mine.rank > t.prizePlaces) {
+                                val valueText = if (metric == "count") {
+                                    mine.value.toInt().toString()
+                                } else {
+                                    "%.2f".format(Locale.US, mine.value)
+                                }
+                                if (lang == "ru") {
+                                    if (showFish) {
+                                        val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                        "Твоя позиция: ${mine.rank}. Рыба: $fishName $valueText"
+                                    } else {
+                                        "Твоя позиция: ${mine.rank}. Поймано: $valueText"
+                                    }
+                                } else {
+                                    if (showFish) {
+                                        val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                        "Your position: ${mine.rank}. Fish: $fishName $valueText"
+                                    } else {
+                                        "Your position: ${mine.rank}. Caught: $valueText"
+                                    }
+                                }
+                            } else null
+                            buildString {
+                                append(header)
+                                append(body)
+                                if (mineLine != null) {
+                                    append("\n\n")
+                                    append(mineLine)
                                 }
                             }
                         } else {
