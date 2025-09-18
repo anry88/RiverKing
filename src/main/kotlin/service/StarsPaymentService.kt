@@ -44,7 +44,7 @@ class StarsPaymentService(
     )
 
     /** Send invoice for lure package purchase to chat. */
-    suspend fun sendPackageInvoice(chatId: Long, packageId: String) = withContext(Dispatchers.IO) {
+    suspend fun sendPackageInvoice(chatId: Long, buyerId: Long, packageId: String) = withContext(Dispatchers.IO) {
         val pack = fishing.listShop("ru").flatMap { it.packs }.find { it.id == packageId }
             ?: throw IllegalArgumentException("Unknown package")
 
@@ -52,7 +52,7 @@ class StarsPaymentService(
             chatId = chatId,
             title = pack.name,
             description = pack.desc,
-            payload = "pack=${pack.id};user=$chatId",
+            payload = "pack=${pack.id};user=$buyerId",
             providerToken = env.providerToken,
             currency = "XTR",
             prices = listOf(LabeledPrice(pack.name, pack.price)),
