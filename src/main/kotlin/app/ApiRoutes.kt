@@ -790,7 +790,12 @@ fun Application.apiRoutes(env: Env) {
                     location = I18n.location(c.location, language)
                 )
             }
-            call.respond(res.copy(catch = localizedCatch))
+            val localizedUnlocked = if (res.unlockedLocations.isEmpty()) {
+                emptyList()
+            } else {
+                res.unlockedLocations.map { I18n.location(it, language) }
+            }
+            call.respond(res.copy(catch = localizedCatch, unlockedLocations = localizedUnlocked))
         }
 
         // Change lure
