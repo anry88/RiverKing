@@ -721,14 +721,30 @@ Available commands:
                     "/stats" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        val total = fishing.totalCaughtCount(uid)
-                        val today = fishing.todayCaughtCount(uid)
-                        val reply = if (lang == "ru") {
-                            """🐟 Всего поймано: $total
-📅 За сегодня: $today""".trimIndent()
+                        val totalCount = fishing.totalCaughtCount(uid)
+                        val totalWeight = fishing.totalCaughtKg(uid)
+                        val todayCount = fishing.todayCaughtCount(uid)
+                        val todayWeight = fishing.todayCaughtKg(uid)
+                        val rarityStats = fishing.catchStatsByRarity(uid)
+                        val unit = if (lang == "ru") "кг" else "kg"
+                        val countLabel = if (lang == "ru") "шт." else "fish"
+                        fun formatWeight(value: Double) = "%.2f".format(Locale.US, value) + " $unit"
+                        val breakdown = if (rarityStats.isEmpty()) {
+                            ""
                         } else {
-                            """🐟 Total fish caught: $total
-📅 Today: $today""".trimIndent()
+                            val title = if (lang == "ru") "\n\nРедкость:" else "\n\nBy rarity:"
+                            val lines = rarityStats.joinToString("\n") { stat ->
+                                val rarity = RARITY_LABELS[lang]?.get(stat.rarity) ?: stat.rarity
+                                "• $rarity — ${stat.count} $countLabel, ${formatWeight(stat.weight)}"
+                            }
+                            title + "\n" + lines
+                        }
+                        val reply = if (lang == "ru") {
+                            """🐟 Всего поймано: $totalCount $countLabel (${formatWeight(totalWeight)})
+📅 За сегодня: $todayCount $countLabel (${formatWeight(todayWeight)})$breakdown""".trimIndent()
+                        } else {
+                            """🐟 Total caught: $totalCount $countLabel (${formatWeight(totalWeight)})
+📅 Today: $todayCount $countLabel (${formatWeight(todayWeight)})$breakdown""".trimIndent()
                         }
                         logCommandMetric("stats", mapOf("result" to "shown"), source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
@@ -756,7 +772,7 @@ Available commands:
                             return true
                         }
                         try {
-                            stars.sendPackageInvoice(chatId, buyerTgId, arg)
+                            stars.sendPackageInvoice(chatId, buyerTgId, arg, lang)
                             logCommandMetric("buy", mapOf("result" to "sent", "pack" to arg), source)
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, arg, e)
@@ -1466,34 +1482,55 @@ Available commands:
             } else if (text.startsWith("/paysupport")) {
                 val args = text.removePrefix("/paysupport").trim()
                 val uid = fishing.ensureUserByTgId(userId)
+                val lang = fishing.userLanguage(uid)
+                val payments = PayService.listPayments(uid)
+                val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
+                val source = "message"
                 if (args.isEmpty()) {
-                    val payments = PayService.listPayments(uid)
-                    val reply = if (payments.isEmpty()) {
-                        "Покупок не найдено"
+                    if (payments.isEmpty()) {
+                        val reply = if (lang == "ru") {
+                            "Покупок не найдено"
+                        } else {
+                            "No purchases found"
+                        }
+                        logCommandMetric("paysupport", mapOf("result" to "empty"), source)
+                        trySend(chatId, reply)
                     } else {
                         val list = payments.joinToString("\n") {
-                            "${it.id}: пакет ${it.packageId} на сумму ${it.amount} ${it.currency}"
+                            val label = packNames[it.packageId] ?: it.packageId
+                            "${it.id}: $label — ${it.amount} ${it.currency}"
                         }
-                        "Выберите покупку для возврата, отправив /paysupport <ID> <причина>:\n$list"
-                    }
-                    try {
-                        bot.sendMessage(chatId, reply)
-                    } catch (e: Exception) {
-                        log.error("sendMessage failed chatId={}", chatId, e)
+                        val reply = if (lang == "ru") {
+                            "Выберите покупку для возврата, отправив /paysupport <ID> <причина>:\n$list"
+                        } else {
+                            "Choose a payment for refund by sending /paysupport <ID> <reason>:\n$list"
+                        }
+                        logCommandMetric("paysupport", mapOf("action" to "list"), source)
+                        trySend(chatId, reply)
                     }
                 } else {
                     val parts = args.split(" ", limit = 2)
                     val paymentId = parts.getOrNull(0)?.toLongOrNull()
-                    val reason = parts.getOrNull(1) ?: ""
-                    if (paymentId != null) {
-                        val payment = PayService.listPayments(uid).find { it.id == paymentId }
+                    val reason = parts.getOrNull(1)?.trim() ?: ""
+                    if (paymentId == null) {
+                        val reply = if (lang == "ru") {
+                            "Неверный формат. Используйте /paysupport <ID> <причина>."
+                        } else {
+                            "Invalid format. Use /paysupport <ID> <reason>."
+                        }
+                        logCommandMetric("paysupport", mapOf("result" to "invalid_args"), source)
+                        trySend(chatId, reply)
+                    } else {
+                        val payment = payments.find { it.id == paymentId }
                         if (payment != null) {
                             val reqId = PayService.createSupportRequest(uid, paymentId, reason)
-                            try {
-                                bot.sendMessage(chatId, "Запрос #$reqId отправлен администрации")
-                            } catch (e: Exception) {
-                                log.error("sendMessage failed chatId={}", chatId, e)
+                            val reply = if (lang == "ru") {
+                                "Запрос #$reqId отправлен администрации"
+                            } else {
+                                "Request #$reqId has been sent to the admins"
                             }
+                            logCommandMetric("paysupport", mapOf("result" to "submitted"), source)
+                            trySend(chatId, reply)
                             if (env.adminTgId != 0L) {
                                 val msg = "Запрос #$reqId от $chatId, платеж $paymentId: $reason\n" +
                                         "/refund $reqId — одобрить возврат\n" +
@@ -1506,17 +1543,21 @@ Available commands:
                                 }
                             }
                         } else {
-                            try {
-                                bot.sendMessage(chatId, "Покупка не найдена")
-                            } catch (e: Exception) {
-                                log.error("sendMessage failed chatId={}", chatId, e)
+                            val reply = if (lang == "ru") {
+                                "Покупка не найдена"
+                            } else {
+                                "Purchase not found"
                             }
+                            logCommandMetric("paysupport", mapOf("result" to "not_found"), source)
+                            trySend(chatId, reply)
                         }
                     }
                 }
             } else if (text.startsWith("/answer")) {
                 val parts = text.split(" ", limit = 3)
                 val uid = fishing.ensureUserByTgId(userId)
+                val lang = fishing.userLanguage(uid)
+                val source = "message"
                 var id = parts.getOrNull(1)?.toLongOrNull()
                 val answer: String? = if (id != null) {
                     parts.getOrNull(2)
@@ -1524,8 +1565,16 @@ Available commands:
                     id = PayService.latestInfoRequest(uid)?.id
                     parts.getOrNull(1)
                 }
-                if (id != null && answer != null) {
-                    val reqId = id
+                if (id == null || answer.isNullOrBlank()) {
+                    val reply = if (lang == "ru") {
+                        "Укажи запрос и ответ: /answer <ID> <ответ>"
+                    } else {
+                        "Provide a request and reply: /answer <ID> <message>"
+                    }
+                    logCommandMetric("answer", mapOf("result" to "invalid_args"), source)
+                    trySend(chatId, reply)
+                } else {
+                    val reqId = id!!
                     val req = PayService.findSupportRequest(reqId)
                     if (req != null && req.userId == uid) {
                         PayService.updateSupportRequest(reqId, "pending", answer)
@@ -1533,20 +1582,30 @@ Available commands:
                             try {
                                 bot.sendMessage(
                                     env.adminTgId,
-                                    "Ответ по запросу #$id от $chatId: $answer\n" +
-                                            "/refund $id — одобрить возврат\n" +
-                                            "/reject $id <причина> — отклонить\n" +
-                                            "/ask $id <вопрос> — запросить информацию"
+                                    "Ответ по запросу #$reqId от $chatId: $answer\n" +
+                                            "/refund $reqId — одобрить возврат\n" +
+                                            "/reject $reqId <причина> — отклонить\n" +
+                                            "/ask $reqId <вопрос> — запросить информацию"
                                 )
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", env.adminTgId, e)
                             }
                         }
-                        try {
-                            bot.sendMessage(chatId, "Ответ отправлен администрации")
-                        } catch (e: Exception) {
-                            log.error("sendMessage failed chatId={}", chatId, e)
+                        val reply = if (lang == "ru") {
+                            "Ответ отправлен администрации"
+                        } else {
+                            "Your reply has been sent to the admins"
                         }
+                        logCommandMetric("answer", mapOf("result" to "sent"), source)
+                        trySend(chatId, reply)
+                    } else {
+                        val reply = if (lang == "ru") {
+                            "Запрос не найден"
+                        } else {
+                            "Request not found"
+                        }
+                        logCommandMetric("answer", mapOf("result" to "not_found"), source)
+                        trySend(chatId, reply)
                     }
                 }
             } else if (chatId == env.adminTgId) {
