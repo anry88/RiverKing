@@ -160,17 +160,18 @@ function NicknameModal({me,onClose,onSave}){
   );
 }
 
-function DailyModal({streak,available,onClose,onClaim}){
-  const rewards = [
-    [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:5} ],
-    [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:10} ],
-    [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:10} ],
-    [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15} ],
-    [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5} ],
-    [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5} ],
-    [ {name:'Пресная мирная',qty:15}, {name:'Пресная хищная',qty:15}, {name:'Морская мирная',qty:5}, {name:'Морская хищная',qty:5}, {name:'Пресная мирная+',qty:1}, {name:'Пресная хищная+',qty:1} ],
+function DailyModal({streak,available,rewards,onClose,onClaim}){
+  const defaultRewards = [
+    [ {name:'Пресная мирная',qty:8}, {name:'Пресная хищная',qty:4} ],
+    [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:6} ],
+    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:6} ],
+    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8} ],
+    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8}, {name:'Пресная мирная+',qty:1} ],
+    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:10} ],
+    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:12}, {name:'Пресная хищная+',qty:1} ],
   ];
-  const day = Math.min(streak,7);
+  const displayRewards = (rewards && rewards.length ? rewards : defaultRewards);
+  const day = Math.min(Math.max(streak,0), displayRewards.length);
   const current = available ? day : day - 1;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -181,7 +182,7 @@ function DailyModal({streak,available,onClose,onClaim}){
         <div className="relative p-4">
           <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
           <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
-            {rewards.map((items,i)=>{
+            {displayRewards.map((items,i)=>{
               const done = i < day;
               const isCurrent = i === current;
               return (
