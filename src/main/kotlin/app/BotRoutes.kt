@@ -985,10 +985,19 @@ Available commands:
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, packId, e)
                             logCommandMetric("buy", mapOf("result" to "error", "pack" to packId), source)
-                            val reply = if (lang == "ru") {
-                                "Не удалось отправить счёт. Попробуй ещё раз позже."
+                            val reply = if (invoiceChatId != chatId) {
+                                val link = "https://t.me/${env.botName}?start=start"
+                                if (lang == "ru") {
+                                    "Не удалось отправить счёт. Возможно, бот не может писать тебе личные сообщения — разреши ему писать, перейдя по ссылке: $link. Попробуй ещё раз позже."
+                                } else {
+                                    "Failed to send the invoice. The bot might not be allowed to message you privately — allow it by opening: $link. Please try again later."
+                                }
                             } else {
-                                "Failed to send the invoice. Please try again later."
+                                if (lang == "ru") {
+                                    "Не удалось отправить счёт. Попробуй ещё раз позже."
+                                } else {
+                                    "Failed to send the invoice. Please try again later."
+                                }
                             }
                             trySend(chatId, reply, replyToMessageId = replyTo)
                         }
