@@ -947,9 +947,18 @@ Available commands:
                             return true
                         }
                         val packId = value ?: return true
+                        val invoiceChatId = if (chatId < 0) buyerTgId else chatId
                         try {
-                            stars.sendPackageInvoice(chatId, buyerTgId, packId, lang)
+                            stars.sendPackageInvoice(invoiceChatId, buyerTgId, packId, lang)
                             logCommandMetric("buy", mapOf("result" to "sent", "pack" to packId), source)
+                            if (invoiceChatId != chatId) {
+                                val info = if (lang == "ru") {
+                                    "Счёт отправлен в личные сообщения."
+                                } else {
+                                    "The invoice was sent to your private chat."
+                                }
+                                trySend(chatId, info, replyToMessageId = replyTo)
+                            }
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, packId, e)
                             logCommandMetric("buy", mapOf("result" to "error", "pack" to packId), source)
