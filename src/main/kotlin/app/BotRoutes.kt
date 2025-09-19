@@ -294,82 +294,107 @@ fun Application.botRoutes(env: Env) {
                     val name: String,
                     val ruDescription: String,
                     val enDescription: String,
-                    val messageText: (String) -> String
+                    val assetName: String,
+                    val messageText: (lang: String, uid: Long) -> String
                 )
 
                 val inlineCommands = listOf(
                     InlineCommandInfo(
                         name = "start",
                         ruDescription = "Приветственное сообщение и список команд",
-                        enDescription = "Welcome message and command list"
-                    ) { "/start" },
+                        enDescription = "Welcome message and command list",
+                        assetName = "start.png"
+                    ) { _, _ -> "/start" },
                     InlineCommandInfo(
                         name = "startapp",
                         ruDescription = "Открыть игру",
-                        enDescription = "Open the game"
-                    ) { "/startapp" },
+                        enDescription = "Open the game",
+                        assetName = "startapp.png"
+                    ) { _, _ -> "/startapp" },
                     InlineCommandInfo(
                         name = "cast",
                         ruDescription = "Забросить снасть",
-                        enDescription = "Cast your line"
-                    ) { "/cast" },
+                        enDescription = "Cast your line",
+                        assetName = "cast.png"
+                    ) { _, _ -> "/cast" },
                     InlineCommandInfo(
                         name = "bait",
                         ruDescription = "Сменить приманку",
-                        enDescription = "Change your bait"
-                    ) { "/bait" },
+                        enDescription = "Change your bait",
+                        assetName = "bait.png"
+                    ) { _, _ -> "/bait" },
                     InlineCommandInfo(
                         name = "location",
                         ruDescription = "Сменить локацию",
-                        enDescription = "Change your location"
-                    ) { "/location" },
+                        enDescription = "Change your location",
+                        assetName = "location.png"
+                    ) { _, _ -> "/location" },
                     InlineCommandInfo(
                         name = "daily",
                         ruDescription = "Получить ежедневную награду",
-                        enDescription = "Claim your daily reward"
-                    ) { "/daily" },
+                        enDescription = "Claim your daily reward",
+                        assetName = "daily.png"
+                    ) { _, _ -> "/daily" },
                     InlineCommandInfo(
                         name = "prizes",
                         ruDescription = "Забрать призы турнира",
-                        enDescription = "Claim tournament prizes"
-                    ) { "/prizes" },
+                        enDescription = "Claim tournament prizes",
+                        assetName = "prizes.png"
+                    ) { _, _ -> "/prizes" },
                     InlineCommandInfo(
                         name = "shop",
                         ruDescription = "Купить приманки за звёзды",
-                        enDescription = "Buy baits with Stars"
-                    ) { "/shop" },
+                        enDescription = "Buy baits with Stars",
+                        assetName = "shop.png"
+                    ) { _, _ -> "/shop" },
                     InlineCommandInfo(
                         name = "tournament",
                         ruDescription = "Таблица текущего турнира и твоя позиция",
-                        enDescription = "View the current tournament leaderboard and your rank"
-                    ) { "/tournament" },
+                        enDescription = "View the current tournament leaderboard and your rank",
+                        assetName = "tournament.png"
+                    ) { _, _ -> "/tournament" },
                     InlineCommandInfo(
                         name = "stats",
                         ruDescription = "Статистика по пойманной рыбе",
-                        enDescription = "Your fishing stats"
-                    ) { "/stats" },
+                        enDescription = "Your fishing stats",
+                        assetName = "stats.png"
+                    ) { _, _ -> "/stats" },
                     InlineCommandInfo(
                         name = "language",
                         ruDescription = "Выбрать язык",
-                        enDescription = "Choose your language"
-                    ) { "/language" },
+                        enDescription = "Choose your language",
+                        assetName = "language.png"
+                    ) { currentLang, currentUid ->
+                        val nickname = fishing.displayName(currentUid)
+                        val fallback = if (currentLang == "ru") "не задан" else "not set"
+                        val label = if (currentLang == "ru") {
+                            "Текущий ник: ${nickname ?: fallback}"
+                        } else {
+                            "Current nickname: ${nickname ?: fallback}"
+                        }
+                        "/language\n$label"
+                    },
                     InlineCommandInfo(
                         name = "nickname",
                         ruDescription = "Сменить ник",
-                        enDescription = "Change your nickname"
-                    ) { "/nickname" }
+                        enDescription = "Change your nickname",
+                        assetName = "nickname.png"
+                    ) { _, _ -> "/nickname" }
                 )
 
                 val query = iq.query.trim()
                 val normalized = query.lowercase().removePrefix("/")
+                val assetsBaseUrl = env.publicBaseUrl.trimEnd('/') + "/app/assets/inline_commands"
                 val matched = inlineCommands.filter { normalized.isEmpty() || it.name.startsWith(normalized) }
                     .ifEmpty { inlineCommands }
                 val results = matched.map { info ->
+                    val messageText = info.messageText(lang, uid)
                     InlineQueryResultArticle(
                         id = info.name,
                         title = info.name,
                         description = if (lang == "ru") info.ruDescription else info.enDescription,
-                        inputMessageContent = InputTextMessageContent(info.messageText(lang))
+                        inputMessageContent = InputTextMessageContent(messageText),
+                        thumbUrl = "$assetsBaseUrl/${info.assetName}"
                     )
                 }
 
@@ -686,7 +711,9 @@ fun Application.botRoutes(env: Env) {
             ): Boolean {
                 if (!rawText.startsWith("/")) return false
                 val text = rawText.trim()
-                val parts = text.split(" ", limit = 2)
+                val commandLine = text.lineSequence().firstOrNull()?.trim().orEmpty()
+                if (commandLine.isEmpty()) return false
+                val parts = commandLine.split(" ", limit = 2)
                 val command = parts[0]
                 val commandTarget = command.substringAfter('@', "").takeIf { it.isNotEmpty() }
                 if (commandTarget != null && !commandTarget.equals(env.botName, ignoreCase = true)) {
