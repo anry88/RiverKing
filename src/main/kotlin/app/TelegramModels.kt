@@ -19,6 +19,9 @@ data class InlineQueryResultArticle(
     val id: String,
     val title: String,
     @kotlinx.serialization.SerialName("input_message_content") val inputMessageContent: InputTextMessageContent,
-    val description: String? = null
+    val description: String? = null,
+    @kotlinx.serialization.SerialName("thumb_url") val thumbUrl: String? = null,
+    @kotlinx.serialization.SerialName("thumb_width") val thumbWidth: Int? = null,
+    @kotlinx.serialization.SerialName("thumb_height") val thumbHeight: Int? = null,
 )
 

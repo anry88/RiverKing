@@ -107,19 +107,32 @@ object I18n {
         "20 пресных простых: 10 мирных и 10 хищных" to "20 freshwater basics: 10 peaceful and 10 predator",
         "50 пресных простых: 25 мирных и 25 хищных" to "50 freshwater basics: 25 peaceful and 25 predator",
         "120 пресных простых: 60 мирных и 60 хищных" to "120 freshwater basics: 60 peaceful and 60 predator",
+        "10 морских простых: 3 мирных и 7 хищных" to "10 saltwater basics: 3 peaceful and 7 predator",
         "20 морских простых: 10 мирных и 10 хищных" to "20 saltwater basics: 10 peaceful and 10 predator",
+        "20 морских простых: 6 мирных и 14 хищных" to "20 saltwater basics: 6 peaceful and 14 predator",
+        "50 морских простых: 15 мирных и 35 хищных" to "50 saltwater basics: 15 peaceful and 35 predator",
         "50 морских простых: 25 мирных и 25 хищных" to "50 saltwater basics: 25 peaceful and 25 predator",
+        "120 морских простых: 40 мирных и 80 хищных" to "120 saltwater basics: 40 peaceful and 80 predator",
         "120 морских простых: 60 мирных и 60 хищных" to "120 saltwater basics: 60 peaceful and 60 predator",
         "10 пресных улучшенных: 5 мирных и 5 хищных" to "10 freshwater advanced: 5 peaceful and 5 predator",
         "25 пресных улучшенных: 12 мирных и 13 хищных" to "25 freshwater advanced: 12 peaceful and 13 predator",
         "60 пресных улучшенных: 30 мирных и 30 хищных" to "60 freshwater advanced: 30 peaceful and 30 predator",
+        "10 морских улучшенных: 4 мирные+ и 6 хищные+" to "10 saltwater advanced: 4 peaceful+ and 6 predator+",
         "10 морских улучшенных: 5 мирных и 5 хищных" to "10 saltwater advanced: 5 peaceful and 5 predator",
+        "25 морских улучшенных: 9 мирных+ и 16 хищных+" to "25 saltwater advanced: 9 peaceful+ and 16 predator+",
         "25 морских улучшенных: 12 мирных и 13 хищных" to "25 saltwater advanced: 12 peaceful and 13 predator",
+        "60 морских улучшенных: 20 мирных+ и 40 хищных+" to "60 saltwater advanced: 20 peaceful+ and 40 predator+",
         "60 морских улучшенных: 30 мирных и 30 хищных" to "60 saltwater advanced: 30 peaceful and 30 predator",
+        "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (6 мирных и 14 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)" to
+            "40 freshwater basics (20 peaceful and 20 predator), 20 saltwater basics (6 peaceful and 14 predator) and 5 freshwater advanced (3 peaceful+ and 2 predator+)",
         "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (10 мирных и 10 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)" to
             "40 freshwater basics (20 peaceful and 20 predator), 20 saltwater basics (10 peaceful and 10 predator) and 5 freshwater advanced (3 peaceful+ and 2 predator+)",
+        "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (12 мирных и 28 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (1 мирная+ и 4 хищные+)" to
+            "80 freshwater basics (40 peaceful and 40 predator), 40 saltwater basics (12 peaceful and 28 predator), 15 freshwater advanced (8 peaceful+ and 7 predator+) and 5 saltwater advanced (1 peaceful+ and 4 predator+)",
         "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (20 мирных и 20 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (3 мирные+ и 2 хищные+)" to
             "80 freshwater basics (40 peaceful and 40 predator), 40 saltwater basics (20 peaceful and 20 predator), 15 freshwater advanced (8 peaceful+ and 7 predator+) and 5 saltwater advanced (3 peaceful+ and 2 predator+)",
+        "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (40 мирных и 80 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (6 мирных+ и 14 хищных+)" to
+            "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (40 peaceful and 80 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (6 peaceful+ and 14 predator+)",
         "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (60 мирных и 60 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (10 мирных+ и 10 хищных+)" to
             "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (60 peaceful and 60 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (10 peaceful+ and 10 predator+)",
         "15 пресных хищных" to "15 freshwater predator",
