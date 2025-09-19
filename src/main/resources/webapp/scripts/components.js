@@ -171,8 +171,16 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:12}, {name:'Пресная хищная+',qty:1} ],
   ];
   const displayRewards = (rewards && rewards.length ? rewards : defaultRewards);
-  const day = Math.min(Math.max(streak,0), displayRewards.length);
-  const current = available ? day : day - 1;
+  const totalDays = displayRewards.length;
+  const day = Math.min(Math.max(streak,0), totalDays);
+  const current = totalDays === 0
+    ? -1
+    : (available
+      ? Math.min(day, totalDays - 1)
+      : Math.min(Math.max(day - 1, 0), totalDays - 1));
+  const doneThreshold = available
+    ? Math.min(day, Math.max(totalDays - 1, 0))
+    : Math.min(day, totalDays);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
@@ -183,7 +191,7 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
           <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
           <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
             {displayRewards.map((items,i)=>{
-              const done = i < day;
+              const done = i < doneThreshold;
               const isCurrent = i === current;
               return (
                 <div key={i} className={`p-2 rounded-lg text-center ${done ? 'opacity-40' : 'bg-white/10'} ${isCurrent ? 'ring-2 ring-yellow-300' : ''}`}>

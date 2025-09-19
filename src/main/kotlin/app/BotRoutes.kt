@@ -419,7 +419,10 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
+            fun ownedData(ownerUid: Long, payload: Any): String = "$ownerUid:${payload.toString()}"
+
             fun sendLanguageMenu(
+                uid: Long,
                 chatId: Long,
                 lang: String,
                 prefix: String? = null,
@@ -442,8 +445,8 @@ fun Application.botRoutes(env: Env) {
                 val markup = Json.encodeToString(
                     InlineKeyboardMarkup(
                         listOf(
-                            listOf(InlineKeyboardButton(ruLabel, "/language ru")),
-                            listOf(InlineKeyboardButton(enLabel, "/language en")),
+                            listOf(InlineKeyboardButton(ruLabel, "/language ${ownedData(uid, "ru")}")),
+                            listOf(InlineKeyboardButton(enLabel, "/language ${ownedData(uid, "en")}")),
                         )
                     )
                 )
@@ -494,7 +497,7 @@ fun Application.botRoutes(env: Env) {
                         append(")")
                         if (lure.id == currentId) append(" ✅")
                     }
-                        InlineKeyboardButton(title, "/bait ${lure.id}")
+                        InlineKeyboardButton(title, "/bait ${ownedData(uid, lure.id)}")
                 }.chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
@@ -546,7 +549,7 @@ fun Application.botRoutes(env: Env) {
                             append(I18n.location(loc.name, lang))
                             if (loc.id == currentId) append(" ✅")
                         }
-                        InlineKeyboardButton(label, "/location ${loc.id}")
+                        InlineKeyboardButton(label, "/location ${ownedData(uid, loc.id)}")
                     }
                     .chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
@@ -609,7 +612,7 @@ fun Application.botRoutes(env: Env) {
                         val name = displayName(prize)
                         val short = if (name.length > 32) name.take(29) + "…" else name
                         val qty = if (prize.qty > 1) " x${prize.qty}" else ""
-                        listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${prize.id}"))
+                        listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
                     }
                     Json.encodeToString(InlineKeyboardMarkup(buttons))
                 }
@@ -617,6 +620,7 @@ fun Application.botRoutes(env: Env) {
             }
 
             fun sendShopMenu(
+                uid: Long,
                 chatId: Long,
                 lang: String,
                 replyToMessageId: Long? = null,
@@ -665,7 +669,7 @@ fun Application.botRoutes(env: Env) {
                 val buttons = shop.flatMap { category ->
                     category.packs.map { pack ->
                         val label = "${pack.name} — ${pack.price}⭐"
-                        InlineKeyboardButton(label, "/buy ${pack.id}")
+                        InlineKeyboardButton(label, "/buy ${ownedData(uid, pack.id)}")
                     }
                 }.chunked(2)
 
@@ -692,6 +696,16 @@ fun Application.botRoutes(env: Env) {
                 val arg = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
                 val source = if (isCallback) "callback" else "message"
                 val replyTo = messageId
+                fun ownedArg(raw: String?, uid: Long): Pair<String?, Boolean> {
+                    if (!isCallback) return raw to false
+                    if (raw == null) return null to false
+                    val prefix = "$uid:"
+                    return if (raw.startsWith(prefix)) {
+                        raw.removePrefix(prefix) to false
+                    } else {
+                        null to true
+                    }
+                }
                 when (commandName) {
                     "/startapp" -> {
                         val uid = ensureUserId(from) ?: return false
@@ -786,7 +800,7 @@ Available commands:
                                     } else {
                                         valueText
                                     }
-                                    "${e.rank}. ${e.user ?: "-"} — $info"
+                                    "\u200E${e.rank}. ${e.user ?: "-"} — $info"
                                 }
                             }
                             val mineLine = if (mine != null && mine.rank > t.prizePlaces) {
@@ -795,7 +809,7 @@ Available commands:
                                 } else {
                                     "%.2f".format(Locale.US, mine.value)
                                 }
-                                if (lang == "ru") {
+                                val line = if (lang == "ru") {
                                     if (showFish) {
                                         val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
                                         "Твоя позиция: ${mine.rank}. Рыба: $fishName $valueText"
@@ -810,6 +824,7 @@ Available commands:
                                         "Your position: ${mine.rank}. Caught: $valueText"
                                     }
                                 }
+                                "\u200E$line"
                             } else null
                             buildString {
                                 append(header)
@@ -854,15 +869,16 @@ Available commands:
                             val params = mapOf("result" to "claimed", "streak" to streak.toString())
                             logCommandMetric("daily", params, source)
                             val schedule = fishing.dailyRewardSchedule(uid)
-                            val rewards = schedule.getOrNull(streak.coerceAtMost(7) - 1).orEmpty()
+                            val displayDay = streak.coerceAtMost(7)
+                            val rewards = schedule.getOrNull(displayDay - 1).orEmpty()
                             val lines = rewards.map { reward ->
                                 val name = I18n.lure(reward.name, lang)
                                 "• $name x${reward.qty}"
                             }
                             val body = if (lang == "ru") {
-                                "Вы получили ежедневную награду (день $streak):"
+                                "Вы получили ежедневную награду (день $displayDay):"
                             } else {
-                                "Daily reward claimed (day $streak):"
+                                "Daily reward claimed (day $displayDay):"
                             }
                             val text = buildString {
                                 append(body)
@@ -911,14 +927,16 @@ Available commands:
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
                         logCommandMetric("shop", mapOf("action" to "show"), source)
-                        sendShopMenu(chatId, lang, replyToMessageId = replyTo)
+                        sendShopMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         return true
                     }
                     "/buy" -> {
                         val buyerTgId = from?.id ?: return false
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        if (arg.isNullOrBlank()) {
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (value.isNullOrBlank()) {
                             logCommandMetric("buy", mapOf("result" to "missing_arg"), source)
                             val reply = if (lang == "ru") {
                                 "Укажи набор или воспользуйся командой /shop."
@@ -928,12 +946,13 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
+                        val packId = value ?: return true
                         try {
-                            stars.sendPackageInvoice(chatId, buyerTgId, arg, lang)
-                            logCommandMetric("buy", mapOf("result" to "sent", "pack" to arg), source)
+                            stars.sendPackageInvoice(chatId, buyerTgId, packId, lang)
+                            logCommandMetric("buy", mapOf("result" to "sent", "pack" to packId), source)
                         } catch (e: Exception) {
-                            log.error("sendInvoice failed chatId={} pack={}", chatId, arg, e)
-                            logCommandMetric("buy", mapOf("result" to "error", "pack" to arg), source)
+                            log.error("sendInvoice failed chatId={} pack={}", chatId, packId, e)
+                            logCommandMetric("buy", mapOf("result" to "error", "pack" to packId), source)
                             val reply = if (lang == "ru") {
                                 "Не удалось отправить счёт. Попробуй ещё раз позже."
                             } else {
@@ -1073,11 +1092,13 @@ Available commands:
                     "/language" -> {
                         val uid = ensureUserId(from) ?: return false
                         var lang = fishing.userLanguage(uid)
-                        if (arg == null) {
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (value == null) {
                             logCommandMetric("language", mapOf("action" to "show"), source)
-                            sendLanguageMenu(chatId, lang, replyToMessageId = replyTo)
+                            sendLanguageMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         } else {
-                            val normalized = arg.lowercase()
+                            val normalized = value.lowercase()
                             if (normalized in setOf("ru", "en")) {
                                 fishing.setLanguage(uid, normalized)
                                 lang = normalized
@@ -1088,7 +1109,7 @@ Available commands:
                                 } else {
                                     "Language switched to English"
                                 }
-                                sendLanguageMenu(chatId, lang, prefix, replyTo)
+                                sendLanguageMenu(uid, chatId, lang, prefix, replyTo)
                             } else {
                                 val params = mapOf("language" to normalized, "result" to "invalid")
                                 logCommandMetric("language", params, source)
@@ -1097,7 +1118,7 @@ Available commands:
                                 } else {
                                     "Unknown language. Please use the buttons below."
                                 }
-                                sendLanguageMenu(chatId, lang, prefix, replyTo)
+                                sendLanguageMenu(uid, chatId, lang, prefix, replyTo)
                             }
                         }
                         return true
@@ -1105,13 +1126,15 @@ Available commands:
                     "/bait" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        if (arg == null) {
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (value == null) {
                             logCommandMetric("bait", mapOf("action" to "show"), source)
                             sendBaitMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         } else {
-                            val lureId = arg.toLongOrNull()
+                            val lureId = value.toLongOrNull()
                             if (lureId == null) {
-                                logCommandMetric("bait", mapOf("result" to "invalid", "value" to arg), source)
+                                logCommandMetric("bait", mapOf("result" to "invalid", "value" to value), source)
                                 val reply = if (lang == "ru") "Неверный формат приманки" else "Invalid bait value"
                                 trySend(chatId, reply, replyToMessageId = replyTo)
                             } else {
@@ -1145,13 +1168,15 @@ Available commands:
                     "/location" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        if (arg == null) {
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (value == null) {
                             logCommandMetric("location", mapOf("action" to "show"), source)
                             sendLocationMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         } else {
-                            val locId = arg.toLongOrNull()
+                            val locId = value.toLongOrNull()
                             if (locId == null) {
-                                logCommandMetric("location", mapOf("result" to "invalid", "value" to arg), source)
+                                logCommandMetric("location", mapOf("result" to "invalid", "value" to value), source)
                                 val reply = if (lang == "ru") "Неверный формат локации" else "Invalid location value"
                                 trySend(chatId, reply, replyToMessageId = replyTo)
                             } else {
@@ -1238,8 +1263,8 @@ Available commands:
                         val markup = Json.encodeToString(
                             InlineKeyboardMarkup(
                                 listOf(
-                                    listOf(InlineKeyboardButton(confirmLabel, "/nickname_confirm $sanitized")),
-                                    listOf(InlineKeyboardButton(cancelLabel, "/nickname_cancel")),
+                                    listOf(InlineKeyboardButton(confirmLabel, "/nickname_confirm ${ownedData(uid, sanitized)}")),
+                                    listOf(InlineKeyboardButton(cancelLabel, "/nickname_cancel ${ownedData(uid, "cancel")}")),
                                 )
                             )
                         )
@@ -1250,7 +1275,9 @@ Available commands:
                     "/nickname_confirm" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        val newName = arg?.let { sanitizeName(it).replace('\n', ' ').trim() } ?: ""
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val newName = value?.let { sanitizeName(it).replace('\n', ' ').trim() } ?: ""
                         if (newName.isEmpty()) {
                             logCommandMetric("nickname", mapOf("result" to "invalid_confirm"), source)
                             val reply = if (lang == "ru") {
@@ -1275,6 +1302,8 @@ Available commands:
                     "/nickname_cancel" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
                         logCommandMetric("nickname", mapOf("result" to "cancel"), source)
                         val reply = if (lang == "ru") {
                             "Изменение ника отменено."
@@ -1287,7 +1316,9 @@ Available commands:
                     "/prizeclaim" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        val prizeId = arg?.toLongOrNull()
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val prizeId = value?.toLongOrNull()
                         if (prizeId == null) {
                             logCommandMetric("prizes_claim", mapOf("result" to "invalid_id"), source)
                             val reply = if (lang == "ru") {
