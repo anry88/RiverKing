@@ -959,6 +959,29 @@ Available commands:
                                 }
                                 trySend(chatId, info, replyToMessageId = replyTo)
                             }
+                        } catch (e: StarsPaymentService.MissingPrivateChatAccessException) {
+                            log.warn("sendInvoice missing private chat access chatId={} pack={}", chatId, packId)
+                            logCommandMetric(
+                                "buy",
+                                mapOf("result" to "dm_required", "pack" to packId),
+                                source,
+                            )
+                            if (invoiceChatId != chatId) {
+                                val link = "https://t.me/${env.botName}?start=shop"
+                                val info = if (lang == "ru") {
+                                    "Бот не может отправить счёт в личные сообщения. Разреши боту писать, нажав Старт: $link"
+                                } else {
+                                    "I couldn't send the invoice to your private chat. Allow the bot to message you by pressing Start: $link"
+                                }
+                                trySend(chatId, info, replyToMessageId = replyTo)
+                            } else {
+                                val reply = if (lang == "ru") {
+                                    "Не удалось отправить счёт. Попробуй ещё раз позже."
+                                } else {
+                                    "Failed to send the invoice. Please try again later."
+                                }
+                                trySend(chatId, reply, replyToMessageId = replyTo)
+                            }
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, packId, e)
                             logCommandMetric("buy", mapOf("result" to "error", "pack" to packId), source)

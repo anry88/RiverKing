@@ -6,7 +6,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -18,6 +22,10 @@ class StarsPaymentService(
     private val env: Env,
     private val fishing: FishingService,
 ) {
+
+    class MissingPrivateChatAccessException(message: String) : Exception(message)
+
+    class StarsPaymentException(message: String, val errorCode: Int? = null) : Exception(message)
 
     @Serializable
     private data class LabeledPrice(val label: String, val amount: Int)
@@ -66,16 +74,45 @@ class StarsPaymentService(
 
         val url = URL("https://api.telegram.org/bot${env.botToken}/sendInvoice")
         val body = Json.encodeToString(invoice)
-        (url.openConnection() as HttpURLConnection).apply {
+        var status = 0
+        val response = (url.openConnection() as HttpURLConnection).run {
             requestMethod = "POST"
             connectTimeout = 15000
             readTimeout = 15000
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             outputStream.use { it.write(body.toByteArray()) }
-            val stream = if (responseCode in 200..299) inputStream else errorStream
-            stream.use { it.readBytes() }
+            status = responseCode
+            val stream = if (status in 200..299) inputStream else errorStream
+            val text = stream.buffered().use { it.readBytes().decodeToString() }
             disconnect()
+            text
+        }
+
+        if (response.isBlank()) {
+            if (status !in 200..299) {
+                throw StarsPaymentException("Failed to send invoice", status)
+            }
+            return@withContext
+        }
+
+        val json = try {
+            Json.parseToJsonElement(response).jsonObject
+        } catch (_: Exception) {
+            if (status !in 200..299) {
+                throw StarsPaymentException("Failed to send invoice", status)
+            }
+            return@withContext
+        }
+
+        val ok = json["ok"]?.jsonPrimitive?.booleanOrNull
+        if (ok == false) {
+            val description = json["description"]?.jsonPrimitive?.content
+            val errorCode = json["error_code"]?.jsonPrimitive?.intOrNull
+            if (errorCode == 403 && description?.contains("can't initiate conversation", ignoreCase = true) == true) {
+                throw MissingPrivateChatAccessException(description)
+            }
+            throw StarsPaymentException(description ?: "Failed to send invoice", errorCode)
         }
     }
 
