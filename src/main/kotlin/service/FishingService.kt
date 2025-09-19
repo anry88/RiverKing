@@ -680,7 +680,8 @@ class FishingService {
                     "micro_salt_starter",
                     "Морской старт",
                     "10 морских простых: 3 мирных и 7 хищных",
-                    25,
+//                    25,
+                    1,
                     listOf("Морская мирная" to 3, "Морская хищная" to 7)
                 ),
                 ShopPackage(
