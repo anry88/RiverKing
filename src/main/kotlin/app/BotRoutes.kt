@@ -301,8 +301,8 @@ fun Application.botRoutes(env: Env) {
                 val inlineCommands = listOf(
                     InlineCommandInfo(
                         name = "start",
-                        ruDescription = "Приветственное сообщение и список команд",
-                        enDescription = "Welcome message and command list",
+                        ruDescription = "Стартовать бота и получить список команд",
+                        enDescription = "Start the bot and get the command list",
                         assetName = "start.png"
                     ) { _, _ -> "/start" },
                     InlineCommandInfo(
@@ -1281,10 +1281,13 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         if (arg.isNullOrBlank()) {
                             logCommandMetric("nickname", mapOf("result" to "missing_arg"), source)
+                            val currentLabel = fishing.displayName(uid)
+                                ?.takeIf { it.isNotBlank() }
+                                ?: if (lang == "ru") "не установлен" else "not set"
                             val reply = if (lang == "ru") {
-                                "Укажи новый ник после команды, например: /nickname Рыбак"
+                                "Текущий ник: \"$currentLabel\".\nУкажи новый ник после команды, например: /nickname Рыбак"
                             } else {
-                                "Provide a new nickname after the command, e.g. /nickname Fisher"
+                                "Current nickname: \"$currentLabel\".\nProvide a new nickname after the command, e.g. /nickname Fisher"
                             }
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
