@@ -827,7 +827,8 @@ Available commands:
                                     } else {
                                         valueText
                                     }
-                                    "\u200E${e.rank}. ${e.user ?: "-"} — $info"
+                                    val userName = e.user?.let { "\u2066$it\u2069" } ?: "-"
+                                    "\u200E${e.rank}. $userName — $info"
                                 }
                             }
                             val mineLine = if (mine != null && mine.rank > t.prizePlaces) {
