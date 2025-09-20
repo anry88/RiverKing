@@ -172,6 +172,15 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Марлин синий" to "webapp/assets/fish/marlin_siniy.png",
     "Тунец синеперый" to "webapp/assets/fish/tunets_sineperiy.png",
     "Акула мако" to "webapp/assets/fish/akula_mako.png",
+    "Альбакор" to "webapp/assets/fish/albakor.png",
+    "Голец арктический" to "webapp/assets/fish/golets_arkticheskiy.png",
+    "Форель кумжа" to "webapp/assets/fish/forel_kumzha.png",
+    "Пикша" to "webapp/assets/fish/piksha.png",
+    "Тюрбо" to "webapp/assets/fish/tyurbo.png",
+    "Сайра" to "webapp/assets/fish/sayra.png",
+    "Летучая рыба" to "webapp/assets/fish/letuchaya_ryba.png",
+    "Рыба-луна" to "webapp/assets/fish/ryba_luna.png",
+    "Сельдяной король" to "webapp/assets/fish/seldyanoy_korol.png",
 )
 
 private val LOCATION_BACKGROUNDS = run {
@@ -1141,7 +1150,13 @@ Available commands:
                                 }
                                 logCommandMetric(
                                     "cast",
-                                    mapOf("result" to "caught", "rarity" to catch.rarity, "location" to locId.toString()),
+                                    mapOf(
+                                        "result" to "caught",
+                                        "rarity" to catch.rarity,
+                                        "location" to locId.toString(),
+                                        "fish" to catch.fish,
+                                        "weight" to weightText,
+                                    ),
                                     source,
                                 )
                             } catch (e: Exception) {

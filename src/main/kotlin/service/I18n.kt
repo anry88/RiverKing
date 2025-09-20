@@ -59,6 +59,15 @@ object I18n {
         "Марлин синий" to "Blue Marlin",
         "Тунец синеперый" to "Bluefin Tuna",
         "Акула мако" to "Mako Shark",
+        "Альбакор" to "Albacore",
+        "Голец арктический" to "Arctic Char",
+        "Форель кумжа" to "Brown Trout",
+        "Пикша" to "Haddock",
+        "Тюрбо" to "Turbot",
+        "Сайра" to "Pacific Saury",
+        "Летучая рыба" to "Flying Fish",
+        "Рыба-луна" to "Ocean Sunfish",
+        "Сельдяной король" to "Oarfish",
     )
 
     private val locations = mapOf(
