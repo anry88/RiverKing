@@ -1155,9 +1155,17 @@ Available commands:
                                         "rarity" to catch.rarity,
                                         "location" to locId.toString(),
                                         "fish" to catch.fish,
-                                        "weight" to weightText,
                                     ),
                                     source,
+                                )
+                                Metrics.gauge(
+                                    "catch_weight_kg",
+                                    catch.weight,
+                                    mapOf(
+                                        "fish" to catch.fish,
+                                        "location" to catch.location,
+                                        "rarity" to catch.rarity,
+                                    ),
                                 )
                             } catch (e: Exception) {
                                 log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
