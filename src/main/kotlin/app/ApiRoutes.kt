@@ -729,6 +729,10 @@ fun Application.apiRoutes(env: Env) {
                     mapOf("error" to (e.message ?: "rate limit"))
                 )
             }
+            Metrics.counter(
+                "hook_total",
+                mapOf("result" to if (res.success) "caught" else "escaped")
+            )
             call.respond(res)
         }
 
