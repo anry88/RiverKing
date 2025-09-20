@@ -1141,7 +1141,13 @@ Available commands:
                                 }
                                 logCommandMetric(
                                     "cast",
-                                    mapOf("result" to "caught", "rarity" to catch.rarity, "location" to locId.toString()),
+                                    mapOf(
+                                        "result" to "caught",
+                                        "rarity" to catch.rarity,
+                                        "location" to locId.toString(),
+                                        "fish" to catch.fish,
+                                        "weight" to weightText,
+                                    ),
                                     source,
                                 )
                             } catch (e: Exception) {
