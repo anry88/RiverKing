@@ -115,17 +115,29 @@ object DB {
         }
 
         // --- Locations ---
-        val pond = upsertLocation("Пруд", 0.0, 1.0)
-        val river = upsertLocation("Река", 10.0, 1.5)
-        val lake = upsertLocation("Озеро", 50.0, 2.0)
+//        val pond = upsertLocation("Пруд", 0.0, 1.0)
+//        val river = upsertLocation("Река", 10.0, 1.5)
+//        val lake = upsertLocation("Озеро", 50.0, 2.0)
+//
+//        val swamp = upsertLocation("Болото", 5.0, 1.2)
+//        val mtnRiver = upsertLocation("Горная река", 120.0, 2.2)
+//        val reservoir = upsertLocation("Водохранилище", 200.0, 2.4)
+//        val delta = upsertLocation("Дельта реки", 350.0, 2.6)
+//        val coast = upsertLocation("Прибрежье моря", 600.0, 3.0)
+//        val fjord = upsertLocation("Фьорд", 900.0, 3.5)
+//        val openOcean = upsertLocation("Открытый океан", 5000.0, 4.2)
 
-        val swamp = upsertLocation("Болото", 5.0, 1.2)
-        val mtnRiver = upsertLocation("Горная река", 120.0, 2.2)
-        val reservoir = upsertLocation("Водохранилище", 200.0, 2.4)
-        val delta = upsertLocation("Дельта реки", 350.0, 2.6)
-        val coast = upsertLocation("Прибрежье моря", 600.0, 3.0)
-        val fjord = upsertLocation("Фьорд", 900.0, 3.5)
-        val openOcean = upsertLocation("Открытый океан", 5000.0, 4.2)
+        val pond = upsertLocation("Пруд", 0.0, 1.0)
+        val river = upsertLocation("Река", 0.0, 1.5)
+        val lake = upsertLocation("Озеро", 0.0, 2.0)
+
+        val swamp = upsertLocation("Болото", 0.0, 1.2)
+        val mtnRiver = upsertLocation("Горная река", 0.0, 2.2)
+        val reservoir = upsertLocation("Водохранилище", 0.0, 2.4)
+        val delta = upsertLocation("Дельта реки", 0.0, 2.6)
+        val coast = upsertLocation("Прибрежье моря", 0.0, 3.0)
+        val fjord = upsertLocation("Фьорд", 0.0, 3.5)
+        val openOcean = upsertLocation("Открытый океан", 0.0, 4.2)
 
         // --- Fish: базовые пресные ---
         val fP = upsertFish("Плотва", "common", 0.2, 0.05, false, "fresh")
