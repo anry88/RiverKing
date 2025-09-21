@@ -186,16 +186,16 @@ private val FISH_IMAGE_PATHS = mapOf(
 
 private val LOCATION_BACKGROUNDS = run {
     val base = mapOf(
-        "Пруд" to "webapp/assets/backgrounds/pond.png",
-        "Река" to "webapp/assets/originals/riverking_bg_river_1600x900.png",
-        "Озеро" to "webapp/assets/originals/riverking_bg_lake_1600x900.png",
-        "Болото" to "webapp/assets/originals/riverking_bg_swamp_1600x900.png",
-        "Горная река" to "webapp/assets/originals/riverking_bg_mountain_river_1600x900.png",
-        "Водохранилище" to "webapp/assets/originals/riverking_bg_reservoir_1600x900.png",
-        "Дельта реки" to "webapp/assets/originals/riverking_bg_river_delta_1600x900.png",
-        "Прибрежье моря" to "webapp/assets/originals/riverking_bg_sea_coast_1600x900.png",
-        "Фьорд" to "webapp/assets/originals/riverking_bg_fjord_1600x900.png",
-        "Открытый океан" to "webapp/assets/originals/riverking_bg_open_ocean_1600x900.png",
+        "Пруд" to "webapp/assets/originals/backgrounds/pond.png",
+        "Река" to "webapp/assets/originals/backgrounds/river.png",
+        "Озеро" to "webapp/assets/originals/backgrounds/lake.png",
+        "Болото" to "webapp/assets/originals/backgrounds/swamp.png",
+        "Горная река" to "webapp/assets/originals/backgrounds/mountain_river.png",
+        "Водохранилище" to "webapp/assets/originals/backgrounds/reservoir.png",
+        "Дельта реки" to "webapp/assets/originals/backgrounds/river_delta.png",
+        "Прибрежье моря" to "webapp/assets/originals/backgrounds/sea_coast.png",
+        "Фьорд" to "webapp/assets/originals/backgrounds/fjord.png",
+        "Открытый океан" to "webapp/assets/originals/backgrounds/open_ocean.png",
     )
     base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
 }

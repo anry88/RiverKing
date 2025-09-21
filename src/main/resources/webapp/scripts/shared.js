@@ -53,17 +53,21 @@
   const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
   const LOCATION_BG = {
     1: '/app/assets/backgrounds/pond.png',
-    2: '/app/assets/riverking_bg_river_1600x900.png',
-    3: '/app/assets/riverking_bg_lake_1600x900.png',
-    4: '/app/assets/riverking_bg_swamp_1600x900.png',
-    5: '/app/assets/riverking_bg_mountain_river_1600x900.png',
-    6: '/app/assets/riverking_bg_reservoir_1600x900.png',
-    7: '/app/assets/riverking_bg_river_delta_1600x900.png',
-    8: '/app/assets/riverking_bg_sea_coast_1600x900.png',
-    9: '/app/assets/riverking_bg_fjord_1600x900.png',
-    10: '/app/assets/riverking_bg_open_ocean_1600x900.png'
+    2: '/app/assets/backgrounds/river.png',
+    3: '/app/assets/backgrounds/lake.png',
+    4: '/app/assets/backgrounds/swamp.png',
+    5: '/app/assets/backgrounds/mountain_river.png',
+    6: '/app/assets/backgrounds/reservoir.png',
+    7: '/app/assets/backgrounds/river_delta.png',
+    8: '/app/assets/backgrounds/sea_coast.png',
+    9: '/app/assets/backgrounds/fjord.png',
+    10: '/app/assets/backgrounds/open_ocean.png',
+    11: '/app/assets/backgrounds/amazon_riverbed.png',
+    12: '/app/assets/backgrounds/flooded_forest.png',
+    13: '/app/assets/backgrounds/mangroves.png',
+    14: '/app/assets/backgrounds/coral_flats.png',
   };
-  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.0804, y: 0.0479 };
+  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.12435, y: 0.08594 };
   const ROD_CONFIG = {
     spark: {
       image: '/app/assets/rods/yellow_rod.png',
@@ -71,19 +75,19 @@
     },
     dew: {
       image: '/app/assets/rods/green_rod.png',
-      tipAnchor: { x: 0.1396, y: 0.0664 },
+      tipAnchor: { x: 0.1875, y: 0.10449 },
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.3223, y: 0.0049 },
+      tipAnchor: { x: 0.70964, y: 0.02637 },
     },
     abyss: {
       image: '/app/assets/rods/black_rod.png',
-      tipAnchor: { x: 0.3223, y: 0.0049 },
+      tipAnchor: { x: 0.70964, y: 0.02637 },
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
-      tipAnchor: { x: 0.1348, y: 0.0752 },
+      tipAnchor: { x: 0.18034, y: 0.11328 },
     },
     default: {
       image: '/app/assets/rods/yellow_rod.png',
