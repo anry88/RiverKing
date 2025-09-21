@@ -41,6 +41,12 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const [tension, setTension] = React.useState(0.2);
   const floatPxRef = React.useRef({x:0,y:0});
 
+  React.useEffect(()=>{
+    if(!Number.isFinite(floatRel.x) || !Number.isFinite(floatRel.y)){
+      setFloatRel(shorePosRel);
+    }
+  }, [floatRel.x, floatRel.y, shorePosRel]);
+
   const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
   const floatPx = toPx(floatRel);
   React.useEffect(()=>{ floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
@@ -166,7 +172,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   }, [result, catchTargetPx, hasCatchAnimationBeenShown, markCatchAnimationShown]);
 
   const tweenTo = (toRel, ms=600)=>{
-    const from = {...floatRel};
+    const from = {
+      x: Number.isFinite(floatRel.x) ? floatRel.x : shorePosRel.x,
+      y: Number.isFinite(floatRel.y) ? floatRel.y : shorePosRel.y
+    };
     const start = performance.now();
     const step = (now)=>{
       const tVal = Math.min(1, (now - start)/ms);
@@ -179,7 +188,13 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
 
   React.useEffect(()=>{
     if(casting){
+      if(w <= 0 || !Number.isFinite(tipX)){
+        return;
+      }
       const tipRelX = tipX / w;
+      if(!Number.isFinite(tipRelX)){
+        return;
+      }
       const minX = Math.max(0.05, tipRelX - 0.20);
       const maxX = Math.max(minX, tipRelX - 0.05);
       const target = {
