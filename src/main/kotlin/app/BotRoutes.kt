@@ -93,6 +93,7 @@ private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -185,16 +186,16 @@ private val FISH_IMAGE_PATHS = mapOf(
 
 private val LOCATION_BACKGROUNDS = run {
     val base = mapOf(
-        "Пруд" to "webapp/assets/originals/riverking_bg_pond_1600x900.png",
-        "Река" to "webapp/assets/originals/riverking_bg_river_1600x900.png",
-        "Озеро" to "webapp/assets/originals/riverking_bg_lake_1600x900.png",
-        "Болото" to "webapp/assets/originals/riverking_bg_swamp_1600x900.png",
-        "Горная река" to "webapp/assets/originals/riverking_bg_mountain_river_1600x900.png",
-        "Водохранилище" to "webapp/assets/originals/riverking_bg_reservoir_1600x900.png",
-        "Дельта реки" to "webapp/assets/originals/riverking_bg_river_delta_1600x900.png",
-        "Прибрежье моря" to "webapp/assets/originals/riverking_bg_sea_coast_1600x900.png",
-        "Фьорд" to "webapp/assets/originals/riverking_bg_fjord_1600x900.png",
-        "Открытый океан" to "webapp/assets/originals/riverking_bg_open_ocean_1600x900.png",
+        "Пруд" to "webapp/assets/originals/backgrounds/pond.png",
+        "Река" to "webapp/assets/originals/backgrounds/river.png",
+        "Озеро" to "webapp/assets/originals/backgrounds/lake.png",
+        "Болото" to "webapp/assets/originals/backgrounds/swamp.png",
+        "Горная река" to "webapp/assets/originals/backgrounds/mountain_river.png",
+        "Водохранилище" to "webapp/assets/originals/backgrounds/reservoir.png",
+        "Дельта реки" to "webapp/assets/originals/backgrounds/river_delta.png",
+        "Прибрежье моря" to "webapp/assets/originals/backgrounds/sea_coast.png",
+        "Фьорд" to "webapp/assets/originals/backgrounds/fjord.png",
+        "Открытый океан" to "webapp/assets/originals/backgrounds/open_ocean.png",
     )
     base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
 }
@@ -333,6 +334,12 @@ fun Application.botRoutes(env: Env) {
                         assetName = "bait.png"
                     ) { _, _ -> "/bait" },
                     InlineCommandInfo(
+                        name = "rod",
+                        ruDescription = "Сменить удочку",
+                        enDescription = "Change your rod",
+                        assetName = "rod.png"
+                    ) { _, _ -> "/rod" },
+                    InlineCommandInfo(
                         name = "location",
                         ruDescription = "Сменить локацию",
                         enDescription = "Change your location",
@@ -440,16 +447,40 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
+            fun splitMessage(text: String, limit: Int = TELEGRAM_MESSAGE_LENGTH_LIMIT): List<String> {
+                if (text.length <= limit) return listOf(text)
+                val chunks = mutableListOf<String>()
+                var index = 0
+                while (index < text.length) {
+                    var end = (index + limit).coerceAtMost(text.length)
+                    if (end < text.length) {
+                        val newlineIndex = text.lastIndexOf('\n', end - 1)
+                        if (newlineIndex >= index) {
+                            end = newlineIndex + 1
+                        }
+                    }
+                    chunks += text.substring(index, end)
+                    index = end
+                }
+                return chunks
+            }
+
             fun trySend(
                 chatId: Long,
                 text: String,
                 replyMarkup: String? = null,
                 replyToMessageId: Long? = null,
             ) {
-                try {
-                    bot.sendMessage(chatId, text, replyMarkup, replyToMessageId)
-                } catch (e: Exception) {
-                    log.error("sendMessage failed chatId={}", chatId, e)
+                val parts = splitMessage(text)
+                val lastIndex = parts.lastIndex
+                parts.forEachIndexed { idx, part ->
+                    val markup = if (idx == lastIndex) replyMarkup else null
+                    val replyTo = if (idx == 0) replyToMessageId else null
+                    try {
+                        bot.sendMessage(chatId, part, markup, replyTo)
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={} part={}/{}", chatId, idx + 1, parts.size, e)
+                    }
                 }
             }
 
@@ -485,6 +516,33 @@ fun Application.botRoutes(env: Env) {
                     )
                 )
                 trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            fun rodBonusLabel(water: String?, predator: Boolean?, lang: String): String {
+                return when {
+                    water == null -> if (lang == "ru") "Бонусов нет." else "No bonus."
+                    water == "fresh" && predator == true -> if (lang == "ru") {
+                        "−50% шанс побега пресноводных хищных рыб."
+                    } else {
+                        "50% less escape chance for freshwater predator fish."
+                    }
+                    water == "fresh" && (predator == false) -> if (lang == "ru") {
+                        "−50% шанс побега пресноводных мирных рыб."
+                    } else {
+                        "50% less escape chance for freshwater peaceful fish."
+                    }
+                    water == "salt" && predator == true -> if (lang == "ru") {
+                        "−50% шанс побега морских хищных рыб."
+                    } else {
+                        "50% less escape chance for saltwater predator fish."
+                    }
+                    water == "salt" && (predator == false) -> if (lang == "ru") {
+                        "−50% шанс побега морских мирных рыб."
+                    } else {
+                        "50% less escape chance for saltwater peaceful fish."
+                    }
+                    else -> if (lang == "ru") "Бонусов нет." else "No bonus."
+                }
             }
 
             fun sendBaitMenu(
@@ -534,6 +592,60 @@ fun Application.botRoutes(env: Env) {
                         InlineKeyboardButton(title, "/bait ${ownedData(uid, lure.id)}")
                 }.chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            fun sendRodMenu(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val rods = fishing.listRods(uid)
+                val currentId = transaction {
+                    Users.select { Users.id eq uid }.single()[Users.currentRodId]?.value
+                }
+                val header = if (lang == "ru") {
+                    "Текущая удочка: ${currentId?.let { id -> rods.find { it.id == id }?.let { I18n.rod(it.name, lang) } } ?: "не выбрана"}"
+                } else {
+                    "Current rod: ${currentId?.let { id -> rods.find { it.id == id }?.let { I18n.rod(it.name, lang) } } ?: "not selected"}"
+                }
+                val prompt = if (lang == "ru") "Выберите удочку:" else "Choose a rod:"
+                val details = rods.joinToString("\n") { rod ->
+                    val localizedName = I18n.rod(rod.name, lang)
+                    val nameLine = buildString {
+                        append("• ")
+                        append(localizedName)
+                        if (rod.id == currentId) append(" ✅")
+                    }
+                    val infoLine = if (rod.unlocked) {
+                        rodBonusLabel(rod.bonusWater, rod.bonusPredator, lang)
+                    } else {
+                        val req = if (lang == "ru") "Требуется %.0f кг" else "Requires %.0f kg"
+                        req.format(Locale.US, rod.unlockKg)
+                    }
+                    "$nameLine\n  $infoLine"
+                }
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix.trim())
+                        append("\n\n")
+                    }
+                    append(header)
+                    append("\n")
+                    append(prompt)
+                    if (details.isNotBlank()) {
+                        append("\n\n")
+                        append(details)
+                    }
+                }
+                val buttons = rods.filter { it.unlocked }.map { rod ->
+                    val localizedName = I18n.rod(rod.name, lang)
+                    val label = if (rod.id == currentId) "$localizedName ✅" else localizedName
+                    listOf(InlineKeyboardButton(label, "/rod ${ownedData(uid, rod.id)}"))
+                }
+                val markup = if (buttons.isEmpty()) null else Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
@@ -769,6 +881,7 @@ fun Application.botRoutes(env: Env) {
 Доступные команды:
 /cast — забросить снасть
 /bait — сменить приманку
+/rod — выбрать удочку
 /location — сменить локацию
 /daily — получить ежедневную награду
 /prizes — забрать призы турнира
@@ -783,6 +896,7 @@ fun Application.botRoutes(env: Env) {
 Available commands:
 /cast — cast your line
 /bait — change your bait
+/rod — change your rod
 /location — change your location
 /daily — claim your daily reward
 /prizes — claim tournament prizes
@@ -1121,6 +1235,17 @@ Available commands:
                                 } else {
                                     ""
                                 }
+                                val rodLine = if (castRes.unlockedRods.isNotEmpty()) {
+                                    val localized = castRes.unlockedRods.map { I18n.rod(it, lang) }
+                                    val prefix = if (lang == "ru") {
+                                        if (localized.size > 1) "\n🎣 Открыты новые удочки: " else "\n🎣 Открыта новая удочка: "
+                                    } else {
+                                        if (localized.size > 1) "\n🎣 New rods unlocked: " else "\n🎣 New rod unlocked: "
+                                    }
+                                    prefix + localized.joinToString(", ")
+                                } else {
+                                    ""
+                                }
                                 val caption = buildString {
                                     append("🐟 ")
                                     append(fishName)
@@ -1136,6 +1261,7 @@ Available commands:
                                     append(locationName)
                                     append(newLine)
                                     append(unlockedLine)
+                                    append(rodLine)
                                 }
                                 val image = loadFishImage(catch.fish, catch.location)
                                 if (image != null) {
@@ -1250,6 +1376,49 @@ Available commands:
                                         "casting" -> if (lang == "ru") "Нельзя менять приманку во время заброса" else "You can't change bait while casting"
                                         "no lure" -> if (lang == "ru") "Эта приманка недоступна" else "This bait is not available"
                                         else -> if (lang == "ru") "Не удалось сменить приманку" else "Failed to change bait"
+                                    }
+                                    trySend(chatId, msg, replyToMessageId = replyTo)
+                                }
+                            }
+                        }
+                        return true
+                    }
+                    "/rod" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (value == null) {
+                            logCommandMetric("rod", mapOf("action" to "show"), source)
+                            sendRodMenu(uid, chatId, lang, replyToMessageId = replyTo)
+                        } else {
+                            val rodId = value.toLongOrNull()
+                            if (rodId == null) {
+                                logCommandMetric("rod", mapOf("result" to "invalid", "value" to value), source)
+                                val reply = if (lang == "ru") "Неверное значение удочки" else "Invalid rod value"
+                                trySend(chatId, reply, replyToMessageId = replyTo)
+                            } else {
+                                try {
+                                    fishing.setRod(uid, rodId)
+                                    logCommandMetric(
+                                        "rod",
+                                        mapOf("result" to "success", "value" to rodId.toString()),
+                                        source,
+                                    )
+                                    val prefix = if (lang == "ru") "Удочка обновлена" else "Rod updated"
+                                    sendRodMenu(uid, chatId, lang, prefix, replyTo)
+                                } catch (e: Exception) {
+                                    val reason = e.message ?: "error"
+                                    logCommandMetric(
+                                        "rod",
+                                        mapOf("result" to "error", "value" to rodId.toString(), "reason" to reason),
+                                        source,
+                                    )
+                                    val msg = when (reason) {
+                                        "casting" -> if (lang == "ru") "Нельзя менять удочку во время заброса" else "You can't change the rod while casting"
+                                        "locked" -> if (lang == "ru") "Эта удочка еще недоступна" else "This rod is locked"
+                                        "no rod" -> if (lang == "ru") "Эта удочка недоступна" else "You don't have this rod"
+                                        else -> if (lang == "ru") "Не удалось сменить удочку" else "Failed to change rod"
                                     }
                                     trySend(chatId, msg, replyToMessageId = replyTo)
                                 }

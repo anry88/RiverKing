@@ -3,6 +3,8 @@ package db
 import app.Env
 import org.jetbrains.exposed.dao.id.LongIdTable
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.javatime.timestamp
 import java.time.Instant
@@ -12,6 +14,7 @@ object DB {
         // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
         Database.connect(url = env.dbUrl, driver = "org.sqlite.JDBC")
         transaction {
+            ensureRodCodeColumn()
             SchemaUtils.createMissingTablesAndColumns(
                 Users,
                 Locations,
@@ -32,6 +35,48 @@ object DB {
             )
             seedIfEmpty()
         }
+    }
+
+    private fun ensureRodCodeColumn() {
+        val tx = TransactionManager.current()
+        val tableName = Rods.tableName
+        val rodsExists = tx.exec(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'"
+        ) { rs -> rs.next() } ?: false
+        if (!rodsExists) return
+        val hasCode = tx.exec("PRAGMA table_info($tableName)") { rs ->
+            var found = false
+            while (rs.next()) {
+                if (rs.getString("name").equals("code", ignoreCase = true)) {
+                    found = true
+                    break
+                }
+            }
+            found
+        } ?: false
+        if (hasCode) return
+
+        // Add the column without NOT NULL constraint to avoid SQLite migration failures.
+        tx.exec("ALTER TABLE $tableName ADD COLUMN code VARCHAR(50)")
+
+        val predefined = mapOf(
+            "Искра" to "spark",
+            "Роса" to "dew",
+            "Поток" to "stream",
+            "Глубь" to "abyss",
+            "Шторм" to "storm",
+        )
+
+        predefined.forEach { (name, code) ->
+            Rods.update({ Rods.name eq name }) { it[Rods.code] = code }
+        }
+
+        Rods.slice(Rods.id).select { Rods.code.isNull() }.forEach { row ->
+            val id = row[Rods.id].value
+            Rods.update({ Rods.id eq id }) { it[Rods.code] = "rod_$id" }
+        }
+
+        tx.exec("CREATE UNIQUE INDEX IF NOT EXISTS ${tableName}_code_unique ON $tableName(code)")
     }
 
     private fun seedIfEmpty() {
@@ -109,6 +154,38 @@ object DB {
                     it[Lures.predator] = predator
                     it[Lures.water] = water
                     it[Lures.rarityBonus] = rarityBonus
+                }
+                id
+            }
+        }
+
+        fun upsertRod(
+            code: String,
+            name: String,
+            unlock: Double,
+            bonusWater: String? = null,
+            bonusPredator: Boolean? = null,
+        ): Long {
+            val row = Rods.select { Rods.code eq code }.singleOrNull()
+                ?: Rods.select { Rods.name eq name }.singleOrNull()
+            return if (row == null) {
+                Rods.insertAndGetId {
+                    it[Rods.code] = code
+                    it[Rods.name] = name
+                    it[priceStars] = null
+                    it[modsJson] = "{}"
+                    it[unlockKg] = unlock
+                    it[Rods.bonusWater] = bonusWater
+                    it[Rods.bonusPredator] = bonusPredator
+                }.value
+            } else {
+                val id = row[Rods.id].value
+                Rods.update({ Rods.id eq id }) {
+                    it[Rods.code] = code
+                    it[Rods.name] = name
+                    it[unlockKg] = unlock
+                    it[Rods.bonusWater] = bonusWater
+                    it[Rods.bonusPredator] = bonusPredator
                 }
                 id
             }
@@ -208,6 +285,13 @@ object DB {
         // Эпики для Горной реки
         val fArc = upsertFish("Голец арктический", "epic", 2.8, 1.2, true, "fresh")
         val fKum = upsertFish("Форель кумжа", "epic", 4.0, 1.5, true, "fresh")
+
+        // --- Rods ---
+        upsertRod("spark", "Искра", 0.0, null, null)
+        upsertRod("dew", "Роса", 15.0, "fresh", false)
+        upsertRod("stream", "Поток", 150.0, "fresh", true)
+        upsertRod("abyss", "Глубь", 450.0, "salt", false)
+        upsertRod("storm", "Шторм", 1000.0, "salt", true)
 
         // --- Weights per location ---
 
@@ -365,6 +449,7 @@ object Users : LongIdTable() {
     val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
+    val currentRodId = reference("current_rod_id", Rods).nullable()
     val castLureId = reference("cast_lure_id", Lures).nullable()
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
@@ -397,9 +482,13 @@ object Lures : LongIdTable() {
 }
 
 object Rods : LongIdTable() {
+    val code = varchar("code", 50).uniqueIndex()
     val name = varchar("name", 100)
     val priceStars = integer("price_stars").nullable()
     val modsJson = text("mods_json")
+    val unlockKg = double("unlock_kg").default(0.0)
+    val bonusWater = varchar("bonus_water", 20).nullable()
+    val bonusPredator = bool("bonus_predator").nullable()
 }
 
 object InventoryLures : Table() {

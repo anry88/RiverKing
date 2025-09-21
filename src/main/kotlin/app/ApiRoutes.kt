@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 import service.FishingService
 import service.LocationDTO
 import service.RecentDTO
+import service.RodDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.TournamentService
@@ -174,6 +175,7 @@ fun Application.apiRoutes(env: Env) {
             fishing.resetCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures = fishing.listLures(uid).map { it.copy(name = I18n.lure(it.name, language)) }
+            val rods = fishing.listRods(uid).map { it.copy(name = I18n.rod(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
             val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
@@ -195,6 +197,9 @@ fun Application.apiRoutes(env: Env) {
             val currentLureId = transaction {
                 Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
             }
+            val currentRodId = transaction {
+                Users.select { Users.id eq uid }.single()[Users.currentRodId]?.value
+            }
             val recent = fishing.recent(uid).map { r ->
                 r.copy(
                     fish = I18n.fish(r.fish, language),
@@ -213,6 +218,8 @@ fun Application.apiRoutes(env: Env) {
                 val needsNickname: Boolean,
                 val lures: List<LureDTO>,
                 val currentLureId: Long?,
+                val rods: List<RodDTO>,
+                val currentRodId: Long?,
                 val totalWeight: Double,
                 val todayWeight: Double,
                 val locationId: Long,
@@ -231,6 +238,8 @@ fun Application.apiRoutes(env: Env) {
                     displayName == null,
                     lures,
                     currentLureId,
+                    rods,
+                    currentRodId,
                     totalWeight,
                     todayWeight,
                     currentLocId,
@@ -800,7 +809,18 @@ fun Application.apiRoutes(env: Env) {
             } else {
                 res.unlockedLocations.map { I18n.location(it, language) }
             }
-            call.respond(res.copy(catch = localizedCatch, unlockedLocations = localizedUnlocked))
+            val localizedRods = if (res.unlockedRods.isEmpty()) {
+                emptyList()
+            } else {
+                res.unlockedRods.map { I18n.rod(it, language) }
+            }
+            call.respond(
+                res.copy(
+                    catch = localizedCatch,
+                    unlockedLocations = localizedUnlocked,
+                    unlockedRods = localizedRods,
+                )
+            )
         }
 
         // Change lure
@@ -818,6 +838,24 @@ fun Application.apiRoutes(env: Env) {
                 call.respond(HttpStatusCode.NoContent)
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
+            }
+        }
+
+        // Change rod
+        post("/api/rod/{id}") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            try {
+                fishing.setRod(uid, id)
+                call.respond(HttpStatusCode.NoContent)
+            } catch (e: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad rod")))
             }
         }
 

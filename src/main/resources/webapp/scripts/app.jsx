@@ -14,6 +14,7 @@ const tgParam = (()=>{
 })();
 
 const FAIL_REACTION_SECONDS = 5.1;
+const BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
 function App(){
   const [me,setMe] = React.useState(null);
@@ -33,6 +34,7 @@ function App(){
   const [error,setError] = React.useState(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [baitsOpen, setBaitsOpen] = React.useState(false);
+  const [rodsOpen, setRodsOpen] = React.useState(false);
   const [tab, setTab] = React.useState('fish');
   const [shop,setShop] = React.useState([]);
   const starterPackName = React.useMemo(() => (
@@ -65,6 +67,16 @@ function App(){
   const tapReactionRef = React.useRef(0);
   const tapTimerRef = React.useRef(null);
   const tapFinishingRef = React.useRef(false);
+  const catchAnimationIdRef = React.useRef(0);
+  const lastCatchAnimationShownRef = React.useRef(null);
+  const markCatchAnimationShown = React.useCallback(id => {
+    if(id == null) return;
+    lastCatchAnimationShownRef.current = id;
+  }, []);
+  const hasCatchAnimationBeenShown = React.useCallback(id => {
+    if(id == null) return false;
+    return lastCatchAnimationShownRef.current === id;
+  }, []);
 
   React.useEffect(()=>{
     autoCastRef.current = autoCast;
@@ -134,8 +146,10 @@ function App(){
   React.useEffect(()=>{
     try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
     try{
+      const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : [ROD_IMG];
       Object.values(LOCATION_BG)
-        .concat([ROD_IMG, '/app/assets/riverking_bobber.svg'])
+        .concat(rodImages)
+        .concat([BOBBER_ICON])
         .forEach(src=>{ new Image().src = src; });
     }catch(e){}
     (async()=>{
@@ -457,7 +471,9 @@ function App(){
         const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
         const newTotal = (me.totalWeight||0)+c.weight;
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
-        setResult({...c,newFish:isNewFish,newLocations:newLocs});
+        const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
+        const animationId = ++catchAnimationIdRef.current;
+        setResult({...c,newFish:isNewFish,newLocations:newLocs,newRods,animationId});
         setMe(p=>{
           const tot = (p.totalWeight||0)+c.weight;
           return {
@@ -465,6 +481,7 @@ function App(){
             totalWeight:tot,
             todayWeight:(p.todayWeight||0)+c.weight,
             locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+            rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
             recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
             caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
           };
@@ -692,7 +709,7 @@ function App(){
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src="/app/assets/riverking_bobber.svg" alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+              <img src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
               <div className="text-lg font-semibold mb-1">
                 {
@@ -710,7 +727,7 @@ function App(){
         {refRewards && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src="/app/assets/riverking_bobber.svg" alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce" />
+              <img src={BOBBER_ICON} alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t(
                 (!refInfo || refInfo.invited.length===0)
                   ? 'welcomeBonus'
@@ -737,6 +754,7 @@ function App(){
           onEditNickname={()=>setNickOpen(true)}
           onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
           onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
+          onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
           onToggleLanguage={toggleLanguage}
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
@@ -763,6 +781,8 @@ function App(){
               setAutoCast={setAutoCast}
               autoCastRef={autoCastRef}
               autoCastTimeoutRef={autoCastTimeoutRef}
+              hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
+              markCatchAnimationShown={markCatchAnimationShown}
             />
           )}
 
@@ -817,6 +837,25 @@ function App(){
             setError(e.message==='unauthorized'
               ? t('authRequired')
               : t('selectBaitFailed'));
+          }
+        }} />
+        <RodsDrawer open={rodsOpen} onClose={()=>setRodsOpen(false)} me={me} onSelect={async id=>{
+          try{
+            const r = await fetch(`/api/rod/`+id,{method:'POST',credentials:'include'});
+            if(!r.ok){
+              if(r.status===401) throw new Error('unauthorized');
+              const err = await r.json().catch(()=>({}));
+              throw new Error(err.error||'failed');
+            }
+            setMe(p=>({...p,currentRodId:id}));
+          }catch(e){
+            const reason = e.message;
+            setError(reason==='unauthorized'
+              ? t('authRequired')
+              : reason==='casting' ? t('rodCasting')
+              : reason==='locked' ? t('rodLocked')
+              : reason==='no rod' ? t('rodUnavailable')
+              : t('selectRodFailed'));
           }
         }} />
       </div>
