@@ -113,7 +113,7 @@ function Guide({me}){
                   <img
                     src={rodImage}
                     alt={rod.name}
-                    className="w-12 h-12 object-contain shrink-0"
+                    className="w-16 h-16 object-contain shrink-0"
                     loading="lazy"
                     decoding="async"
                   />
