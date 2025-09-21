@@ -51,6 +51,16 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const targetWFrac = isSmall ? 0.70 : (isTablet ? 0.55 : 0.48);
   const targetHFrac = isSmall ? 0.92 : (isTablet ? 0.90 : 0.86);
 
+  const stageHeight = React.useMemo(() => {
+    if (isSmall) {
+      return 'clamp(220px, calc(var(--vh) * 0.48), 340px)';
+    }
+    if (isTablet) {
+      return 'clamp(320px, calc(var(--vh) * 0.54), 420px)';
+    }
+    return 'clamp(360px, calc(var(--vh) * 0.56), 540px)';
+  }, [isSmall, isTablet]);
+
   const rodScaleBase = Math.min((w * targetWFrac) / 1200, (h * targetHFrac) / 1200);
   const rodScale = rodScaleBase * ROD_SIZE_MULT;
 
@@ -226,7 +236,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10" ref={stageRef}
-         style={{height:'calc(var(--vh) * 0.56)'}}>
+         style={{height: stageHeight}}>
       <div
         className="absolute inset-0 transition-opacity duration-200"
         style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center bottom', opacity:bgLoaded?1:0}}
@@ -342,7 +352,7 @@ function FishingTab({
 }){
   return (
     <>
-      <div className="mt-4">
+      <div className="mt-3 md:mt-4">
         <FishingStage
           me={me}
           setMe={setMe}
