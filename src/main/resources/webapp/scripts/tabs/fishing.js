@@ -1,3 +1,5 @@
+const ACTION_HEIGHT_CLASS = "min-h-[64px] md:min-h-[72px]";
+
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
   const ariaLabel = `${t('tapPrompt', goal)} ${t('tapCount', {count, goal})}. ${t('tapCountdown', timeLabel)}`;
@@ -6,7 +8,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
       <div className="relative w-full">
         <button
           onClick={onTap}
-          className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg relative overflow-hidden flex items-center justify-center"
+          className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg relative overflow-hidden flex items-center justify-center`}
           aria-label={ariaLabel}
         >
           <span className="sr-only">{ariaLabel}</span>
@@ -29,7 +31,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   );
 }
 
-function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef}){
+function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result}){
   const stageRef = React.useRef(null);
   const {w,h} = useResizeObserver(stageRef);
 
@@ -37,9 +39,11 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [tension, setTension] = React.useState(0.2);
+  const floatPxRef = React.useRef({x:0,y:0});
 
   const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
   const floatPx = toPx(floatRel);
+  React.useEffect(()=>{ floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
@@ -67,6 +71,82 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     y: (tipY + floatPx.y) / 2 + (isSmall ? 50 : (60 + 120 * tension))
   };
   const linePath = `M ${tipX},${tipY} Q ${ctrl.x},${ctrl.y} ${floatPx.x},${floatPx.y}`;
+
+  const catchTargetPx = React.useMemo(()=>{
+    const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
+    const baseY = rodTop + rodH * ROD_BASE_ANCHOR.y;
+    const targetX = baseX - rodW * (isSmall ? 0.22 : 0.16);
+    const targetY = baseY - rodH * (isSmall ? 0.26 : 0.20);
+    return {
+      x: Math.min(w - 32, Math.max(32, targetX)),
+      y: Math.min(h - 32, Math.max(32, targetY))
+    };
+  }, [rodLeft, rodTop, rodW, rodH, isSmall, w, h]);
+
+  const [catchAnim, setCatchAnim] = React.useState(null);
+  const catchAnimRef = React.useRef(null);
+  const catchAnimFrameRef = React.useRef(null);
+  const catchAnimTimeoutRef = React.useRef(null);
+
+  React.useEffect(()=>{
+    return ()=>{
+      if(catchAnimFrameRef.current){ cancelAnimationFrame(catchAnimFrameRef.current); }
+      if(catchAnimTimeoutRef.current){ clearTimeout(catchAnimTimeoutRef.current); }
+      catchAnimRef.current = null;
+    };
+  },[]);
+
+  React.useEffect(()=>{
+    if(catchAnimFrameRef.current){ cancelAnimationFrame(catchAnimFrameRef.current); catchAnimFrameRef.current = null; }
+    if(catchAnimTimeoutRef.current){ clearTimeout(catchAnimTimeoutRef.current); catchAnimTimeoutRef.current = null; }
+
+    if(!result){
+      catchAnimRef.current = null;
+      setCatchAnim(null);
+      return;
+    }
+
+    const start = {...floatPxRef.current};
+    const end = {...catchTargetPx};
+    const animState = {
+      fish: result.fish,
+      rarity: result.rarity,
+      start,
+      end,
+      progress: 0
+    };
+    catchAnimRef.current = animState;
+    setCatchAnim(animState);
+
+    const duration = 900;
+    const startedAt = performance.now();
+    const step = (now)=>{
+      if(catchAnimRef.current !== animState) return;
+      const tVal = Math.min(1, (now - startedAt) / duration);
+      const eased = easeOutCubic(tVal);
+      setCatchAnim(prev => {
+        if(!prev || catchAnimRef.current !== animState) return prev;
+        return {...prev, progress: eased};
+      });
+      if(tVal < 1){
+        catchAnimFrameRef.current = requestAnimationFrame(step);
+      } else {
+        catchAnimTimeoutRef.current = setTimeout(()=>{
+          if(catchAnimRef.current === animState){
+            catchAnimRef.current = null;
+            setCatchAnim(null);
+          }
+        }, 350);
+      }
+    };
+    catchAnimFrameRef.current = requestAnimationFrame(step);
+
+    return ()=>{
+      if(catchAnimRef.current === animState){
+        catchAnimRef.current = null;
+      }
+    };
+  }, [result, catchTargetPx]);
 
   const tweenTo = (toRel, ms=600)=>{
     const from = {...floatRel};
@@ -108,6 +188,42 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const bobberAnim = biting ? 'animate-[bite_0.6s_ease-in-out_infinite]' : (casting ? 'animate-[bob_3s_ease-in-out_infinite]' : '');
   const showRipple = casting && !biting;
 
+  const rarityGlow = {
+    common: 'rgba(255,255,255,0.5)',
+    uncommon: 'rgba(74,222,128,0.65)',
+    rare: 'rgba(59,130,246,0.65)',
+    epic: 'rgba(168,85,247,0.65)',
+    legendary: 'rgba(250,204,21,0.75)'
+  };
+  let catchStyle = null;
+  let catchGlowStyle = null;
+  let catchImage = null;
+  if(catchAnim){
+    const img = FISH_IMG[catchAnim.fish];
+    if(img){
+      const {start, end, progress} = catchAnim;
+      const lift = Math.sin(progress * Math.PI) * (isSmall ? 26 : 38);
+      const x = start.x + (end.x - start.x) * progress;
+      const y = start.y + (end.y - start.y) * progress - lift;
+      const scale = 0.75 + progress * 0.3;
+      const rotation = (Math.sin(progress * Math.PI) * (isSmall ? 9 : 13));
+      const fadeStart = 0.8;
+      const opacity = progress < fadeStart ? 1 : Math.max(0, 1 - (progress - fadeStart) / (1 - fadeStart));
+      const size = isSmall ? 72 : 88;
+      catchStyle = {
+        transform: `translate3d(${x - size / 2}px, ${y - size / 2}px, 0) scale(${scale}) rotate(${rotation}deg)`,
+        width: size,
+        height: size,
+        opacity,
+      };
+      catchGlowStyle = {
+        background: `radial-gradient(circle, ${rarityGlow[catchAnim.rarity] || 'rgba(255,255,255,0.55)'} 0%, transparent 70%)`,
+        opacity: 0.9,
+      };
+      catchImage = img;
+    }
+  }
+
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10" ref={stageRef}
          style={{height:'calc(var(--vh) * 0.56)'}}>
@@ -144,14 +260,21 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
 
+      {catchImage && catchStyle && (
+        <div className="absolute pointer-events-none" style={catchStyle} aria-hidden="true">
+          <div className="absolute inset-0 blur-xl" style={catchGlowStyle}></div>
+          <img src={catchImage} alt="" className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,0.45)]" />
+        </div>
+      )}
+
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
         {!casting ? (
           castReady ? (
-            <button onClick={onCast} className="btn-lg w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+            <button onClick={onCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
-            <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
-              <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-              <div className="opacity-90">{t('castCooldown')}</div>
+            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
+              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
+              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
             </div>
           )
         ) : tapping ? (
@@ -163,11 +286,11 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
             className="w-full md:w-1/2"
           />
         ) : biting ? (
-          <button onClick={onHook} className="btn-lg w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
+          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
         ) : (
-          <div className="glass w-full md:w-1/2 py-4 rounded-2xl text-center">
-            <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-            <div className="opacity-90">{t('waitingBite')}</div>
+          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
+            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
+            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
           </div>
         )}
       </div>
@@ -238,17 +361,18 @@ function FishingTab({
           setAutoCast={setAutoCast}
           autoCastRef={autoCastRef}
           autoCastTimeoutRef={autoCastTimeoutRef}
+          result={result}
         />
       </div>
 
       <div className="md:hidden mt-3">
         {!casting ? (
           castReady ? (
-            <button onClick={onCast} className="btn-lg w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg">{t('castRod')}</button>
+            <button onClick={onCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
-            <div className="glass w-full py-4 rounded-2xl text-center">
-              <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-              <div className="opacity-90">{t('castCooldown')}</div>
+            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
+              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
+              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
             </div>
           )
         ) : tapActive ? (
@@ -260,11 +384,11 @@ function FishingTab({
             className="w-full"
           />
         ) : biting ? (
-          <button onClick={onHook} className="btn-lg w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg">{t('hook')}</button>
+          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
         ) : (
-          <div className="glass w-full py-4 rounded-2xl text-center">
-            <div className="mx-auto h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin mb-2"></div>
-            <div className="opacity-90">{t('waitingBite')}</div>
+          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
+            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
+            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
           </div>
         )}
       </div>
