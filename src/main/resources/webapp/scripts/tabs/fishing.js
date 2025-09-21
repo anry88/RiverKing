@@ -1,4 +1,4 @@
-const ACTION_HEIGHT_CLASS = "min-h-[64px] md:min-h-[72px]";
+const ACTION_HEIGHT_CLASS = "min-h-[100px]";
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
