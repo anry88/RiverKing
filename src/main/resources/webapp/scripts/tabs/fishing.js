@@ -229,7 +229,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
          style={{height:'calc(var(--vh) * 0.56)'}}>
       <div
         className="absolute inset-0 transition-opacity duration-200"
-        style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center', opacity:bgLoaded?1:0}}
+        style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center bottom', opacity:bgLoaded?1:0}}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
