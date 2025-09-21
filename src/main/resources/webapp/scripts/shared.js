@@ -63,17 +63,38 @@
     9: '/app/assets/riverking_bg_fjord_1600x900.png',
     10: '/app/assets/riverking_bg_open_ocean_1600x900.png'
   };
-  const ROD_IMAGES = {
-    spark: '/app/assets/rods/yellow_rod.png',
-    dew: '/app/assets/rods/green_rod.png',
-    stream: '/app/assets/rods/blue_rod.png',
-    abyss: '/app/assets/rods/black_rod.png',
-    storm: '/app/assets/rods/silver_rod.png',
-    default: '/app/assets/rods/yellow_rod.png',
+  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.0804, y: 0.0479 };
+  const ROD_CONFIG = {
+    spark: {
+      image: '/app/assets/rods/yellow_rod.png',
+      tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+    },
+    dew: {
+      image: '/app/assets/rods/green_rod.png',
+      tipAnchor: { x: 0.1396, y: 0.0664 },
+    },
+    stream: {
+      image: '/app/assets/rods/blue_rod.png',
+      tipAnchor: { x: 0.3223, y: 0.0049 },
+    },
+    abyss: {
+      image: '/app/assets/rods/black_rod.png',
+      tipAnchor: { x: 0.3223, y: 0.0049 },
+    },
+    storm: {
+      image: '/app/assets/rods/silver_rod.png',
+      tipAnchor: { x: 0.1348, y: 0.0752 },
+    },
+    default: {
+      image: '/app/assets/rods/yellow_rod.png',
+      tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+    },
   };
+  const ROD_IMAGES = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.image]));
+  const ROD_TIP_ANCHORS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.tipAnchor]));
   const ROD_IMG = ROD_IMAGES.default;
   const ROD_IMG_SIZE = { width: 1536, height: 1024 };
-  const ROD_TIP_ANCHOR = { x: 0.150, y: 0.049 };
+  const ROD_TIP_ANCHOR = ROD_TIP_ANCHORS.default || ROD_TIP_ANCHOR_DEFAULT;
   const ROD_BASE_ANCHOR = { x: 0.383, y: 0.998 };
   const ROD_SIZE_MULT = 1.5;
   const ROD_BASE_X_FRACTION = 2 / 3;
@@ -460,6 +481,7 @@
   window.ROD_IMG = ROD_IMG;
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;
   window.ROD_TIP_ANCHOR = ROD_TIP_ANCHOR;
+  window.ROD_TIP_ANCHORS = ROD_TIP_ANCHORS;
   window.ROD_BASE_ANCHOR = ROD_BASE_ANCHOR;
   window.ROD_SIZE_MULT = ROD_SIZE_MULT;
   window.ROD_BASE_X_FRACTION = ROD_BASE_X_FRACTION;

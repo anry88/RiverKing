@@ -71,6 +71,9 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const rodImage = (window.ROD_IMAGES && currentRod?.code && window.ROD_IMAGES[currentRod.code])
     || (window.ROD_IMAGES && window.ROD_IMAGES.default)
     || ROD_IMG;
+  const rodTipAnchor = (window.ROD_TIP_ANCHORS && currentRod?.code && window.ROD_TIP_ANCHORS[currentRod.code])
+    || (window.ROD_TIP_ANCHORS && window.ROD_TIP_ANCHORS.default)
+    || ROD_TIP_ANCHOR;
   const rodBaseWidth = (ROD_IMG_SIZE && ROD_IMG_SIZE.width) || 1200;
   const rodBaseHeight = (ROD_IMG_SIZE && ROD_IMG_SIZE.height) || 1200;
   const rodScaleBase = Math.min((w * targetWFrac) / rodBaseWidth, (h * targetHFrac) / rodBaseHeight);
@@ -85,8 +88,8 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const rodBottomOvershoot = Math.min( Math.max(h * 0.08, 50), 140 );
   const rodTop = h - rodH + rodBottomOvershoot;
 
-  const tipX = rodLeft + rodW * ROD_TIP_ANCHOR.x;
-  const tipY = rodTop  + rodH * ROD_TIP_ANCHOR.y;
+  const tipX = rodLeft + rodW * rodTipAnchor.x;
+  const tipY = rodTop  + rodH * rodTipAnchor.y;
 
   const ctrl = {
     x: (tipX + floatPx.x) / 2 - (isSmall ? 24 : 40),
@@ -290,7 +293,13 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         decoding="async"
       />
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <path d={linePath} stroke="#e6e6e6" strokeWidth="2" fill="none" opacity="0.95"/>
+        <path
+          d={linePath}
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          fill="none"
+        />
       </svg>
 
       <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
