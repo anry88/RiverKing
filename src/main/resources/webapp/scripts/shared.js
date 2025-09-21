@@ -1,5 +1,6 @@
 (() => {
   const tg = window.Telegram?.WebApp;
+  window.BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
   function applyInsets() {
     const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;

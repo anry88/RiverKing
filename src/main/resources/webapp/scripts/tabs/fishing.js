@@ -34,6 +34,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
 function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown}){
   const stageRef = React.useRef(null);
   const {w,h} = useResizeObserver(stageRef);
+  const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
   const WATER_TOP_REL = 0.48;
   const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
@@ -303,7 +304,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       </svg>
 
       <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
-        <img src="/app/assets/riverking_bobber.svg" alt="bobber" className={`relative w-6 h-6 drop-shadow ${bobberAnim}`}/>
+        <img src={bobberIcon} alt="bobber" className={`relative bobber-cast drop-shadow ${bobberAnim}`}/>
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
 
