@@ -67,11 +67,13 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     return 'clamp(360px, calc(var(--vh) * 0.56), 540px)';
   }, [isSmall, isTablet]);
 
-  const rodScaleBase = Math.min((w * targetWFrac) / 1200, (h * targetHFrac) / 1200);
+  const rodBaseWidth = (ROD_IMG_SIZE && ROD_IMG_SIZE.width) || 1200;
+  const rodBaseHeight = (ROD_IMG_SIZE && ROD_IMG_SIZE.height) || 1200;
+  const rodScaleBase = Math.min((w * targetWFrac) / rodBaseWidth, (h * targetHFrac) / rodBaseHeight);
   const rodScale = rodScaleBase * ROD_SIZE_MULT;
 
-  const rodW = 1200 * rodScale;
-  const rodH = 1200 * rodScale;
+  const rodW = rodBaseWidth * rodScale;
+  const rodH = rodBaseHeight * rodScale;
 
   const baseDesiredX = w * ROD_BASE_X_FRACTION;
   const rodLeft = baseDesiredX - rodW * ROD_BASE_ANCHOR.x;

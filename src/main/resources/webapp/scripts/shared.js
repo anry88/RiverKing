@@ -52,7 +52,7 @@
   };
   const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
   const LOCATION_BG = {
-    1: '/app/assets/riverking_bg_pond_1600x900.png',
+    1: '/app/assets/backgrounds/pond.png',
     2: '/app/assets/riverking_bg_river_1600x900.png',
     3: '/app/assets/riverking_bg_lake_1600x900.png',
     4: '/app/assets/riverking_bg_swamp_1600x900.png',
@@ -63,9 +63,10 @@
     9: '/app/assets/riverking_bg_fjord_1600x900.png',
     10: '/app/assets/riverking_bg_open_ocean_1600x900.png'
   };
-  const ROD_IMG = '/app/assets/riverking_rod_right_v2.png';
-  const ROD_TIP_ANCHOR = { x: 0.285, y: 0.18 };
-  const ROD_BASE_ANCHOR = { x: 0.58, y: 0.98 };
+  const ROD_IMG = '/app/assets/rods/simple_rod.png';
+  const ROD_IMG_SIZE = { width: 1536, height: 1024 };
+  const ROD_TIP_ANCHOR = { x: 0.150, y: 0.049 };
+  const ROD_BASE_ANCHOR = { x: 0.383, y: 0.998 };
   const ROD_SIZE_MULT = 1.5;
   const ROD_BASE_X_FRACTION = 2 / 3;
 
@@ -422,6 +423,7 @@
   window.lureColor = lureColor;
   window.LOCATION_BG = LOCATION_BG;
   window.ROD_IMG = ROD_IMG;
+  window.ROD_IMG_SIZE = ROD_IMG_SIZE;
   window.ROD_TIP_ANCHOR = ROD_TIP_ANCHOR;
   window.ROD_BASE_ANCHOR = ROD_BASE_ANCHOR;
   window.ROD_SIZE_MULT = ROD_SIZE_MULT;
