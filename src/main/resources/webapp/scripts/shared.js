@@ -67,7 +67,7 @@
     13: '/app/assets/backgrounds/mangroves.png',
     14: '/app/assets/backgrounds/coral_flats.png',
   };
-  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.12435, y: 0.08594 };
+  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
   const ROD_CONFIG = {
     spark: {
       image: '/app/assets/rods/yellow_rod.png',
@@ -75,19 +75,19 @@
     },
     dew: {
       image: '/app/assets/rods/green_rod.png',
-      tipAnchor: { x: 0.1875, y: 0.10449 },
+      tipAnchor: { x: 0.13607, y: 0.06641 },
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.70964, y: 0.02637 },
+      tipAnchor: { x: 0.32227, y: 0.00488 },
     },
     abyss: {
       image: '/app/assets/rods/black_rod.png',
-      tipAnchor: { x: 0.70964, y: 0.02637 },
+      tipAnchor: { x: 0.32227, y: 0.00488 },
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
-      tipAnchor: { x: 0.18034, y: 0.11328 },
+      tipAnchor: { x: 0.13411, y: 0.07520 },
     },
     default: {
       image: '/app/assets/rods/yellow_rod.png',
