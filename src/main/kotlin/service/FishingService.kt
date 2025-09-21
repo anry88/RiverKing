@@ -23,9 +23,23 @@ data class LocationDTO(
 )
 
 @Serializable
+data class RodDTO(
+    val id: Long,
+    val code: String,
+    val name: String,
+    val unlockKg: Double,
+    val unlocked: Boolean,
+    val bonusWater: String? = null,
+    val bonusPredator: Boolean? = null,
+)
+
+@Serializable
 data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
 
 class FishingService {
+    companion object {
+        private const val DEFAULT_ROD_CODE = "spark"
+    }
     data class DailyReward(val name: String, val qty: Int)
 
     private val freshDailyRewards: List<List<DailyReward>> = listOf(
@@ -111,6 +125,7 @@ class FishingService {
         if (existing == null) {
             val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
             val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
+            val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
             val newId = Users.insertAndGetId {
                 it[Users.tgId] = tgId
                 it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
@@ -119,6 +134,7 @@ class FishingService {
                 it[Users.username] = username
                 it[Users.language] = if (language?.startsWith("ru") == true) "ru" else "en"
                 it[currentLureId] = freshId
+                it[currentRodId] = baseRodId
             }.value
             InventoryLures.insert {
                 it[InventoryLures.userId] = newId
@@ -129,6 +145,11 @@ class FishingService {
                 it[InventoryLures.userId] = newId
                 it[InventoryLures.lureId] = predId
                 it[InventoryLures.qty] = 5
+            }
+            InventoryRods.insert {
+                it[InventoryRods.userId] = newId
+                it[InventoryRods.rodId] = baseRodId
+                it[InventoryRods.qty] = 1
             }
             if (refToken != null) {
                 ReferralService.setReferrer(newId, refToken)
@@ -143,6 +164,9 @@ class FishingService {
                     if (username != null) it[Users.username] = username
                 }
             }
+            val total = totalKg(id)
+            ensureRodInventory(id, total)
+            ensureCurrentRod(id, total)
             id
         }
     }
@@ -291,6 +315,23 @@ class FishingService {
         }
     }
 
+    fun listRods(userId: Long): List<RodDTO> = transaction {
+        val total = totalKg(userId)
+        ensureRodInventory(userId, total)
+        ensureCurrentRod(userId, total)
+        Rods.selectAll().orderBy(Rods.unlockKg).map {
+            RodDTO(
+                it[Rods.id].value,
+                it[Rods.code],
+                it[Rods.name],
+                it[Rods.unlockKg],
+                it[Rods.unlockKg] <= total,
+                it[Rods.bonusWater],
+                it[Rods.bonusPredator],
+            )
+        }
+    }
+
     private fun ensureCurrentLure(userId: Long): Long? {
         val current = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
         val curQty = current?.let {
@@ -306,6 +347,75 @@ class FishingService {
             .firstOrNull()?.get(Lures.id)?.value
         Users.update({ Users.id eq userId }) { it[currentLureId] = first }
         return first
+    }
+
+    fun setRod(userId: Long, rodId: Long) = transaction {
+        val casting = Users.select { Users.id eq userId }.single()[Users.isCasting]
+        require(!casting) { "casting" }
+        val total = totalKg(userId)
+        ensureRodInventory(userId, total)
+        val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull() ?: error("bad rod")
+        require(rodRow[Rods.unlockKg] <= total) { "locked" }
+        val has = InventoryRods.select {
+            (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
+        }.any()
+        require(has) { "no rod" }
+        Users.update({ Users.id eq userId }) { it[currentRodId] = rodId }
+    }
+
+    private fun ensureRodInventory(userId: Long, total: Double) {
+        val unlockedIds = Rods
+            .slice(Rods.id)
+            .select { Rods.unlockKg lessEq total }
+            .map { it[Rods.id].value }
+        unlockedIds.forEach { rodId ->
+            val has = InventoryRods.select {
+                (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
+            }.any()
+            if (!has) {
+                InventoryRods.insert {
+                    it[InventoryRods.userId] = userId
+                    it[InventoryRods.rodId] = rodId
+                    it[InventoryRods.qty] = 1
+                }
+            }
+        }
+    }
+
+    private fun ensureCurrentRod(userId: Long, totalWeight: Double? = null): Long {
+        val total = totalWeight ?: totalKg(userId)
+        ensureRodInventory(userId, total)
+        val row = Users.select { Users.id eq userId }.single()
+        val current = row[Users.currentRodId]?.value
+        if (current != null) {
+            val rodRow = Rods.select { Rods.id eq current }.singleOrNull()
+            if (rodRow != null && rodRow[Rods.unlockKg] <= total) {
+                return current
+            }
+        }
+        val fallback = Rods
+            .select { Rods.unlockKg lessEq total }
+            .orderBy(Rods.unlockKg)
+            .firstOrNull()?.get(Rods.id)?.value
+            ?: Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
+        Users.update({ Users.id eq userId }) { it[currentRodId] = fallback }
+        return fallback
+    }
+
+    private fun rodBonusMultiplier(rodRow: ResultRow?, water: String, predator: Boolean): Double {
+        if (rodRow == null) return 1.0
+        val bonusWater = rodRow[Rods.bonusWater]
+        val bonusPredator = rodRow[Rods.bonusPredator]
+        if (bonusWater != null && bonusWater != water) return 1.0
+        if (bonusPredator != null && bonusPredator != predator) return 1.0
+        return 0.5
+    }
+
+    private fun rodUnlocksBetween(totalBefore: Double, totalAfter: Double): List<String> {
+        if (totalAfter <= totalBefore) return emptyList()
+        return Rods.select {
+            (Rods.unlockKg greater totalBefore) and (Rods.unlockKg lessEq totalAfter)
+        }.orderBy(Rods.unlockKg).map { it[Rods.name] }
     }
 
     fun giveDailyBaits(userId: Long): Triple<List<LureDTO>, Long?, Int>? = transaction {
@@ -437,10 +547,20 @@ class FishingService {
     )
 
     @Serializable
+    data class GuideRodDTO(
+        val code: String,
+        val name: String,
+        val unlockKg: Double,
+        val bonusWater: String?,
+        val bonusPredator: Boolean?,
+    )
+
+    @Serializable
     data class GuideDTO(
         val locations: List<GuideLocationDTO>,
         val fish: List<GuideFishDTO>,
         val lures: List<GuideLureDTO>,
+        val rods: List<GuideRodDTO>,
     )
 
     fun guide(lang: String): GuideDTO = transaction {
@@ -504,7 +624,17 @@ class FishingService {
             GuideLureDTO(name, fishList, locations)
         }
 
-        GuideDTO(locationDtos, fishDtos, lureDtos)
+        val rodDtos = Rods.selectAll().orderBy(Rods.unlockKg).map { rRow ->
+            GuideRodDTO(
+                rRow[Rods.code],
+                I18n.rod(rRow[Rods.name], lang),
+                rRow[Rods.unlockKg],
+                rRow[Rods.bonusWater],
+                rRow[Rods.bonusPredator],
+            )
+        }
+
+        GuideDTO(locationDtos, fishDtos, lureDtos, rodDtos)
     }
 
     @Serializable
@@ -871,6 +1001,8 @@ class FishingService {
         val lureWater = lureRow[Lures.water]
 
         val total = totalKg(userId)
+        ensureRodInventory(userId, total)
+        ensureCurrentRod(userId, total)
         val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
             ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
         val locRow = Locations.select { Locations.id eq locId }.single()
@@ -894,11 +1026,21 @@ class FishingService {
     fun locationEscapeChance(userId: Long): Pair<Long, Double> = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         val total = totalKg(userId)
+        ensureRodInventory(userId, total)
+        val rodId = ensureCurrentRod(userId, total)
+        val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
         val locId = userRow[Users.currentLocationId]?.value
             ?: Locations.select { Locations.unlockKg lessEq total }
                 .orderBy(Locations.unlockKg)
                 .first()[Locations.id].value
-        locId to baseEscapeChance(locId)
+        val lureId = userRow[Users.castLureId]?.value ?: userRow[Users.currentLureId]?.value
+        val lureRow = lureId?.let { Lures.select { Lures.id eq it }.singleOrNull() }
+        val bonus = if (lureRow != null) {
+            rodBonusMultiplier(rodRow, lureRow[Lures.water], lureRow[Lures.predator])
+        } else {
+            1.0
+        }
+        locId to (baseEscapeChance(locId) * bonus)
     }
 
     @Serializable
@@ -922,6 +1064,7 @@ class FishingService {
         val catch: CatchDTO? = null,
         val autoFish: Boolean = false,
         val unlockedLocations: List<String> = emptyList(),
+        val unlockedRods: List<String> = emptyList(),
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -955,7 +1098,15 @@ class FishingService {
         val locRow = Locations.select { Locations.id eq locId }.single()
         require(locRow[Locations.unlockKg] <= total) { "locked" }
         val pool = (LocationFishWeights innerJoin Fish)
-            .slice(Fish.id, Fish.meanKg, Fish.varKg, Fish.rarity, LocationFishWeights.weight)
+            .slice(
+                Fish.id,
+                Fish.meanKg,
+                Fish.varKg,
+                Fish.rarity,
+                Fish.predator,
+                Fish.water,
+                LocationFishWeights.weight,
+            )
             .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
             .toList()
         require(pool.isNotEmpty()) { "No suitable fish" }
@@ -972,6 +1123,15 @@ class FishingService {
 
         val auto = userRow[Users.autoFishUntil]?.isAfter(Instant.now()) == true
 
+        ensureRodInventory(userId, total)
+        val rodId = ensureCurrentRod(userId, total)
+        val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
+        val escapeChance = baseEscapeChance(locId) * rodBonusMultiplier(
+            rodRow,
+            picked[Fish.water],
+            picked[Fish.predator],
+        )
+
         fun escape(): HookResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -985,8 +1145,7 @@ class FishingService {
         if (!auto && reactionTime >= 5.0) return@transaction escape()
 
         val catchChance = if (auto) 1.0 else {
-            val minEscape = baseEscapeChance(locId)
-            (1.0 - minEscape) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
+            (1.0 - escapeChance) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
         }
         if (!auto && rnd.nextDouble() > catchChance) return@transaction escape()
 
@@ -1020,6 +1179,7 @@ class FishingService {
             caught: Boolean,
             catch: CatchDTO? = null,
             unlockedLocations: List<String> = emptyList(),
+            unlockedRods: List<String> = emptyList(),
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1027,7 +1187,7 @@ class FishingService {
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return CastResultDTO(caught, catch, autoActive, unlockedLocations)
+            return CastResultDTO(caught, catch, autoActive, unlockedLocations, unlockedRods)
         }
 
         if (pending == null) return@transaction finish(false)
@@ -1052,6 +1212,9 @@ class FishingService {
         } else {
             emptyList()
         }
+        val unlockedRods = rodUnlocksBetween(totalBefore, totalAfter)
+        ensureRodInventory(userId, totalAfter)
+        ensureCurrentRod(userId, totalAfter)
 
         Catches.insert {
             it[Catches.userId] = userId
@@ -1072,6 +1235,7 @@ class FishingService {
                 fishId = fishId,
             ),
             unlockedLocations = unlockedLocations,
+            unlockedRods = unlockedRods,
         )
     }
 

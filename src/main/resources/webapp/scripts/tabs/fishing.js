@@ -34,6 +34,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
 function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown}){
   const stageRef = React.useRef(null);
   const {w,h} = useResizeObserver(stageRef);
+  const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
   const WATER_TOP_REL = 0.48;
   const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
@@ -67,11 +68,20 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     return 'clamp(360px, calc(var(--vh) * 0.56), 540px)';
   }, [isSmall, isTablet]);
 
-  const rodScaleBase = Math.min((w * targetWFrac) / 1200, (h * targetHFrac) / 1200);
+  const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
+  const rodImage = (window.ROD_IMAGES && currentRod?.code && window.ROD_IMAGES[currentRod.code])
+    || (window.ROD_IMAGES && window.ROD_IMAGES.default)
+    || ROD_IMG;
+  const rodTipAnchor = (window.ROD_TIP_ANCHORS && currentRod?.code && window.ROD_TIP_ANCHORS[currentRod.code])
+    || (window.ROD_TIP_ANCHORS && window.ROD_TIP_ANCHORS.default)
+    || ROD_TIP_ANCHOR;
+  const rodBaseWidth = (ROD_IMG_SIZE && ROD_IMG_SIZE.width) || 1200;
+  const rodBaseHeight = (ROD_IMG_SIZE && ROD_IMG_SIZE.height) || 1200;
+  const rodScaleBase = Math.min((w * targetWFrac) / rodBaseWidth, (h * targetHFrac) / rodBaseHeight);
   const rodScale = rodScaleBase * ROD_SIZE_MULT;
 
-  const rodW = 1200 * rodScale;
-  const rodH = 1200 * rodScale;
+  const rodW = rodBaseWidth * rodScale;
+  const rodH = rodBaseHeight * rodScale;
 
   const baseDesiredX = w * ROD_BASE_X_FRACTION;
   const rodLeft = baseDesiredX - rodW * ROD_BASE_ANCHOR.x;
@@ -79,8 +89,8 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const rodBottomOvershoot = Math.min( Math.max(h * 0.08, 50), 140 );
   const rodTop = h - rodH + rodBottomOvershoot;
 
-  const tipX = rodLeft + rodW * ROD_TIP_ANCHOR.x;
-  const tipY = rodTop  + rodH * ROD_TIP_ANCHOR.y;
+  const tipX = rodLeft + rodW * rodTipAnchor.x;
+  const tipY = rodTop  + rodH * rodTipAnchor.y;
 
   const ctrl = {
     x: (tipX + floatPx.x) / 2 - (isSmall ? 24 : 40),
@@ -276,7 +286,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       )}
 
       <img
-        src={ROD_IMG}
+        src={rodImage}
         alt="rod"
         className="absolute select-none pointer-events-none"
         style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
@@ -284,11 +294,17 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         decoding="async"
       />
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-        <path d={linePath} stroke="#e6e6e6" strokeWidth="2" fill="none" opacity="0.95"/>
+        <path
+          d={linePath}
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          fill="none"
+        />
       </svg>
 
       <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
-        <img src="/app/assets/riverking_bobber.svg" alt="bobber" className={`relative w-6 h-6 drop-shadow ${bobberAnim}`}/>
+        <img src={bobberIcon} alt="bobber" className={`relative bobber-cast drop-shadow ${bobberAnim}`}/>
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
 
@@ -439,6 +455,9 @@ function FishingTab({
             {result.newLocations && result.newLocations.map((n,i)=>(
               <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
             ))}
+            {result.newRods && result.newRods.length>0 && (
+              <div className="text-xs text-emerald-400">{(result.newRods.length>1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
+            )}
           </div>
         </div>
       )}

@@ -13,18 +13,18 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <!-- Preload key assets (Ktor serves under /app) -->
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_pond_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_river_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_lake_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_swamp_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_mountain_river_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_reservoir_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_river_delta_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_sea_coast_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_fjord_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bg_open_ocean_1600x900.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_rod_right_v2.png">
-  <link rel="preload" as="image" href="/app/assets/riverking_bobber.svg">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/pond.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/river.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/lake.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/swamp.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/mountain_river.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/reservoir.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/river_delta.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/sea_coast.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/fjord.png">
+  <link rel="preload" as="image" href="/app/assets/backgrounds/open_ocean.png">
+  <link rel="preload" as="image" href="/app/assets/rods/yellow_rod.png">
+  <link rel="preload" as="image" href="/app/assets/menu/bobber.png">
   <link rel="preload" as="image" href="/app/assets/fish/karas.png">
   <link rel="preload" as="image" href="/app/assets/fish/karp.png">
   <link rel="preload" as="image" href="/app/assets/fish/lesch.png">
@@ -108,6 +108,12 @@
       border-radius:9999px;
       background:rgba(255,255,255,.55);
       box-shadow:0 0 0 10px rgba(255,255,255,.14);
+    }
+
+    .bobber-cast{
+      width:24px;
+      height:24px;
+      object-fit:contain;
     }
 
     @keyframes pop {0%{transform:scale(.5);opacity:0;}80%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);}}

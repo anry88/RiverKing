@@ -2,6 +2,14 @@ function Guide({me}){
   const [section,setSection] = React.useState('locations');
   const [data,setData] = React.useState(null);
   const [error,setError] = React.useState(null);
+  const rodBonusText = React.useCallback((rod)=>{
+    if(!rod || !rod.bonusWater) return t('rodNoBonus');
+    if(rod.bonusWater==='fresh' && rod.bonusPredator) return t('rodBonusFreshPredator');
+    if(rod.bonusWater==='fresh' && !rod.bonusPredator) return t('rodBonusFreshPeaceful');
+    if(rod.bonusWater==='salt' && rod.bonusPredator) return t('rodBonusSaltPredator');
+    if(rod.bonusWater==='salt' && !rod.bonusPredator) return t('rodBonusSaltPeaceful');
+    return t('rodNoBonus');
+  }, [me.language]);
   React.useEffect(()=>{
     setData(null); setError(null);
     fetch('/api/guide',{credentials:'include'})
@@ -17,6 +25,7 @@ function Guide({me}){
         <button onClick={()=>setSection('locations')} className={`flex-1 py-2 rounded-xl ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
         <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
         <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
+        <button onClick={()=>setSection('rods')} className={`flex-1 py-2 rounded-xl ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
       </div>
       {section==='locations' && (
         <div className="space-y-4">
@@ -89,6 +98,34 @@ function Guide({me}){
               <div className="text-xs">{t('locationsLabel')} {l.locations.join(', ')}</div>
             </div>
           ))}
+        </div>
+      )}
+      {section==='rods' && (
+        <div className="space-y-4">
+          {data.rods.map(rod=>{
+            const myRod = (me.rods||[]).find(r=>r.code===rod.code) || {};
+            const unlocked = myRod.unlocked;
+            const status = unlocked ? t('unlocked') : t('requiresKg', Number(rod.unlockKg).toFixed(0));
+            const rodImage = (window.ROD_IMAGES && (window.ROD_IMAGES[rod.code] || window.ROD_IMAGES.default)) || ROD_IMG;
+            return (
+              <div key={rod.code} className="p-4 glass rounded-xl">
+                <div className="flex items-start gap-3">
+                  <img
+                    src={rodImage}
+                    alt={rod.name}
+                    className="w-16 h-16 object-contain shrink-0"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div>
+                    <div className="font-semibold">{rod.name}</div>
+                    <div className="text-xs opacity-70 mt-1">{status}</div>
+                    <div className="text-xs mt-2">{rodBonusText(rod)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

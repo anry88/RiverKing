@@ -94,6 +94,14 @@ object I18n {
         "Морская хищная+" to "Saltwater Predator+",
     )
 
+    private val rods = mapOf(
+        "Искра" to "Spark",
+        "Роса" to "Dew",
+        "Поток" to "Stream",
+        "Глубь" to "Abyss",
+        "Шторм" to "Storm",
+    )
+
     private val texts = mapOf(
         "Пресные простые" to "Freshwater Basics",
         "Морские простые" to "Saltwater Basics",
@@ -155,5 +163,6 @@ object I18n {
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
     fun location(name: String, lang: String) = if (lang == "en") locations[name] ?: name else name
     fun lure(name: String, lang: String) = if (lang == "en") lures[name] ?: name else name
+    fun rod(name: String, lang: String) = if (lang == "en") rods[name] ?: name else name
     fun text(str: String, lang: String) = if (lang == "en") texts[str] ?: str else str
 }

@@ -11,10 +11,12 @@ function StatChip({icon,label,value,active=false,onClick}){
   );
 }
 
-function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLanguage}){
+function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,onToggleLanguage}){
   const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
   const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+  const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
+  const rodVal = currentRod ? currentRod.name : '—';
   const languages = [
     {code:'ru', label:'🇷🇺 RU'},
     {code:'en', label:'🇺🇸 EN'},
@@ -42,6 +44,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onToggleLang
       <div className="px-4 py-2 bg-black/20 border-b border-white/10">
         <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
           <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
+          <StatChip icon={'🎣'} label={t('rod')} value={rodVal} onClick={onOpenRods} />
           <StatChip icon={'🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
           <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
@@ -143,6 +146,53 @@ function BaitsDrawer({open,onClose,me,onSelect}){
   );
 }
 
+function rodBonusText(rod){
+  if(!rod) return '';
+  if(!rod.bonusWater) return t('rodNoBonus');
+  if(rod.bonusWater==='fresh' && rod.bonusPredator) return t('rodBonusFreshPredator');
+  if(rod.bonusWater==='fresh' && !rod.bonusPredator) return t('rodBonusFreshPeaceful');
+  if(rod.bonusWater==='salt' && rod.bonusPredator) return t('rodBonusSaltPredator');
+  if(rod.bonusWater==='salt' && !rod.bonusPredator) return t('rodBonusSaltPeaceful');
+  return t('rodNoBonus');
+}
+
+function RodsDrawer({open,onClose,me,onSelect}){
+  const rods = me.rods || [];
+  return (
+    <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
+      <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
+      <div
+          className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-semibold">{t('rods')}</div>
+          <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+        </div>
+        <div className="space-y-2 overflow-y-auto pr-1">
+          {rods.map(rod=>{
+            const locked = !rod.unlocked;
+            const isCurrent = me.currentRodId===rod.id;
+            const info = locked ? t('requiresKg', Number(rod.unlockKg).toFixed(0)) : rodBonusText(rod);
+            return (
+              <button key={rod.id} disabled={locked}
+                      onClick={()=>{ if(!locked){ onSelect(rod.id); onClose(); } }}
+                      className={`w-full text-left p-3 rounded-xl border ${isCurrent? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${locked?'opacity-50 cursor-not-allowed':''}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">{rod.name}</div>
+                    <div className="text-xs opacity-70">{info}</div>
+                  </div>
+                  {isCurrent && <div className="text-emerald-400 text-sm">{t('current')}</div>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NicknameModal({me,onClose,onSave}){
   const [value,setValue] = React.useState(me.username||'');
   return (
@@ -185,7 +235,7 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
       <div className="relative w-[90%] max-w-sm rounded-xl overflow-hidden">
-        <img src="/app/assets/riverking_bg_pond_1600x900.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
+        <img src="/app/assets/backgrounds/pond.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
         <div className="absolute inset-0 bg-black/50"></div>
         <div className="relative p-4">
           <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>
