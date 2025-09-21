@@ -185,7 +185,7 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
       <div className="relative w-[90%] max-w-sm rounded-xl overflow-hidden">
-        <img src="/app/assets/riverking_bg_pond_1600x900.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
+        <img src="/app/assets/backgrounds/pond.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
         <div className="absolute inset-0 bg-black/50"></div>
         <div className="relative p-4">
           <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>

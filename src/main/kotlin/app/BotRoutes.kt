@@ -186,7 +186,7 @@ private val FISH_IMAGE_PATHS = mapOf(
 
 private val LOCATION_BACKGROUNDS = run {
     val base = mapOf(
-        "Пруд" to "webapp/assets/originals/riverking_bg_pond_1600x900.png",
+        "Пруд" to "webapp/assets/backgrounds/pond.png",
         "Река" to "webapp/assets/originals/riverking_bg_river_1600x900.png",
         "Озеро" to "webapp/assets/originals/riverking_bg_lake_1600x900.png",
         "Болото" to "webapp/assets/originals/riverking_bg_swamp_1600x900.png",
