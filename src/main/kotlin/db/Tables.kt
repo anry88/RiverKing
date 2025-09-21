@@ -3,6 +3,8 @@ package db
 import app.Env
 import org.jetbrains.exposed.dao.id.LongIdTable
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.javatime.timestamp
 import java.time.Instant
@@ -12,6 +14,7 @@ object DB {
         // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
         Database.connect(url = env.dbUrl, driver = "org.sqlite.JDBC")
         transaction {
+            ensureRodCodeColumn()
             SchemaUtils.createMissingTablesAndColumns(
                 Users,
                 Locations,
@@ -32,6 +35,48 @@ object DB {
             )
             seedIfEmpty()
         }
+    }
+
+    private fun ensureRodCodeColumn() {
+        val tx = TransactionManager.current()
+        val tableName = Rods.tableName
+        val rodsExists = tx.exec(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'"
+        ) { rs -> rs.next() } ?: false
+        if (!rodsExists) return
+        val hasCode = tx.exec("PRAGMA table_info($tableName)") { rs ->
+            var found = false
+            while (rs.next()) {
+                if (rs.getString("name").equals("code", ignoreCase = true)) {
+                    found = true
+                    break
+                }
+            }
+            found
+        } ?: false
+        if (hasCode) return
+
+        // Add the column without NOT NULL constraint to avoid SQLite migration failures.
+        tx.exec("ALTER TABLE $tableName ADD COLUMN code VARCHAR(50)")
+
+        val predefined = mapOf(
+            "Искра" to "spark",
+            "Роса" to "dew",
+            "Поток" to "stream",
+            "Глубь" to "abyss",
+            "Шторм" to "storm",
+        )
+
+        predefined.forEach { (name, code) ->
+            Rods.update({ Rods.name eq name }) { it[Rods.code] = code }
+        }
+
+        Rods.slice(Rods.id).select { Rods.code.isNull() }.forEach { row ->
+            val id = row[Rods.id].value
+            Rods.update({ Rods.id eq id }) { it[Rods.code] = "rod_$id" }
+        }
+
+        tx.exec("CREATE UNIQUE INDEX IF NOT EXISTS ${tableName}_code_unique ON $tableName(code)")
     }
 
     private fun seedIfEmpty() {
@@ -122,6 +167,7 @@ object DB {
             bonusPredator: Boolean? = null,
         ): Long {
             val row = Rods.select { Rods.code eq code }.singleOrNull()
+                ?: Rods.select { Rods.name eq name }.singleOrNull()
             return if (row == null) {
                 Rods.insertAndGetId {
                     it[Rods.code] = code
@@ -135,6 +181,7 @@ object DB {
             } else {
                 val id = row[Rods.id].value
                 Rods.update({ Rods.id eq id }) {
+                    it[Rods.code] = code
                     it[Rods.name] = name
                     it[unlockKg] = unlock
                     it[Rods.bonusWater] = bonusWater
