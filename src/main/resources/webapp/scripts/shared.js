@@ -79,11 +79,11 @@
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.32227, y: 0.00488 },
+      tipAnchor: { x: 0.16276, y: 0.07422 },
     },
     abyss: {
       image: '/app/assets/rods/black_rod.png',
-      tipAnchor: { x: 0.32227, y: 0.00488 },
+      tipAnchor: { x: 0.14844, y: 0.04688 },
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
