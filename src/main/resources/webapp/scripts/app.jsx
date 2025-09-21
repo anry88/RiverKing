@@ -65,6 +65,16 @@ function App(){
   const tapReactionRef = React.useRef(0);
   const tapTimerRef = React.useRef(null);
   const tapFinishingRef = React.useRef(false);
+  const catchAnimationIdRef = React.useRef(0);
+  const lastCatchAnimationShownRef = React.useRef(null);
+  const markCatchAnimationShown = React.useCallback(id => {
+    if(id == null) return;
+    lastCatchAnimationShownRef.current = id;
+  }, []);
+  const hasCatchAnimationBeenShown = React.useCallback(id => {
+    if(id == null) return false;
+    return lastCatchAnimationShownRef.current === id;
+  }, []);
 
   React.useEffect(()=>{
     autoCastRef.current = autoCast;
@@ -457,7 +467,8 @@ function App(){
         const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
         const newTotal = (me.totalWeight||0)+c.weight;
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
-        setResult({...c,newFish:isNewFish,newLocations:newLocs});
+        const animationId = ++catchAnimationIdRef.current;
+        setResult({...c,newFish:isNewFish,newLocations:newLocs,animationId});
         setMe(p=>{
           const tot = (p.totalWeight||0)+c.weight;
           return {
@@ -763,6 +774,8 @@ function App(){
               setAutoCast={setAutoCast}
               autoCastRef={autoCastRef}
               autoCastTimeoutRef={autoCastTimeoutRef}
+              hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
+              markCatchAnimationShown={markCatchAnimationShown}
             />
           )}
 

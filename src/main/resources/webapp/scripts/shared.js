@@ -397,12 +397,21 @@
   function useResizeObserver(ref) {
     const [size, setSize] = React.useState({ w: 0, h: 0 });
     React.useEffect(() => {
-      if (!ref.current) return;
-      const ro = new ResizeObserver(([entry]) => {
-        const cr = entry.contentRect;
-        setSize({ w: cr.width, h: cr.height });
+      const node = ref.current;
+      if (!node) return;
+      const updateFromRect = rect => {
+        const w = rect?.width || 0;
+        const h = rect?.height || 0;
+        setSize(prev => (prev.w === w && prev.h === h) ? prev : { w, h });
+      };
+      updateFromRect(node.getBoundingClientRect());
+      const ro = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          const rect = entry?.contentRect;
+          if (rect) updateFromRect(rect);
+        }
       });
-      ro.observe(ref.current);
+      ro.observe(node);
       return () => ro.disconnect();
     }, [ref]);
     return size;

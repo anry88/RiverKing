@@ -31,7 +31,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   );
 }
 
-function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result}){
+function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown}){
   const stageRef = React.useRef(null);
   const {w,h} = useResizeObserver(stageRef);
 
@@ -110,7 +110,11 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     if(catchAnimFrameRef.current){ cancelAnimationFrame(catchAnimFrameRef.current); catchAnimFrameRef.current = null; }
     if(catchAnimTimeoutRef.current){ clearTimeout(catchAnimTimeoutRef.current); catchAnimTimeoutRef.current = null; }
 
-    if(!result){
+    const alreadyShown = result?.animationId != null && typeof hasCatchAnimationBeenShown === 'function'
+      ? hasCatchAnimationBeenShown(result.animationId)
+      : false;
+
+    if(!result || alreadyShown){
       catchAnimRef.current = null;
       setCatchAnim(null);
       return;
@@ -127,6 +131,9 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     };
     catchAnimRef.current = animState;
     setCatchAnim(animState);
+    if(result.animationId != null && typeof markCatchAnimationShown === 'function'){
+      markCatchAnimationShown(result.animationId);
+    }
 
     const duration = 900;
     const startedAt = performance.now();
@@ -156,7 +163,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         catchAnimRef.current = null;
       }
     };
-  }, [result, catchTargetPx]);
+  }, [result, catchTargetPx, hasCatchAnimationBeenShown, markCatchAnimationShown]);
 
   const tweenTo = (toRel, ms=600)=>{
     const from = {...floatRel};
@@ -348,7 +355,9 @@ function FishingTab({
   autoCast,
   setAutoCast,
   autoCastRef,
-  autoCastTimeoutRef
+  autoCastTimeoutRef,
+  hasCatchAnimationBeenShown,
+  markCatchAnimationShown
 }){
   return (
     <>
@@ -372,6 +381,8 @@ function FishingTab({
           autoCastRef={autoCastRef}
           autoCastTimeoutRef={autoCastTimeoutRef}
           result={result}
+          hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
+          markCatchAnimationShown={markCatchAnimationShown}
         />
       </div>
 
