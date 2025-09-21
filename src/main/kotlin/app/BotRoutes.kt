@@ -93,6 +93,7 @@ private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -440,16 +441,40 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
+            fun splitMessage(text: String, limit: Int = TELEGRAM_MESSAGE_LENGTH_LIMIT): List<String> {
+                if (text.length <= limit) return listOf(text)
+                val chunks = mutableListOf<String>()
+                var index = 0
+                while (index < text.length) {
+                    var end = (index + limit).coerceAtMost(text.length)
+                    if (end < text.length) {
+                        val newlineIndex = text.lastIndexOf('\n', end - 1)
+                        if (newlineIndex >= index) {
+                            end = newlineIndex + 1
+                        }
+                    }
+                    chunks += text.substring(index, end)
+                    index = end
+                }
+                return chunks
+            }
+
             fun trySend(
                 chatId: Long,
                 text: String,
                 replyMarkup: String? = null,
                 replyToMessageId: Long? = null,
             ) {
-                try {
-                    bot.sendMessage(chatId, text, replyMarkup, replyToMessageId)
-                } catch (e: Exception) {
-                    log.error("sendMessage failed chatId={}", chatId, e)
+                val parts = splitMessage(text)
+                val lastIndex = parts.lastIndex
+                parts.forEachIndexed { idx, part ->
+                    val markup = if (idx == lastIndex) replyMarkup else null
+                    val replyTo = if (idx == 0) replyToMessageId else null
+                    try {
+                        bot.sendMessage(chatId, part, markup, replyTo)
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={} part={}/{}", chatId, idx + 1, parts.size, e)
+                    }
                 }
             }
 
