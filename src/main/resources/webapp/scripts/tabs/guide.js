@@ -106,11 +106,23 @@ function Guide({me}){
             const myRod = (me.rods||[]).find(r=>r.code===rod.code) || {};
             const unlocked = myRod.unlocked;
             const status = unlocked ? t('unlocked') : t('requiresKg', Number(rod.unlockKg).toFixed(0));
+            const rodImage = (window.ROD_IMAGES && (window.ROD_IMAGES[rod.code] || window.ROD_IMAGES.default)) || ROD_IMG;
             return (
               <div key={rod.code} className="p-4 glass rounded-xl">
-                <div className="font-semibold">{rod.name}</div>
-                <div className="text-xs opacity-70 mt-1">{status}</div>
-                <div className="text-xs mt-2">{rodBonusText(rod)}</div>
+                <div className="flex items-start gap-3">
+                  <img
+                    src={rodImage}
+                    alt={rod.name}
+                    className="w-12 h-12 object-contain shrink-0"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div>
+                    <div className="font-semibold">{rod.name}</div>
+                    <div className="text-xs opacity-70 mt-1">{status}</div>
+                    <div className="text-xs mt-2">{rodBonusText(rod)}</div>
+                  </div>
+                </div>
               </div>
             );
           })}
