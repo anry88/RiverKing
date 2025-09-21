@@ -67,6 +67,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     return 'clamp(360px, calc(var(--vh) * 0.56), 540px)';
   }, [isSmall, isTablet]);
 
+  const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
+  const rodImage = (window.ROD_IMAGES && currentRod?.code && window.ROD_IMAGES[currentRod.code])
+    || (window.ROD_IMAGES && window.ROD_IMAGES.default)
+    || ROD_IMG;
   const rodBaseWidth = (ROD_IMG_SIZE && ROD_IMG_SIZE.width) || 1200;
   const rodBaseHeight = (ROD_IMG_SIZE && ROD_IMG_SIZE.height) || 1200;
   const rodScaleBase = Math.min((w * targetWFrac) / rodBaseWidth, (h * targetHFrac) / rodBaseHeight);
@@ -278,7 +282,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       )}
 
       <img
-        src={ROD_IMG}
+        src={rodImage}
         alt="rod"
         className="absolute select-none pointer-events-none"
         style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
@@ -441,6 +445,9 @@ function FishingTab({
             {result.newLocations && result.newLocations.map((n,i)=>(
               <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
             ))}
+            {result.newRods && result.newRods.length>0 && (
+              <div className="text-xs text-emerald-400">{(result.newRods.length>1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
+            )}
           </div>
         </div>
       )}

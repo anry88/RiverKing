@@ -63,7 +63,15 @@
     9: '/app/assets/riverking_bg_fjord_1600x900.png',
     10: '/app/assets/riverking_bg_open_ocean_1600x900.png'
   };
-  const ROD_IMG = '/app/assets/rods/simple_rod.png';
+  const ROD_IMAGES = {
+    spark: '/app/assets/rods/yellow_rod.png',
+    dew: '/app/assets/rods/green_rod.png',
+    stream: '/app/assets/rods/blue_rod.png',
+    abyss: '/app/assets/rods/black_rod.png',
+    storm: '/app/assets/rods/silver_rod.png',
+    default: '/app/assets/rods/yellow_rod.png',
+  };
+  const ROD_IMG = ROD_IMAGES.default;
   const ROD_IMG_SIZE = { width: 1536, height: 1024 };
   const ROD_TIP_ANCHOR = { x: 0.150, y: 0.049 };
   const ROD_BASE_ANCHOR = { x: 0.383, y: 0.998 };
@@ -169,6 +177,8 @@
     ru: {
       location: 'Локация',
       baits: 'Приманки',
+      rod: 'Удочка',
+      rods: 'Удочки',
       total: 'Всего',
       today: 'Сегодня',
       yesterday: 'Вчера',
@@ -181,6 +191,11 @@
       unlocked: 'Открыто',
       requiresKg: kg => `Требуется ${kg} кг`,
       current: 'Текущий',
+      rodBonusFreshPeaceful: '−50% шанс побега пресноводных мирных рыб',
+      rodBonusFreshPredator: '−50% шанс побега пресноводных хищных рыб',
+      rodBonusSaltPeaceful: '−50% шанс побега морских мирных рыб',
+      rodBonusSaltPredator: '−50% шанс побега морских хищных рыб',
+      rodNoBonus: 'Бонусов нет',
       upcoming: 'Предстоящие',
       past: 'Прошедшие',
       lures: 'Приманки',
@@ -196,6 +211,10 @@
       changeLocationFailed: 'Не удалось сменить локацию',
       castFailed: 'Не удалось забросить',
       selectBaitFailed: 'Не удалось выбрать приманку',
+      selectRodFailed: 'Не удалось выбрать удочку',
+      rodLocked: 'Удочка ещё недоступна',
+      rodCasting: 'Нельзя менять удочку во время заброса',
+      rodUnavailable: 'Эта удочка недоступна',
       loading: 'Загрузка...',
       fish: 'Рыбы',
       reachKg: kg => `Набери ${kg} кг, чтобы открыть`,
@@ -224,6 +243,8 @@
       new: 'Новая!',
       locationLabel: 'Локация:',
       newLocation: 'Открыта новая локация:',
+      newRod: 'Открыта новая удочка:',
+      newRodPlural: 'Открыты новые удочки:',
       dailyTaken: 'Ежедневные приманки уже забраны.',
       noBaits: 'Нет приманок. Забери ежедневные или купи в магазине.',
       castOften: 'Слишком часто забрасываешь. Подожди пару секунд.',
@@ -275,6 +296,8 @@
     en: {
       location: 'Location',
       baits: 'Baits',
+      rod: 'Rod',
+      rods: 'Rods',
       total: 'Total',
       today: 'Today',
       yesterday: 'Yesterday',
@@ -287,6 +310,11 @@
       unlocked: 'Unlocked',
       requiresKg: kg => `${kg} kg required`,
       current: 'Current',
+      rodBonusFreshPeaceful: '50% less escape chance for freshwater peaceful fish',
+      rodBonusFreshPredator: '50% less escape chance for freshwater predator fish',
+      rodBonusSaltPeaceful: '50% less escape chance for saltwater peaceful fish',
+      rodBonusSaltPredator: '50% less escape chance for saltwater predator fish',
+      rodNoBonus: 'No bonus',
       upcoming: 'Upcoming',
       past: 'Past',
       lures: 'Baits',
@@ -302,6 +330,10 @@
       changeLocationFailed: 'Failed to change location',
       castFailed: 'Failed to cast',
       selectBaitFailed: 'Failed to select bait',
+      selectRodFailed: 'Failed to select rod',
+      rodLocked: 'This rod is locked',
+      rodCasting: 'Cannot change rod while casting',
+      rodUnavailable: 'This rod is not available',
       loading: 'Loading...',
       fish: 'Fish',
       reachKg: kg => `Reach ${kg} kg to unlock`,
@@ -330,6 +362,8 @@
       new: 'New!',
       locationLabel: 'Location:',
       newLocation: 'New location unlocked:',
+      newRod: 'New rod unlocked:',
+      newRodPlural: 'New rods unlocked:',
       dailyTaken: 'Daily baits already claimed.',
       noBaits: 'No baits. Claim daily ones or buy in the shop.',
       castOften: 'Casting too often. Wait a few seconds.',
@@ -422,6 +456,7 @@
   window.rarityNames = rarityNames;
   window.lureColor = lureColor;
   window.LOCATION_BG = LOCATION_BG;
+  window.ROD_IMAGES = ROD_IMAGES;
   window.ROD_IMG = ROD_IMG;
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;
   window.ROD_TIP_ANCHOR = ROD_TIP_ANCHOR;

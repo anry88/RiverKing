@@ -33,6 +33,7 @@ function App(){
   const [error,setError] = React.useState(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [baitsOpen, setBaitsOpen] = React.useState(false);
+  const [rodsOpen, setRodsOpen] = React.useState(false);
   const [tab, setTab] = React.useState('fish');
   const [shop,setShop] = React.useState([]);
   const starterPackName = React.useMemo(() => (
@@ -144,8 +145,10 @@ function App(){
   React.useEffect(()=>{
     try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
     try{
+      const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : [ROD_IMG];
       Object.values(LOCATION_BG)
-        .concat([ROD_IMG, '/app/assets/riverking_bobber.svg'])
+        .concat(rodImages)
+        .concat(['/app/assets/riverking_bobber.svg'])
         .forEach(src=>{ new Image().src = src; });
     }catch(e){}
     (async()=>{
@@ -467,8 +470,9 @@ function App(){
         const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
         const newTotal = (me.totalWeight||0)+c.weight;
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
+        const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const animationId = ++catchAnimationIdRef.current;
-        setResult({...c,newFish:isNewFish,newLocations:newLocs,animationId});
+        setResult({...c,newFish:isNewFish,newLocations:newLocs,newRods,animationId});
         setMe(p=>{
           const tot = (p.totalWeight||0)+c.weight;
           return {
@@ -476,6 +480,7 @@ function App(){
             totalWeight:tot,
             todayWeight:(p.todayWeight||0)+c.weight,
             locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+            rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
             recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
             caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
           };
@@ -748,6 +753,7 @@ function App(){
           onEditNickname={()=>setNickOpen(true)}
           onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
           onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
+          onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
           onToggleLanguage={toggleLanguage}
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
@@ -830,6 +836,25 @@ function App(){
             setError(e.message==='unauthorized'
               ? t('authRequired')
               : t('selectBaitFailed'));
+          }
+        }} />
+        <RodsDrawer open={rodsOpen} onClose={()=>setRodsOpen(false)} me={me} onSelect={async id=>{
+          try{
+            const r = await fetch(`/api/rod/`+id,{method:'POST',credentials:'include'});
+            if(!r.ok){
+              if(r.status===401) throw new Error('unauthorized');
+              const err = await r.json().catch(()=>({}));
+              throw new Error(err.error||'failed');
+            }
+            setMe(p=>({...p,currentRodId:id}));
+          }catch(e){
+            const reason = e.message;
+            setError(reason==='unauthorized'
+              ? t('authRequired')
+              : reason==='casting' ? t('rodCasting')
+              : reason==='locked' ? t('rodLocked')
+              : reason==='no rod' ? t('rodUnavailable')
+              : t('selectRodFailed'));
           }
         }} />
       </div>

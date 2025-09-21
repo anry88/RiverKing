@@ -114,6 +114,36 @@ object DB {
             }
         }
 
+        fun upsertRod(
+            code: String,
+            name: String,
+            unlock: Double,
+            bonusWater: String? = null,
+            bonusPredator: Boolean? = null,
+        ): Long {
+            val row = Rods.select { Rods.code eq code }.singleOrNull()
+            return if (row == null) {
+                Rods.insertAndGetId {
+                    it[Rods.code] = code
+                    it[Rods.name] = name
+                    it[priceStars] = null
+                    it[modsJson] = "{}"
+                    it[unlockKg] = unlock
+                    it[Rods.bonusWater] = bonusWater
+                    it[Rods.bonusPredator] = bonusPredator
+                }.value
+            } else {
+                val id = row[Rods.id].value
+                Rods.update({ Rods.id eq id }) {
+                    it[Rods.name] = name
+                    it[unlockKg] = unlock
+                    it[Rods.bonusWater] = bonusWater
+                    it[Rods.bonusPredator] = bonusPredator
+                }
+                id
+            }
+        }
+
         // --- Locations ---
         val pond = upsertLocation("Пруд", 0.0, 1.0)
         val river = upsertLocation("Река", 10.0, 1.5)
@@ -208,6 +238,13 @@ object DB {
         // Эпики для Горной реки
         val fArc = upsertFish("Голец арктический", "epic", 2.8, 1.2, true, "fresh")
         val fKum = upsertFish("Форель кумжа", "epic", 4.0, 1.5, true, "fresh")
+
+        // --- Rods ---
+        upsertRod("spark", "Искра", 0.0, null, null)
+        upsertRod("dew", "Роса", 15.0, "fresh", false)
+        upsertRod("stream", "Поток", 150.0, "fresh", true)
+        upsertRod("abyss", "Глубь", 450.0, "salt", false)
+        upsertRod("storm", "Шторм", 1000.0, "salt", true)
 
         // --- Weights per location ---
 
@@ -365,6 +402,7 @@ object Users : LongIdTable() {
     val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
+    val currentRodId = reference("current_rod_id", Rods).nullable()
     val castLureId = reference("cast_lure_id", Lures).nullable()
     val isCasting = bool("is_casting").default(false)
     val lastCastAt = timestamp("last_cast_at").nullable()
@@ -397,9 +435,13 @@ object Lures : LongIdTable() {
 }
 
 object Rods : LongIdTable() {
+    val code = varchar("code", 50).uniqueIndex()
     val name = varchar("name", 100)
     val priceStars = integer("price_stars").nullable()
     val modsJson = text("mods_json")
+    val unlockKg = double("unlock_kg").default(0.0)
+    val bonusWater = varchar("bonus_water", 20).nullable()
+    val bonusPredator = bool("bonus_predator").nullable()
 }
 
 object InventoryLures : Table() {
