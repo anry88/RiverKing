@@ -6,10 +6,22 @@ function ShopTab({
   copyRefLink,
   generateRefLink,
   starterPackName,
-  buyPack
+  buyPack,
+  dailyAvailable,
+  onOpenDaily
 }){
   return (
     <div className="mt-6">
+      {dailyAvailable && (
+        <button
+          type="button"
+          onClick={onOpenDaily}
+          className="w-full px-3 py-2 mb-3 rounded-xl glass flex items-center justify-center gap-2 text-sm"
+        >
+          <span>🎁</span>
+          <span>{t('gift')}</span>
+        </button>
+      )}
       <div className="mb-4">
         <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
         {refOpen && (
