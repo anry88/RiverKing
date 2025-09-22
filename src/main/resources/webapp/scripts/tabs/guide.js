@@ -47,8 +47,12 @@ function Guide({me}){
                       ))}
                     </div>
                     <div className="text-sm opacity-80 text-left">{t('baitsLabel')}</div>
-                    <div className="flex flex-wrap gap-1 text-sm opacity-80 text-left">
-                      {loc.lures.map(l=> <span key={l} className={lureColor(l)}>{l}</span>)}
+                    <div className="text-sm opacity-80 text-left">
+                      {loc.lures.map((l,i)=>(
+                        <span key={l} className={lureColor(l)}>
+                          {l}{i<loc.lures.length-1?', ':''}
+                        </span>
+                      ))}
                     </div>
                   </>
                 ) : (
@@ -96,8 +100,12 @@ function Guide({me}){
             <div key={l.name} className="p-4 glass rounded-xl">
               <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
               <div className="text-xs mt-1">{t('fishes')}</div>
-              <div className="flex flex-wrap gap-1 text-xs mb-1">
-                {l.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
+              <div className="text-xs mb-1">
+                {l.fish.map((f,i)=>(
+                  <span key={f.name} className={rarityColors[f.rarity]||''}>
+                    {f.name}{i<l.fish.length-1?', ':''}
+                  </span>
+                ))}
               </div>
               <div className="text-xs">{t('locationsLabel')} {l.locations.join(', ')}</div>
             </div>
