@@ -39,6 +39,7 @@ data class RecentDTO(val fish: String, val weight: Double, val location: String,
 class FishingService {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
+        private const val BEGINNER_CATCH_THRESHOLD = 5
     }
     data class DailyReward(val name: String, val qty: Int)
 
@@ -253,6 +254,17 @@ class FishingService {
     private fun catchUser(row: ResultRow): String? =
         nameFromRow(row)
 
+    private fun totalCatchCount(userId: Long): Long {
+        val countExpr = Catches.id.count()
+        return Catches
+            .slice(countExpr)
+            .select { Catches.userId eq userId }
+            .singleOrNull()?.get(countExpr) ?: 0L
+    }
+
+    private fun isBeginnerUser(userId: Long): Boolean =
+        totalCatchCount(userId) < BEGINNER_CATCH_THRESHOLD
+
     private fun totalKg(userId: Long) =
         Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
@@ -266,9 +278,7 @@ class FishingService {
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
     }
 
-    fun totalCaughtCount(userId: Long): Long = transaction {
-        Catches.select { Catches.userId eq userId }.count()
-    }
+    fun totalCaughtCount(userId: Long): Long = transaction { totalCatchCount(userId) }
 
     fun todayCaughtCount(userId: Long): Long = transaction {
         val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -1159,12 +1169,14 @@ class FishingService {
             return HookResultDTO(false, auto)
         }
 
-        if (!auto && reactionTime >= 5.0) return@transaction escape()
+        val isBeginner = isBeginnerUser(userId)
 
-        val catchChance = if (auto) 1.0 else {
+        if (!auto && !isBeginner && reactionTime >= 5.0) return@transaction escape()
+
+        val catchChance = if (auto || isBeginner) 1.0 else {
             (1.0 - escapeChance) * (1.0 - reactionTime / 5.0).coerceIn(0.0, 1.0)
         }
-        if (!auto && rnd.nextDouble() > catchChance) return@transaction escape()
+        if (!auto && !isBeginner && rnd.nextDouble() > catchChance) return@transaction escape()
 
         val fishId = picked[Fish.id].value
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
@@ -1208,7 +1220,8 @@ class FishingService {
         }
 
         if (pending == null) return@transaction finish(false)
-        if (!autoCatch && !success) return@transaction finish(false)
+        val isBeginner = isBeginnerUser(userId)
+        if (!autoCatch && !success && !isBeginner) return@transaction finish(false)
 
         val fishId = pending[PendingCatches.fishId].value
         val weight = pending[PendingCatches.weight]
