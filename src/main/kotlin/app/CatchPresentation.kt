@@ -114,6 +114,14 @@ val RARITY_LABELS = mapOf(
     ),
 )
 
+private val RARITY_COLORS = mapOf(
+    "common" to Color.WHITE,
+    "uncommon" to Color(0x34, 0xD3, 0x99),
+    "rare" to Color(0x60, 0xA5, 0xFA),
+    "epic" to Color(0xC0, 0x84, 0xFC),
+    "legendary" to Color(0xFA, 0xCC, 0x15),
+)
+
 fun buildCatchCaption(
     lang: String,
     fishName: String,
@@ -160,6 +168,7 @@ fun generateCatchImage(
     locationName: String,
     displayFishName: String,
     weightKg: Double,
+    rarity: String?,
     lang: String,
 ): ByteArray? {
     val path = FISH_IMAGE_PATHS[fishInternalName] ?: return null
@@ -214,7 +223,8 @@ fun generateCatchImage(
 
         val nameFont = fitFont(g2d, displayFishName, Font("SansSerif", Font.BOLD, (size * 0.09).roundToInt()), maxTextWidth)
         g2d.font = nameFont
-        g2d.color = Color.WHITE
+        val rarityColor = RARITY_COLORS[rarity?.lowercase(Locale.US)] ?: Color.WHITE
+        g2d.color = rarityColor
         val nameMetrics = g2d.fontMetrics
         val nameX = padding
         val nameY = overlayY + nameMetrics.ascent + (padding / 3)

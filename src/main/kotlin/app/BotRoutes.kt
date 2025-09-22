@@ -1209,6 +1209,7 @@ Available commands:
                                     catch.location,
                                     fishName,
                                     catch.weight,
+                                    catch.rarity,
                                     lang,
                                 )
                                 if (image != null) {
