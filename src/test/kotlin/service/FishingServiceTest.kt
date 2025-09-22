@@ -33,7 +33,7 @@ class FishingServiceTest {
         transaction {
             val ids = Locations.selectAll().orderBy(Locations.unlockKg).map { it[Locations.id].value }
             ids.forEachIndexed { idx, id ->
-                val expected = (0.05 * (idx + 1)).coerceAtMost(0.5)
+                val expected = (0.05 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }
         }
