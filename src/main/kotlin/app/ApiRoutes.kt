@@ -883,6 +883,7 @@ fun Application.apiRoutes(env: Env) {
                 catch.location,
                 fishName,
                 catch.weight,
+                catch.rarity,
                 language,
             )
             try {
