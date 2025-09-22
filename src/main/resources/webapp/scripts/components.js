@@ -264,10 +264,10 @@ function CatchDetailsModal({catchData, me, onClose}){
           ) : (
             <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
           )}
-          {catchData.location && <div className="text-sm opacity-70 mt-3">{t('locationLabel')} {catchData.location}</div>}
-          <div className="text-2xl font-semibold mt-2">{weight} {t('kg')}</div>
-          {dateLabel && <div className="text-xs opacity-60 mt-1">{dateLabel}</div>}
-          {catchData.user && <div className="text-xs opacity-70 mt-1"><bdi>{catchData.user}</bdi></div>}
+          {catchData.location && <div className={`text-sm opacity-70 mt-3 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
+          <div className={`text-2xl font-semibold mt-2 ${rarityClass}`}>{weight} {t('kg')}</div>
+          {dateLabel && <div className={`text-xs opacity-60 mt-1 ${rarityClass}`}>{dateLabel}</div>}
+          {catchData.user && <div className={`text-xs opacity-70 mt-1 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
           {canSend && (
             <button
               type="button"
