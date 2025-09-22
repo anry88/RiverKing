@@ -1187,27 +1187,31 @@ Available commands:
                             val waitSeconds = 5 + Random.nextInt(26)
                             delay(waitSeconds * 1000L)
                             try {
-                                val (locId, baseEscape) = fishing.locationEscapeChance(uid)
-                                val reactionTime = ((1.5 / (1.0 - baseEscape))).coerceAtMost(5.0)
-                                val hookRes = fishing.hook(uid, waitSeconds, reactionTime)
+                                val escapeInfo = fishing.locationEscapeChance(uid)
+                                val extraEscapeChance = if (escapeInfo.rodBonusMultiplier < 1.0) 0.15 else 0.30
+                                val hookRes = fishing.hook(uid, waitSeconds, 0.0, extraEscapeChance)
                                 if (!hookRes.success) {
                                     val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
                                     trySend(chatId, escapedText, replyToMessageId = replyTo)
                                     logCommandMetric(
                                         "cast",
-                                        mapOf("result" to "escaped", "location" to locId.toString()),
+                                        mapOf("result" to "escaped", "location" to escapeInfo.locationId.toString()),
                                         source,
                                     )
                                     return@launch
                                 }
-                                val castRes = fishing.cast(uid, waitSeconds, reactionTime, true)
+                                val castRes = fishing.cast(uid, waitSeconds, 0.0, true)
                                 val catch = castRes.catch
                                 if (catch == null) {
                                     val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
                                     trySend(chatId, escapedText, replyToMessageId = replyTo)
                                     logCommandMetric(
                                         "cast",
-                                        mapOf("result" to "escaped", "location" to locId.toString(), "stage" to "final"),
+                                        mapOf(
+                                            "result" to "escaped",
+                                            "location" to escapeInfo.locationId.toString(),
+                                            "stage" to "final",
+                                        ),
                                         source,
                                     )
                                     return@launch
@@ -1279,7 +1283,7 @@ Available commands:
                                     mapOf(
                                         "result" to "caught",
                                         "rarity" to catch.rarity,
-                                        "location" to locId.toString(),
+                                        "location" to escapeInfo.locationId.toString(),
                                         "fish" to catch.fish,
                                     ),
                                     source,
