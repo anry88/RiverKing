@@ -229,7 +229,10 @@ function CatchDetailsModal({catchData, me, onClose}){
   if(!catchData) return null;
   const weight = Number(catchData.weight||0).toFixed(2);
   const dateLabel = catchData.at ? new Date(catchData.at).toLocaleString() : null;
-  const fishImg = catchData.fish && FISH_IMG[catchData.fish];
+  const fishId = catchData.fishId != null ? Number(catchData.fishId) : null;
+  const unlockedFishIds = Array.isArray(me?.caughtFishIds) ? me.caughtFishIds : [];
+  const fishUnlocked = fishId == null || unlockedFishIds.some(id => Number(id) === fishId);
+  const fishImg = fishUnlocked && catchData.fish ? FISH_IMG[catchData.fish] : null;
   const rarityClass = catchData.rarity && rarityColors[catchData.rarity] ? rarityColors[catchData.rarity] : '';
   const isOwnCatch = catchData.userId != null && me?.id != null && Number(catchData.userId) === Number(me.id);
   const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
@@ -289,10 +292,17 @@ function CatchDetailsModal({catchData, me, onClose}){
               <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
-            {fishImg ? (
-              <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
+            {fishUnlocked ? (
+              fishImg ? (
+                <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
+              ) : (
+                <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
+              )
             ) : (
-              <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
+              <div className="w-32 h-32 bg-gray-800/70 rounded-xl flex items-center justify-center mx-auto relative">
+                <span className="text-5xl opacity-20">🐟</span>
+                <span className="absolute text-3xl">?</span>
+              </div>
             )}
             {catchData.location && <div className={`text-sm opacity-70 mt-3 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
             <div className={`text-2xl font-semibold mt-2 ${rarityClass}`}>{weight} {t('kg')}</div>
