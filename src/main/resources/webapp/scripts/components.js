@@ -233,6 +233,24 @@ function CatchDetailsModal({catchData, me, onClose}){
   const rarityClass = catchData.rarity && rarityColors[catchData.rarity] ? rarityColors[catchData.rarity] : '';
   const isOwnCatch = catchData.userId != null && me?.id != null && Number(catchData.userId) === Number(me.id);
   const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
+  const locationBg = React.useMemo(()=>{
+    if(catchData.locationBg) return catchData.locationBg;
+    const byId = catchData.locationId && window.LOCATION_BG ? window.LOCATION_BG[catchData.locationId] : null;
+    if(byId) return byId;
+    const locName = (catchData.location || '').trim();
+    if(!locName) return null;
+    const normalized = locName.toLowerCase();
+    if(window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]){
+      return window.LOCATION_BG_BY_NAME[normalized];
+    }
+    if(Array.isArray(me?.locations)){
+      const match = me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized);
+      if(match && window.LOCATION_BG && window.LOCATION_BG[match.id]){
+        return window.LOCATION_BG[match.id];
+      }
+    }
+    return null;
+  }, [catchData.locationBg, catchData.locationId, catchData.location, me?.locations]);
 
   async function handleSend(){
     if(!canSend || sending) return;
@@ -254,32 +272,45 @@ function CatchDetailsModal({catchData, me, onClose}){
     <div className="fixed inset-0 z-50">
       <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
       <div className="relative mx-4 mt-safe flex items-center justify-center min-h-full pointer-events-none">
-        <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto">
-          <div className="flex items-start justify-between mb-3">
-            <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
-            <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+        <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto relative overflow-hidden">
+          {locationBg && (
+            <>
+              <img
+                src={locationBg}
+                alt={catchData.location || ''}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={e=>{ e.currentTarget.style.display='none'; }}
+              />
+              <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
+            </>
+          )}
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+            </div>
+            {fishImg ? (
+              <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
+            ) : (
+              <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
+            )}
+            {catchData.location && <div className={`text-sm opacity-70 mt-3 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
+            <div className={`text-2xl font-semibold mt-2 ${rarityClass}`}>{weight} {t('kg')}</div>
+            {dateLabel && <div className={`text-xs opacity-60 mt-1 ${rarityClass}`}>{dateLabel}</div>}
+            {catchData.user && <div className={`text-xs opacity-70 mt-1 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
+            {canSend && (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending}
+                className={`w-full mt-4 px-4 py-3 rounded-xl font-semibold ${sending?'bg-emerald-500/60':'bg-emerald-600 hover:bg-emerald-500'}`}
+              >
+                {sending ? t('sendingCatch') : t('sendToMe')}
+              </button>
+            )}
+            {status && <div className="text-xs text-emerald-300 mt-2">{status}</div>}
+            {error && <div className="text-xs text-red-300 mt-2">{error}</div>}
           </div>
-          {fishImg ? (
-            <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
-          ) : (
-            <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
-          )}
-          {catchData.location && <div className={`text-sm opacity-70 mt-3 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
-          <div className={`text-2xl font-semibold mt-2 ${rarityClass}`}>{weight} {t('kg')}</div>
-          {dateLabel && <div className={`text-xs opacity-60 mt-1 ${rarityClass}`}>{dateLabel}</div>}
-          {catchData.user && <div className={`text-xs opacity-70 mt-1 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
-          {canSend && (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={sending}
-              className={`w-full mt-4 px-4 py-3 rounded-xl font-semibold ${sending?'bg-emerald-500/60':'bg-emerald-600 hover:bg-emerald-500'}`}
-            >
-              {sending ? t('sendingCatch') : t('sendToMe')}
-            </button>
-          )}
-          {status && <div className="text-xs text-emerald-300 mt-2">{status}</div>}
-          {error && <div className="text-xs text-red-300 mt-2">{error}</div>}
         </div>
       </div>
     </div>

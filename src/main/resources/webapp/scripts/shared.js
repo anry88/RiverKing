@@ -142,6 +142,45 @@
     13: '/app/assets/backgrounds/mangroves.png',
     14: '/app/assets/backgrounds/coral_flats.png',
   };
+
+  const normalizeLocationName = value => {
+    if (!value && value !== 0) return '';
+    return String(value).trim().toLowerCase();
+  };
+
+  const LOCATION_NAMES = {
+    1: ['Пруд', 'Pond'],
+    2: ['Река', 'River'],
+    3: ['Озеро', 'Lake'],
+    4: ['Болото', 'Swamp'],
+    5: ['Горная река', 'Mountain River'],
+    6: ['Водохранилище', 'Reservoir'],
+    7: ['Дельта реки', 'River Delta'],
+    8: ['Прибрежье моря', 'Sea Coast'],
+    9: ['Фьорд', 'Fjord'],
+    10: ['Открытый океан', 'Open Ocean'],
+    11: ['Амазонское русло', 'Amazon Riverbed'],
+    12: ['Затопленный лес', 'Flooded Forest'],
+    13: ['Мангровые заросли', 'Mangroves'],
+    14: ['Коралловые отмели', 'Coral Flats'],
+  };
+
+  const LOCATION_BG_BY_NAME = {};
+  Object.entries(LOCATION_NAMES).forEach(([id, names]) => {
+    const bg = LOCATION_BG[id];
+    if (!bg) return;
+    names.forEach(name => {
+      if (!name) return;
+      LOCATION_BG_BY_NAME[normalizeLocationName(name)] = bg;
+    });
+  });
+  Object.values(LOCATION_BG).forEach(url => {
+    const slug = url.split('/').pop()?.replace('.png', '') || '';
+    const normalizedSlug = normalizeLocationName(slug.replace(/_/g, ' '));
+    if (normalizedSlug && !LOCATION_BG_BY_NAME[normalizedSlug]) {
+      LOCATION_BG_BY_NAME[normalizedSlug] = url;
+    }
+  });
   const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
   const ROD_CONFIG = {
     spark: {
@@ -562,6 +601,7 @@
   window.rarityNames = rarityNames;
   window.lureColor = lureColor;
   window.LOCATION_BG = LOCATION_BG;
+  window.LOCATION_BG_BY_NAME = LOCATION_BG_BY_NAME;
   window.ROD_IMAGES = ROD_IMAGES;
   window.ROD_IMG = ROD_IMG;
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;
