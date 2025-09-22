@@ -762,28 +762,27 @@ function App(){
 
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (
-            <FishingTab
-              me={me}
-              setMe={setMe}
-              casting={casting}
-              biting={biting}
-              tapActive={tapActive}
-              tapCount={tapCount}
-              tapTimeLeft={tapTimeLeft}
-              castReady={castReady}
-              onCast={()=>cast(false)}
-              onHook={()=>hook(false)}
-              onTap={handleTap}
-              result={result}
-              error={error}
-              onClaimDaily={openDaily}
-              autoCast={autoCast}
-              setAutoCast={setAutoCast}
-              autoCastRef={autoCastRef}
-              autoCastTimeoutRef={autoCastTimeoutRef}
-              hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
-              markCatchAnimationShown={markCatchAnimationShown}
-            />
+          <FishingTab
+            me={me}
+            setMe={setMe}
+            casting={casting}
+            biting={biting}
+            tapActive={tapActive}
+            tapCount={tapCount}
+            tapTimeLeft={tapTimeLeft}
+            castReady={castReady}
+            onCast={()=>cast(false)}
+            onHook={()=>hook(false)}
+            onTap={handleTap}
+            result={result}
+            error={error}
+            autoCast={autoCast}
+            setAutoCast={setAutoCast}
+            autoCastRef={autoCastRef}
+            autoCastTimeoutRef={autoCastTimeoutRef}
+            hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
+            markCatchAnimationShown={markCatchAnimationShown}
+          />
           )}
 
           {tab === 'tournaments' && (
@@ -815,6 +814,8 @@ function App(){
               generateRefLink={generateRefLink}
               starterPackName={starterPackName}
               buyPack={buyPack}
+              dailyAvailable={me.dailyAvailable}
+              onOpenDaily={openDaily}
             />
           )}
           {tab === 'guide' && (
@@ -822,7 +823,7 @@ function App(){
           )}
         </div>
 
-        <BottomNav tab={tab} setTab={setTab} />
+        <BottomNav tab={tab} setTab={setTab} dailyAvailable={me.dailyAvailable} />
 
         <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
         <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{

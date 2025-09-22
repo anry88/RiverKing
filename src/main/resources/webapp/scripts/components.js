@@ -54,7 +54,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
   );
 }
 
-function BottomNav({tab,setTab}){
+function BottomNav({tab,setTab,dailyAvailable}){
   const items = [
     {id:'fish', label:t('fishing'), icon:'/app/assets/menu/fishing.png'},
     {id:'tournaments', label:t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
@@ -74,7 +74,14 @@ function BottomNav({tab,setTab}){
             className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
             aria-current={tab===item.id ? 'page' : undefined}
           >
-            <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+            <div className="relative">
+              <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+              {dailyAvailable && item.id==='shop' && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-black text-[10px] font-bold flex items-center justify-center">
+                  !
+                </span>
+              )}
+            </div>
             <span className="leading-tight text-center">{item.label}</span>
           </button>
         ))}

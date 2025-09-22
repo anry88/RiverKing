@@ -31,7 +31,7 @@ function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   );
 }
 
-function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, onClaimDaily, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown}){
+function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown}){
   const stageRef = React.useRef(null);
   const {w,h} = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -275,16 +275,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
-      {me.dailyAvailable && (
-        <button
-          onClick={onClaimDaily}
-          className="absolute top-3 right-3 z-10 px-3 py-1 rounded-lg glass flex items-center gap-1 text-sm transform origin-top-right scale-[1.33]"
-        >
-          <span>🎁</span>
-          <span>{t('gift')}</span>
-        </button>
-      )}
-
       <img
         src={rodImage}
         alt="rod"
@@ -382,7 +372,6 @@ function FishingTab({
   onTap,
   result,
   error,
-  onClaimDaily,
   autoCast,
   setAutoCast,
   autoCastRef,
@@ -406,7 +395,6 @@ function FishingTab({
           onCast={onCast}
           onHook={onHook}
           onTap={onTap}
-          onClaimDaily={onClaimDaily}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
           autoCastRef={autoCastRef}

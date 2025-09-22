@@ -39,8 +39,12 @@ function Guide({me}){
                   <>
                     <img src={LOCATION_BG[loc.id]} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
                     <div className="text-sm opacity-80 text-left">{t('fishes')}</div>
-                    <div className="flex flex-wrap gap-1 text-sm mb-2 text-left">
-                      {loc.fish.map(f=> <span key={f.name} className={rarityColors[f.rarity]||''}>{f.name}</span>)}
+                    <div className="text-sm mb-2 text-left">
+                      {loc.fish.map((f,i)=>(
+                        <span key={f.name} className={rarityColors[f.rarity]||''}>
+                          {f.name}{i<loc.fish.length-1?', ':''}
+                        </span>
+                      ))}
                     </div>
                     <div className="text-sm opacity-80 text-left">{t('baitsLabel')}</div>
                     <div className="flex flex-wrap gap-1 text-sm opacity-80 text-left">
