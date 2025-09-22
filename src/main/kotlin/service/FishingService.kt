@@ -39,7 +39,7 @@ data class RecentDTO(val fish: String, val weight: Double, val location: String,
 class FishingService {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
-        private const val BEGINNER_CATCH_THRESHOLD = 5
+        private const val BEGINNER_CATCH_THRESHOLD = 6
     }
     data class DailyReward(val name: String, val qty: Int)
 
