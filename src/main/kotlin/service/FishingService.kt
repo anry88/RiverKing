@@ -511,7 +511,16 @@ class FishingService {
     }
 
     @Serializable
-    data class LureDTO(val id: Long, val name: String, val qty: Int, val predator: Boolean, val water: String, val rarityBonus: Double)
+    data class LureDTO(
+        val id: Long,
+        val name: String,
+        val qty: Int,
+        val predator: Boolean,
+        val water: String,
+        val rarityBonus: Double,
+        val displayName: String = name,
+        val description: String = "",
+    )
 
     fun listLures(userId: Long): List<LureDTO> = transaction {
         ensureCurrentLure(userId)

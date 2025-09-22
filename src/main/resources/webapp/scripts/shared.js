@@ -51,7 +51,81 @@
     ru: { common: 'Простая', uncommon: 'Необычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' },
     en: { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
   };
-  const lureColor = name => name.includes('+') ? rarityColors.legendary : '';
+  const LURE_INFO = {
+    'Пресная мирная': {
+      plus: false,
+      ruName: 'Зерновая крошка',
+      enName: 'Grain Crumble',
+      ruDescription: 'Для мирной пресноводной рыбы.',
+      enDescription: 'For peaceful freshwater fish.'
+    },
+    'Пресная хищная': {
+      plus: false,
+      ruName: 'Ручейный малек',
+      enName: 'Brook Minnow',
+      ruDescription: 'Для хищной пресноводной рыбы.',
+      enDescription: 'For predatory freshwater fish.'
+    },
+    'Морская мирная': {
+      plus: false,
+      ruName: 'Морская водоросль',
+      enName: 'Seaweed Strand',
+      ruDescription: 'Для мирной морской рыбы.',
+      enDescription: 'For peaceful saltwater fish.'
+    },
+    'Морская хищная': {
+      plus: false,
+      ruName: 'Кольца кальмара',
+      enName: 'Squid Rings',
+      ruDescription: 'Для хищной морской рыбы.',
+      enDescription: 'For predatory saltwater fish.'
+    },
+    'Пресная мирная+': {
+      plus: true,
+      ruName: 'Луговой червь',
+      enName: 'Meadow Worm',
+      ruDescription: 'Для редкой мирной пресноводной рыбы.',
+      enDescription: 'For rare peaceful freshwater fish.'
+    },
+    'Пресная хищная+': {
+      plus: true,
+      ruName: 'Серебряный живец',
+      enName: 'Silver Shiner',
+      ruDescription: 'Для редкой хищной пресноводной рыбы.',
+      enDescription: 'For rare predatory freshwater fish.'
+    },
+    'Морская мирная+': {
+      plus: true,
+      ruName: 'Неоновый планктон',
+      enName: 'Neon Plankton',
+      ruDescription: 'Для редкой мирной морской рыбы.',
+      enDescription: 'For rare peaceful saltwater fish.'
+    },
+    'Морская хищная+': {
+      plus: true,
+      ruName: 'Королевская креветка',
+      enName: 'Royal Shrimp',
+      ruDescription: 'Для редкой хищной морской рыбы.',
+      enDescription: 'For rare predatory saltwater fish.'
+    },
+  };
+  const LURE_INFO_BY_DISPLAY = {};
+  Object.values(LURE_INFO).forEach(info => {
+    LURE_INFO_BY_DISPLAY[info.ruName] = info;
+    LURE_INFO_BY_DISPLAY[info.enName] = info;
+  });
+  const getLureInfo = value => {
+    if (!value) return null;
+    if (typeof value === 'string') return LURE_INFO[value] || LURE_INFO_BY_DISPLAY[value] || null;
+    return LURE_INFO[value.name] || LURE_INFO[value.displayName] || null;
+  };
+  const lureColor = lure => {
+    const info = getLureInfo(lure);
+    if (info) return info.plus ? rarityColors.legendary : '';
+    if (typeof lure === 'object' && lure?.rarityBonus > 0) return rarityColors.legendary;
+    const str = typeof lure === 'string' ? lure : (lure?.name || lure?.displayName || '');
+    return str.includes('+') ? rarityColors.legendary : '';
+  };
   const LOCATION_BG = {
     1: '/app/assets/backgrounds/pond.png',
     2: '/app/assets/backgrounds/river.png',
@@ -111,20 +185,16 @@
   const FISH_TRANSLATIONS = {
     'Плотва': 'Roach','Окунь': 'Perch','Карась': 'Crucian Carp','Лещ': 'Bream','Щука': 'Pike','Карп': 'Carp','Сом': 'Catfish','Осётр': 'Sturgeon','Уклейка': 'Bleak','Линь': 'Tench','Ротан': 'Rotan','Судак': 'Zander','Чехонь': 'Sabrefish','Хариус': 'Grayling','Форель ручьевая': 'Brook Trout','Таймень': 'Taimen','Налим': 'Burbot','Сиг': 'Whitefish','Голавль': 'Chub','Жерех': 'Asp','Толстолобик': 'Bighead Carp','Белый амур': 'Grass Carp','Угорь европейский': 'European Eel','Стерлядь': 'Sterlet','Кефаль': 'Mullet','Камбала': 'Flounder','Сельдь': 'Herring','Ставрида': 'Horse Mackerel','Треска': 'Cod','Сайда': 'Pollock','Морская форель': 'Sea Trout','Палтус': 'Halibut','Корюшка': 'Smelt','Лосось атлантический': 'Atlantic Salmon','Лаврак': 'Sea Bass','Скумбрия атлантическая': 'Atlantic Mackerel','Белуга': 'Beluga','Ёрш': 'Ruffe','Пескарь': 'Gudgeon','Густера': 'Blue Bream','Краснопёрка': 'Rudd','Елец': 'Dace','Верхоплавка': 'Topmouth Gudgeon','Гольян': 'Minnow','Язь': 'Ide','Бычок': 'Goby','Килька': 'Sprat','Мойва': 'Capelin','Сардина': 'Sardine','Анчоус': 'Anchovy','Дорадо': 'Dorado','Ваху': 'Wahoo','Парусник': 'Sailfish','Рыба-меч': 'Swordfish','Марлин синий': 'Blue Marlin','Тунец синеперый': 'Bluefin Tuna','Акула мако': 'Mako Shark','Альбакор': 'Albacore','Голец арктический': 'Arctic Char','Форель кумжа': 'Brown Trout','Пикша': 'Haddock','Тюрбо': 'Turbot','Сайра': 'Pacific Saury','Летучая рыба': 'Flying Fish','Рыба-луна': 'Ocean Sunfish','Сельдяной король': 'Oarfish'
   };
-  const LURE_TRANSLATIONS = {
-    'Пресная мирная': 'Freshwater Peaceful',
-    'Пресная хищная': 'Freshwater Predator',
-    'Морская мирная': 'Saltwater Peaceful',
-    'Морская хищная': 'Saltwater Predator',
-    'Пресная мирная+': 'Freshwater Peaceful+',
-    'Пресная хищная+': 'Freshwater Predator+',
-    'Морская мирная+': 'Saltwater Peaceful+',
-    'Морская хищная+': 'Saltwater Predator+',
-  };
   const FISH_IMG = {};
-  const translateLure = n => {
-    if (document.documentElement.lang === 'en') return LURE_TRANSLATIONS[n] || n;
-    return n;
+  const translateLure = (n, lang = document.documentElement.lang) => {
+    const info = getLureInfo(n);
+    if (!info) return n;
+    return lang === 'en' ? info.enName : info.ruName;
+  };
+  const lureDescriptionText = (n, lang = document.documentElement.lang) => {
+    const info = getLureInfo(n);
+    if (!info) return '';
+    return lang === 'en' ? info.enDescription : info.ruDescription;
   };
   Object.entries({
     'Плотва': '/app/assets/fish/plotva.png',
@@ -495,6 +565,7 @@
   window.CAST_READY_DELAY_MS = CAST_READY_DELAY_MS;
   window.FISH_IMG = FISH_IMG;
   window.translateLure = translateLure;
+  window.lureDescriptionText = lureDescriptionText;
   window.makeT = makeT;
   window.initLang = initLang;
   window.easeOutCubic = easeOutCubic;

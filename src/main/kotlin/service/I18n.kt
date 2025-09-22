@@ -83,15 +83,62 @@ object I18n {
         "Открытый океан" to "Open Ocean",
     )
 
+    private data class LureTexts(
+        val ruName: String,
+        val enName: String,
+        val ruDescription: String,
+        val enDescription: String,
+    )
+
     private val lures = mapOf(
-        "Пресная мирная" to "Freshwater Peaceful",
-        "Пресная хищная" to "Freshwater Predator",
-        "Морская мирная" to "Saltwater Peaceful",
-        "Морская хищная" to "Saltwater Predator",
-        "Пресная мирная+" to "Freshwater Peaceful+",
-        "Пресная хищная+" to "Freshwater Predator+",
-        "Морская мирная+" to "Saltwater Peaceful+",
-        "Морская хищная+" to "Saltwater Predator+",
+        "Пресная мирная" to LureTexts(
+            ruName = "Зерновая крошка",
+            enName = "Grain Crumble",
+            ruDescription = "Для мирной пресноводной рыбы.",
+            enDescription = "For peaceful freshwater fish.",
+        ),
+        "Пресная хищная" to LureTexts(
+            ruName = "Ручейный малек",
+            enName = "Brook Minnow",
+            ruDescription = "Для хищной пресноводной рыбы.",
+            enDescription = "For predatory freshwater fish.",
+        ),
+        "Морская мирная" to LureTexts(
+            ruName = "Морская водоросль",
+            enName = "Seaweed Strand",
+            ruDescription = "Для мирной морской рыбы.",
+            enDescription = "For peaceful saltwater fish.",
+        ),
+        "Морская хищная" to LureTexts(
+            ruName = "Кольца кальмара",
+            enName = "Squid Rings",
+            ruDescription = "Для хищной морской рыбы.",
+            enDescription = "For predatory saltwater fish.",
+        ),
+        "Пресная мирная+" to LureTexts(
+            ruName = "Луговой червь",
+            enName = "Meadow Worm",
+            ruDescription = "Для редкой мирной пресноводной рыбы.",
+            enDescription = "For rare peaceful freshwater fish.",
+        ),
+        "Пресная хищная+" to LureTexts(
+            ruName = "Серебряный живец",
+            enName = "Silver Shiner",
+            ruDescription = "Для редкой хищной пресноводной рыбы.",
+            enDescription = "For rare predatory freshwater fish.",
+        ),
+        "Морская мирная+" to LureTexts(
+            ruName = "Неоновый планктон",
+            enName = "Neon Plankton",
+            ruDescription = "Для редкой мирной морской рыбы.",
+            enDescription = "For rare peaceful saltwater fish.",
+        ),
+        "Морская хищная+" to LureTexts(
+            ruName = "Королевская креветка",
+            enName = "Royal Shrimp",
+            ruDescription = "Для редкой хищной морской рыбы.",
+            enDescription = "For rare predatory saltwater fish.",
+        ),
     )
 
     private val rods = mapOf(
@@ -162,7 +209,31 @@ object I18n {
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
     fun location(name: String, lang: String) = if (lang == "en") locations[name] ?: name else name
-    fun lure(name: String, lang: String) = if (lang == "en") lures[name] ?: name else name
+    fun lure(name: String, lang: String): String {
+        val texts = lures[name]
+        return when {
+            texts == null -> if (lang == "en") oldLureName(name) else name
+            lang == "ru" -> texts.ruName
+            else -> texts.enName
+        }
+    }
+
+    private fun oldLureName(name: String) = when (name) {
+        "Пресная мирная" -> "Freshwater Peaceful"
+        "Пресная хищная" -> "Freshwater Predator"
+        "Морская мирная" -> "Saltwater Peaceful"
+        "Морская хищная" -> "Saltwater Predator"
+        "Пресная мирная+" -> "Freshwater Peaceful+"
+        "Пресная хищная+" -> "Freshwater Predator+"
+        "Морская мирная+" -> "Saltwater Peaceful+"
+        "Морская хищная+" -> "Saltwater Predator+"
+        else -> name
+    }
+
+    fun lureDescription(name: String, lang: String): String {
+        val texts = lures[name] ?: return ""
+        return if (lang == "ru") texts.ruDescription else texts.enDescription
+    }
     fun rod(name: String, lang: String) = if (lang == "en") rods[name] ?: name else name
     fun text(str: String, lang: String) = if (lang == "en") texts[str] ?: str else str
 }

@@ -14,7 +14,8 @@ function StatChip({icon,label,value,active=false,onClick}){
 function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,onToggleLanguage}){
   const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
-  const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+  const lureName = curLure?.displayName || (curLure ? translateLure(curLure.name) : null);
+  const lureVal = curLure? `${lureName} (${curLure.qty})` : '—';
   const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
   const rodVal = currentRod ? currentRod.name : '—';
   const languages = [
@@ -134,19 +135,23 @@ function BaitsDrawer({open,onClose,me,onSelect}){
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
         </div>
         <div className="space-y-2 overflow-y-auto pr-1">
-          {me.lures.map(l=> (
+          {me.lures.map(l=> {
+            const displayName = l.displayName || translateLure(l.name);
+            const desc = l.description || lureDescriptionText(l);
+            return (
             <button key={l.id} disabled={l.qty<=0}
                     onClick={()=>{ if(l.qty>0){ onSelect(l.id); onClose(); } }}
                     className={`w-full text-left p-3 rounded-xl border ${me.currentLureId===l.id? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${l.qty<=0?'opacity-50 cursor-not-allowed':''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
-                  <div className="text-xs opacity-70">{t('qty', l.qty)}</div>
+                  <div className={`font-semibold ${lureColor(l)}`}>{displayName}</div>
+                  {desc && <div className="text-xs opacity-70 mt-1">{desc}</div>}
+                  <div className="text-xs opacity-60 mt-1">{t('qty', l.qty)}</div>
                 </div>
                 {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">{t('current')}</div>}
               </div>
             </button>
-          ))}
+          )})}
         </div>
       </div>
     </div>
