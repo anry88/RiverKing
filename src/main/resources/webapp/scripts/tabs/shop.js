@@ -55,7 +55,6 @@ function ShopTab({
                 {cat.packs.map(item=> {
                   const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
                   const discountPercent = hasDiscount ? Math.floor(((item.originalPrice - item.price) * 100) / item.originalPrice) : null;
-                  const discountUntil = hasDiscount && item.discountEnd ? new Date(item.discountEnd).toLocaleDateString() : null;
                   return (
                     <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -73,7 +72,7 @@ function ShopTab({
                         {hasDiscount && (
                           <div className="text-xs text-right">
                             <div className="line-through opacity-60">{`${item.originalPrice}★`}</div>
-                            <div className="opacity-70">{t('shopDiscountInfo', { percent: discountPercent, until: discountUntil })}</div>
+                            <div className="opacity-70">{t('shopDiscountInfo', { percent: discountPercent })}</div>
                           </div>
                         )}
                       </div>
