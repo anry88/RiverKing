@@ -28,18 +28,12 @@ import service.PrizeSpec
 import service.I18n
 import util.Metrics
 import util.sanitizeName
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import javax.imageio.ImageIO
 import kotlin.random.Random
-import kotlin.math.max
-import kotlin.math.roundToInt
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.select
@@ -97,155 +91,6 @@ private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
-private val RARITY_LABELS = mapOf(
-    "ru" to mapOf(
-        "common" to "Простая",
-        "uncommon" to "Необычная",
-        "rare" to "Редкая",
-        "epic" to "Эпическая",
-        "legendary" to "Легендарная",
-    ),
-    "en" to mapOf(
-        "common" to "Common",
-        "uncommon" to "Uncommon",
-        "rare" to "Rare",
-        "epic" to "Epic",
-        "legendary" to "Legendary",
-    ),
-)
-
-private val FISH_IMAGE_PATHS = mapOf(
-    "Плотва" to "webapp/assets/fish/plotva.png",
-    "Окунь" to "webapp/assets/fish/okun.png",
-    "Карась" to "webapp/assets/fish/karas.png",
-    "Лещ" to "webapp/assets/fish/lesch.png",
-    "Щука" to "webapp/assets/fish/schuka.png",
-    "Карп" to "webapp/assets/fish/karp.png",
-    "Сом" to "webapp/assets/fish/som.png",
-    "Осётр" to "webapp/assets/fish/osetr.png",
-    "Уклейка" to "webapp/assets/fish/ukleyka.png",
-    "Линь" to "webapp/assets/fish/lin.png",
-    "Ротан" to "webapp/assets/fish/rotan.png",
-    "Судак" to "webapp/assets/fish/sudak.png",
-    "Чехонь" to "webapp/assets/fish/chehon.png",
-    "Хариус" to "webapp/assets/fish/harius.png",
-    "Форель ручьевая" to "webapp/assets/fish/forel_ruchevaya.png",
-    "Таймень" to "webapp/assets/fish/taymen.png",
-    "Налим" to "webapp/assets/fish/nalim.png",
-    "Сиг" to "webapp/assets/fish/sig.png",
-    "Голавль" to "webapp/assets/fish/golavl.png",
-    "Жерех" to "webapp/assets/fish/zhereh.png",
-    "Толстолобик" to "webapp/assets/fish/tolstolobik.png",
-    "Белый амур" to "webapp/assets/fish/beliy_amur.png",
-    "Угорь европейский" to "webapp/assets/fish/ugor_evropeyskiy.png",
-    "Стерлядь" to "webapp/assets/fish/sterlyad.png",
-    "Кефаль" to "webapp/assets/fish/kefal.png",
-    "Камбала" to "webapp/assets/fish/kambala.png",
-    "Сельдь" to "webapp/assets/fish/seld.png",
-    "Ставрида" to "webapp/assets/fish/stavrida.png",
-    "Треска" to "webapp/assets/fish/treska.png",
-    "Сайда" to "webapp/assets/fish/sayda.png",
-    "Морская форель" to "webapp/assets/fish/morskaya_forel.png",
-    "Палтус" to "webapp/assets/fish/paltus.png",
-    "Корюшка" to "webapp/assets/fish/koryushka.png",
-    "Лосось атлантический" to "webapp/assets/fish/losos_atlanticheskiy.png",
-    "Лаврак" to "webapp/assets/fish/lavrak.png",
-    "Скумбрия атлантическая" to "webapp/assets/fish/skumbriya_atlanticheskaya.png",
-    "Белуга" to "webapp/assets/fish/beluga.png",
-    "Ёрш" to "webapp/assets/fish/yorsh.png",
-    "Пескарь" to "webapp/assets/fish/peskar.png",
-    "Густера" to "webapp/assets/fish/gustera.png",
-    "Краснопёрка" to "webapp/assets/fish/krasnopyorka.png",
-    "Елец" to "webapp/assets/fish/elets.png",
-    "Верхоплавка" to "webapp/assets/fish/verhoplavka.png",
-    "Гольян" to "webapp/assets/fish/golyan.png",
-    "Язь" to "webapp/assets/fish/yaz.png",
-    "Бычок" to "webapp/assets/fish/bychyok.png",
-    "Килька" to "webapp/assets/fish/kilka.png",
-    "Мойва" to "webapp/assets/fish/mojva.png",
-    "Сардина" to "webapp/assets/fish/sardina.png",
-    "Анчоус" to "webapp/assets/fish/anchous.png",
-    "Дорадо" to "webapp/assets/fish/dorado.png",
-    "Ваху" to "webapp/assets/fish/vahu.png",
-    "Парусник" to "webapp/assets/fish/parusnik.png",
-    "Рыба-меч" to "webapp/assets/fish/ryba_mech.png",
-    "Марлин синий" to "webapp/assets/fish/marlin_siniy.png",
-    "Тунец синеперый" to "webapp/assets/fish/tunets_sineperiy.png",
-    "Акула мако" to "webapp/assets/fish/akula_mako.png",
-    "Альбакор" to "webapp/assets/fish/albakor.png",
-    "Голец арктический" to "webapp/assets/fish/golets_arkticheskiy.png",
-    "Форель кумжа" to "webapp/assets/fish/forel_kumzha.png",
-    "Пикша" to "webapp/assets/fish/piksha.png",
-    "Тюрбо" to "webapp/assets/fish/tyurbo.png",
-    "Сайра" to "webapp/assets/fish/sayra.png",
-    "Летучая рыба" to "webapp/assets/fish/letuchaya_ryba.png",
-    "Рыба-луна" to "webapp/assets/fish/ryba_luna.png",
-    "Сельдяной король" to "webapp/assets/fish/seldyanoy_korol.png",
-)
-
-private val LOCATION_BACKGROUNDS = run {
-    val base = mapOf(
-        "Пруд" to "webapp/assets/originals/backgrounds/pond.png",
-        "Река" to "webapp/assets/originals/backgrounds/river.png",
-        "Озеро" to "webapp/assets/originals/backgrounds/lake.png",
-        "Болото" to "webapp/assets/originals/backgrounds/swamp.png",
-        "Горная река" to "webapp/assets/originals/backgrounds/mountain_river.png",
-        "Водохранилище" to "webapp/assets/originals/backgrounds/reservoir.png",
-        "Дельта реки" to "webapp/assets/originals/backgrounds/river_delta.png",
-        "Прибрежье моря" to "webapp/assets/originals/backgrounds/sea_coast.png",
-        "Фьорд" to "webapp/assets/originals/backgrounds/fjord.png",
-        "Открытый океан" to "webapp/assets/originals/backgrounds/open_ocean.png",
-    )
-    base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
-}
-
-private fun loadFishImage(name: String, location: String): ByteArray? {
-    val path = FISH_IMAGE_PATHS[name] ?: return null
-    val classLoader = Thread.currentThread().contextClassLoader
-    val originalPath = path.replace("webapp/assets/fish/", "webapp/assets/originals/fish/")
-    val fishStream = classLoader.getResourceAsStream(originalPath) ?: return null
-    fishStream.use { stream ->
-        val fishImage = ImageIO.read(stream) ?: return null
-        val size = 1024
-        val finalImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
-        val g2d = finalImage.createGraphics()
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-
-        LOCATION_BACKGROUNDS[location]?.let { bgPath ->
-            classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
-                val bgImage = ImageIO.read(bgStream)
-                if (bgImage != null) {
-                    val scale = max(size.toDouble() / bgImage.width, size.toDouble() / bgImage.height)
-                    val newWidth = (bgImage.width * scale).roundToInt()
-                    val newHeight = (bgImage.height * scale).roundToInt()
-                    val offsetX = ((size - newWidth) / 2.0).roundToInt()
-                    val offsetY = ((size - newHeight) / 2.0).roundToInt()
-                    g2d.drawImage(
-                        bgImage,
-                        offsetX,
-                        offsetY,
-                        offsetX + newWidth,
-                        offsetY + newHeight,
-                        0,
-                        0,
-                        bgImage.width,
-                        bgImage.height,
-                        null,
-                    )
-                }
-            }
-        }
-
-        val fishX = ((size - fishImage.width) / 2.0).roundToInt()
-        val fishY = ((size - fishImage.height) / 2.0).roundToInt()
-        g2d.drawImage(fishImage, fishX, fishY, null)
-        g2d.dispose()
-        val baos = ByteArrayOutputStream()
-        ImageIO.write(finalImage, "png", baos)
-        return baos.toByteArray()
-    }
-}
 
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
@@ -1218,11 +1063,7 @@ Available commands:
                                     return@launch
                                 }
                                 val fishName = I18n.fish(catch.fish, lang)
-                                val rarityText = RARITY_LABELS[lang]?.get(catch.rarity) ?: catch.rarity
                                 val locationName = I18n.location(catch.location, lang)
-                                val weightText = "%.2f".format(Locale.US, catch.weight)
-                                val unit = if (lang == "ru") "кг" else "kg"
-                                val locationLabel = if (lang == "ru") "Локация" else "Location"
                                 val isNew = catch.fishId?.let { it !in knownFish } == true
                                 val newLine = if (isNew) {
                                     if (lang == "ru") "\n✨ Новая рыба!" else "\n✨ New fish!"
@@ -1251,24 +1092,21 @@ Available commands:
                                 } else {
                                     ""
                                 }
-                                val caption = buildString {
-                                    append("🐟 ")
-                                    append(fishName)
-                                    append(" (")
-                                    append(rarityText)
-                                    append(") — ")
-                                    append(weightText)
-                                    append(' ')
-                                    append(unit)
-                                    append("\n")
-                                    append(locationLabel)
-                                    append(": ")
-                                    append(locationName)
-                                    append(newLine)
-                                    append(unlockedLine)
-                                    append(rodLine)
-                                }
-                                val image = loadFishImage(catch.fish, catch.location)
+                                val caption = buildCatchCaption(
+                                    lang = lang,
+                                    fishName = fishName,
+                                    rarity = catch.rarity,
+                                    weightKg = catch.weight,
+                                    locationName = locationName,
+                                    extraLines = listOf(newLine, unlockedLine, rodLine),
+                                )
+                                val image = generateCatchImage(
+                                    catch.fish,
+                                    catch.location,
+                                    fishName,
+                                    catch.weight,
+                                    lang,
+                                )
                                 if (image != null) {
                                     try {
                                         bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)

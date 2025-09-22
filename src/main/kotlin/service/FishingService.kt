@@ -34,7 +34,14 @@ data class RodDTO(
 )
 
 @Serializable
-data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
+data class RecentDTO(
+    val id: Long,
+    val fish: String,
+    val weight: Double,
+    val location: String,
+    val rarity: String,
+    val at: String,
+)
 
 class FishingService {
     companion object {
@@ -1066,6 +1073,7 @@ class FishingService {
 
     @Serializable
     data class CatchDTO(
+        val id: Long,
         val fish: String,
         val weight: Double,
         val location: String,
@@ -1246,23 +1254,26 @@ class FishingService {
         ensureRodInventory(userId, totalAfter)
         ensureCurrentRod(userId, totalAfter)
 
-        Catches.insert {
+        val caughtAt = Instant.now()
+        val catchId = Catches.insertAndGetId {
             it[Catches.userId] = userId
             it[Catches.fishId] = fishId
             it[Catches.weight] = weight
             it[Catches.locationId] = locId
-            it[Catches.createdAt] = Instant.now()
+            it[Catches.createdAt] = caughtAt
         }
 
         finish(
             true,
             CatchDTO(
+                catchId.value,
                 fishName,
                 weight,
                 locName,
                 rarity,
-                userId = null,
+                userId = userId,
                 fishId = fishId,
+                at = caughtAt.toString(),
             ),
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
@@ -1271,12 +1282,13 @@ class FishingService {
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
         (Catches innerJoin Fish innerJoin Locations)
-            .slice(Fish.name, Fish.rarity, Catches.weight, Catches.createdAt, Locations.name)
+            .slice(Catches.id, Fish.name, Fish.rarity, Catches.weight, Catches.createdAt, Locations.name)
             .selectAll().where { Catches.userId eq userId }
             .orderBy(Catches.createdAt, SortOrder.DESC)
             .limit(limit)
             .map {
                 RecentDTO(
+                    it[Catches.id].value,
                     it[Fish.name],
                     it[Catches.weight],
                     it[Locations.name],
@@ -1284,6 +1296,27 @@ class FishingService {
                     it[Catches.createdAt].toString()
                 )
             }
+    }
+
+    fun catchById(userId: Long, catchId: Long): CatchDTO? = transaction {
+        ((Catches leftJoin Users) innerJoin Fish)
+            .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
+            .select { (Catches.id eq catchId) and (Catches.userId eq userId) }
+            .limit(1)
+            .map {
+                CatchDTO(
+                    it[Catches.id].value,
+                    it[Fish.name],
+                    it[Catches.weight],
+                    it[Locations.name],
+                    it[Fish.rarity],
+                    it[Catches.userId].value,
+                    it[Fish.id].value,
+                    user = catchUser(it),
+                    at = it[Catches.createdAt].toString(),
+                )
+            }
+            .singleOrNull()
     }
 
     private fun rarityRank(r: String) = when (r) {
@@ -1342,6 +1375,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1373,6 +1407,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1403,6 +1438,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1433,6 +1469,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],

@@ -1,4 +1,4 @@
-function Achievements({me, setMe}){
+function Achievements({me, setMe, onCatchClick}){
   const [mode,setMode] = React.useState('personal');
   const [section,setSection] = React.useState('location');
   const [period,setPeriod] = React.useState('all');
@@ -64,7 +64,20 @@ function Achievements({me, setMe}){
           </select>
           <div className="space-y-2">
             {list.map((c,i)=>(
-              <div key={i} className="p-3 glass rounded-xl flex justify-between">
+              <button
+                key={i}
+                type="button"
+                onClick={()=>{
+                  if(onCatchClick && c.id){
+                    onCatchClick({
+                      ...c,
+                      userId: c.userId ?? me.id,
+                      user: c.user,
+                    });
+                  }
+                }}
+                className="w-full p-3 glass rounded-xl flex justify-between text-left"
+              >
                 <div className="flex items-center gap-3">
                   {(me.caughtFishIds||[]).includes(c.fishId) ? (
                     <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
@@ -80,7 +93,7 @@ function Achievements({me, setMe}){
                   </div>
                 </div>
                 <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-              </div>
+              </button>
             ))}
             {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
           </div>
@@ -94,7 +107,20 @@ function Achievements({me, setMe}){
           </select>
           <div className="space-y-2">
             {list.map((c,i)=>(
-              <div key={i} className="p-3 glass rounded-xl flex justify-between">
+              <button
+                key={i}
+                type="button"
+                onClick={()=>{
+                  if(onCatchClick && c.id){
+                    onCatchClick({
+                      ...c,
+                      userId: c.userId,
+                      user: c.user,
+                    });
+                  }
+                }}
+                className="w-full p-3 glass rounded-xl flex justify-between text-left"
+              >
                 <div className="flex items-center gap-3">
                   {(me.caughtFishIds||[]).includes(c.fishId) ? (
                     <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
@@ -110,7 +136,7 @@ function Achievements({me, setMe}){
                   </div>
                 </div>
                 <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-              </div>
+              </button>
             ))}
             {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}
           </div>
