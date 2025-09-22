@@ -32,6 +32,7 @@ fun Application.apiRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val bot = TelegramBot(env.botToken)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
@@ -127,8 +128,10 @@ fun Application.apiRoutes(env: Env) {
     @Serializable
     data class LeaderboardEntryDTO(
         val rank: Int,
+        val userId: Long? = null,
         val user: String? = null,
         val value: Double,
+        val catchId: Long? = null,
         val fish: String? = null,
         val fishId: Long? = null,
         val location: String? = null,
@@ -219,6 +222,7 @@ fun Application.apiRoutes(env: Env) {
 
             @Serializable
             data class MeResp(
+                val id: Long,
                 val username: String?,
                 val needsNickname: Boolean,
                 val lures: List<LureDTO>,
@@ -239,6 +243,7 @@ fun Application.apiRoutes(env: Env) {
             )
             call.respond(
                 MeResp(
+                    uid,
                     displayName,
                     displayName == null,
                     lures,
@@ -319,8 +324,10 @@ fun Application.apiRoutes(env: Env) {
                 leaderboard = top.map {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -331,8 +338,10 @@ fun Application.apiRoutes(env: Env) {
                 mine = mine?.let {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -375,8 +384,10 @@ fun Application.apiRoutes(env: Env) {
                 leaderboard = top.map {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -387,8 +398,10 @@ fun Application.apiRoutes(env: Env) {
                 mine = mine?.let {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -841,6 +854,49 @@ fun Application.apiRoutes(env: Env) {
                     unlockedRods = localizedRods,
                 )
             )
+        }
+
+        post("/api/catches/{id}/send") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val catchId = call.parameters["id"]?.toLongOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val catch = fishing.catchById(uid, catchId)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val fishName = I18n.fish(catch.fish, language)
+            val locationName = I18n.location(catch.location, language)
+            val caption = buildCatchCaption(
+                lang = language,
+                fishName = fishName,
+                rarity = catch.rarity,
+                weightKg = catch.weight,
+                locationName = locationName,
+            )
+            val image = generateCatchImage(
+                catch.fish,
+                catch.location,
+                fishName,
+                catch.weight,
+                language,
+            )
+            try {
+                if (image != null) {
+                    bot.sendPhoto(tgId, image, caption)
+                } else {
+                    bot.sendMessage(tgId, caption)
+                }
+            } catch (e: Exception) {
+                log.error("send catch card failed uid={} catchId={}", uid, catchId, e)
+                return@post call.respond(HttpStatusCode.BadGateway, mapOf("error" to "send_failed"))
+            }
+            Metrics.counter("catch_share_total", mapOf("result" to "ok"))
+            call.respond(HttpStatusCode.Accepted)
         }
 
         // Change lure

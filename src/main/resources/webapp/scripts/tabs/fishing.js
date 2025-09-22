@@ -377,7 +377,8 @@ function FishingTab({
   autoCastRef,
   autoCastTimeoutRef,
   hasCatchAnimationBeenShown,
-  markCatchAnimationShown
+  markCatchAnimationShown,
+  onCatchClick
 }){
   return (
     <>
@@ -434,7 +435,19 @@ function FishingTab({
       </div>
 
       {result && (
-        <div className="mt-4 p-4 rounded-xl glass flex items-center gap-4">
+        <button
+          type="button"
+          onClick={()=>{
+            if(onCatchClick && result.id){
+              onCatchClick({
+                ...result,
+                userId: result.userId ?? me.id,
+                user: result.user || me.username || t('you')
+              });
+            }
+          }}
+          className="mt-4 w-full text-left p-4 rounded-xl glass flex items-center gap-4"
+        >
           <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>e.currentTarget.style.display='none'} />
           <div>
             <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
@@ -447,7 +460,7 @@ function FishingTab({
               <div className="text-xs text-emerald-400">{(result.newRods.length>1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
             )}
           </div>
-        </div>
+        </button>
       )}
       {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
 
@@ -458,7 +471,20 @@ function FishingTab({
         ) : (
           <div className="space-y-2">
             {me.recent.map((c,i)=> (
-              <div key={i} className="p-3 rounded--xl border border-white/10 flex items-center justify-between">
+              <button
+                key={i}
+                type="button"
+                onClick={()=>{
+                  if(onCatchClick && c.id){
+                    onCatchClick({
+                      ...c,
+                      userId: c.userId ?? me.id,
+                      user: c.user || me.username || t('you')
+                    });
+                  }
+                }}
+                className="w-full p-3 rounded--xl border border-white/10 flex items-center justify-between text-left"
+              >
                 <div className="flex items-center gap-3">
                   <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e=>e.currentTarget.style.display='none'} />
                   <div>
@@ -467,7 +493,7 @@ function FishingTab({
                   </div>
                 </div>
                 <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-              </div>
+              </button>
             ))}
           </div>
         )}
