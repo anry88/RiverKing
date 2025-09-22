@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.timestamp
 import java.time.Instant
 
@@ -32,6 +33,7 @@ object DB {
                 UserPrizes,
                 ReferralLinks,
                 ReferralRewards,
+                ShopDiscounts,
             )
             seedIfEmpty()
         }
@@ -585,4 +587,11 @@ object ReferralRewards : LongIdTable() {
     val packageId = varchar("package_id", 100).nullable()
     val qty = integer("qty").default(1)
     val claimed = bool("claimed").default(false)
+}
+
+object ShopDiscounts : LongIdTable() {
+    val packageId = varchar("package_id", 100).uniqueIndex()
+    val price = integer("price")
+    val startDate = date("start_date")
+    val endDate = date("end_date")
 }
