@@ -174,7 +174,12 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             fishing.resetCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures = fishing.listLures(uid).map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures = fishing.listLures(uid).map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             val rods = fishing.listRods(uid).map { it.copy(name = I18n.rod(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
@@ -475,7 +480,12 @@ fun Application.apiRoutes(env: Env) {
                 tournaments.claimPrize(uid, id, fishing)
             } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures2 = lures.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(ShopBuyResp(lures2, current))
         }
 
@@ -495,7 +505,12 @@ fun Application.apiRoutes(env: Env) {
             @Serializable
             data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?, val dailyStreak: Int)
 
-            val lures = res.first.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures = res.first.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(DailyResp(lures, res.second, res.third))
         }
 
@@ -646,7 +661,12 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val (lures, current) = ReferralService.claimAllRewards(uid, fishing)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures2 = lures.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(ShopBuyResp(lures2, current))
         }
 

@@ -568,6 +568,16 @@ fun Application.botRoutes(env: Env) {
                 } else {
                     if (lang == "ru") "Выберите приманку:" else "Choose a bait:"
                 }
+                val details = sorted.joinToString("\n") { lure ->
+                    val name = I18n.lure(lure.name, lang)
+                    val desc = I18n.lureDescription(lure.name, lang)
+                    val qtyLabel = if (lang == "ru") "${lure.qty} шт." else "${lure.qty} pcs."
+                    if (desc.isBlank()) {
+                        "• $name — $qtyLabel"
+                    } else {
+                        "• $name — $desc ($qtyLabel)"
+                    }
+                }
                 val text = buildString {
                     if (!prefix.isNullOrBlank()) {
                         append(prefix)
@@ -576,6 +586,10 @@ fun Application.botRoutes(env: Env) {
                     append(header)
                     append("\n")
                     append(prompt)
+                    if (details.isNotBlank()) {
+                        append("\n")
+                        append(details)
+                    }
                 }
                 if (sorted.isEmpty()) {
                     trySend(chatId, text, replyToMessageId = replyToMessageId)
