@@ -56,9 +56,6 @@ function ShopTab({
                   const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
                   const discountPercent = hasDiscount ? Math.floor(((item.originalPrice - item.price) * 100) / item.originalPrice) : null;
                   const discountUntil = hasDiscount && item.discountEnd ? new Date(item.discountEnd).toLocaleDateString() : null;
-                  const priceText = hasDiscount
-                    ? `${item.price}★ (${t('shopDiscountInfo', { percent: discountPercent, until: discountUntil })})`
-                    : `${item.price}★`;
                   return (
                     <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -71,7 +68,15 @@ function ShopTab({
                           )}
                         </div>
                       </div>
-                      <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{priceText}</button>
+                      <div className="flex flex-col items-end gap-1">
+                        <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{`${item.price}★`}</button>
+                        {hasDiscount && (
+                          <div className="text-xs text-right">
+                            <div className="line-through opacity-60">{`${item.originalPrice}★`}</div>
+                            <div className="opacity-70">{t('shopDiscountInfo', { percent: discountPercent, until: discountUntil })}</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
