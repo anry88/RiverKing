@@ -52,21 +52,29 @@ function ShopTab({
             <div key={cat.id}>
               <div className="font-semibold mb-1">{cat.name}</div>
               <div className="space-y-2">
-                {cat.packs.map(item=> (
-                  <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={`/app/assets/baits/${item.id}.png`} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-                      <div>
-                        <div className="font-semibold">{item.name}</div>
-                        <div className="text-xs opacity-70">{item.desc}</div>
-                        {item.until && (
-                          <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
-                        )}
+                {cat.packs.map(item=> {
+                  const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
+                  const discountPercent = hasDiscount ? Math.floor(((item.originalPrice - item.price) * 100) / item.originalPrice) : null;
+                  const discountUntil = hasDiscount && item.discountEnd ? new Date(item.discountEnd).toLocaleDateString() : null;
+                  const priceText = hasDiscount
+                    ? `${item.price}★ (${t('shopDiscountInfo', { percent: discountPercent, until: discountUntil })})`
+                    : `${item.price}★`;
+                  return (
+                    <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img src={`/app/assets/baits/${item.id}.png`} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        <div>
+                          <div className="font-semibold">{item.name}</div>
+                          <div className="text-xs opacity-70">{item.desc}</div>
+                          {item.until && (
+                            <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
+                          )}
+                        </div>
                       </div>
+                      <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{priceText}</button>
                     </div>
-                    <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
