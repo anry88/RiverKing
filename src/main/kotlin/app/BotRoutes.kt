@@ -829,6 +829,7 @@ fun Application.botRoutes(env: Env) {
                 chatId: Long,
                 isCallback: Boolean = false,
                 messageId: Long? = null,
+                sourceOverride: String? = null,
             ): Boolean {
                 if (!rawText.startsWith("/")) return false
                 val text = rawText.trim()
@@ -842,7 +843,7 @@ fun Application.botRoutes(env: Env) {
                 }
                 val commandName = command.substringBefore('@')
                 val arg = parts.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
-                val source = if (isCallback) "callback" else "message"
+                val source = sourceOverride ?: if (isCallback) "callback" else "message"
                 val replyTo = messageId
                 fun ownedArg(raw: String?, uid: Long): Pair<String?, Boolean> {
                     if (!isCallback) return raw to false
@@ -1818,6 +1819,7 @@ Available commands:
             val chatId = message.chat.id
             val userId = message.from?.id ?: return@post call.respond(HttpStatusCode.OK)
             val text = message.text ?: ""
+            val commandSource = if (message.viaBot != null) "inline" else "message"
 
             adminStates[userId]?.let { draft ->
                 when (draft.step) {
@@ -2009,7 +2011,14 @@ Available commands:
                 return@post call.respond(HttpStatusCode.OK)
             }
 
-            if (processUserCommand(text, message.from, chatId, messageId = message.message_id)) {
+            if (processUserCommand(
+                    text,
+                    message.from,
+                    chatId,
+                    messageId = message.message_id,
+                    sourceOverride = commandSource,
+                )
+            ) {
                 return@post call.respond(HttpStatusCode.OK)
             } else if (text.startsWith("/paysupport")) {
                 val args = text.removePrefix("/paysupport").trim()
@@ -2017,7 +2026,7 @@ Available commands:
                 val lang = fishing.userLanguage(uid)
                 val payments = PayService.listPayments(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
-                val source = "message"
+                val source = commandSource
                 if (args.isEmpty()) {
                     if (payments.isEmpty()) {
                         val reply = if (lang == "ru") {
@@ -2089,7 +2098,7 @@ Available commands:
                 val parts = text.split(" ", limit = 3)
                 val uid = fishing.ensureUserByTgId(userId)
                 val lang = fishing.userLanguage(uid)
-                val source = "message"
+                val source = commandSource
                 var id = parts.getOrNull(1)?.toLongOrNull()
                 val answer: String? = if (id != null) {
                     parts.getOrNull(2)
@@ -2251,6 +2260,7 @@ private data class TgMessage(
     val from: TgUser? = null,
     val text: String? = null,
     @SerialName("successful_payment") val successfulPayment: TgSuccessfulPayment? = null,
+    @SerialName("via_bot") val viaBot: TgUser? = null,
 )
 
 @Serializable
