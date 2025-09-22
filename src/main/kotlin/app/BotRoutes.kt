@@ -738,10 +738,16 @@ fun Application.botRoutes(env: Env) {
                             append(pack.name)
                             append(" — ")
                             val priceText = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
-                                val until = pack.discountEnd?.format(DATE_FMT)?.let {
-                                    if (lang == "ru") " (до $it)" else " (until $it)"
+                                val discountPercent = ((pack.originalPrice - pack.price) * 100) / pack.originalPrice
+                                val untilPart = pack.discountEnd?.format(DATE_FMT)?.let {
+                                    if (lang == "ru") " до $it" else " until $it"
                                 } ?: ""
-                                "${strikethrough("${pack.originalPrice}⭐")} ${pack.price}⭐$until"
+                                val discountLabel = if (lang == "ru") {
+                                    "скидка $discountPercent% от полной цены$untilPart"
+                                } else {
+                                    "discount $discountPercent% off full price$untilPart"
+                                }
+                                "${pack.price}⭐ ($discountLabel)"
                             } else {
                                 "${pack.price}⭐"
                             }
@@ -759,7 +765,16 @@ fun Application.botRoutes(env: Env) {
                 val buttons = shop.flatMap { category ->
                     category.packs.map { pack ->
                         val labelPrice = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
-                            "${strikethrough("${pack.originalPrice}⭐")} ${pack.price}⭐"
+                            val discountPercent = ((pack.originalPrice - pack.price) * 100) / pack.originalPrice
+                            val untilPart = pack.discountEnd?.format(DATE_FMT)?.let {
+                                if (lang == "ru") " до $it" else " until $it"
+                            } ?: ""
+                            val discountLabel = if (lang == "ru") {
+                                "скидка $discountPercent% от полной цены$untilPart"
+                            } else {
+                                "discount $discountPercent% off full price$untilPart"
+                            }
+                            "${pack.price}⭐ ($discountLabel)"
                         } else {
                             "${pack.price}⭐"
                         }
