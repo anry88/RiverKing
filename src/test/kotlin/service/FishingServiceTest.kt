@@ -6,6 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 class FishingServiceTest {
     private fun testEnv(name: String) = Env(
@@ -94,5 +96,31 @@ class FishingServiceTest {
             assertEquals(false, userRow[Users.isCasting])
             assertEquals(null, userRow[Users.castLureId])
         }
+    }
+
+    @Test
+    fun shopDiscountsAppliedAndRemoved() {
+        val svc = newService("testdb_shop_discount")
+        val now = LocalDate.now(ZoneOffset.UTC)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = now, end = now.plusDays(2))
+
+        val discounted = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(10, discounted.price)
+        assertEquals(39, discounted.originalPrice)
+        assertEquals(now.plusDays(2), discounted.discountEnd)
+
+        val discounts = svc.listDiscounts().associateBy { it.packageId }
+        val stored = discounts[packId]
+        requireNotNull(stored)
+        assertEquals(10, stored.price)
+        assertEquals(now, stored.startDate)
+
+        svc.removeDiscount(packId)
+
+        val restored = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(39, restored.price)
+        assertEquals(null, restored.originalPrice)
     }
 }

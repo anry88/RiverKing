@@ -81,7 +81,16 @@ fun Application.apiRoutes(env: Env) {
     data class HookReq(val wait: Int, val reaction: Double)
 
     @Serializable
-    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int, val until: String? = null)
+    data class ShopPackageDTO(
+        val id: String,
+        val name: String,
+        val desc: String,
+        val price: Int,
+        val until: String? = null,
+        val originalPrice: Int? = null,
+        val discountStart: String? = null,
+        val discountEnd: String? = null,
+    )
 
     @Serializable
     data class ShopCategoryDTO(val id: String, val name: String, val packs: List<ShopPackageDTO>)
@@ -560,7 +569,16 @@ fun Application.apiRoutes(env: Env) {
                         val until = if (p.id == "autofish") {
                             autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
                         } else null
-                        ShopPackageDTO(p.id, p.name, p.desc, p.price, until)
+                        ShopPackageDTO(
+                            id = p.id,
+                            name = p.name,
+                            desc = p.desc,
+                            price = p.price,
+                            until = until,
+                            originalPrice = p.originalPrice,
+                            discountStart = p.discountStart?.toString(),
+                            discountEnd = p.discountEnd?.toString(),
+                        )
                     }
                 )
             }

@@ -76,6 +76,18 @@ private data class AdminDraft(
 
 private enum class AdminStep { NAME_RU, NAME_EN, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
 
+private data class DiscountDraft(
+    var step: DiscountStep = DiscountStep.PACK,
+    var packageId: String = "",
+    var packageName: String = "",
+    var basePrice: Int = 0,
+    var price: Int? = null,
+    var start: LocalDate? = null,
+    var end: LocalDate? = null,
+)
+
+private enum class DiscountStep { PACK, PRICE, START, END }
+
 private data class BroadcastDraft(
     var step: BroadcastStep = BroadcastStep.TEXT_RU,
     var textRu: String = "",
@@ -123,6 +135,7 @@ fun Application.botRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val adminStates = mutableMapOf<Long, AdminDraft>()
+    val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
@@ -310,6 +323,16 @@ fun Application.botRoutes(env: Env) {
                 return chunks
             }
 
+            fun strikethrough(text: String): String {
+                if (text.isBlank()) return text
+                val combining = '\u0336'
+                val builder = StringBuilder(text.length * 2)
+                text.forEach { ch ->
+                    builder.append(ch).append(combining)
+                }
+                return builder.toString()
+            }
+
             fun trySend(
                 chatId: Long,
                 text: String,
@@ -452,6 +475,61 @@ fun Application.botRoutes(env: Env) {
                 }.chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            fun sendDiscountMenu(chatId: Long) {
+                val discounts = fishing.listDiscounts().sortedBy { it.startDate }
+                val body = if (discounts.isEmpty()) {
+                    "Скидок сейчас нет."
+                } else {
+                    val lines = discounts.joinToString("\n") { d ->
+                        val pack = fishing.findPack(d.packageId)
+                        val name = pack?.let { I18n.text(it.name, "ru") } ?: d.packageId
+                        val basePrice = pack?.price
+                        val priceText = basePrice?.let { strikethrough("$it⭐") + " ${d.price}⭐" } ?: "${d.price}⭐"
+                        val start = d.startDate.format(DATE_FMT)
+                        val end = d.endDate.format(DATE_FMT)
+                        "• $name — $priceText ($start — $end)"
+                    }
+                    "Текущие скидки:\n$lines"
+                }
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                buttons += listOf(InlineKeyboardButton("Добавить скидку", "create_discount"))
+                discounts.forEach { d ->
+                    val pack = fishing.findPack(d.packageId)
+                    val name = pack?.let { I18n.text(it.name, "ru") } ?: d.packageId
+                    val short = if (name.length > 32) name.take(29) + "…" else name
+                    buttons += listOf(InlineKeyboardButton("Убрать: $short", "remove_discount_${d.packageId}"))
+                }
+                buttons += listOf(InlineKeyboardButton("Закрыть", "discount_cancel"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                try {
+                    bot.sendMessage(chatId, body, markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            }
+
+            fun sendDiscountPackPicker(chatId: Long) {
+                val packs = fishing.listShop("ru").flatMap { it.packs }.sortedBy { it.name }
+                if (packs.isEmpty()) {
+                    try {
+                        bot.sendMessage(chatId, "Магазин пуст, скидку добавить нельзя")
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={}", chatId, e)
+                    }
+                    return
+                }
+                val buttons = packs.map { pack ->
+                    InlineKeyboardButton(pack.name, "discount_pack_${pack.id}")
+                }.chunked(2).toMutableList()
+                buttons += listOf(InlineKeyboardButton("Отмена", "discount_cancel"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                try {
+                    bot.sendMessage(chatId, "Выберите товар для скидки", markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
             }
 
             fun sendRodMenu(
@@ -659,8 +737,15 @@ fun Application.botRoutes(env: Env) {
                             append("\n• ")
                             append(pack.name)
                             append(" — ")
-                            append(pack.price)
-                            append('⭐')
+                            val priceText = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
+                                val until = pack.discountEnd?.format(DATE_FMT)?.let {
+                                    if (lang == "ru") " (до $it)" else " (until $it)"
+                                } ?: ""
+                                "${strikethrough("${pack.originalPrice}⭐")} ${pack.price}⭐$until"
+                            } else {
+                                "${pack.price}⭐"
+                            }
+                            append(priceText)
                             if (pack.desc.isNotBlank()) {
                                 append("\n  ")
                                 append(pack.desc)
@@ -673,7 +758,12 @@ fun Application.botRoutes(env: Env) {
 
                 val buttons = shop.flatMap { category ->
                     category.packs.map { pack ->
-                        val label = "${pack.name} — ${pack.price}⭐"
+                        val labelPrice = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
+                            "${strikethrough("${pack.originalPrice}⭐")} ${pack.price}⭐"
+                        } else {
+                            "${pack.price}⭐"
+                        }
+                        val label = "${pack.name} — $labelPrice"
                         InlineKeyboardButton(label, "/buy ${ownedData(uid, pack.id)}")
                     }
                 }.chunked(2)
@@ -1543,6 +1633,62 @@ Available commands:
                                 log.error("sendMessage failed chatId={}", target, e)
                             }
                         }
+                        data == "discounts_menu" -> {
+                            sendDiscountMenu(target)
+                        }
+                        data == "create_discount" -> {
+                            discountStates[cq.from.id] = DiscountDraft(step = DiscountStep.PACK)
+                            sendDiscountPackPicker(target)
+                        }
+                        data == "discount_cancel" -> {
+                            discountStates.remove(cq.from.id)
+                        }
+                        data != null && data.startsWith("discount_pack_") -> {
+                            val id = data.removePrefix("discount_pack_")
+                            val pack = fishing.findPack(id)
+                            if (pack != null) {
+                                val name = I18n.text(pack.name, "ru")
+                                val existing = fishing.getDiscount(id)
+                                val draft = DiscountDraft(
+                                    step = DiscountStep.PRICE,
+                                    packageId = id,
+                                    packageName = name,
+                                    basePrice = pack.price,
+                                    price = existing?.price,
+                                    start = existing?.startDate,
+                                    end = existing?.endDate,
+                                )
+                                discountStates[cq.from.id] = draft
+                                val current = existing?.let {
+                                    val start = it.startDate.format(DATE_FMT)
+                                    val end = it.endDate.format(DATE_FMT)
+                                    "\nТекущая скидка: ${it.price}⭐ ($start — $end)"
+                                } ?: ""
+                                val message = "Введите цену в звёздах для \"$name\" (обычная цена: ${pack.price}⭐)$current"
+                                try {
+                                    bot.sendMessage(target, message)
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", target, e)
+                                }
+                            }
+                        }
+                        data != null && data.startsWith("remove_discount_") -> {
+                            val id = data.removePrefix("remove_discount_")
+                            val removed = fishing.removeDiscount(id) > 0
+                            val packName = fishing.findPack(id)?.let { I18n.text(it.name, "ru") } ?: id
+                            val reply = if (removed) {
+                                "Скидка для \"$packName\" удалена"
+                            } else {
+                                "Скидка для \"$packName\" не найдена"
+                            }
+                            discountStates.remove(cq.from.id)
+                            try {
+                                bot.sendMessage(target, reply)
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", target, e)
+                            }
+                            sendDiscountMenu(target)
+                        }
                         data == "list_tournaments" -> {
                             val current = tournaments.currentTournament()
                             val upcoming = tournaments.upcomingTournaments()
@@ -1672,6 +1818,91 @@ Available commands:
             val userId = message.from?.id ?: return@post call.respond(HttpStatusCode.OK)
             val text = message.text ?: ""
             val commandSource = if (message.viaBot != null) "inline" else "message"
+
+            discountStates[userId]?.let { draft ->
+                if (text == "/cancel") {
+                    discountStates.remove(userId)
+                    try {
+                        bot.sendMessage(chatId, "Настройка скидки отменена")
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={}", chatId, e)
+                    }
+                    return@post call.respond(HttpStatusCode.OK)
+                }
+                when (draft.step) {
+                    DiscountStep.PACK -> {
+                        try {
+                            bot.sendMessage(chatId, "Выберите товар кнопкой ниже")
+                        } catch (_: Exception) {}
+                    }
+                    DiscountStep.PRICE -> {
+                        val value = text.trim().toIntOrNull()
+                        if (value == null || value <= 0) {
+                            try {
+                                bot.sendMessage(chatId, "Укажите цену числом")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.price = value
+                            draft.step = DiscountStep.START
+                            val current = draft.start?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                            try {
+                                bot.sendMessage(chatId, "Дата начала скидки (дд.мм.гггг)$current")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                        }
+                    }
+                    DiscountStep.START -> {
+                        val date = runCatching { LocalDate.parse(text.trim(), DATE_FMT) }.getOrNull()
+                        if (date == null) {
+                            try {
+                                bot.sendMessage(chatId, "Неверный формат даты, используйте дд.мм.гггг")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.start = date
+                            draft.step = DiscountStep.END
+                            val current = draft.end?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                            try {
+                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг)$current")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                        }
+                    }
+                    DiscountStep.END -> {
+                        val date = runCatching { LocalDate.parse(text.trim(), DATE_FMT) }.getOrNull()
+                        val start = draft.start
+                        val price = draft.price
+                        if (date == null || start == null || price == null) {
+                            try {
+                                bot.sendMessage(chatId, "Неверный формат даты, используйте дд.мм.гггг")
+                            } catch (_: Exception) {}
+                        } else if (date.isBefore(start)) {
+                            try {
+                                bot.sendMessage(chatId, "Дата окончания не может быть раньше даты начала")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.end = date
+                            fishing.setDiscount(draft.packageId, price, start, date)
+                            val startStr = start.format(DATE_FMT)
+                            val endStr = date.format(DATE_FMT)
+                            val messageText = buildString {
+                                append("Скидка для \"${draft.packageName}\" сохранена: ")
+                                append(strikethrough("${draft.basePrice}⭐"))
+                                append(" → ${price}⭐ ($startStr — $endStr)")
+                            }
+                            discountStates.remove(userId)
+                            try {
+                                bot.sendMessage(chatId, messageText)
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                            sendDiscountMenu(chatId)
+                        }
+                    }
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
 
             adminStates[userId]?.let { draft ->
                 when (draft.step) {
@@ -2004,8 +2235,22 @@ Available commands:
             } else if (chatId == env.adminTgId) {
                 when {
                     text.startsWith("/admin") -> {
-                        val markup = """{"inline_keyboard":[[{"text":"Создать турнир","callback_data":"create_tournament"},{"text":"Список турниров","callback_data":"list_tournaments"}],[{"text":"Разослать сообщение","callback_data":"broadcast_message"}]]}"""
+                        val markup = Json.encodeToString(
+                            InlineKeyboardMarkup(
+                                listOf(
+                                    listOf(
+                                        InlineKeyboardButton("Создать турнир", "create_tournament"),
+                                        InlineKeyboardButton("Список турниров", "list_tournaments"),
+                                    ),
+                                    listOf(
+                                        InlineKeyboardButton("Разослать сообщение", "broadcast_message"),
+                                        InlineKeyboardButton("Скидки магазина", "discounts_menu"),
+                                    ),
+                                )
+                            )
+                        )
                         try { bot.sendMessage(chatId, "Админ меню", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        discountStates.remove(userId)
                     }
                     text.startsWith("/refund") -> {
                         val id = text.split(" ").getOrNull(1)?.toLongOrNull()

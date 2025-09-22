@@ -664,20 +664,28 @@ class FishingService {
         GuideDTO(locationDtos, fishDtos, lureDtos, rodDtos)
     }
 
-    @Serializable
     data class ShopPackage(
         val id: String,
         val name: String,
         val desc: String,
         val price: Int,
         val items: List<Pair<String, Int>>,
+        val originalPrice: Int? = null,
+        val discountStart: LocalDate? = null,
+        val discountEnd: LocalDate? = null,
     )
 
-    @Serializable
     data class ShopCategory(
         val id: String,
         val name: String,
         val packs: List<ShopPackage>,
+    )
+
+    data class ShopDiscount(
+        val packageId: String,
+        val price: Int,
+        val startDate: LocalDate,
+        val endDate: LocalDate,
     )
 
     private val shopCategories = listOf(
@@ -868,17 +876,89 @@ class FishingService {
 
     fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
 
-    fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
-        cat.copy(
-            name = I18n.text(cat.name, lang),
-            packs = cat.packs.map { p ->
-                p.copy(
-                    name = I18n.text(p.name, lang),
-                    desc = I18n.text(p.desc, lang),
-                    items = p.items.map { I18n.lure(it.first, lang) to it.second }
+    fun listShop(lang: String): List<ShopCategory> {
+        val now = LocalDate.now(ZoneOffset.UTC)
+        val discounts = transaction {
+            ShopDiscounts.selectAll().associateBy(
+                { it[ShopDiscounts.packageId] },
+                {
+                    ShopDiscount(
+                        packageId = it[ShopDiscounts.packageId],
+                        price = it[ShopDiscounts.price],
+                        startDate = it[ShopDiscounts.startDate],
+                        endDate = it[ShopDiscounts.endDate],
+                    )
+                }
+            )
+        }
+        return shopCategories.map { cat ->
+            cat.copy(
+                name = I18n.text(cat.name, lang),
+                packs = cat.packs.map { p ->
+                    val discount = discounts[p.id]
+                    val active = discount?.let { now >= it.startDate && now <= it.endDate } == true
+                    val finalPrice = if (active) discount!!.price else p.price
+                    val originalPrice = if (active) p.price else null
+                    val discountStart = if (active) discount!!.startDate else null
+                    val discountEnd = if (active) discount!!.endDate else null
+                    p.copy(
+                        name = I18n.text(p.name, lang),
+                        desc = I18n.text(p.desc, lang),
+                        price = finalPrice,
+                        items = p.items.map { I18n.lure(it.first, lang) to it.second },
+                        originalPrice = originalPrice,
+                        discountStart = discountStart,
+                        discountEnd = discountEnd,
+                    )
+                }
+            )
+        }
+    }
+
+    fun listDiscounts(): List<ShopDiscount> = transaction {
+        ShopDiscounts.selectAll().map {
+            ShopDiscount(
+                packageId = it[ShopDiscounts.packageId],
+                price = it[ShopDiscounts.price],
+                startDate = it[ShopDiscounts.startDate],
+                endDate = it[ShopDiscounts.endDate],
+            )
+        }
+    }
+
+    fun getDiscount(packageId: String): ShopDiscount? = transaction {
+        ShopDiscounts.select { ShopDiscounts.packageId eq packageId }
+            .singleOrNull()
+            ?.let {
+                ShopDiscount(
+                    packageId = it[ShopDiscounts.packageId],
+                    price = it[ShopDiscounts.price],
+                    startDate = it[ShopDiscounts.startDate],
+                    endDate = it[ShopDiscounts.endDate],
                 )
             }
-        )
+    }
+
+    fun setDiscount(packageId: String, price: Int, start: LocalDate, end: LocalDate) = transaction {
+        val existing = ShopDiscounts.select { ShopDiscounts.packageId eq packageId }.singleOrNull()
+        if (existing == null) {
+            ShopDiscounts.insert {
+                it[ShopDiscounts.packageId] = packageId
+                it[ShopDiscounts.price] = price
+                it[ShopDiscounts.startDate] = start
+                it[ShopDiscounts.endDate] = end
+            }
+        } else {
+            ShopDiscounts.update({ ShopDiscounts.packageId eq packageId }) {
+                it[ShopDiscounts.price] = price
+                it[ShopDiscounts.startDate] = start
+                it[ShopDiscounts.endDate] = end
+            }
+        }
+    }
+
+    fun removeDiscount(packageId: String): Int = transaction {
+        ShopDiscounts.deleteWhere { ShopDiscounts.packageId eq packageId }
     }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
