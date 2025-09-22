@@ -408,6 +408,7 @@ class FishingService {
         val bonusPredator = rodRow[Rods.bonusPredator]
         if (bonusWater != null && bonusWater != water) return 1.0
         if (bonusPredator != null && bonusPredator != predator) return 1.0
+        if (bonusWater == null && bonusPredator == null) return 1.0
         return 0.5
     }
 
@@ -1023,7 +1024,13 @@ class FishingService {
         newLure
     }
 
-    fun locationEscapeChance(userId: Long): Pair<Long, Double> = transaction {
+    data class LocationEscapeChance(
+        val locationId: Long,
+        val escapeChance: Double,
+        val rodBonusMultiplier: Double,
+    )
+
+    fun locationEscapeChance(userId: Long): LocationEscapeChance = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         val total = totalKg(userId)
         ensureRodInventory(userId, total)
@@ -1040,7 +1047,11 @@ class FishingService {
         } else {
             1.0
         }
-        locId to (baseEscapeChance(locId) * bonus)
+        LocationEscapeChance(
+            locationId = locId,
+            escapeChance = baseEscapeChance(locId) * bonus,
+            rodBonusMultiplier = bonus,
+        )
     }
 
     @Serializable
@@ -1079,10 +1090,16 @@ class FishingService {
     internal fun baseEscapeChance(locId: Long): Double {
         val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
         val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
-        return (0.05 * rank).coerceAtMost(0.5)
+        val tier = (rank - 1).coerceAtLeast(0)
+        return (0.05 * tier).coerceAtMost(0.5)
     }
 
-    fun hook(userId: Long, waitSeconds: Int, reactionTime: Double): HookResultDTO = transaction {
+    fun hook(
+        userId: Long,
+        waitSeconds: Int,
+        reactionTime: Double,
+        extraEscapeChance: Double = 0.0,
+    ): HookResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
         val lureId = userRow[Users.castLureId]?.value ?: error("No lure selected")
@@ -1130,7 +1147,7 @@ class FishingService {
             rodRow,
             picked[Fish.water],
             picked[Fish.predator],
-        )
+        ) + extraEscapeChance
 
         fun escape(): HookResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
