@@ -222,6 +222,70 @@ function NicknameModal({me,onClose,onSave}){
   );
 }
 
+function CatchDetailsModal({catchData, me, onClose}){
+  const [status,setStatus] = React.useState(null);
+  const [error,setError] = React.useState(null);
+  const [sending,setSending] = React.useState(false);
+  if(!catchData) return null;
+  const weight = Number(catchData.weight||0).toFixed(2);
+  const dateLabel = catchData.at ? new Date(catchData.at).toLocaleString() : null;
+  const fishImg = catchData.fish && FISH_IMG[catchData.fish];
+  const rarityClass = catchData.rarity && rarityColors[catchData.rarity] ? rarityColors[catchData.rarity] : '';
+  const isOwnCatch = catchData.userId != null && me?.id != null && Number(catchData.userId) === Number(me.id);
+  const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
+
+  async function handleSend(){
+    if(!canSend || sending) return;
+    setSending(true);
+    setStatus(null);
+    setError(null);
+    try{
+      const res = await fetch(`/api/catches/${catchData.id}/send`,{method:'POST',credentials:'include'});
+      if(!res.ok) throw new Error('send_failed');
+      setStatus(t('catchSent'));
+    }catch(e){
+      setError(t('catchSendFailed'));
+    }finally{
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
+      <div className="relative mx-4 mt-safe flex items-center justify-center min-h-full pointer-events-none">
+        <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto">
+          <div className="flex items-start justify-between mb-3">
+            <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
+            <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+          </div>
+          {fishImg ? (
+            <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
+          ) : (
+            <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
+          )}
+          {catchData.location && <div className="text-sm opacity-70 mt-3">{t('locationLabel')} {catchData.location}</div>}
+          <div className="text-2xl font-semibold mt-2">{weight} {t('kg')}</div>
+          {dateLabel && <div className="text-xs opacity-60 mt-1">{dateLabel}</div>}
+          {catchData.user && <div className="text-xs opacity-70 mt-1"><bdi>{catchData.user}</bdi></div>}
+          {canSend && (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending}
+              className={`w-full mt-4 px-4 py-3 rounded-xl font-semibold ${sending?'bg-emerald-500/60':'bg-emerald-600 hover:bg-emerald-500'}`}
+            >
+              {sending ? t('sendingCatch') : t('sendToMe')}
+            </button>
+          )}
+          {status && <div className="text-xs text-emerald-300 mt-2">{status}</div>}
+          {error && <div className="text-xs text-red-300 mt-2">{error}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DailyModal({streak,available,rewards,onClose,onClaim}){
   const defaultRewards = [
     [ {name:'Пресная мирная',qty:8}, {name:'Пресная хищная',qty:4} ],

@@ -48,6 +48,7 @@ function App(){
   const [nickOpen,setNickOpen] = React.useState(false);
   const [prize,setPrize] = React.useState(null);
   const [prizeHint,setPrizeHint] = React.useState(null);
+  const [catchDetails,setCatchDetails] = React.useState(null);
   const [dailyOpen,setDailyOpen] = React.useState(false);
   const [refOpen,setRefOpen] = React.useState(false);
   const [refInfo,setRefInfo] = React.useState(null);
@@ -76,6 +77,11 @@ function App(){
   const hasCatchAnimationBeenShown = React.useCallback(id => {
     if(id == null) return false;
     return lastCatchAnimationShownRef.current === id;
+  }, []);
+
+  const handleCatchClick = React.useCallback(data => {
+    if(!data) return;
+    setCatchDetails({...data});
   }, []);
 
   React.useEffect(()=>{
@@ -474,18 +480,18 @@ function App(){
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const animationId = ++catchAnimationIdRef.current;
         setResult({...c,newFish:isNewFish,newLocations:newLocs,newRods,animationId});
-        setMe(p=>{
-          const tot = (p.totalWeight||0)+c.weight;
-          return {
-            ...p,
-            totalWeight:tot,
-            todayWeight:(p.todayWeight||0)+c.weight,
-            locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
-            rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
-            recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
-            caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
-          };
-        });
+            setMe(p=>{
+              const tot = (p.totalWeight||0)+c.weight;
+              return {
+                ...p,
+                totalWeight:tot,
+                todayWeight:(p.todayWeight||0)+c.weight,
+                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
+                recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
+                caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
+              };
+            });
         try{
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
           if(ct.status===200){
@@ -762,27 +768,28 @@ function App(){
 
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (
-          <FishingTab
-            me={me}
-            setMe={setMe}
-            casting={casting}
-            biting={biting}
-            tapActive={tapActive}
-            tapCount={tapCount}
-            tapTimeLeft={tapTimeLeft}
-            castReady={castReady}
-            onCast={()=>cast(false)}
-            onHook={()=>hook(false)}
-            onTap={handleTap}
-            result={result}
-            error={error}
-            autoCast={autoCast}
-            setAutoCast={setAutoCast}
-            autoCastRef={autoCastRef}
-            autoCastTimeoutRef={autoCastTimeoutRef}
-            hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
-            markCatchAnimationShown={markCatchAnimationShown}
-          />
+            <FishingTab
+              me={me}
+              setMe={setMe}
+              casting={casting}
+              biting={biting}
+              tapActive={tapActive}
+              tapCount={tapCount}
+              tapTimeLeft={tapTimeLeft}
+              castReady={castReady}
+              onCast={()=>cast(false)}
+              onHook={()=>hook(false)}
+              onTap={handleTap}
+              result={result}
+              error={error}
+              autoCast={autoCast}
+              setAutoCast={setAutoCast}
+              autoCastRef={autoCastRef}
+              autoCastTimeoutRef={autoCastTimeoutRef}
+              hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
+              markCatchAnimationShown={markCatchAnimationShown}
+              onCatchClick={handleCatchClick}
+            />
           )}
 
           {tab === 'tournaments' && (
@@ -799,10 +806,11 @@ function App(){
               prizeHint={prizeHint}
               setPrizeHint={setPrizeHint}
               shop={shop}
+              onCatchClick={handleCatchClick}
             />
           )}
           {tab === 'achievements' && (
-            <Achievements me={me} setMe={setMe} />
+            <Achievements me={me} setMe={setMe} onCatchClick={handleCatchClick} />
           )}
           {tab === 'shop' && (
             <ShopTab
