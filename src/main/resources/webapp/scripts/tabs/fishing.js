@@ -2,7 +2,6 @@ const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
 const BOBBER_SIZE = 24;
 const BOBBER_RADIUS = BOBBER_SIZE / 2;
 const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
-const BOBBER_LINE_ANCHOR_INSET = BOBBER_SIZE * 0.145; // aligns with the tip of the bobber artwork
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
@@ -43,7 +42,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const WATER_TOP_REL = 0.48;
   const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
-  const [tension, setTension] = React.useState(0.2);
   const [floatVisual, setFloatVisual] = React.useState({offset:0, tilt:0, submerge:0});
   const floatPxRef = React.useRef({x:0,y:0});
 
@@ -73,7 +71,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     : null;
   const lineAttach = React.useMemo(() => ({
     x: floatPx.x,
-    y: floatPx.y - BOBBER_RADIUS + BOBBER_LINE_ANCHOR_INSET
+    y: floatPx.y
   }), [floatPx.x, floatPx.y]);
   const lineClipId = React.useMemo(() => `line-clip-${Math.random().toString(36).slice(2, 9)}`, []);
   const lineClipHeight = Math.max(0, Math.min(h, waterlineY));
@@ -169,17 +167,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipX = rodLeft + rodW * rodTipAnchor.x;
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
-  const floatLift = Math.max(0, -floatVisual.offset);
-  const floatDip = Math.max(0, floatVisual.offset);
-  const sagBase = isSmall ? 50 : (60 + 120 * tension);
-  const sagDynamic = sagBase + floatDip * (isSmall ? 0.45 : 0.65) - floatLift * (isSmall ? 0.9 : 1.2);
-  const sagClamped = Math.max(isSmall ? 28 : 36, sagDynamic);
-
-  const ctrl = {
-    x: (tipX + lineAttach.x) / 2 - (isSmall ? 24 : 40),
-    y: (tipY + lineAttach.y) / 2 + sagClamped
-  };
-  const linePath = `M ${tipX},${tipY} Q ${ctrl.x},${ctrl.y} ${lineAttach.x},${lineAttach.y}`;
+  const linePath = `M ${tipX},${tipY} L ${lineAttach.x},${lineAttach.y}`;
 
   const catchTargetPx = React.useMemo(()=>{
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -294,11 +282,9 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         x: minX + Math.random() * (maxX - minX),
         y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
       };
-      setTension(0.15 + Math.random() * 0.25);
       tweenTo(target, 650);
     } else {
       setFloatRel(shorePosRel);
-      setTension(0.18);
     }
   }, [casting, shorePosRel, tipX, w]);
 
