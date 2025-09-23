@@ -92,7 +92,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     };
   }, [bobberClipPath]);
 
-  const shouldAnimateFloat = (casting && castLanded) || biting;
+  const shouldAnimateFloat = (casting && castLanded) || biting || tapping;
   React.useEffect(()=>{
     let frame;
     if(!shouldAnimateFloat){
@@ -108,14 +108,27 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     const animate = (now)=>{
       if(start === null){ start = now; }
       const t = (now - start) / 1000;
-      const basePeriod = biting ? 0.6 : 3;
+      const state = tapping ? 'tapping' : (biting ? 'biting' : 'idle');
+      const basePeriod = state === 'biting' ? 0.6 : (state === 'tapping' ? 0.45 : 3);
       const mainWave = Math.sin((t * Math.PI * 2) / basePeriod);
-      const extraWave = biting ? Math.sin((t * Math.PI * 2) / (basePeriod * 0.5)) : 0;
-      const offset = mainWave * (biting ? 8.5 : 4) + extraWave * 2.5;
-      const tilt = biting
-        ? Math.sin((t * Math.PI * 2) / (basePeriod * 0.7)) * 9
-        : mainWave * 2.5;
-      const submerge = offset > 0 ? Math.min(1, offset / (biting ? 10 : 6)) : 0;
+      let offset;
+      let tilt;
+      let submerge;
+      if(state === 'biting'){
+        const extraWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.5));
+        offset = mainWave * 8.5 + extraWave * 2.5;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.7)) * 9;
+        submerge = offset > 0 ? Math.min(1, offset / 10) : 0;
+      } else if(state === 'tapping'){
+        const quickWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.65));
+        offset = mainWave * 5 + quickWave * 1.6;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.8)) * 6;
+        submerge = offset > 0 ? Math.min(1, offset / 8) : 0;
+      } else {
+        offset = mainWave * 4;
+        tilt = mainWave * 2.5;
+        submerge = offset > 0 ? Math.min(1, offset / 6) : 0;
+      }
       const nextState = {offset, tilt, submerge};
       setFloatVisual(prev => {
         if(
@@ -133,7 +146,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     return ()=>{
       if(frame){ cancelAnimationFrame(frame); }
     };
-  }, [shouldAnimateFloat, biting]);
+  }, [shouldAnimateFloat, biting, tapping]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
