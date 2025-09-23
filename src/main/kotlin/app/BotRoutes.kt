@@ -361,7 +361,7 @@ fun Application.botRoutes(env: Env) {
                 chatId: Long,
             ): String {
                 if (chatId >= 0) return base
-                val rarityLabel = RARITY_LABELS["ru"]?.get(catch.rarity) ?: catch.rarity
+                val rarityLabel = RARITY_LABELS["en"]?.get(catch.rarity) ?: catch.rarity
                 val rarityValue = toHashtagValue(rarityLabel)
                 val fishNameEn = toHashtagValue(I18n.fish(catch.fish, "en"))
                 val fishNameRu = toHashtagValue(I18n.fish(catch.fish, "ru"))
@@ -804,20 +804,7 @@ fun Application.botRoutes(env: Env) {
 
                 val buttons = shop.flatMap { category ->
                     category.packs.map { pack ->
-                        val labelPrice = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
-                            val discountPercent = ((pack.originalPrice - pack.price) * 100) / pack.originalPrice
-                            val untilPart = pack.discountEnd?.format(DATE_FMT)?.let {
-                                if (lang == "ru") " до $it" else " until $it"
-                            } ?: ""
-                            val discountLabel = if (lang == "ru") {
-                                "скидка $discountPercent% от полной цены$untilPart"
-                            } else {
-                                "discount $discountPercent% off full price$untilPart"
-                            }
-                            "${pack.price}⭐ ($discountLabel)"
-                        } else {
-                            "${pack.price}⭐"
-                        }
+                        val labelPrice = "${pack.price}⭐"
                         val label = "${pack.name} — $labelPrice"
                         InlineKeyboardButton(label, "/buy ${ownedData(uid, pack.id)}")
                     }
