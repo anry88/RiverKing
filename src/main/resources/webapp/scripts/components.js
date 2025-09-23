@@ -78,7 +78,7 @@ function BottomNav({tab,setTab,dailyAvailable}){
             <div className="relative">
               <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
               {dailyAvailable && item.id==='shop' && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-black text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                   !
                 </span>
               )}
