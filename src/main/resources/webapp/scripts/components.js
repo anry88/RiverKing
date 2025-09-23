@@ -292,22 +292,28 @@ function CatchDetailsModal({catchData, me, onClose}){
               <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
-            {fishUnlocked ? (
-              fishImg ? (
-                <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain mx-auto" onError={e=>{e.currentTarget.style.display='none';}} />
-              ) : (
-                <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center mx-auto text-4xl">🐟</div>
-              )
-            ) : (
-              <div className="w-32 h-32 bg-gray-800/70 rounded-xl flex items-center justify-center mx-auto relative">
-                <span className="text-5xl opacity-20">🐟</span>
-                <span className="absolute text-3xl">?</span>
+            <div className="mt-3 flex items-start gap-4">
+              <div className="flex-shrink-0">
+                {fishUnlocked ? (
+                  fishImg ? (
+                    <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain" onError={e=>{e.currentTarget.style.display='none';}} />
+                  ) : (
+                    <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center text-4xl">🐟</div>
+                  )
+                ) : (
+                  <div className="w-32 h-32 bg-gray-800/70 rounded-xl flex items-center justify-center relative">
+                    <span className="text-5xl opacity-20">🐟</span>
+                    <span className="absolute text-3xl">?</span>
+                  </div>
+                )}
               </div>
-            )}
-            {catchData.location && <div className={`text-sm opacity-70 mt-3 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
-            <div className={`text-2xl font-semibold mt-2 ${rarityClass}`}>{weight} {t('kg')}</div>
-            {dateLabel && <div className={`text-xs opacity-60 mt-1 ${rarityClass}`}>{dateLabel}</div>}
-            {catchData.user && <div className={`text-xs opacity-70 mt-1 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
+              <div className="ml-auto flex flex-col items-end text-right gap-1">
+                {catchData.location && <div className={`text-sm opacity-70 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
+                <div className={`text-2xl font-semibold ${rarityClass}`}>{weight} {t('kg')}</div>
+                {dateLabel && <div className={`text-xs opacity-60 ${rarityClass}`}>{dateLabel}</div>}
+                {catchData.user && <div className={`text-xs opacity-70 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
+              </div>
+            </div>
             {canSend && (
               <button
                 type="button"
