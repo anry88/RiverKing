@@ -811,7 +811,17 @@ fun Application.botRoutes(env: Env) {
                 }.chunked(2)
 
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
-                trySend(chatId, text, markup, replyToMessageId)
+                val parts = splitMessage(text)
+                if (parts.size == 1) {
+                    trySend(chatId, text, markup, replyToMessageId)
+                } else {
+                    parts.forEachIndexed { index, part ->
+                        val trimmedPart = part.trimEnd()
+                        val partMarkup = if (index == 0) markup else null
+                        val partReplyTo = if (index == 0) replyToMessageId else null
+                        trySend(chatId, trimmedPart, partMarkup, partReplyTo)
+                    }
+                }
             }
 
             suspend fun processUserCommand(
