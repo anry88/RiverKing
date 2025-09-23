@@ -255,32 +255,172 @@ fun generateCatchImage(
         caughtAt?.let { infoLines += "\uD83D\uDDD3 ${formatCatchDate(it, lang)}" }
         anglerName?.takeIf { it.isNotBlank() }?.let { infoLines += "\uD83D\uDC64 $it" }
 
-        if (infoLines.isNotEmpty()) {
-            var currentY = nameY + nameMetrics.descent + (padding / 3)
-            infoLines.forEach { line ->
-                val infoFont = fitFont(
-                    g2d,
-                    line,
-                    Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt()),
-                    maxTextWidth,
-                )
-                g2d.font = infoFont
-                g2d.color = Color.WHITE
-                val infoMetrics = g2d.fontMetrics
-                currentY += infoMetrics.ascent
-                g2d.drawString(line, padding, currentY)
-                currentY += infoMetrics.descent + (padding * 0.2).roundToInt()
-            }
+        data class InfoLine(val text: String, val font: Font, val metrics: java.awt.FontMetrics)
+
+        val infoEntries = infoLines.map { line ->
+            val infoFont = fitFont(
+                g2d,
+                line,
+                Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt()),
+                maxTextWidth,
+            )
+            InfoLine(line, infoFont, g2d.getFontMetrics(infoFont))
         }
 
         val weightText = "%.2f %s".format(Locale.US, weightKg, unit)
         val weightFont = fitFont(g2d, weightText, Font("SansSerif", Font.PLAIN, (size * 0.07).roundToInt()), maxTextWidth)
         g2d.font = weightFont
         g2d.color = rarityColor
-        val weightMetrics = g2d.fontMetrics
+        val weightMetrics = g2d.getFontMetrics(weightFont)
+        var weightBaseline = overlayY + overlayHeight - padding / 2
+        val bottomMargin = (padding * 0.24).roundToInt().coerceAtLeast(12)
+        val maxWeightBaseline = (size - bottomMargin).coerceAtLeast(weightBaseline)
+        if (weightBaseline > maxWeightBaseline) {
+            weightBaseline = maxWeightBaseline
+        }
+
+        val nameBottom = nameY + nameMetrics.descent
+        var beforeSpacing = (padding * 0.25).roundToInt()
+        val minBeforeSpacing = (padding * 0.1).roundToInt().coerceAtLeast(6)
+        var afterSpacing = (padding * 0.2).roundToInt()
+        val minAfterSpacing = (padding * 0.12).roundToInt().coerceAtLeast(6)
+        var betweenSpacing = if (infoEntries.size > 1) (padding * 0.14).roundToInt() else 0
+        val minBetweenSpacing = if (infoEntries.size > 1) (padding * 0.06).roundToInt().coerceAtLeast(2) else 0
+        val infoHeightSum = infoEntries.sumOf { it.metrics.ascent + it.metrics.descent }
+
+        fun layoutInfoLines(): Triple<List<Int>, Int, Int> {
+            if (infoEntries.isEmpty()) {
+                val weightTop = weightBaseline - weightMetrics.ascent
+                val reference = weightTop - afterSpacing
+                return Triple(emptyList(), reference, reference)
+            }
+            val weightTop = weightBaseline - weightMetrics.ascent
+            var currentTop = weightTop - afterSpacing
+            val baselines = MutableList(infoEntries.size) { 0 }
+            val spacingBetween = if (infoEntries.size > 1) betweenSpacing else 0
+            for (i in infoEntries.indices.reversed()) {
+                val entry = infoEntries[i]
+                val baseline = currentTop - entry.metrics.descent
+                baselines[i] = baseline
+                val top = baseline - entry.metrics.ascent
+                currentTop = top - spacingBetween
+            }
+            val firstEntry = infoEntries.first()
+            val lastEntry = infoEntries.last()
+            val infoTop = baselines.first() - firstEntry.metrics.ascent
+            val infoBottom = baselines.last() + lastEntry.metrics.descent
+            return Triple(baselines, infoTop, infoBottom)
+        }
+
+        var infoBlockHeight = if (infoEntries.isNotEmpty()) {
+            infoHeightSum + betweenSpacing * (infoEntries.size - 1)
+        } else {
+            0
+        }
+
+        val maxIterations = 10
+        var baselines: List<Int> = emptyList()
+        var infoTop = 0
+        var infoBottom = 0
+        for (iteration in 0 until maxIterations) {
+            val weightTop = weightBaseline - weightMetrics.ascent
+            val desiredTop = nameBottom + beforeSpacing
+            val projectedTop = weightTop - afterSpacing - infoBlockHeight
+            if (projectedTop < desiredTop) {
+                val deficit = desiredTop - projectedTop
+                val shift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
+                if (shift > 0 && deficit > 0) {
+                    val appliedShift = deficit.coerceAtMost(shift)
+                    weightBaseline += appliedShift
+                    continue
+                }
+                if (beforeSpacing > minBeforeSpacing && deficit > 0) {
+                    val reduce = deficit.coerceAtMost(beforeSpacing - minBeforeSpacing)
+                    beforeSpacing -= reduce
+                    continue
+                }
+                if (betweenSpacing > minBetweenSpacing && infoEntries.size > 1) {
+                    val perUnitGain = infoEntries.size - 1
+                    val neededUnits = ((deficit + perUnitGain - 1) / perUnitGain).coerceAtLeast(1)
+                    val reduce = neededUnits.coerceAtMost(betweenSpacing - minBetweenSpacing)
+                    betweenSpacing -= reduce
+                    infoBlockHeight = infoHeightSum + betweenSpacing * (infoEntries.size - 1)
+                    continue
+                }
+                if (afterSpacing > minAfterSpacing) {
+                    val reduce = deficit.coerceAtMost(afterSpacing - minAfterSpacing)
+                    afterSpacing -= reduce
+                    continue
+                }
+            }
+
+            val layout = layoutInfoLines()
+            baselines = layout.first
+            infoTop = layout.second
+            infoBottom = layout.third
+            val desiredSpacingTop = nameBottom + beforeSpacing
+            if (infoTop < desiredSpacingTop) {
+                val deficitTop = desiredSpacingTop - infoTop
+                val availableShift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
+                if (availableShift > 0 && deficitTop > 0) {
+                    val shift = deficitTop.coerceAtMost(availableShift)
+                    weightBaseline += shift
+                    continue
+                }
+                if (beforeSpacing > minBeforeSpacing && deficitTop > 0) {
+                    val reduce = deficitTop.coerceAtMost(beforeSpacing - minBeforeSpacing)
+                    beforeSpacing -= reduce
+                    continue
+                }
+            }
+
+            val weightTopAfter = weightBaseline - weightMetrics.ascent
+            val neededBottomSpacing = infoBottom + afterSpacing
+            if (neededBottomSpacing > weightTopAfter) {
+                val deficitBottom = neededBottomSpacing - weightTopAfter
+                val availableShift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
+                if (availableShift > 0 && deficitBottom > 0) {
+                    val shift = deficitBottom.coerceAtMost(availableShift)
+                    weightBaseline += shift
+                    continue
+                }
+                if (afterSpacing > minAfterSpacing && deficitBottom > 0) {
+                    val reduce = deficitBottom.coerceAtMost(afterSpacing - minAfterSpacing)
+                    afterSpacing -= reduce
+                    continue
+                }
+                if (betweenSpacing > minBetweenSpacing && infoEntries.size > 1 && deficitBottom > 0) {
+                    val perUnitGain = infoEntries.size - 1
+                    val neededUnits = ((deficitBottom + perUnitGain - 1) / perUnitGain).coerceAtLeast(1)
+                    val reduce = neededUnits.coerceAtMost(betweenSpacing - minBetweenSpacing)
+                    betweenSpacing -= reduce
+                    infoBlockHeight = infoHeightSum + betweenSpacing * (infoEntries.size - 1)
+                    continue
+                }
+            }
+
+            break
+        }
+
+        if (infoEntries.isNotEmpty() && baselines.isEmpty()) {
+            val layout = layoutInfoLines()
+            baselines = layout.first
+            infoTop = layout.second
+            infoBottom = layout.third
+        }
+
+        infoEntries.forEachIndexed { index, entry ->
+            g2d.font = entry.font
+            g2d.color = rarityColor
+            val baseline = baselines.getOrNull(index)
+                ?: (weightBaseline - weightMetrics.ascent - afterSpacing)
+            g2d.drawString(entry.text, padding, baseline)
+        }
+
+        g2d.font = weightFont
+        g2d.color = rarityColor
         val weightX = padding
-        val weightY = overlayY + overlayHeight - padding / 2
-        g2d.drawString(weightText, weightX, weightY)
+        g2d.drawString(weightText, weightX, weightBaseline)
 
         g2d.dispose()
         val baos = ByteArrayOutputStream()
