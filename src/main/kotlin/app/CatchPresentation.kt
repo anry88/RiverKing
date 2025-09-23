@@ -6,6 +6,9 @@ import java.awt.GradientPaint
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.imageio.ImageIO
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -122,6 +125,17 @@ private val RARITY_COLORS = mapOf(
     "legendary" to Color(0xFA, 0xCC, 0x15),
 )
 
+private val DATE_FORMATTERS = mapOf(
+    "ru" to DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"),
+    "en" to DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+)
+
+private fun formatCatchDate(instant: Instant, lang: String): String {
+    val zone = ZoneId.systemDefault()
+    val formatter = DATE_FORMATTERS[lang] ?: DATE_FORMATTERS.getValue("en")
+    return instant.atZone(zone).format(formatter)
+}
+
 fun buildCatchCaption(
     lang: String,
     fishName: String,
@@ -165,11 +179,14 @@ private fun fitFont(g2d: java.awt.Graphics2D, text: String, baseFont: Font, maxW
 
 fun generateCatchImage(
     fishInternalName: String,
-    locationName: String,
+    locationInternalName: String,
     displayFishName: String,
+    displayLocationName: String? = null,
     weightKg: Double,
     rarity: String?,
     lang: String,
+    anglerName: String? = null,
+    caughtAt: Instant? = null,
 ): ByteArray? {
     val path = FISH_IMAGE_PATHS[fishInternalName] ?: return null
     val classLoader = Thread.currentThread().contextClassLoader
@@ -183,7 +200,9 @@ fun generateCatchImage(
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
 
-        LOCATION_BACKGROUNDS[locationName]?.let { bgPath ->
+        val backgroundPath = LOCATION_BACKGROUNDS[locationInternalName]
+            ?: displayLocationName?.let { LOCATION_BACKGROUNDS[it] }
+        backgroundPath?.let { bgPath ->
             classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
                 val bgImage = ImageIO.read(bgStream)
                 if (bgImage != null) {
@@ -231,9 +250,33 @@ fun generateCatchImage(
         g2d.drawString(displayFishName, nameX, nameY)
 
         val unit = if (lang == "ru") "кг" else "kg"
+        val infoLines = mutableListOf<String>()
+        displayLocationName?.takeIf { it.isNotBlank() }?.let { infoLines += "\uD83D\uDCCD $it" }
+        caughtAt?.let { infoLines += "\uD83D\uDDD3 ${formatCatchDate(it, lang)}" }
+        anglerName?.takeIf { it.isNotBlank() }?.let { infoLines += "\uD83D\uDC64 $it" }
+
+        if (infoLines.isNotEmpty()) {
+            var currentY = nameY + nameMetrics.descent + (padding / 3)
+            infoLines.forEach { line ->
+                val infoFont = fitFont(
+                    g2d,
+                    line,
+                    Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt()),
+                    maxTextWidth,
+                )
+                g2d.font = infoFont
+                g2d.color = Color.WHITE
+                val infoMetrics = g2d.fontMetrics
+                currentY += infoMetrics.ascent
+                g2d.drawString(line, padding, currentY)
+                currentY += (padding * 0.2).roundToInt()
+            }
+        }
+
         val weightText = "%.2f %s".format(Locale.US, weightKg, unit)
         val weightFont = fitFont(g2d, weightText, Font("SansSerif", Font.PLAIN, (size * 0.07).roundToInt()), maxTextWidth)
         g2d.font = weightFont
+        g2d.color = rarityColor
         val weightMetrics = g2d.fontMetrics
         val weightX = padding
         val weightY = overlayY + overlayHeight - padding / 2
