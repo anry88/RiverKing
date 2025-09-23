@@ -4,6 +4,7 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.GradientPaint
 import java.awt.RenderingHints
+import java.awt.geom.Path2D
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.time.Instant
@@ -136,6 +137,21 @@ private fun formatCatchDate(instant: Instant, lang: String): String {
     return instant.atZone(zone).format(formatter)
 }
 
+private enum class InfoIcon {
+    LOCATION,
+    DATE,
+    ANGLER,
+}
+
+private data class InfoItem(val icon: InfoIcon, val text: String)
+
+private data class PreparedInfoEntry(
+    val item: InfoItem,
+    val font: Font,
+    val metrics: java.awt.FontMetrics,
+    val iconSize: Int,
+)
+
 fun buildCatchCaption(
     lang: String,
     fishName: String,
@@ -199,6 +215,7 @@ fun generateCatchImage(
         val g2d = finalImage.createGraphics()
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
         val backgroundPath = LOCATION_BACKGROUNDS[locationInternalName]
             ?: displayLocationName?.let { LOCATION_BACKGROUNDS[it] }
@@ -231,7 +248,7 @@ fun generateCatchImage(
         val fishY = ((size - fishImage.height) / 2.0).roundToInt()
         g2d.drawImage(fishImage, fishX, fishY, null)
 
-        val overlayHeight = (size * 0.28).roundToInt()
+        val overlayHeight = (size * 0.32).roundToInt()
         val overlayY = size - overlayHeight
         val gradient = GradientPaint(0f, overlayY.toFloat(), Color(0, 0, 0, 0), 0f, size.toFloat(), Color(0, 0, 0, 200))
         g2d.paint = gradient
@@ -250,21 +267,22 @@ fun generateCatchImage(
         g2d.drawString(displayFishName, nameX, nameY)
 
         val unit = if (lang == "ru") "кг" else "kg"
-        val infoLines = mutableListOf<String>()
-        displayLocationName?.takeIf { it.isNotBlank() }?.let { infoLines += "\uD83D\uDCCD $it" }
-        caughtAt?.let { infoLines += "\uD83D\uDDD3 ${formatCatchDate(it, lang)}" }
-        anglerName?.takeIf { it.isNotBlank() }?.let { infoLines += "\uD83D\uDC64 $it" }
+        val infoItems = mutableListOf<InfoItem>()
+        displayLocationName?.takeIf { it.isNotBlank() }?.let { infoItems += InfoItem(InfoIcon.LOCATION, it) }
+        caughtAt?.let { infoItems += InfoItem(InfoIcon.DATE, formatCatchDate(it, lang)) }
+        anglerName?.takeIf { it.isNotBlank() }?.let { infoItems += InfoItem(InfoIcon.ANGLER, it) }
 
-        data class InfoLine(val text: String, val font: Font, val metrics: java.awt.FontMetrics)
-
-        val infoEntries = infoLines.map { line ->
-            val infoFont = fitFont(
-                g2d,
-                line,
-                Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt()),
-                maxTextWidth,
-            )
-            InfoLine(line, infoFont, g2d.getFontMetrics(infoFont))
+        val iconGap = (padding * 0.18).roundToInt().coerceAtLeast(12)
+        val infoEntries = infoItems.map { item ->
+            var infoFont = Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt())
+            var metrics = g2d.getFontMetrics(infoFont)
+            var iconSize = max((infoFont.size * 1.1).roundToInt(), 16)
+            while (iconSize + iconGap + metrics.stringWidth(item.text) > maxTextWidth && infoFont.size > 22) {
+                infoFont = infoFont.deriveFont((infoFont.size - 2).toFloat())
+                metrics = g2d.getFontMetrics(infoFont)
+                iconSize = max((infoFont.size * 1.1).roundToInt(), 16)
+            }
+            PreparedInfoEntry(item, infoFont, metrics, iconSize)
         }
 
         val weightText = "%.2f %s".format(Locale.US, weightKg, unit)
@@ -280,12 +298,12 @@ fun generateCatchImage(
         }
 
         val nameBottom = nameY + nameMetrics.descent
-        var beforeSpacing = (padding * 0.25).roundToInt()
-        val minBeforeSpacing = (padding * 0.1).roundToInt().coerceAtLeast(6)
-        var afterSpacing = (padding * 0.2).roundToInt()
-        val minAfterSpacing = (padding * 0.12).roundToInt().coerceAtLeast(6)
-        var betweenSpacing = if (infoEntries.size > 1) (padding * 0.14).roundToInt() else 0
-        val minBetweenSpacing = if (infoEntries.size > 1) (padding * 0.06).roundToInt().coerceAtLeast(2) else 0
+        val topSpacing = (padding * 0.35).roundToInt().coerceAtLeast(22)
+        val minTopSpacing = (padding * 0.25).roundToInt().coerceAtLeast(16)
+        var afterSpacing = (padding * 0.24).roundToInt()
+        val minAfterSpacing = (padding * 0.14).roundToInt().coerceAtLeast(8)
+        var betweenSpacing = if (infoEntries.size > 1) (padding * 0.16).roundToInt() else 0
+        val minBetweenSpacing = if (infoEntries.size > 1) (padding * 0.08).roundToInt().coerceAtLeast(3) else 0
         val infoHeightSum = infoEntries.sumOf { it.metrics.ascent + it.metrics.descent }
 
         fun layoutInfoLines(): Triple<List<Int>, Int, Int> {
@@ -324,7 +342,7 @@ fun generateCatchImage(
         var infoBottom = 0
         for (iteration in 0 until maxIterations) {
             val weightTop = weightBaseline - weightMetrics.ascent
-            val desiredTop = nameBottom + beforeSpacing
+            val desiredTop = nameBottom + topSpacing
             val projectedTop = weightTop - afterSpacing - infoBlockHeight
             if (projectedTop < desiredTop) {
                 val deficit = desiredTop - projectedTop
@@ -332,11 +350,6 @@ fun generateCatchImage(
                 if (shift > 0 && deficit > 0) {
                     val appliedShift = deficit.coerceAtMost(shift)
                     weightBaseline += appliedShift
-                    continue
-                }
-                if (beforeSpacing > minBeforeSpacing && deficit > 0) {
-                    val reduce = deficit.coerceAtMost(beforeSpacing - minBeforeSpacing)
-                    beforeSpacing -= reduce
                     continue
                 }
                 if (betweenSpacing > minBetweenSpacing && infoEntries.size > 1) {
@@ -358,18 +371,13 @@ fun generateCatchImage(
             baselines = layout.first
             infoTop = layout.second
             infoBottom = layout.third
-            val desiredSpacingTop = nameBottom + beforeSpacing
+            val desiredSpacingTop = nameBottom + topSpacing
             if (infoTop < desiredSpacingTop) {
                 val deficitTop = desiredSpacingTop - infoTop
                 val availableShift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
                 if (availableShift > 0 && deficitTop > 0) {
                     val shift = deficitTop.coerceAtMost(availableShift)
                     weightBaseline += shift
-                    continue
-                }
-                if (beforeSpacing > minBeforeSpacing && deficitTop > 0) {
-                    val reduce = deficitTop.coerceAtMost(beforeSpacing - minBeforeSpacing)
-                    beforeSpacing -= reduce
                     continue
                 }
             }
@@ -409,12 +417,55 @@ fun generateCatchImage(
             infoBottom = layout.third
         }
 
+        if (infoEntries.isNotEmpty()) {
+            val desiredTop = nameBottom + topSpacing
+            val minimalTop = nameBottom + minTopSpacing
+            if (infoTop < desiredTop) {
+                val availableShift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
+                val needed = desiredTop - infoTop
+                val applied = needed.coerceAtMost(availableShift)
+                if (applied > 0) {
+                    weightBaseline += applied
+                    baselines = baselines.map { it + applied }
+                    infoTop += applied
+                    infoBottom += applied
+                }
+            }
+            if (infoTop < minimalTop) {
+                val availableShift = (maxWeightBaseline - weightBaseline).coerceAtLeast(0)
+                val needed = minimalTop - infoTop
+                val applied = needed.coerceAtMost(availableShift)
+                if (applied > 0) {
+                    weightBaseline += applied
+                    baselines = baselines.map { it + applied }
+                    infoTop += applied
+                    infoBottom += applied
+                }
+            }
+            if (infoTop < minimalTop) {
+                val offset = minimalTop - infoTop
+                baselines = baselines.map { it + offset }
+                weightBaseline += offset
+                infoBottom += offset
+                infoTop += offset
+                if (weightBaseline > maxWeightBaseline) {
+                    val overflow = weightBaseline - maxWeightBaseline
+                    weightBaseline -= overflow
+                    baselines = baselines.map { it - overflow }
+                    infoTop -= overflow
+                    infoBottom -= overflow
+                }
+            }
+        }
+
         infoEntries.forEachIndexed { index, entry ->
             g2d.font = entry.font
             g2d.color = rarityColor
             val baseline = baselines.getOrNull(index)
                 ?: (weightBaseline - weightMetrics.ascent - afterSpacing)
-            g2d.drawString(entry.text, padding, baseline)
+            drawInfoIcon(g2d, entry.item.icon, padding, baseline, entry.iconSize, rarityColor)
+            val textX = padding + entry.iconSize + iconGap
+            g2d.drawString(entry.item.text, textX, baseline)
         }
 
         g2d.font = weightFont
@@ -427,4 +478,78 @@ fun generateCatchImage(
         ImageIO.write(finalImage, "png", baos)
         return baos.toByteArray()
     }
+}
+
+private fun drawInfoIcon(
+    g2d: java.awt.Graphics2D,
+    icon: InfoIcon,
+    x: Int,
+    baseline: Int,
+    size: Int,
+    color: Color,
+) {
+    if (size <= 0) return
+    val originalColor = g2d.color
+    val top = baseline - size
+    val width = size
+    val primary = Color(color.red, color.green, color.blue, 220)
+    val secondary = Color(color.red, color.green, color.blue, 160)
+    g2d.color = primary
+    when (icon) {
+        InfoIcon.LOCATION -> {
+            val centerX = x + width / 2
+            val circleDiameter = (size * 0.55).roundToInt()
+            val circleTop = top + (size * 0.1).roundToInt()
+            g2d.fillOval(centerX - circleDiameter / 2, circleTop, circleDiameter, circleDiameter)
+            val pointer = Path2D.Double()
+            val bottomY = (top + size).toDouble()
+            val controlY = top + size * 0.65
+            pointer.moveTo(centerX.toDouble(), bottomY)
+            pointer.curveTo(
+                (centerX - width * 0.45), controlY,
+                (centerX - width * 0.38), (circleTop + circleDiameter).toDouble(),
+                centerX.toDouble(), (circleTop + circleDiameter).toDouble(),
+            )
+            pointer.curveTo(
+                (centerX + width * 0.38), (circleTop + circleDiameter).toDouble(),
+                (centerX + width * 0.45), controlY,
+                centerX.toDouble(), bottomY,
+            )
+            g2d.fill(pointer)
+            val hole = (circleDiameter * 0.45).roundToInt()
+            if (hole > 0) {
+                g2d.color = secondary
+                g2d.fillOval(centerX - hole / 2, circleTop + circleDiameter / 2 - hole / 2, hole, hole)
+                g2d.color = primary
+            }
+        }
+        InfoIcon.DATE -> {
+            val iconWidth = (width * 0.9).roundToInt()
+            val left = x
+            val radius = (size * 0.3).roundToInt()
+            val headerHeight = (size * 0.35).roundToInt()
+            g2d.fillRoundRect(left, top + headerHeight / 2, iconWidth, size - headerHeight / 2, radius, radius)
+            g2d.color = secondary
+            g2d.fillRoundRect(left, top, iconWidth, headerHeight + radius / 2, radius, radius)
+            val strapWidth = (iconWidth * 0.2).roundToInt()
+            val strapHeight = (headerHeight * 0.5).roundToInt().coerceAtLeast(2)
+            val strapTop = top - strapHeight / 2
+            g2d.fillRect(left + radius / 3, strapTop, strapWidth, strapHeight)
+            g2d.fillRect(left + iconWidth - strapWidth - radius / 3, strapTop, strapWidth, strapHeight)
+            g2d.color = primary
+        }
+        InfoIcon.ANGLER -> {
+            val iconWidth = (width * 0.9).roundToInt()
+            val headDiameter = (size * 0.45).roundToInt()
+            val headX = x + iconWidth / 2 - headDiameter / 2
+            val headY = top
+            g2d.fillOval(headX, headY, headDiameter, headDiameter)
+            val bodyHeight = size - headDiameter / 2
+            val bodyWidth = (iconWidth * 0.95).roundToInt()
+            val bodyX = x + iconWidth / 2 - bodyWidth / 2
+            val bodyY = headY + headDiameter / 2
+            g2d.fillRoundRect(bodyX, bodyY, bodyWidth, bodyHeight, bodyWidth / 2, bodyWidth / 2)
+        }
+    }
+    g2d.color = originalColor
 }
