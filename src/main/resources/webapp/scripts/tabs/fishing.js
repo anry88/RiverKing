@@ -1,4 +1,8 @@
 const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
+const BOBBER_SIZE = 24;
+const BOBBER_RADIUS = BOBBER_SIZE / 2;
+const MAX_BOBBER_SUBMERGE_CLIP = BOBBER_RADIUS * 0.75;
+const BOBBER_LINE_ANCHOR_INSET = 2;
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
@@ -56,6 +60,52 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     y: floatBasePx.y + floatVisual.offset
   }), [floatBasePx.x, floatBasePx.y, floatVisual.offset]);
   React.useEffect(()=>{ floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
+
+  const bobberSubmerge = Math.max(0, Math.min(1, floatVisual.submerge));
+  const bobberClipPx = bobberSubmerge * MAX_BOBBER_SUBMERGE_CLIP;
+  const bobberClipPath = bobberClipPx > 0.01
+    ? `inset(${bobberClipPx}px 0 0 0 round ${BOBBER_RADIUS}px)`
+    : null;
+  const bobberTopY = floatPx.y - BOBBER_RADIUS + bobberClipPx;
+  const lineAttach = React.useMemo(() => ({
+    x: floatPx.x,
+    y: bobberTopY + BOBBER_LINE_ANCHOR_INSET
+  }), [floatPx.x, bobberTopY]);
+  const bobberClipStyle = React.useMemo(() => {
+    if (!bobberClipPath) return null;
+    return {
+      clipPath: bobberClipPath,
+      WebkitClipPath: bobberClipPath
+    };
+  }, [bobberClipPath]);
+  const bobberShadeStyle = React.useMemo(() => {
+    if (bobberClipPx <= 0.01) return null;
+    const intensity = Math.min(0.75, 0.35 + bobberClipPx * 0.05);
+    return {
+      top: bobberClipPx,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'linear-gradient(to bottom, rgba(10,16,26,0.5), rgba(10,16,26,0.2))',
+      opacity: intensity,
+      mixBlendMode: 'multiply',
+      borderRadius: '9999px',
+      pointerEvents: 'none'
+    };
+  }, [bobberClipPx]);
+  const bobberOverlayStyle = React.useMemo(() => {
+    if (bobberClipPx <= 0.01) return null;
+    const fadeHeight = 6 + bobberClipPx * 0.45;
+    return {
+      top: Math.max(0, bobberClipPx - fadeHeight * 0.65),
+      height: fadeHeight,
+      background: 'linear-gradient(to bottom, rgba(120,186,255,0.6), rgba(120,186,255,0))',
+      opacity: 0.55,
+      mixBlendMode: 'screen',
+      borderRadius: '9999px',
+      pointerEvents: 'none'
+    };
+  }, [bobberClipPx]);
 
   const shouldAnimateFloat = casting || biting;
   React.useEffect(()=>{
@@ -141,10 +191,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
   const ctrl = {
-    x: (tipX + floatPx.x) / 2 - (isSmall ? 24 : 40),
-    y: (tipY + floatPx.y) / 2 + (isSmall ? 50 : (60 + 120 * tension))
+    x: (tipX + lineAttach.x) / 2 - (isSmall ? 24 : 40),
+    y: (tipY + lineAttach.y) / 2 + (isSmall ? 50 : (60 + 120 * tension))
   };
-  const linePath = `M ${tipX},${tipY} Q ${ctrl.x},${ctrl.y} ${floatPx.x},${floatPx.y}`;
+  const linePath = `M ${tipX},${tipY} Q ${ctrl.x},${ctrl.y} ${lineAttach.x},${lineAttach.y}`;
 
   const catchTargetPx = React.useMemo(()=>{
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -340,24 +390,40 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         />
       </svg>
 
-      <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
+      <div
+        className="absolute"
+        style={{
+          left: floatPx.x - BOBBER_RADIUS,
+          top: floatPx.y - BOBBER_RADIUS,
+          width: BOBBER_SIZE,
+          height: BOBBER_SIZE
+        }}
+      >
         <div className="absolute inset-0">
           <img
             src={bobberIcon}
             alt="bobber"
             className="relative bobber-cast drop-shadow"
             style={{
-              transform: `rotate(${floatVisual.tilt}deg)`
+              transform: `rotate(${floatVisual.tilt}deg)`,
+              ...(bobberClipStyle || {})
             }}
           />
-          {floatVisual.submerge > 0 && (
+          {bobberShadeStyle && (
             <div
-              className="pointer-events-none absolute left-0 right-0 bottom-0 rounded-full"
+              className="pointer-events-none absolute left-0 right-0 rounded-full"
               style={{
-                height: 12 + floatVisual.submerge * 10,
-                opacity: Math.min(0.85, floatVisual.submerge * 0.85),
-                background: 'linear-gradient(to top, rgba(10,16,26,0.82) 0%, rgba(10,16,26,0.55) 55%, rgba(10,16,26,0) 100%)',
-                mixBlendMode: 'multiply'
+                ...bobberShadeStyle,
+                ...(bobberClipStyle || {})
+              }}
+            ></div>
+          )}
+          {bobberOverlayStyle && (
+            <div
+              className="pointer-events-none absolute left-0 right-0 rounded-full"
+              style={{
+                ...bobberOverlayStyle,
+                ...(bobberClipStyle || {})
               }}
             ></div>
           )}
