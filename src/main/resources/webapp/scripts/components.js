@@ -298,8 +298,8 @@ function CatchDetailsModal({catchData, me, onClose}){
               <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
               <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
             </div>
-            <div className="mt-3 flex items-stretch gap-4">
-              <div className="flex-shrink-0 self-start">
+            <div className="mt-3 flex flex-col gap-4">
+              <div className="flex justify-center w-full">
                 {fishUnlocked ? (
                   fishImg ? (
                     <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain" onError={e=>{e.currentTarget.style.display='none';}} />
@@ -313,7 +313,7 @@ function CatchDetailsModal({catchData, me, onClose}){
                   </div>
                 )}
               </div>
-              <div className="ml-auto flex flex-col items-end text-right gap-1 justify-end self-stretch">
+              <div className="w-full flex flex-col items-start text-left gap-1">
                 {catchData.location && <div className={`text-sm opacity-70 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
                 {catchData.user && <div className={`text-xs opacity-70 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
                 {dateLabel && <div className={`text-xs opacity-60 ${rarityClass}`}>{dateLabel}</div>}
