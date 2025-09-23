@@ -1257,13 +1257,16 @@ Available commands:
                                     extraLines = listOf(newLine, unlockedLine, rodLine),
                                 )
                                 val caption = withGroupCatchTags(captionBase, catch, chatId)
+                                val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
                                 val image = generateCatchImage(
                                     catch.fish,
                                     catch.location,
                                     fishName,
+                                    locationName,
                                     catch.weight,
                                     catch.rarity,
                                     lang,
+                                    caughtAt = caughtAt,
                                 )
                                 if (image != null) {
                                     try {

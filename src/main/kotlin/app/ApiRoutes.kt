@@ -889,6 +889,7 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val fishName = I18n.fish(catch.fish, language)
             val locationName = I18n.location(catch.location, language)
+            val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
             val caption = buildCatchCaption(
                 lang = language,
                 fishName = fishName,
@@ -900,9 +901,12 @@ fun Application.apiRoutes(env: Env) {
                 catch.fish,
                 catch.location,
                 fishName,
+                locationName,
                 catch.weight,
                 catch.rarity,
                 language,
+                anglerName = catch.user,
+                caughtAt = caughtAt,
             )
             try {
                 if (image != null) {
