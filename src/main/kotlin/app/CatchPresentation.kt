@@ -263,8 +263,8 @@ fun generateCatchImage(
         val unit = if (lang == "ru") "кг" else "kg"
         val infoItems = mutableListOf<String>()
         displayLocationName?.takeIf { it.isNotBlank() }?.let { infoItems += it }
-        caughtAt?.let { infoItems += formatCatchDate(it, lang) }
         anglerName?.takeIf { it.isNotBlank() }?.let { infoItems += it }
+        caughtAt?.let { infoItems += formatCatchDate(it, lang) }
 
         val infoEntries = infoItems.map { text ->
             var infoFont = Font("SansSerif", Font.PLAIN, (size * 0.045).roundToInt())
@@ -449,17 +449,22 @@ fun generateCatchImage(
             }
         }
 
+        val textRightEdge = size - padding
+
         infoEntries.forEachIndexed { index, entry ->
             g2d.font = entry.font
             g2d.color = rarityColor
             val baseline = baselines.getOrNull(index)
                 ?: (weightBaseline - weightMetrics.ascent - afterSpacing)
-            g2d.drawString(entry.text, padding, baseline)
+            val textWidth = entry.metrics.stringWidth(entry.text)
+            val textX = textRightEdge - textWidth
+            g2d.drawString(entry.text, textX, baseline)
         }
 
         g2d.font = weightFont
         g2d.color = rarityColor
-        val weightX = padding
+        val weightWidth = weightMetrics.stringWidth(weightText)
+        val weightX = textRightEdge - weightWidth
         g2d.drawString(weightText, weightX, weightBaseline)
 
         g2d.dispose()
