@@ -45,9 +45,12 @@ function TournamentsTab({
     return packageId;
   }, [shop]);
 
-  const getPrizeImg = React.useCallback((packageId) => (
-    packageId==='autofish_week' ? '/app/assets/baits/autofish.png' : `/app/assets/baits/${packageId}.png`
-  ), []);
+  const getPrizeImg = React.useCallback((packageId) => {
+    if(!packageId) return '';
+    return String(packageId).startsWith('autofish')
+      ? '/app/assets/shop/autofish.png'
+      : `/app/assets/shop/${packageId}.png`;
+  }, []);
 
   const renderPrizeHint = (rank, prize) => (
     prizeHint?.rank===rank && (

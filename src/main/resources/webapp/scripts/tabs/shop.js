@@ -1,3 +1,9 @@
+const getShopIcon = id => {
+  if(!id) return '';
+  if(String(id).startsWith('autofish')) return '/app/assets/shop/autofish.png';
+  return `/app/assets/shop/${id}.png`;
+};
+
 function ShopTab({
   shop,
   toggleRef,
@@ -58,7 +64,7 @@ function ShopTab({
                   return (
                     <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <img src={`/app/assets/baits/${item.id}.png`} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        <img src={getShopIcon(item.id)} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
                         <div>
                           <div className="font-semibold">{item.name}</div>
                           <div className="text-xs opacity-70">{item.desc}</div>
