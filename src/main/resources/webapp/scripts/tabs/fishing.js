@@ -1,7 +1,7 @@
 const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
 const BOBBER_SIZE = 24;
 const BOBBER_RADIUS = BOBBER_SIZE / 2;
-const MAX_BOBBER_SUBMERGE_CLIP = BOBBER_RADIUS * 0.75;
+const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
 const BOBBER_LINE_ANCHOR_INSET = 2;
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
@@ -61,16 +61,19 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   }), [floatBasePx.x, floatBasePx.y, floatVisual.offset]);
   React.useEffect(()=>{ floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
 
-  const bobberSubmerge = Math.max(0, Math.min(1, floatVisual.submerge));
-  const bobberClipPx = bobberSubmerge * MAX_BOBBER_SUBMERGE_CLIP;
-  const bobberClipPath = bobberClipPx > 0.01
-    ? `inset(${bobberClipPx}px 0 0 0 round ${BOBBER_RADIUS}px)`
+  const waterlineY = React.useMemo(() => {
+    const value = floatBasePx.y - BOBBER_RADIUS + BOBBER_VISIBLE_ABOVE_WATER;
+    return Math.max(0, Math.min(h, value));
+  }, [floatBasePx.y, h]);
+  const bobberBottom = floatPx.y + BOBBER_RADIUS;
+  const bobberHiddenHeight = Math.max(0, Math.min(BOBBER_SIZE, bobberBottom - waterlineY));
+  const bobberClipPath = bobberHiddenHeight > 0.01
+    ? `inset(0 0 ${bobberHiddenHeight}px 0 round ${BOBBER_RADIUS}px)`
     : null;
-  const bobberTopY = floatPx.y - BOBBER_RADIUS + bobberClipPx;
   const lineAttach = React.useMemo(() => ({
     x: floatPx.x,
-    y: bobberTopY + BOBBER_LINE_ANCHOR_INSET
-  }), [floatPx.x, bobberTopY]);
+    y: floatPx.y - BOBBER_RADIUS + BOBBER_LINE_ANCHOR_INSET
+  }), [floatPx.x, floatPx.y]);
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
     return {
@@ -78,56 +81,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       WebkitClipPath: bobberClipPath
     };
   }, [bobberClipPath]);
-  const bobberShadeStyle = React.useMemo(() => {
-    if (bobberClipPx <= 0.01) return null;
-    const intensity = Math.min(0.75, 0.35 + bobberClipPx * 0.05);
-    return {
-      top: bobberClipPx,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'linear-gradient(to bottom, rgba(10,16,26,0.5), rgba(10,16,26,0.2))',
-      opacity: intensity,
-      mixBlendMode: 'multiply',
-      borderRadius: '9999px',
-      pointerEvents: 'none'
-    };
-  }, [bobberClipPx]);
-  const bobberOverlayStyle = React.useMemo(() => {
-    if (bobberClipPx <= 0.01) return null;
-    const fadeHeight = 6 + bobberClipPx * 0.45;
-    return {
-      top: Math.max(0, bobberClipPx - fadeHeight * 0.65),
-      height: fadeHeight,
-      background: 'linear-gradient(to bottom, rgba(120,186,255,0.6), rgba(120,186,255,0))',
-      opacity: 0.55,
-      mixBlendMode: 'screen',
-      borderRadius: '9999px',
-      pointerEvents: 'none'
-    };
-  }, [bobberClipPx]);
-
-  const bobberUnderwaterClip = React.useMemo(() => {
-    if (bobberClipPx <= 0.01 || !bobberClipPath) return null;
-    const inset = Math.max(bobberClipPx, BOBBER_RADIUS - 1);
-    return `inset(${inset}px 0 0 0 round ${BOBBER_RADIUS}px)`;
-  }, [bobberClipPx, bobberClipPath]);
-  const bobberBlurStyle = React.useMemo(() => {
-    if (bobberClipPx <= 0.01 || floatVisual.offset <= 0.2 || !bobberUnderwaterClip) return null;
-    const blurStrength = Math.min(6, 2.4 + bobberClipPx * 0.18);
-    const blurOpacity = Math.min(0.75, 0.35 + bobberClipPx * 0.03);
-    return {
-      transform: `rotate(${floatVisual.tilt}deg)`,
-      filter: `blur(${blurStrength}px)`,
-      opacity: blurOpacity,
-      clipPath: bobberUnderwaterClip,
-      WebkitClipPath: bobberUnderwaterClip,
-      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,1) 100%)',
-      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,1) 100%)',
-      transformOrigin: '50% 50%',
-      pointerEvents: 'none'
-    };
-  }, [bobberClipPx, floatVisual.offset, floatVisual.tilt, bobberUnderwaterClip]);
 
   const shouldAnimateFloat = casting || biting;
   React.useEffect(()=>{
@@ -437,33 +390,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
               ...(bobberClipStyle || {})
             }}
           />
-          {bobberBlurStyle && (
-            <img
-              src={bobberIcon}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 select-none"
-              style={bobberBlurStyle}
-            />
-          )}
-          {bobberShadeStyle && (
-            <div
-              className="pointer-events-none absolute left-0 right-0 rounded-full"
-              style={{
-                ...bobberShadeStyle,
-                ...(bobberClipStyle || {})
-              }}
-            ></div>
-          )}
-          {bobberOverlayStyle && (
-            <div
-              className="pointer-events-none absolute left-0 right-0 rounded-full"
-              style={{
-                ...bobberOverlayStyle,
-                ...(bobberClipStyle || {})
-              }}
-            ></div>
-          )}
         </div>
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
