@@ -107,6 +107,28 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     };
   }, [bobberClipPx]);
 
+  const bobberUnderwaterClip = React.useMemo(() => {
+    if (bobberClipPx <= 0.01 || !bobberClipPath) return null;
+    const inset = Math.max(bobberClipPx, BOBBER_RADIUS - 1);
+    return `inset(${inset}px 0 0 0 round ${BOBBER_RADIUS}px)`;
+  }, [bobberClipPx, bobberClipPath]);
+  const bobberBlurStyle = React.useMemo(() => {
+    if (bobberClipPx <= 0.01 || floatVisual.offset <= 0.2 || !bobberUnderwaterClip) return null;
+    const blurStrength = Math.min(6, 2.4 + bobberClipPx * 0.18);
+    const blurOpacity = Math.min(0.75, 0.35 + bobberClipPx * 0.03);
+    return {
+      transform: `rotate(${floatVisual.tilt}deg)`,
+      filter: `blur(${blurStrength}px)`,
+      opacity: blurOpacity,
+      clipPath: bobberUnderwaterClip,
+      WebkitClipPath: bobberUnderwaterClip,
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,1) 100%)',
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,1) 100%)',
+      transformOrigin: '50% 50%',
+      pointerEvents: 'none'
+    };
+  }, [bobberClipPx, floatVisual.offset, floatVisual.tilt, bobberUnderwaterClip]);
+
   const shouldAnimateFloat = casting || biting;
   React.useEffect(()=>{
     let frame;
@@ -190,9 +212,15 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipX = rodLeft + rodW * rodTipAnchor.x;
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
+  const floatLift = Math.max(0, -floatVisual.offset);
+  const floatDip = Math.max(0, floatVisual.offset);
+  const sagBase = isSmall ? 50 : (60 + 120 * tension);
+  const sagDynamic = sagBase + floatDip * (isSmall ? 0.45 : 0.65) - floatLift * (isSmall ? 0.9 : 1.2);
+  const sagClamped = Math.max(isSmall ? 28 : 36, sagDynamic);
+
   const ctrl = {
     x: (tipX + lineAttach.x) / 2 - (isSmall ? 24 : 40),
-    y: (tipY + lineAttach.y) / 2 + (isSmall ? 50 : (60 + 120 * tension))
+    y: (tipY + lineAttach.y) / 2 + sagClamped
   };
   const linePath = `M ${tipX},${tipY} Q ${ctrl.x},${ctrl.y} ${lineAttach.x},${lineAttach.y}`;
 
@@ -409,6 +437,15 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
               ...(bobberClipStyle || {})
             }}
           />
+          {bobberBlurStyle && (
+            <img
+              src={bobberIcon}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 select-none"
+              style={bobberBlurStyle}
+            />
+          )}
           {bobberShadeStyle && (
             <div
               className="pointer-events-none absolute left-0 right-0 rounded-full"
