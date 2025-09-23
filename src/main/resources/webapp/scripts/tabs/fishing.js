@@ -406,7 +406,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     img.src = bgUrl;
     img.onload = () => setBgLoaded(true);
   }, [bgUrl]);
-  const showRipple = castLanded && casting && !biting;
+  const showRipple = castLanded && (biting || tapping);
 
   const rarityGlow = {
     common: 'rgba(255,255,255,0.5)',
