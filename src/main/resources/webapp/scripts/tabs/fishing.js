@@ -2,6 +2,7 @@ const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
 const BOBBER_SIZE = 24;
 const BOBBER_RADIUS = BOBBER_SIZE / 2;
 const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
+const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
@@ -40,13 +41,20 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
   const WATER_TOP_REL = 0.48;
-  const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
+  const shorePosRel = React.useMemo(()=>({x: 0.09, y: WATER_TOP_REL - 0.03}),[]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [floatVisual, setFloatVisual] = React.useState({offset:0, tilt:0, submerge:0});
   const floatPxRef = React.useRef({x:0,y:0});
+  const floatRelRef = React.useRef(floatRel);
+  const [castLanded, setCastLanded] = React.useState(false);
+  const tweenCancelRef = React.useRef(null);
+  const prevCastingRef = React.useRef(false);
+
+  React.useEffect(()=>{ floatRelRef.current = floatRel; }, [floatRel.x, floatRel.y]);
 
   React.useEffect(()=>{
     if(!Number.isFinite(floatRel.x) || !Number.isFinite(floatRel.y)){
+      floatRelRef.current = shorePosRel;
       setFloatRel(shorePosRel);
     }
   }, [floatRel.x, floatRel.y, shorePosRel]);
@@ -63,7 +71,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     const value = floatBasePx.y - BOBBER_RADIUS + BOBBER_VISIBLE_ABOVE_WATER;
     return Math.max(0, Math.min(h, value));
   }, [floatBasePx.y, h]);
-  const isCastInWater = casting || biting || tapping;
+  const isCastInWater = (casting && castLanded) || biting || tapping;
   const bobberBottom = floatPx.y + BOBBER_RADIUS;
   const bobberHiddenHeight = Math.max(0, Math.min(BOBBER_SIZE, bobberBottom - waterlineY));
   const bobberClipPath = isCastInWater && bobberHiddenHeight > 0.01
@@ -84,7 +92,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     };
   }, [bobberClipPath]);
 
-  const shouldAnimateFloat = casting || biting;
+  const shouldAnimateFloat = (casting && castLanded) || biting;
   React.useEffect(()=>{
     let frame;
     if(!shouldAnimateFloat){
@@ -167,7 +175,32 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipX = rodLeft + rodW * rodTipAnchor.x;
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
-  const linePath = `M ${tipX},${tipY} L ${lineAttach.x},${lineAttach.y}`;
+  const shouldShowSlack = !casting && !biting && !tapping;
+  const linePath = React.useMemo(() => {
+    if(!Number.isFinite(tipX) || !Number.isFinite(tipY) || !Number.isFinite(lineAttach.x) || !Number.isFinite(lineAttach.y)){
+      return `M ${tipX},${tipY} L ${lineAttach.x},${lineAttach.y}`;
+    }
+    const dx = lineAttach.x - tipX;
+    const dy = lineAttach.y - tipY;
+    const dist = Math.hypot(dx, dy);
+    if(shouldShowSlack){
+      const sag = Math.min(h * 0.22, Math.max(16, dist * 0.55));
+      const baseMidY = tipY + dy * 0.5;
+      const control1 = {
+        x: tipX + dx * 0.35,
+        y: baseMidY + sag * 0.45
+      };
+      const control2 = {
+        x: tipX + dx * 0.75,
+        y: baseMidY + sag
+      };
+      return `M ${tipX},${tipY} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
+    }
+    const gentleSag = Math.min(h * 0.08, dist * 0.12);
+    const controlX = tipX + dx * 0.5;
+    const controlY = tipY + dy * 0.5 + gentleSag;
+    return `M ${tipX},${tipY} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h]);
 
   const catchTargetPx = React.useMemo(()=>{
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -252,41 +285,99 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     };
   }, [result, catchTargetPx, hasCatchAnimationBeenShown, markCatchAnimationShown]);
 
-  const tweenTo = (toRel, ms=600)=>{
+  const tweenTo = React.useCallback((toRel, ms=600, options={})=>{
     const from = {
-      x: Number.isFinite(floatRel.x) ? floatRel.x : shorePosRel.x,
-      y: Number.isFinite(floatRel.y) ? floatRel.y : shorePosRel.y
+      x: Number.isFinite(floatRelRef.current.x) ? floatRelRef.current.x : shorePosRel.x,
+      y: Number.isFinite(floatRelRef.current.y) ? floatRelRef.current.y : shorePosRel.y
     };
+    const {arcHeight=0, onComplete} = options;
+    let frame = null;
+    let cancelled = false;
     const start = performance.now();
     const step = (now)=>{
+      if(cancelled) return;
       const tVal = Math.min(1, (now - start)/ms);
-      const k = easeOutCubic(tVal);
-      setFloatRel({ x: from.x + (toRel.x - from.x)*k, y: from.y + (toRel.y - from.y)*k });
-      if(tVal<1) requestAnimationFrame(step);
+      const eased = easeInOutCubic(tVal);
+      const arc = arcHeight > 0 ? Math.sin(tVal * Math.PI) * arcHeight : 0;
+      const nextRel = {
+        x: from.x + (toRel.x - from.x) * eased,
+        y: from.y + (toRel.y - from.y) * eased - arc
+      };
+      floatRelRef.current = nextRel;
+      setFloatRel(nextRel);
+      if(tVal < 1){
+        frame = requestAnimationFrame(step);
+      } else {
+        frame = null;
+        if(typeof onComplete === 'function'){
+          onComplete();
+        }
+      }
     };
-    requestAnimationFrame(step);
-  };
+    frame = requestAnimationFrame(step);
+    return ()=>{
+      cancelled = true;
+      if(frame){
+        cancelAnimationFrame(frame);
+      }
+    };
+  }, [shorePosRel.x, shorePosRel.y]);
+
+  React.useEffect(()=>{
+    return ()=>{
+      if(tweenCancelRef.current){
+        tweenCancelRef.current();
+        tweenCancelRef.current = null;
+      }
+    };
+  }, []);
 
   React.useEffect(()=>{
     if(casting){
-      if(w <= 0 || !Number.isFinite(tipX)){
-        return;
+      if(!prevCastingRef.current){
+        setCastLanded(false);
+        if(tweenCancelRef.current){
+          tweenCancelRef.current();
+          tweenCancelRef.current = null;
+        }
+        if(!(w > 0 && Number.isFinite(tipX))){
+          prevCastingRef.current = false;
+          return;
+        }
+        const tipRelX = tipX / w;
+        if(!Number.isFinite(tipRelX)){
+          prevCastingRef.current = false;
+          return;
+        }
+        const minX = Math.max(0.05, tipRelX - 0.20);
+        const maxX = Math.max(minX, tipRelX - 0.05);
+        const target = {
+          x: minX + Math.random() * (maxX - minX),
+          y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
+        };
+        const startRel = floatRelRef.current;
+        const relDistanceY = Math.abs((target?.y ?? startRel.y) - startRel.y);
+        const arcHeight = Math.max(0.015, Math.min(0.08, relDistanceY * 0.75));
+        tweenCancelRef.current = tweenTo(target, 750, {
+          arcHeight,
+          onComplete: () => {
+            tweenCancelRef.current = null;
+            setCastLanded(true);
+          }
+        });
+        prevCastingRef.current = true;
       }
-      const tipRelX = tipX / w;
-      if(!Number.isFinite(tipRelX)){
-        return;
-      }
-      const minX = Math.max(0.05, tipRelX - 0.20);
-      const maxX = Math.max(minX, tipRelX - 0.05);
-      const target = {
-        x: minX + Math.random() * (maxX - minX),
-        y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
-      };
-      tweenTo(target, 650);
     } else {
+      if(tweenCancelRef.current){
+        tweenCancelRef.current();
+        tweenCancelRef.current = null;
+      }
+      setCastLanded(false);
+      floatRelRef.current = shorePosRel;
       setFloatRel(shorePosRel);
+      prevCastingRef.current = false;
     }
-  }, [casting, shorePosRel, tipX, w]);
+  }, [casting, shorePosRel, tipX, tweenTo, w]);
 
   const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
   const [bgLoaded, setBgLoaded] = React.useState(false);
@@ -296,7 +387,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     img.src = bgUrl;
     img.onload = () => setBgLoaded(true);
   }, [bgUrl]);
-  const showRipple = casting && !biting;
+  const showRipple = castLanded && casting && !biting;
 
   const rarityGlow = {
     common: 'rgba(255,255,255,0.5)',
