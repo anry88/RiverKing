@@ -2,7 +2,7 @@ const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
 const BOBBER_SIZE = 24;
 const BOBBER_RADIUS = BOBBER_SIZE / 2;
 const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
-const BOBBER_LINE_ANCHOR_INSET = 2;
+const BOBBER_LINE_ANCHOR_INSET = BOBBER_SIZE * 0.145; // aligns with the tip of the bobber artwork
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
@@ -65,15 +65,19 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     const value = floatBasePx.y - BOBBER_RADIUS + BOBBER_VISIBLE_ABOVE_WATER;
     return Math.max(0, Math.min(h, value));
   }, [floatBasePx.y, h]);
+  const isCastInWater = casting || biting || tapping;
   const bobberBottom = floatPx.y + BOBBER_RADIUS;
   const bobberHiddenHeight = Math.max(0, Math.min(BOBBER_SIZE, bobberBottom - waterlineY));
-  const bobberClipPath = bobberHiddenHeight > 0.01
+  const bobberClipPath = isCastInWater && bobberHiddenHeight > 0.01
     ? `inset(0 0 ${bobberHiddenHeight}px 0 round ${BOBBER_RADIUS}px)`
     : null;
   const lineAttach = React.useMemo(() => ({
     x: floatPx.x,
     y: floatPx.y - BOBBER_RADIUS + BOBBER_LINE_ANCHOR_INSET
   }), [floatPx.x, floatPx.y]);
+  const lineClipId = React.useMemo(() => `line-clip-${Math.random().toString(36).slice(2, 9)}`, []);
+  const lineClipHeight = Math.max(0, Math.min(h, waterlineY));
+  const shouldClipLine = isCastInWater && lineClipHeight > 0 && w > 0;
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
     return {
@@ -362,12 +366,20 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         decoding="async"
       />
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        {shouldClipLine && (
+          <defs>
+            <clipPath id={lineClipId} clipPathUnits="userSpaceOnUse">
+              <rect x="0" y="0" width={Math.max(0, w)} height={lineClipHeight} />
+            </clipPath>
+          </defs>
+        )}
         <path
           d={linePath}
           stroke="rgba(255,255,255,0.45)"
           strokeWidth="1.2"
           strokeLinecap="round"
           fill="none"
+          clipPath={shouldClipLine ? `url(#${lineClipId})` : undefined}
         />
       </svg>
 
