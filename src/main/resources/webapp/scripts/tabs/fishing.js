@@ -40,6 +40,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const shorePosRel = React.useMemo(()=>({x: 0.12, y: WATER_TOP_REL - 0.02}),[]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [tension, setTension] = React.useState(0.2);
+  const [floatVisual, setFloatVisual] = React.useState({offset:0, tilt:0, submerge:0});
   const floatPxRef = React.useRef({x:0,y:0});
 
   React.useEffect(()=>{
@@ -49,8 +50,55 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   }, [floatRel.x, floatRel.y, shorePosRel]);
 
   const toPx = (rel)=>({ x: rel.x * w, y: rel.y * h });
-  const floatPx = toPx(floatRel);
+  const floatBasePx = toPx(floatRel);
+  const floatPx = React.useMemo(()=>({
+    x: floatBasePx.x,
+    y: floatBasePx.y + floatVisual.offset
+  }), [floatBasePx.x, floatBasePx.y, floatVisual.offset]);
   React.useEffect(()=>{ floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
+
+  const shouldAnimateFloat = casting || biting;
+  React.useEffect(()=>{
+    let frame;
+    if(!shouldAnimateFloat){
+      setFloatVisual(prev => {
+        if(prev.offset === 0 && prev.tilt === 0 && prev.submerge === 0){
+          return prev;
+        }
+        return {offset:0, tilt:0, submerge:0};
+      });
+      return;
+    }
+    let start = null;
+    const animate = (now)=>{
+      if(start === null){ start = now; }
+      const t = (now - start) / 1000;
+      const basePeriod = biting ? 0.6 : 3;
+      const mainWave = Math.sin((t * Math.PI * 2) / basePeriod);
+      const extraWave = biting ? Math.sin((t * Math.PI * 2) / (basePeriod * 0.5)) : 0;
+      const offset = mainWave * (biting ? 8.5 : 4) + extraWave * 2.5;
+      const tilt = biting
+        ? Math.sin((t * Math.PI * 2) / (basePeriod * 0.7)) * 9
+        : mainWave * 2.5;
+      const submerge = offset > 0 ? Math.min(1, offset / (biting ? 10 : 6)) : 0;
+      const nextState = {offset, tilt, submerge};
+      setFloatVisual(prev => {
+        if(
+          Math.abs(prev.offset - nextState.offset) < 0.12 &&
+          Math.abs(prev.tilt - nextState.tilt) < 0.12 &&
+          Math.abs(prev.submerge - nextState.submerge) < 0.04
+        ){
+          return prev;
+        }
+        return nextState;
+      });
+      frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return ()=>{
+      if(frame){ cancelAnimationFrame(frame); }
+    };
+  }, [shouldAnimateFloat, biting]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
@@ -227,7 +275,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     img.src = bgUrl;
     img.onload = () => setBgLoaded(true);
   }, [bgUrl]);
-  const bobberAnim = biting ? 'animate-[bite_0.6s_ease-in-out_infinite]' : (casting ? 'animate-[bob_3s_ease-in-out_infinite]' : '');
   const showRipple = casting && !biting;
 
   const rarityGlow = {
@@ -294,7 +341,27 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       </svg>
 
       <div className="absolute" style={{left: floatPx.x-12, top: floatPx.y-12, width: 24, height: 24}}>
-        <img src={bobberIcon} alt="bobber" className={`relative bobber-cast drop-shadow ${bobberAnim}`}/>
+        <div className="absolute inset-0">
+          <img
+            src={bobberIcon}
+            alt="bobber"
+            className="relative bobber-cast drop-shadow"
+            style={{
+              transform: `rotate(${floatVisual.tilt}deg)`
+            }}
+          />
+          {floatVisual.submerge > 0 && (
+            <div
+              className="pointer-events-none absolute left-0 right-0 bottom-0 rounded-full"
+              style={{
+                height: 12 + floatVisual.submerge * 10,
+                opacity: Math.min(0.85, floatVisual.submerge * 0.85),
+                background: 'linear-gradient(to top, rgba(10,16,26,0.82) 0%, rgba(10,16,26,0.55) 55%, rgba(10,16,26,0) 100%)',
+                mixBlendMode: 'multiply'
+              }}
+            ></div>
+          )}
+        </div>
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
 
