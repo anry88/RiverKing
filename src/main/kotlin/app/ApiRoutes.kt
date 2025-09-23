@@ -776,7 +776,9 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val req = call.receive<HookReq>()
-            val res = try { fishing.hook(uid, req.wait, req.reaction) } catch (e: Exception) {
+            val res = try {
+                fishing.hook(uid, req.wait, req.reaction, applyBeginnerProtection = false)
+            } catch (e: Exception) {
                 log.warn(
                     "hook failed tgId={} wait={} reaction={} err={}",
                     tgId,
@@ -807,7 +809,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<CastReq>()
-            val res = try { fishing.cast(uid, req.wait, req.reaction, req.success) } catch (e: Exception) {
+            val res = try {
+                fishing.cast(
+                    uid,
+                    req.wait,
+                    req.reaction,
+                    req.success,
+                    applyBeginnerProtection = false,
+                )
+            } catch (e: Exception) {
                 log.warn(
                     "cast failed tgId={} wait={} reaction={} err={}",
                     tgId,
