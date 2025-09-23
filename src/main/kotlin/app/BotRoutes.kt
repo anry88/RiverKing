@@ -365,7 +365,7 @@ fun Application.botRoutes(env: Env) {
                 val rarityValue = toHashtagValue(rarityLabel)
                 val fishNameEn = toHashtagValue(I18n.fish(catch.fish, "en"))
                 val fishNameRu = toHashtagValue(I18n.fish(catch.fish, "ru"))
-                val tags = "#RiverKing #Раритетность$rarityValue #Fish_name$fishNameEn #Имя_рыбы$fishNameRu"
+                val tags = "#RiverKing #$rarityValue #$fishNameEn #$fishNameRu"
                 return if (base.isBlank()) {
                     tags
                 } else {
