@@ -57,56 +57,64 @@
       ruName: 'Зерновая крошка',
       enName: 'Grain Crumble',
       ruDescription: 'Для мирной пресноводной рыбы.',
-      enDescription: 'For peaceful freshwater fish.'
+      enDescription: 'For peaceful freshwater fish.',
+      icon: '/app/assets/baits/grain_crumble.png'
     },
     'Пресная хищная': {
       plus: false,
       ruName: 'Ручейный малек',
       enName: 'Brook Minnow',
       ruDescription: 'Для хищной пресноводной рыбы.',
-      enDescription: 'For predatory freshwater fish.'
+      enDescription: 'For predatory freshwater fish.',
+      icon: '/app/assets/baits/brook_minnow.png'
     },
     'Морская мирная': {
       plus: false,
       ruName: 'Морская водоросль',
       enName: 'Seaweed Strand',
       ruDescription: 'Для мирной морской рыбы.',
-      enDescription: 'For peaceful saltwater fish.'
+      enDescription: 'For peaceful saltwater fish.',
+      icon: '/app/assets/baits/seaweed_strand.png'
     },
     'Морская хищная': {
       plus: false,
       ruName: 'Кольца кальмара',
       enName: 'Squid Rings',
       ruDescription: 'Для хищной морской рыбы.',
-      enDescription: 'For predatory saltwater fish.'
+      enDescription: 'For predatory saltwater fish.',
+      icon: '/app/assets/baits/squid_rings.png'
     },
     'Пресная мирная+': {
       plus: true,
       ruName: 'Луговой червь',
       enName: 'Meadow Worm',
       ruDescription: 'Для редкой мирной пресноводной рыбы.',
-      enDescription: 'For rare peaceful freshwater fish.'
+      enDescription: 'For rare peaceful freshwater fish.',
+      icon: '/app/assets/baits/meadow_worm.png'
     },
     'Пресная хищная+': {
       plus: true,
       ruName: 'Серебряный живец',
       enName: 'Silver Shiner',
       ruDescription: 'Для редкой хищной пресноводной рыбы.',
-      enDescription: 'For rare predatory freshwater fish.'
+      enDescription: 'For rare predatory freshwater fish.',
+      icon: '/app/assets/baits/silver_shiner.png'
     },
     'Морская мирная+': {
       plus: true,
       ruName: 'Неоновый планктон',
       enName: 'Neon Plankton',
       ruDescription: 'Для редкой мирной морской рыбы.',
-      enDescription: 'For rare peaceful saltwater fish.'
+      enDescription: 'For rare peaceful saltwater fish.',
+      icon: '/app/assets/baits/neon_plankton.png'
     },
     'Морская хищная+': {
       plus: true,
       ruName: 'Королевская креветка',
       enName: 'Royal Shrimp',
       ruDescription: 'Для редкой хищной морской рыбы.',
-      enDescription: 'For rare predatory saltwater fish.'
+      enDescription: 'For rare predatory saltwater fish.',
+      icon: '/app/assets/baits/royal_shrimp.png'
     },
   };
   const LURE_INFO_BY_DISPLAY = {};
@@ -119,6 +127,16 @@
     if (typeof value === 'string') return LURE_INFO[value] || LURE_INFO_BY_DISPLAY[value] || null;
     return LURE_INFO[value.name] || LURE_INFO[value.displayName] || null;
   };
+  const getLureIcon = lure => {
+    const info = getLureInfo(lure);
+    if (info?.icon) return info.icon;
+    if (typeof lure === 'object'){
+      if (typeof lure?.icon === 'string') return lure.icon;
+      if (typeof lure?.image === 'string') return lure.image;
+    }
+    return null;
+  };
+
   const lureColor = lure => {
     const info = getLureInfo(lure);
     if (info) return info.plus ? rarityColors.legendary : '';
@@ -604,6 +622,7 @@
   window.rarityColors = rarityColors;
   window.rarityNames = rarityNames;
   window.lureColor = lureColor;
+  window.getLureIcon = getLureIcon;
   window.LOCATION_BG = LOCATION_BG;
   window.LOCATION_BG_BY_NAME = LOCATION_BG_BY_NAME;
   window.ROD_IMAGES = ROD_IMAGES;

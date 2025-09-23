@@ -1,8 +1,13 @@
 function StatChip({icon,label,value,active=false,onClick}){
+  const iconContent = typeof icon === 'string'
+    ? <span className="text-base" aria-hidden="true">{icon}</span>
+    : icon
+      ? <span className="w-6 h-6 flex items-center justify-center" aria-hidden="true">{icon}</span>
+      : null;
   return (
     <button type="button" onClick={onClick}
       className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center justify-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':'pointer-events-none'} ${active?'ring-1 ring-emerald-500':''}`}>
-      {icon && <span className="text-base">{icon}</span>}
+      {iconContent}
       <div className="leading-tight">
         <div className="text-[10px] uppercase opacity-70">{label}</div>
         <div className="text-sm font-semibold whitespace-nowrap">{value}</div>
@@ -16,6 +21,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
   const lureName = curLure?.displayName || (curLure ? translateLure(curLure.name) : null);
   const lureVal = curLure? `${lureName} (${curLure.qty})` : '—';
+  const lureIconPath = curLure ? getLureIcon(curLure) : null;
   const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
   const rodVal = currentRod ? currentRod.name : '—';
   const languages = [
@@ -46,7 +52,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
         <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
           <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
           <StatChip icon={'🎣'} label={t('rod')} value={rodVal} onClick={onOpenRods} />
-          <StatChip icon={'🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
+          <StatChip icon={lureIconPath ? <img src={lureIconPath} alt="" className="w-5 h-5 object-contain" /> : '🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
           <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
         </div>
