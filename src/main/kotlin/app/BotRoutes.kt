@@ -1,5 +1,6 @@
 package app
 
+import app.RARITY_LABELS
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -331,6 +332,45 @@ fun Application.botRoutes(env: Env) {
                     builder.append(ch).append(combining)
                 }
                 return builder.toString()
+            }
+
+            fun toHashtagValue(value: String): String {
+                val parts = Regex("[\\p{L}\\p{N}]+")
+                    .findAll(value)
+                    .map { it.value }
+                    .filter { it.isNotEmpty() }
+                    .toList()
+                if (parts.isEmpty()) {
+                    return value.filter { it.isLetterOrDigit() }
+                }
+                return parts.joinToString(separator = "") { part ->
+                    if (part.length == 1) {
+                        part.uppercase()
+                    } else {
+                        buildString {
+                            append(part.first().uppercaseChar())
+                            append(part.substring(1))
+                        }
+                    }
+                }
+            }
+
+            fun withGroupCatchTags(
+                base: String,
+                catch: FishingService.CatchDTO,
+                chatId: Long,
+            ): String {
+                if (chatId >= 0) return base
+                val rarityLabel = RARITY_LABELS["ru"]?.get(catch.rarity) ?: catch.rarity
+                val rarityValue = toHashtagValue(rarityLabel)
+                val fishNameEn = toHashtagValue(I18n.fish(catch.fish, "en"))
+                val fishNameRu = toHashtagValue(I18n.fish(catch.fish, "ru"))
+                val tags = "#RiverKing #Раритетность$rarityValue #Fish_name$fishNameEn #Имя_рыбы$fishNameRu"
+                return if (base.isBlank()) {
+                    tags
+                } else {
+                    "$base\n\n$tags"
+                }
             }
 
             fun trySend(
@@ -1211,7 +1251,7 @@ Available commands:
                                 } else {
                                     ""
                                 }
-                                val caption = buildCatchCaption(
+                                val captionBase = buildCatchCaption(
                                     lang = lang,
                                     fishName = fishName,
                                     rarity = catch.rarity,
@@ -1219,6 +1259,7 @@ Available commands:
                                     locationName = locationName,
                                     extraLines = listOf(newLine, unlockedLine, rodLine),
                                 )
+                                val caption = withGroupCatchTags(captionBase, catch, chatId)
                                 val image = generateCatchImage(
                                     catch.fish,
                                     catch.location,
