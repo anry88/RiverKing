@@ -104,8 +104,11 @@ class FishingService {
         listOf(
             DailyReward("Пресная мирная", 8),
             DailyReward("Пресная хищная", 10),
+            DailyReward("Морская мирная", 2),
             DailyReward("Морская хищная", 8),
+            DailyReward("Пресная мирная+", 1),
             DailyReward("Пресная хищная+", 1),
+            DailyReward("Морская мирная+", 1),
             DailyReward("Морская хищная+", 1),
         ),
     )
