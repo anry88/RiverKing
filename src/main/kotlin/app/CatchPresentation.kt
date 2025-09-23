@@ -269,7 +269,7 @@ fun generateCatchImage(
                 val infoMetrics = g2d.fontMetrics
                 currentY += infoMetrics.ascent
                 g2d.drawString(line, padding, currentY)
-                currentY += (padding * 0.2).roundToInt()
+                currentY += infoMetrics.descent + (padding * 0.2).roundToInt()
             }
         }
 
