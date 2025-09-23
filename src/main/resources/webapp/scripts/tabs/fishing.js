@@ -109,21 +109,21 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       if(start === null){ start = now; }
       const t = (now - start) / 1000;
       const state = tapping ? 'tapping' : (biting ? 'biting' : 'idle');
-      const basePeriod = state === 'biting' ? 0.6 : (state === 'tapping' ? 0.45 : 3);
+      const basePeriod = state === 'biting' ? 0.8 : (state === 'tapping' ? 0.65 : 3);
       const mainWave = Math.sin((t * Math.PI * 2) / basePeriod);
       let offset;
       let tilt;
       let submerge;
       if(state === 'biting'){
-        const extraWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.5));
-        offset = mainWave * 8.5 + extraWave * 2.5;
-        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.7)) * 9;
-        submerge = offset > 0 ? Math.min(1, offset / 10) : 0;
+        const extraWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.75));
+        offset = mainWave * 6.5 + extraWave * 1.8;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.9)) * 6.5;
+        submerge = offset > 0 ? Math.min(1, offset / 11) : 0;
       } else if(state === 'tapping'){
-        const quickWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.65));
-        offset = mainWave * 5 + quickWave * 1.6;
-        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.8)) * 6;
-        submerge = offset > 0 ? Math.min(1, offset / 8) : 0;
+        const quickWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.85));
+        offset = mainWave * 4.2 + quickWave * 1.1;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.95)) * 5;
+        submerge = offset > 0 ? Math.min(1, offset / 9) : 0;
       } else {
         offset = mainWave * 4;
         tilt = mainWave * 2.5;
@@ -131,14 +131,20 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       }
       const nextState = {offset, tilt, submerge};
       setFloatVisual(prev => {
+        const lerp = (prevValue, targetValue) => prevValue + (targetValue - prevValue) * 0.18;
+        const smoothed = {
+          offset: lerp(prev.offset, nextState.offset),
+          tilt: lerp(prev.tilt, nextState.tilt),
+          submerge: lerp(prev.submerge, nextState.submerge)
+        };
         if(
-          Math.abs(prev.offset - nextState.offset) < 0.12 &&
-          Math.abs(prev.tilt - nextState.tilt) < 0.12 &&
-          Math.abs(prev.submerge - nextState.submerge) < 0.04
+          Math.abs(smoothed.offset - prev.offset) < 0.01 &&
+          Math.abs(smoothed.tilt - prev.tilt) < 0.01 &&
+          Math.abs(smoothed.submerge - prev.submerge) < 0.01
         ){
           return prev;
         }
-        return nextState;
+        return smoothed;
       });
       frame = requestAnimationFrame(animate);
     };
