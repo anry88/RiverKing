@@ -1210,6 +1210,7 @@ class FishingService {
         waitSeconds: Int,
         reactionTime: Double,
         extraEscapeChance: Double = 0.0,
+        applyBeginnerProtection: Boolean = true,
     ): HookResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
@@ -1270,7 +1271,7 @@ class FishingService {
             return HookResultDTO(false, auto)
         }
 
-        val isBeginner = isBeginnerUser(userId)
+        val isBeginner = applyBeginnerProtection && isBeginnerUser(userId)
 
         if (!auto && !isBeginner && reactionTime >= 5.0) return@transaction escape()
 
@@ -1298,7 +1299,13 @@ class FishingService {
         HookResultDTO(true, auto)
     }
 
-    fun cast(userId: Long, _waitSeconds: Int, _reactionTime: Double, success: Boolean): CastResultDTO = transaction {
+    fun cast(
+        userId: Long,
+        _waitSeconds: Int,
+        _reactionTime: Double,
+        success: Boolean,
+        applyBeginnerProtection: Boolean = true,
+    ): CastResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
         val pending = PendingCatches.select { PendingCatches.userId eq userId }.singleOrNull()
@@ -1321,7 +1328,7 @@ class FishingService {
         }
 
         if (pending == null) return@transaction finish(false)
-        val isBeginner = isBeginnerUser(userId)
+        val isBeginner = applyBeginnerProtection && isBeginnerUser(userId)
         if (!autoCatch && !success && !isBeginner) return@transaction finish(false)
 
         val fishId = pending[PendingCatches.fishId].value
