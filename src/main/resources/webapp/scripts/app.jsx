@@ -810,8 +810,8 @@ function App(){
               onCatchClick={handleCatchClick}
             />
           )}
-          {tab === 'achievements' && (
-            <Achievements me={me} setMe={setMe} onCatchClick={handleCatchClick} />
+          {tab === 'ratings' && (
+            <Ratings me={me} setMe={setMe} onCatchClick={handleCatchClick} />
           )}
           {tab === 'shop' && (
             <ShopTab

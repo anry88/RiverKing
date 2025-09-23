@@ -59,7 +59,7 @@ function BottomNav({tab,setTab,dailyAvailable}){
   const items = [
     {id:'fish', label:t('fishing'), icon:'/app/assets/menu/fishing.png'},
     {id:'tournaments', label:t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
-    {id:'achievements', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
+    {id:'ratings', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
     {id:'guide', label:t('guide'), icon:'/app/assets/menu/guide.png'},
     {id:'shop', label:t('shop'), icon:'/app/assets/menu/shop.png'},
   ];

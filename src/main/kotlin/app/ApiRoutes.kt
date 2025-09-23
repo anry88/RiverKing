@@ -954,8 +954,8 @@ fun Application.apiRoutes(env: Env) {
             }
         }
 
-        // Achievements - personal
-        get("/api/achievements/personal/location/{id}") {
+        // Ratings - personal
+        get("/api/ratings/personal/location/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -963,11 +963,16 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val locationId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopByLocation(uid, id, period, asc).map { c ->
+            val res = fishing.personalTopByLocation(uid, locationId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -976,7 +981,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/personal/species/{id}") {
+        get("/api/ratings/personal/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -984,11 +989,16 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val fishId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopBySpecies(uid, id, period, asc).map { c ->
+            val res = fishing.personalTopBySpecies(uid, fishId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -997,8 +1007,8 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        // Achievements - global
-        get("/api/achievements/global/location/{id}") {
+        // Ratings - global
+        get("/api/ratings/global/location/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -1007,10 +1017,15 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val locationId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopByLocation(id, period, asc).map { c ->
+            val res = fishing.globalTopByLocation(locationId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -1019,7 +1034,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/global/species/{id}") {
+        get("/api/ratings/global/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -1028,10 +1043,15 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val fishId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopBySpecies(id, period, asc).map { c ->
+            val res = fishing.globalTopBySpecies(fishId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)

@@ -1449,14 +1449,15 @@ class FishingService {
 
     fun personalTopByLocation(
         userId: Long,
-        locationId: Long,
+        locationId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
+            var cond: Op<Boolean> = Catches.userId eq userId
+            if (locationId != null) cond = cond and (Catches.locationId eq locationId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1481,14 +1482,15 @@ class FishingService {
 
     fun personalTopBySpecies(
         userId: Long,
-        fishId: Long,
+        fishId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
+            var cond: Op<Boolean> = Catches.userId eq userId
+            if (fishId != null) cond = cond and (Catches.fishId eq fishId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1512,14 +1514,15 @@ class FishingService {
     }
 
     fun globalTopByLocation(
-        locationId: Long,
+        locationId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = Catches.locationId eq locationId
+            var cond: Op<Boolean> = Op.TRUE
+            if (locationId != null) cond = cond and (Catches.locationId eq locationId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1543,14 +1546,15 @@ class FishingService {
     }
 
     fun globalTopBySpecies(
-        fishId: Long,
+        fishId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = Catches.fishId eq fishId
+            var cond: Op<Boolean> = Op.TRUE
+            if (fishId != null) cond = cond and (Catches.fishId eq fishId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)

@@ -1,10 +1,10 @@
-function Achievements({me, setMe, onCatchClick}){
+function Ratings({me, setMe, onCatchClick}){
   const [mode,setMode] = React.useState('personal');
   const [section,setSection] = React.useState('location');
   const [period,setPeriod] = React.useState('all');
-  const [locId,setLocId] = React.useState(me.locationId);
+  const [locId,setLocId] = React.useState(String(me.locationId ?? 'all'));
   const [fishList,setFishList] = React.useState([]);
-  const [fishId,setFishId] = React.useState(null);
+  const [fishId,setFishId] = React.useState('all');
   const [list,setList] = React.useState([]);
   const [order,setOrder] = React.useState('desc');
 
@@ -16,18 +16,12 @@ function Achievements({me, setMe, onCatchClick}){
   },[me.language]);
 
   React.useEffect(()=>{
-    if(section==='species' && fishList.length){
-      setFishId(fishList[0].id);
-    }
-  },[section, fishList]);
-
-  React.useEffect(()=>{
     if(me.needsNickname) return;
     if(section==='location'){
-      fetch(`/api/achievements/${mode}/location/${locId}?period=${period}&order=${order}`,{credentials:'include'})
+      fetch(`/api/ratings/${mode}/location/${locId}?period=${period}&order=${order}`,{credentials:'include'})
         .then(r=>r.json()).then(setList).catch(()=>setList([]));
     } else if(section==='species' && fishId){
-      fetch(`/api/achievements/${mode}/species/${fishId}?period=${period}&order=${order}`,{credentials:'include'})
+      fetch(`/api/ratings/${mode}/species/${fishId}?period=${period}&order=${order}`,{credentials:'include'})
         .then(r=>r.json()).then(setList).catch(()=>setList([]));
     }
   },[mode,section,locId,fishId,period,order,me.needsNickname,me.language]);
@@ -59,8 +53,9 @@ function Achievements({me, setMe, onCatchClick}){
 
       {section==='location' && (
         <div className="space-y-3">
-          <select value={locId} onChange={e=>setLocId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
-            {me.locations.map(l=> <option key={l.id} value={l.id}>{l.name}</option>)}
+          <select value={locId} onChange={e=>setLocId(e.target.value)} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
+            <option value="all">{t('allLocations')}</option>
+            {me.locations.map(l=> <option key={l.id} value={String(l.id)}>{l.name}</option>)}
           </select>
           <div className="space-y-2">
             {list.map((c,i)=>(
@@ -102,8 +97,9 @@ function Achievements({me, setMe, onCatchClick}){
 
       {section==='species' && (
         <div className="space-y-3">
-          <select value={fishId||''} onChange={e=>setFishId(Number(e.target.value))} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
-            {fishList.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
+          <select value={fishId} onChange={e=>setFishId(e.target.value)} className="w-full p-2 rounded-lg bg-black/20 border border-white/10">
+            <option value="all">{t('allFish')}</option>
+            {fishList.map(f=> <option key={f.id} value={String(f.id)}>{f.name}</option>)}
           </select>
           <div className="space-y-2">
             {list.map((c,i)=>(
@@ -145,3 +141,4 @@ function Achievements({me, setMe, onCatchClick}){
     </div>
   );
 }
+
