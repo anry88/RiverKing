@@ -14,6 +14,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import service.I18n
 import java.util.Locale
+import service.FishingService
 
 private val FISH_IMAGE_PATHS = mapOf(
     "Плотва" to "webapp/assets/fish/plotva.png",
@@ -170,6 +171,44 @@ fun buildCatchCaption(
         extraLines.forEach { line ->
             if (line.isNotBlank()) append(line)
         }
+    }
+}
+
+private fun toHashtagValue(value: String): String {
+    val parts = Regex("[\\p{L}\\p{N}]+")
+        .findAll(value)
+        .map { it.value }
+        .filter { it.isNotEmpty() }
+        .toList()
+    if (parts.isEmpty()) {
+        return value.filter { it.isLetterOrDigit() }
+    }
+    return parts.joinToString(separator = "") { part ->
+        if (part.length == 1) {
+            part.uppercase()
+        } else {
+            buildString {
+                append(part.first().uppercaseChar())
+                append(part.substring(1))
+            }
+        }
+    }
+}
+
+fun catchHashtags(catch: FishingService.CatchDTO): String {
+    val rarityLabel = RARITY_LABELS["en"]?.get(catch.rarity) ?: catch.rarity
+    val rarityValue = toHashtagValue(rarityLabel)
+    val fishNameEn = toHashtagValue(I18n.fish(catch.fish, "en"))
+    val fishNameRu = toHashtagValue(I18n.fish(catch.fish, "ru"))
+    return "#RiverKing #$rarityValue #$fishNameEn #$fishNameRu"
+}
+
+fun appendCatchTags(base: String, catch: FishingService.CatchDTO): String {
+    val tags = catchHashtags(catch)
+    return if (base.isBlank()) {
+        tags
+    } else {
+        "$base\n\n$tags"
     }
 }
 
