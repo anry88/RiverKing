@@ -900,13 +900,14 @@ fun Application.apiRoutes(env: Env) {
             val fishName = I18n.fish(catch.fish, language)
             val locationName = I18n.location(catch.location, language)
             val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
-            val caption = buildCatchCaption(
+            val captionBase = buildCatchCaption(
                 lang = language,
                 fishName = fishName,
                 rarity = catch.rarity,
                 weightKg = catch.weight,
                 locationName = locationName,
             )
+            val caption = appendCatchTags(captionBase, catch)
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
