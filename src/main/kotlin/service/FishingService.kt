@@ -43,7 +43,7 @@ data class RecentDTO(
     val at: String,
 )
 
-class FishingService {
+class FishingService(private val clock: Clock = Clock.systemUTC()) {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
         private const val BEGINNER_CATCH_THRESHOLD = 6
@@ -881,7 +881,8 @@ class FishingService {
     fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
 
     fun listShop(lang: String): List<ShopCategory> {
-        val now = LocalDate.now(ZoneOffset.UTC)
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
         val discounts = transaction {
             ShopDiscounts.selectAll().associateBy(
                 { it[ShopDiscounts.packageId] },
@@ -900,7 +901,11 @@ class FishingService {
                 name = I18n.text(cat.name, lang),
                 packs = cat.packs.map { p ->
                     val discount = discounts[p.id]
-                    val active = discount?.let { now >= it.startDate && now <= it.endDate } == true
+                    val active = discount?.let {
+                        val startInstant = it.startDate.atStartOfDay(zone).toInstant()
+                        val endInstant = it.endDate.atStartOfDay(zone).toInstant()
+                        nowInstant >= startInstant && nowInstant < endInstant
+                    } == true
                     val finalPrice = if (active) discount!!.price else p.price
                     val originalPrice = if (active) p.price else null
                     val discountStart = if (active) discount!!.startDate else null

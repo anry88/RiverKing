@@ -100,6 +100,18 @@ private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+
+private val BAIT_ORDER = listOf(
+    "Пресная мирная",
+    "Пресная хищная",
+    "Морская мирная",
+    "Морская хищная",
+    "Пресная мирная+",
+    "Пресная хищная+",
+    "Морская мирная+",
+    "Морская хищная+",
+)
+private val BAIT_ORDER_INDEX = BAIT_ORDER.withIndex().associate { it.value to it.index }
 private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -464,7 +476,12 @@ fun Application.botRoutes(env: Env) {
                 val currentId = transaction {
                     Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
                 }
-                val sorted = lures.sortedBy { I18n.lure(it.name, lang) }
+                val sorted = lures.sortedWith(
+                    compareBy(
+                        { BAIT_ORDER_INDEX[it.name] ?: Int.MAX_VALUE },
+                        { I18n.lure(it.name, lang) },
+                    )
+                )
                 val currentName = sorted.find { it.id == currentId }?.let { I18n.lure(it.name, lang) }
                 val header = if (lang == "ru") {
                     "Текущая приманка: ${currentName ?: "не выбрана"}"
@@ -529,7 +546,7 @@ fun Application.botRoutes(env: Env) {
                         val priceText = basePrice?.let { strikethrough("$it⭐") + " ${d.price}⭐" } ?: "${d.price}⭐"
                         val start = d.startDate.format(DATE_FMT)
                         val end = d.endDate.format(DATE_FMT)
-                        "• $name — $priceText ($start — $end)"
+                        "• $name — $priceText ($start — до $end)"
                     }
                     "Текущие скидки:\n$lines"
                 }
@@ -1184,6 +1201,7 @@ Available commands:
                         } else {
                             "The line is in the water. Waiting for a bite..."
                         }
+                        val anglerName = fishing.displayName(uid)
                         trySend(chatId, waitMessage, replyToMessageId = replyTo)
                         castScope.launch {
                             val waitSeconds = 5 + Random.nextInt(26)
@@ -1266,6 +1284,7 @@ Available commands:
                                     catch.weight,
                                     catch.rarity,
                                     lang,
+                                    anglerName = anglerName,
                                     caughtAt = caughtAt,
                                 )
                                 if (image != null) {
@@ -1719,7 +1738,7 @@ Available commands:
                                 val current = existing?.let {
                                     val start = it.startDate.format(DATE_FMT)
                                     val end = it.endDate.format(DATE_FMT)
-                                    "\nТекущая скидка: ${it.price}⭐ ($start — $end)"
+                                    "\nТекущая скидка: ${it.price}⭐ ($start — до $end)"
                                 } ?: ""
                                 val message = "Введите цену в звёздах для \"$name\" (обычная цена: ${pack.price}⭐)$current"
                                 try {
@@ -1920,7 +1939,7 @@ Available commands:
                             draft.step = DiscountStep.END
                             val current = draft.end?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
                             try {
-                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг)$current")
+                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг, не включительно)$current")
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", chatId, e)
                             }
@@ -1934,9 +1953,9 @@ Available commands:
                             try {
                                 bot.sendMessage(chatId, "Неверный формат даты, используйте дд.мм.гггг")
                             } catch (_: Exception) {}
-                        } else if (date.isBefore(start)) {
+                        } else if (!date.isAfter(start)) {
                             try {
-                                bot.sendMessage(chatId, "Дата окончания не может быть раньше даты начала")
+                                bot.sendMessage(chatId, "Дата окончания должна быть позже даты начала")
                             } catch (_: Exception) {}
                         } else {
                             draft.end = date
@@ -1946,7 +1965,7 @@ Available commands:
                             val messageText = buildString {
                                 append("Скидка для \"${draft.packageName}\" сохранена: ")
                                 append(strikethrough("${draft.basePrice}⭐"))
-                                append(" → ${price}⭐ ($startStr — $endStr)")
+                                append(" → ${price}⭐ ($startStr — до $endStr)")
                             }
                             discountStates.remove(userId)
                             try {

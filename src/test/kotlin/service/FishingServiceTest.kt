@@ -6,7 +6,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 
 class FishingServiceTest {
@@ -24,9 +27,21 @@ class FishingServiceTest {
         botName = "",
     )
 
-    private fun newService(dbName: String): FishingService {
+    private fun newService(dbName: String, clock: Clock = Clock.systemUTC()): FishingService {
         DB.init(testEnv(dbName))
-        return FishingService()
+        return FishingService(clock)
+    }
+
+    private class MutableClock(
+        private var current: Instant,
+        private val zoneId: ZoneId = ZoneOffset.UTC,
+    ) : Clock() {
+        override fun getZone(): ZoneId = zoneId
+        override fun withZone(zone: ZoneId): Clock = MutableClock(current, zone)
+        override fun instant(): Instant = current
+        fun set(instant: Instant) {
+            current = instant
+        }
     }
 
     @Test
@@ -122,5 +137,27 @@ class FishingServiceTest {
         val restored = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
         assertEquals(39, restored.price)
         assertEquals(null, restored.originalPrice)
+    }
+
+    @Test
+    fun discountExpiresAtStartOfEndDate() {
+        val start = LocalDate.of(2025, 9, 22)
+        val endExclusive = start.plusDays(1)
+        val zone = ZoneOffset.UTC
+        val clock = MutableClock(start.atTime(12, 0).atZone(zone).toInstant(), zone)
+        val svc = newService("testdb_discount_end_exclusive", clock)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = start, end = endExclusive)
+
+        val activePack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(10, activePack.price)
+        assertEquals(39, activePack.originalPrice)
+
+        clock.set(endExclusive.atStartOfDay(zone).toInstant())
+
+        val expiredPack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(39, expiredPack.price)
+        assertEquals(null, expiredPack.originalPrice)
     }
 }
