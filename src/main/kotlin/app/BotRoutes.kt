@@ -1259,13 +1259,14 @@ Available commands:
                                 val caption = withGroupCatchTags(captionBase, catch, chatId)
                                 val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
                                 val image = generateCatchImage(
-                                    catch.fish,
-                                    catch.location,
-                                    fishName,
-                                    locationName,
-                                    catch.weight,
-                                    catch.rarity,
-                                    lang,
+                                    fishInternalName = catch.fish,
+                                    locationInternalName = catch.location,
+                                    displayFishName = fishName,
+                                    displayLocationName = locationName,
+                                    weightKg = catch.weight,
+                                    rarity = catch.rarity,
+                                    lang = lang,
+                                    anglerName = catch.user,
                                     caughtAt = caughtAt,
                                 )
                                 if (image != null) {
