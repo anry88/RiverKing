@@ -924,14 +924,21 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
     }
 
-    fun listDiscounts(): List<ShopDiscount> = transaction {
-        ShopDiscounts.selectAll().map {
-            ShopDiscount(
-                packageId = it[ShopDiscounts.packageId],
-                price = it[ShopDiscounts.price],
-                startDate = it[ShopDiscounts.startDate],
-                endDate = it[ShopDiscounts.endDate],
-            )
+    fun listDiscounts(): List<ShopDiscount> {
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
+        val discounts = transaction {
+            ShopDiscounts.selectAll().map {
+                ShopDiscount(
+                    packageId = it[ShopDiscounts.packageId],
+                    price = it[ShopDiscounts.price],
+                    startDate = it[ShopDiscounts.startDate],
+                    endDate = it[ShopDiscounts.endDate],
+                )
+            }
+        }
+        return discounts.filter { discount ->
+            discount.endDate.atStartOfDay(zone).toInstant() > nowInstant
         }
     }
 
@@ -1378,6 +1385,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 rarity,
                 userId = userId,
                 fishId = fishId,
+                user = nameFromRow(userRow),
                 at = caughtAt.toString(),
             ),
             unlockedLocations = unlockedLocations,
