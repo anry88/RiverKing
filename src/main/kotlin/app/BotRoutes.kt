@@ -546,7 +546,7 @@ fun Application.botRoutes(env: Env) {
                         val priceText = basePrice?.let { strikethrough("$it⭐") + " ${d.price}⭐" } ?: "${d.price}⭐"
                         val start = d.startDate.format(DATE_FMT)
                         val end = d.endDate.format(DATE_FMT)
-                        "• $name — $priceText ($start — до $end)"
+                        "• $name — $priceText ($start — $end)"
                     }
                     "Текущие скидки:\n$lines"
                 }
@@ -1277,14 +1277,14 @@ Available commands:
                                 val caption = withGroupCatchTags(captionBase, catch, chatId)
                                 val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
                                 val image = generateCatchImage(
-                                    catch.fish,
-                                    catch.location,
-                                    fishName,
-                                    locationName,
-                                    catch.weight,
-                                    catch.rarity,
-                                    lang,
-                                    anglerName = anglerName,
+                                    fishInternalName = catch.fish,
+                                    locationInternalName = catch.location,
+                                    displayFishName = fishName,
+                                    displayLocationName = locationName,
+                                    weightKg = catch.weight,
+                                    rarity = catch.rarity,
+                                    lang = lang,
+                                    anglerName = catch.user,
                                     caughtAt = caughtAt,
                                 )
                                 if (image != null) {
@@ -1939,7 +1939,7 @@ Available commands:
                             draft.step = DiscountStep.END
                             val current = draft.end?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
                             try {
-                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг, не включительно)$current")
+                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг)$current")
                             } catch (e: Exception) {
                                 log.error("sendMessage failed chatId={}", chatId, e)
                             }
