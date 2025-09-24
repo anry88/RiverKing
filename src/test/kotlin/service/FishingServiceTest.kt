@@ -160,4 +160,25 @@ class FishingServiceTest {
         assertEquals(39, expiredPack.price)
         assertEquals(null, expiredPack.originalPrice)
     }
+
+    @Test
+    fun listDiscountsOmitsExpiredEntries() {
+        val start = LocalDate.of(2025, 10, 1)
+        val endExclusive = start.plusDays(1)
+        val zone = ZoneOffset.UTC
+        val clock = MutableClock(start.minusDays(1).atStartOfDay(zone).toInstant(), zone)
+        val svc = newService("testdb_discount_list_filter", clock)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = start, end = endExclusive)
+
+        val scheduled = svc.listDiscounts().associateBy { it.packageId }
+        assertEquals(1, scheduled.size)
+        assertEquals(10, scheduled[packId]?.price)
+
+        clock.set(endExclusive.atStartOfDay(zone).toInstant())
+
+        val expired = svc.listDiscounts()
+        assertEquals(0, expired.size)
+    }
 }
