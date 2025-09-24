@@ -203,14 +203,22 @@ object DB {
         val delta       = upsertLocation("Дельта реки",     450.0, 2.5)
         val coast       = upsertLocation("Прибрежье моря",  650.0, 2.8)
 
+//        val amazon      = upsertLocation("Русло Амазонки",          900.0,  3.0)
+//        val igapo       = upsertLocation("Игапо, затопленный лес",  1100.0, 3.05)
+//        val mangrove    = upsertLocation("Мангровые заросли",       1500.0, 3.1)
+//        val coralFlats  = upsertLocation("Коралловые отмели",       2000.0, 3.2)
+//
+//        val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
+//        val openOcean   = upsertLocation("Открытый океан",  5000.0, 4.2)
+
         // NEW tropical & Amazonia
         val amazon      = upsertLocation("Русло Амазонки",          900.0,  3.0)
-        val igapo       = upsertLocation("Игапо, затопленный лес",  1100.0, 3.05)
-        val mangrove    = upsertLocation("Мангровые заросли",       1500.0, 3.1)
-        val coralFlats  = upsertLocation("Коралловые отмели",       2000.0, 3.2)
+        val igapo       = upsertLocation("Игапо, затопленный лес",  900.0, 3.05)
+        val mangrove    = upsertLocation("Мангровые заросли",       900.0, 3.1)
+        val coralFlats  = upsertLocation("Коралловые отмели",       900.0, 3.2)
 
-        val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
-        val openOcean   = upsertLocation("Открытый океан",  5000.0, 4.2)
+        val fjord       = upsertLocation("Фьорд",           900.0, 3.4)
+        val openOcean   = upsertLocation("Открытый океан",  900.0, 4.2)
 
         // --- Fish: базовые пресные ---
         val fP  = upsertFish("Плотва", "common", 0.2, 0.05, false, "fresh")
