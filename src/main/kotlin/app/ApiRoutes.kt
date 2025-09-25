@@ -228,6 +228,8 @@ fun Application.apiRoutes(env: Env) {
                 Users.select { Users.id eq uid }.single()[Users.autoFishUntil]
                     ?.isAfter(Instant.now()) ?: false
             }
+            val totalCoins = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
+            val todayCoins = fishing.todayCoins(uid)
 
             @Serializable
             data class MeResp(
@@ -249,6 +251,8 @@ fun Application.apiRoutes(env: Env) {
                 val dailyRewards: List<List<DailyRewardItemDTO>>,
                 val autoFish: Boolean,
                 val language: String,
+                val coins: Long,
+                val todayCoins: Long,
             )
             call.respond(
                 MeResp(
@@ -270,6 +274,8 @@ fun Application.apiRoutes(env: Env) {
                     dailyRewards,
                     autoFish,
                     language,
+                    totalCoins,
+                    todayCoins,
                 )
             )
         }

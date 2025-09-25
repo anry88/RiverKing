@@ -266,6 +266,8 @@ function App(){
             ],
             caughtFishIds:[],
             recent:[], dailyAvailable:true, dailyStreak:0, dailyRewards:[],
+            coins:0,
+            todayCoins:0,
           });
           setShop([]);
         }
@@ -479,13 +481,23 @@ function App(){
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const animationId = ++catchAnimationIdRef.current;
-        setResult({...c,newFish:isNewFish,newLocations:newLocs,newRods,animationId});
+        setResult({
+          ...c,
+          coins: typeof d.coins === 'number' ? d.coins : 0,
+          todayCoins: typeof d.todayCoins === 'number' ? d.todayCoins : undefined,
+          totalCoins: typeof d.totalCoins === 'number' ? d.totalCoins : undefined,
+          newFish:isNewFish,newLocations:newLocs,newRods,animationId
+        });
             setMe(p=>{
               const tot = (p.totalWeight||0)+c.weight;
+              const totalCoins = typeof d.totalCoins === 'number' ? d.totalCoins : p.coins;
+              const todayCoins = typeof d.todayCoins === 'number' ? d.todayCoins : p.todayCoins;
               return {
                 ...p,
                 totalWeight:tot,
                 todayWeight:(p.todayWeight||0)+c.weight,
+                coins: totalCoins,
+                todayCoins: todayCoins,
                 locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
                 rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
                 recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),

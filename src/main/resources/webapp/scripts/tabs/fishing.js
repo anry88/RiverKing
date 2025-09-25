@@ -657,6 +657,11 @@ function FishingTab({
             <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
             <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} {t('kg')}</div>
             <div className="text-xs opacity-70">{t('locationLabel')} {result.location}</div>
+            {typeof result.coins === 'number' && (
+              result.coins > 0
+                ? <div className="text-xs text-yellow-300">{t('coinsEarned', result.coins)}</div>
+                : <div className="text-xs opacity-70">{t('coinsCapReached')}</div>
+            )}
             {result.newLocations && result.newLocations.map((n,i)=>(
               <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
             ))}
