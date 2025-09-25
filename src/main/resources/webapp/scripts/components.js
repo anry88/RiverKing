@@ -342,13 +342,13 @@ function CatchDetailsModal({catchData, me, onClose}){
 
 function DailyModal({streak,available,rewards,onClose,onClaim}){
   const defaultRewards = [
-    [ {name:'Пресная мирная',qty:8}, {name:'Пресная хищная',qty:4} ],
-    [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:6} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:6} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8}, {name:'Пресная мирная+',qty:1} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:10} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:12}, {name:'Пресная хищная+',qty:1} ],
+    [ {name:'Зерновая крошка',qty:8}, {name:'Ручейный малек',qty:4} ],
+    [ {name:'Зерновая крошка',qty:10}, {name:'Ручейный малек',qty:6} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:6} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8}, {name:'Луговой червь',qty:1} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:10} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:12}, {name:'Серебряный живец',qty:1} ],
   ];
   const displayRewards = (rewards && rewards.length ? rewards : defaultRewards);
   const totalDays = displayRewards.length;
