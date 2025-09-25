@@ -29,6 +29,7 @@ import service.PrizeSpec
 import service.I18n
 import util.Metrics
 import util.sanitizeName
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -234,6 +235,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "Buy baits with Stars",
                         assetName = "shop.png"
                     ) { _, _ -> "/shop" },
+                    InlineCommandInfo(
+                        name = "coin_shop",
+                        ruDescription = "Купить наборы за монеты",
+                        enDescription = "Buy bundles with coins",
+                        assetName = "shop.png"
+                    ) { _, _ -> "/coin_shop" },
                     InlineCommandInfo(
                         name = "tournament",
                         ruDescription = "Таблица текущего турнира и твоя позиция",
@@ -802,6 +809,67 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
+            fun sendCoinShopMenu(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val shop = fishing.listShop(lang).map { category ->
+                    category.copy(packs = category.packs.filter { it.coinPrice != null })
+                }.filter { it.packs.isNotEmpty() }
+                if (shop.isEmpty()) {
+                    val emptyText = if (lang == "ru") {
+                        "Покупки за монеты пока недоступны."
+                    } else {
+                        "Coin shop is unavailable right now."
+                    }
+                    trySend(chatId, emptyText, replyToMessageId = replyToMessageId)
+                    return
+                }
+                val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                val formatter = NumberFormat.getIntegerInstance(locale)
+                val balance = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
+                val balanceText = formatter.format(balance)
+                val header = if (lang == "ru") {
+                    "🪙 Магазин за монеты. Баланс: $balanceText монет."
+                } else {
+                    "🪙 Coin shop. Balance: $balanceText coins."
+                }
+                val footer = if (lang == "ru") {
+                    "Чтобы купить, открой мини-приложение: https://t.me/${env.botName}?startapp"
+                } else {
+                    "To buy, open the mini app: https://t.me/${env.botName}?startapp"
+                }
+                val text = buildString {
+                    append(header)
+                    shop.forEach { category ->
+                        append("\n\n")
+                        append(category.name)
+                        category.packs.forEach { pack ->
+                            val coinPrice = pack.coinPrice ?: return@forEach
+                            val priceText = formatter.format(coinPrice)
+                            append("\n• ")
+                            append(pack.name)
+                            append(" — 🪙 ")
+                            append(priceText)
+                            if (pack.desc.isNotBlank()) {
+                                append("\n  ")
+                                append(pack.desc)
+                            }
+                        }
+                    }
+                    append("\n\n")
+                    append(footer)
+                }.trim()
+                val parts = splitMessage(text)
+                parts.forEachIndexed { index, part ->
+                    val trimmedPart = part.trimEnd()
+                    val partReplyTo = if (index == 0) replyToMessageId else null
+                    trySend(chatId, trimmedPart, replyToMessageId = partReplyTo)
+                }
+            }
+
             suspend fun processUserCommand(
                 rawText: String,
                 from: TgUser?,
@@ -866,6 +934,7 @@ fun Application.botRoutes(env: Env) {
 /daily — получить ежедневную награду
 /prizes — забрать призы турнира
 /shop — купить приманки за звёзды
+/coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
@@ -881,6 +950,7 @@ Available commands:
 /daily — claim your daily reward
 /prizes — claim tournament prizes
 /shop — buy baits with Stars
+/coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
 /stats — your fishing stats
 /language — choose your language
@@ -1059,6 +1129,13 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         logCommandMetric("shop", mapOf("action" to "show"), source)
                         sendShopMenu(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/coin_shop" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("coin_shop", mapOf("action" to "show"), source)
+                        sendCoinShopMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         return true
                     }
                     "/buy" -> {

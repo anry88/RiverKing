@@ -396,6 +396,41 @@ function App(){
     }
   }
 
+  async function buyPackWithCoins(id){
+    setError(null);
+    try{
+      const r = await fetch(`/api/shop/${id}/coins`,{method:'POST',credentials:'include'});
+      if(!r.ok){
+        if(r.status===401) throw new Error('unauthorized');
+        let data = null;
+        try{ data = await r.json(); }catch(err){}
+        if(data?.error==='not_enough_coins') throw new Error('not_enough_coins');
+        if(data?.error==='coin_purchase_unavailable') throw new Error('coin_unavailable');
+        throw new Error('purchase_failed');
+      }
+      try{
+        const meResp = await fetch(`/api/me`,{credentials:'include'});
+        if(meResp.ok){
+          setMe(await meResp.json());
+        }
+      }catch(err){}
+      try{
+        const shopResp = await fetch(`/api/shop`,{credentials:'include'});
+        if(shopResp.ok){
+          setShop(await shopResp.json());
+        }
+      }catch(err){}
+    }catch(e){
+      if(e.message==='unauthorized'){
+        setError(t('authRequired'));
+      }else if(e.message==='not_enough_coins'){
+        setError(t('notEnoughCoins'));
+      }else{
+        setError(t('purchaseFailed'));
+      }
+    }
+  }
+
   async function selectLocation(id){
     setError(null);
     try{
@@ -835,6 +870,7 @@ function App(){
               generateRefLink={generateRefLink}
               starterPackName={starterPackName}
               buyPack={buyPack}
+              buyPackWithCoins={buyPackWithCoins}
               dailyAvailable={me.dailyAvailable}
               onOpenDaily={openDaily}
             />

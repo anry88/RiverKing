@@ -90,6 +90,7 @@ fun Application.apiRoutes(env: Env) {
         val originalPrice: Int? = null,
         val discountStart: String? = null,
         val discountEnd: String? = null,
+        val coinPrice: Int? = null,
     )
 
     @Serializable
@@ -584,6 +585,7 @@ fun Application.apiRoutes(env: Env) {
                             originalPrice = p.originalPrice,
                             discountStart = p.discountStart?.toString(),
                             discountEnd = p.discountEnd?.toString(),
+                            coinPrice = p.coinPrice,
                         )
                     }
                 )
@@ -631,6 +633,61 @@ fun Application.apiRoutes(env: Env) {
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
+        }
+
+        post("/api/shop/{id}/coins") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            log.info("coin shop purchase tgId={} pack={}", tgId, id)
+            Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to id))
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = fishing.userLanguage(uid)
+            val result = try {
+                fishing.buyPackageWithCoins(uid, id)
+            } catch (e: FishingService.NotEnoughCoinsException) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "insufficient")
+                )
+                return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "not_enough_coins",
+                        "balance" to e.balance,
+                        "required" to e.required,
+                    )
+                )
+            } catch (_: FishingService.CoinPurchaseUnavailableException) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "unavailable")
+                )
+                return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "coin_purchase_unavailable")
+                )
+            } catch (e: Exception) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "error")
+                )
+                log.warn("coin shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
+            }
+            val localized = result.first.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
+            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to id))
+            log.info("coin shop purchase success tgId={} pack={}", tgId, id)
+            call.respond(ShopBuyResp(localized, result.second))
         }
 
         get("/api/referrals") {

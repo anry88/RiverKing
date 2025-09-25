@@ -13,6 +13,7 @@ function ShopTab({
   generateRefLink,
   starterPackName,
   buyPack,
+  buyPackWithCoins,
   dailyAvailable,
   onOpenDaily
 }){
@@ -74,7 +75,18 @@ function ShopTab({
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{`${item.price}★`}</button>
+                        <button
+                          type="button"
+                          onClick={()=>buyPack(item.id)}
+                          className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                        >{`${item.price}★`}</button>
+                        {typeof item.coinPrice === 'number' && (
+                          <button
+                            type="button"
+                            onClick={()=>buyPackWithCoins?.(item.id)}
+                            className="px-3 py-1 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300"
+                          >{t('buyForCoins', item.coinPrice)}</button>
+                        )}
                         {hasDiscount && (
                           <div className="text-xs text-right">
                             <div className="line-through opacity-60">{`${item.originalPrice}★`}</div>
