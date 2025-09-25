@@ -676,6 +676,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val desc: String,
         val price: Int,
         val items: List<Pair<String, Int>>,
+        val coinPrice: Int? = null,
         val originalPrice: Int? = null,
         val discountStart: LocalDate? = null,
         val discountEnd: LocalDate? = null,
@@ -701,11 +702,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "Пресные простые",
             listOf(
                 ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
-                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10)),
+                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 240),
                 ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
-                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25)),
+                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 550),
                 ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
-                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60)),
+                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1250),
             )
         ),
 
@@ -719,21 +720,24 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "Пополнение S",
                     "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»",
                     55,
-                    listOf("Морская мирная" to 6, "Морская хищная" to 14)
+                    listOf("Морская мирная" to 6, "Морская хищная" to 14),
+                    coinPrice = 450
                 ),
                 ShopPackage(
                     "salt_stock_m",
                     "Запас M",
                     "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»",
                     129,
-                    listOf("Морская мирная" to 15, "Морская хищная" to 35)
+                    listOf("Морская мирная" to 15, "Морская хищная" to 35),
+                    coinPrice = 1000
                 ),
                 ShopPackage(
                     "salt_crate_l",
                     "Ящик L",
                     "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»",
                     299,
-                    listOf("Морская мирная" to 40, "Морская хищная" to 80)
+                    listOf("Морская мирная" to 40, "Морская хищная" to 80),
+                    coinPrice = 2200
                 ),
             )
         ),
@@ -845,21 +849,24 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "Пополнение пресных хищных",
                     "15 «Ручейный малек»",
                     29,
-                    listOf("Пресная хищная" to 15)
+                    listOf("Пресная хищная" to 15),
+                    coinPrice = 210
                 ),
                 ShopPackage(
                     "micro_salt_starter",
                     "Морской старт",
                     "10 морских простых: 3 «Морская водоросль» и 7 «Кольца кальмара»",
                     25,
-                    listOf("Морская мирная" to 3, "Морская хищная" to 7)
+                    listOf("Морская мирная" to 3, "Морская хищная" to 7),
+                    coinPrice = 240
                 ),
                 ShopPackage(
                     "micro_salt_pred_refill",
                     "Морской хищный запас",
                     "20 «Кольца кальмара»",
                     49,
-                    listOf("Морская хищная" to 20)
+                    listOf("Морская хищная" to 20),
+                    coinPrice = 500
                 ),
             )
         ),
@@ -881,6 +888,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
+
+    class CoinPurchaseUnavailableException : RuntimeException()
+    class NotEnoughCoinsException(val required: Int, val balance: Long) : RuntimeException()
 
     fun listShop(lang: String): List<ShopCategory> {
         val nowInstant = Instant.now(clock)
@@ -979,23 +989,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ShopDiscounts.deleteWhere { ShopDiscounts.packageId eq packageId }
     }
 
-    fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
-        if (packageId == "autofish" || packageId == "autofish_week") {
-            val row = Users.select { Users.id eq userId }.forUpdate().single()
-            val cur = row[Users.autoFishUntil]
-            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
-            val newUntil = if (packageId == "autofish") {
-                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
-            } else {
-                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
-            }
-            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
-            return@transaction Pair(emptyList(), null)
-        }
-
-        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
-            ?: error("bad package")
-
+    private fun grantPackItems(userId: Long, pack: ShopPackage): Pair<List<LureDTO>, Long?> {
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -1030,7 +1024,42 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     it[Lures.rarityBonus],
                 )
             }
-        Pair(lures, current)
+        return Pair(lures, current)
+    }
+
+    fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
+        if (packageId == "autofish" || packageId == "autofish_week") {
+            val row = Users.select { Users.id eq userId }.forUpdate().single()
+            val cur = row[Users.autoFishUntil]
+            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
+            val newUntil = if (packageId == "autofish") {
+                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            } else {
+                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
+            }
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
+            return@transaction Pair(emptyList(), null)
+        }
+
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+
+        grantPackItems(userId, pack)
+    }
+
+    fun buyPackageWithCoins(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+        val coinPrice = pack.coinPrice ?: throw CoinPurchaseUnavailableException()
+        val userRow = Users.select { Users.id eq userId }.forUpdate().single()
+        val balance = userRow[Users.coins]
+        if (balance < coinPrice.toLong()) {
+            throw NotEnoughCoinsException(coinPrice, balance)
+        }
+        Users.update({ Users.id eq userId }) {
+            it[coins] = balance - coinPrice
+        }
+        grantPackItems(userId, pack)
     }
 
     fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
