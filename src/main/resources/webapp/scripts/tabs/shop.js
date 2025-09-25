@@ -85,8 +85,8 @@ function ShopTab({
                           <button
                             type="button"
                             onClick={()=>onCoinPurchaseRequest?.(item.id)}
-                            className="px-3 py-1 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300"
-                          >{`🪙 ${Number(item.coinPrice).toLocaleString(coinLocale)}`}</button>
+                            className="px-3 py-1 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400"
+                          >{`${Number(item.coinPrice).toLocaleString(coinLocale)}🪙`}</button>
                         )}
                         {hasDiscount && (
                           <div className="text-xs text-right">

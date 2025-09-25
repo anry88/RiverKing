@@ -55,6 +55,7 @@ function App(){
   const [refRewards,setRefRewards] = React.useState(null);
   const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
   const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
+  const [coinInsufficientOpen, setCoinInsufficientOpen] = React.useState(false);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
   const coinPurchasePriceLabel = coinPurchasePack
     ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
@@ -431,7 +432,8 @@ function App(){
       if(e.message==='unauthorized'){
         setError(t('authRequired'));
       }else if(e.message==='not_enough_coins'){
-        setError(t('notEnoughCoins'));
+        setCoinPurchasePack(null);
+        setCoinInsufficientOpen(true);
       }else{
         setError(t('purchaseFailed'));
       }
@@ -459,6 +461,10 @@ function App(){
   function closeCoinPurchaseModal(){
     if(coinPurchaseProcessing) return;
     setCoinPurchasePack(null);
+  }
+
+  function closeInsufficientCoinsModal(){
+    setCoinInsufficientOpen(false);
   }
 
   async function confirmCoinPurchase(){
@@ -872,20 +878,40 @@ function App(){
                   price: coinPurchasePriceLabel
                 })}
               </div>
-              <div className="flex gap-3 mt-5">
+              <div className="flex gap-3 mt-5 text-sm">
                 <button
                   type="button"
-                  className="flex-1 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:hover:bg-red-600"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:hover:bg-red-600"
                   onClick={closeCoinPurchaseModal}
                   disabled={coinPurchaseProcessing}
                 >{t('cancel')}</button>
                 <button
                   type="button"
-                  className="flex-1 px-3 py-2 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400"
                   onClick={confirmCoinPurchase}
                   disabled={coinPurchaseProcessing}
                 >{t('confirmCoinPurchaseButton', coinPurchasePriceLabel)}</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {coinInsufficientOpen && (
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
+            onClick={closeInsufficientCoinsModal}
+          >
+            <div
+              className="glass p-5 rounded-xl max-w-xs w-[90%] text-center animate-pop"
+              onClick={e=>e.stopPropagation()}
+            >
+              <div className="text-lg font-semibold mb-2">{t('notEnoughCoinsTitle')}</div>
+              <div className="text-sm opacity-80 mb-4">{t('notEnoughCoins')}</div>
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                onClick={closeInsufficientCoinsModal}
+              >{t('close')}</button>
             </div>
           </div>
         )}
