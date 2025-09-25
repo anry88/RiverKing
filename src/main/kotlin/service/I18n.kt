@@ -228,40 +228,40 @@ object I18n {
         "Пополнение пресных хищных" to "Predator Top-up",
         "Морской старт" to "Sea Start",
         "Морской хищный запас" to "Saltwater Predator Stock",
-        "20 пресных простых: 10 мирных и 10 хищных" to "20 freshwater basics: 10 peaceful and 10 predator",
-        "50 пресных простых: 25 мирных и 25 хищных" to "50 freshwater basics: 25 peaceful and 25 predator",
-        "120 пресных простых: 60 мирных и 60 хищных" to "120 freshwater basics: 60 peaceful and 60 predator",
-        "10 морских простых: 3 мирных и 7 хищных" to "10 saltwater basics: 3 peaceful and 7 predator",
-        "20 морских простых: 10 мирных и 10 хищных" to "20 saltwater basics: 10 peaceful and 10 predator",
-        "20 морских простых: 6 мирных и 14 хищных" to "20 saltwater basics: 6 peaceful and 14 predator",
-        "50 морских простых: 15 мирных и 35 хищных" to "50 saltwater basics: 15 peaceful and 35 predator",
-        "50 морских простых: 25 мирных и 25 хищных" to "50 saltwater basics: 25 peaceful and 25 predator",
-        "120 морских простых: 40 мирных и 80 хищных" to "120 saltwater basics: 40 peaceful and 80 predator",
-        "120 морских простых: 60 мирных и 60 хищных" to "120 saltwater basics: 60 peaceful and 60 predator",
-        "10 пресных улучшенных: 5 мирных и 5 хищных" to "10 freshwater advanced: 5 peaceful and 5 predator",
-        "25 пресных улучшенных: 12 мирных и 13 хищных" to "25 freshwater advanced: 12 peaceful and 13 predator",
-        "60 пресных улучшенных: 30 мирных и 30 хищных" to "60 freshwater advanced: 30 peaceful and 30 predator",
-        "10 морских улучшенных: 4 мирные+ и 6 хищные+" to "10 saltwater advanced: 4 peaceful+ and 6 predator+",
-        "10 морских улучшенных: 5 мирных и 5 хищных" to "10 saltwater advanced: 5 peaceful and 5 predator",
-        "25 морских улучшенных: 9 мирных+ и 16 хищных+" to "25 saltwater advanced: 9 peaceful+ and 16 predator+",
-        "25 морских улучшенных: 12 мирных и 13 хищных" to "25 saltwater advanced: 12 peaceful and 13 predator",
-        "60 морских улучшенных: 20 мирных+ и 40 хищных+" to "60 saltwater advanced: 20 peaceful+ and 40 predator+",
-        "60 морских улучшенных: 30 мирных и 30 хищных" to "60 saltwater advanced: 30 peaceful and 30 predator",
-        "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (6 мирных и 14 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)" to
-            "40 freshwater basics (20 peaceful and 20 predator), 20 saltwater basics (6 peaceful and 14 predator) and 5 freshwater advanced (3 peaceful+ and 2 predator+)",
-        "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (10 мирных и 10 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)" to
-            "40 freshwater basics (20 peaceful and 20 predator), 20 saltwater basics (10 peaceful and 10 predator) and 5 freshwater advanced (3 peaceful+ and 2 predator+)",
-        "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (12 мирных и 28 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (1 мирная+ и 4 хищные+)" to
-            "80 freshwater basics (40 peaceful and 40 predator), 40 saltwater basics (12 peaceful and 28 predator), 15 freshwater advanced (8 peaceful+ and 7 predator+) and 5 saltwater advanced (1 peaceful+ and 4 predator+)",
-        "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (20 мирных и 20 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (3 мирные+ и 2 хищные+)" to
-            "80 freshwater basics (40 peaceful and 40 predator), 40 saltwater basics (20 peaceful and 20 predator), 15 freshwater advanced (8 peaceful+ and 7 predator+) and 5 saltwater advanced (3 peaceful+ and 2 predator+)",
-        "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (40 мирных и 80 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (6 мирных+ и 14 хищных+)" to
-            "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (40 peaceful and 80 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (6 peaceful+ and 14 predator+)",
-        "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (60 мирных и 60 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (10 мирных+ и 10 хищных+)" to
-            "200 freshwater basics (100 peaceful and 100 predator), 120 saltwater basics (60 peaceful and 60 predator), 40 freshwater advanced (20 peaceful+ and 20 predator+) and 20 saltwater advanced (10 peaceful+ and 10 predator+)",
-        "15 пресных хищных" to "15 freshwater predator",
-        "20 морских хищных" to "20 saltwater predator",
-        "10 морских простых: 5 мирных и 5 хищных" to "10 saltwater basics: 5 peaceful and 5 predator",
+        "20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»" to "20 freshwater basics: 10 \"Grain Crumble\" and 10 \"Brook Minnow\"",
+        "50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»" to "50 freshwater basics: 25 \"Grain Crumble\" and 25 \"Brook Minnow\"",
+        "120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»" to "120 freshwater basics: 60 \"Grain Crumble\" and 60 \"Brook Minnow\"",
+        "10 морских простых: 3 «Морская водоросль» и 7 «Кольца кальмара»" to "10 saltwater basics: 3 \"Seaweed Strand\" and 7 \"Squid Rings\"",
+        "20 морских простых: 10 «Морская водоросль» и 10 «Кольца кальмара»" to "20 saltwater basics: 10 \"Seaweed Strand\" and 10 \"Squid Rings\"",
+        "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»" to "20 saltwater basics: 6 \"Seaweed Strand\" and 14 \"Squid Rings\"",
+        "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»" to "50 saltwater basics: 15 \"Seaweed Strand\" and 35 \"Squid Rings\"",
+        "50 морских простых: 25 «Морская водоросль» и 25 «Кольца кальмара»" to "50 saltwater basics: 25 \"Seaweed Strand\" and 25 \"Squid Rings\"",
+        "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»" to "120 saltwater basics: 40 \"Seaweed Strand\" and 80 \"Squid Rings\"",
+        "120 морских простых: 60 «Морская водоросль» и 60 «Кольца кальмара»" to "120 saltwater basics: 60 \"Seaweed Strand\" and 60 \"Squid Rings\"",
+        "10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»" to "10 freshwater advanced: 5 \"Meadow Worm\" and 5 \"Silver Shiner\"",
+        "25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»" to "25 freshwater advanced: 12 \"Meadow Worm\" and 13 \"Silver Shiner\"",
+        "60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»" to "60 freshwater advanced: 30 \"Meadow Worm\" and 30 \"Silver Shiner\"",
+        "10 морских улучшенных: 4 «Неоновый планктон» и 6 «Королевская креветка»" to "10 saltwater advanced: 4 \"Neon Plankton\" and 6 \"Royal Shrimp\"",
+        "10 морских улучшенных: 5 «Неоновый планктон» и 5 «Королевская креветка»" to "10 saltwater advanced: 5 \"Neon Plankton\" and 5 \"Royal Shrimp\"",
+        "25 морских улучшенных: 9 «Неоновый планктон» и 16 «Королевская креветка»" to "25 saltwater advanced: 9 \"Neon Plankton\" and 16 \"Royal Shrimp\"",
+        "25 морских улучшенных: 12 «Неоновый планктон» и 13 «Королевская креветка»" to "25 saltwater advanced: 12 \"Neon Plankton\" and 13 \"Royal Shrimp\"",
+        "60 морских улучшенных: 20 «Неоновый планктон» и 40 «Королевская креветка»" to "60 saltwater advanced: 20 \"Neon Plankton\" and 40 \"Royal Shrimp\"",
+        "60 морских улучшенных: 30 «Неоновый планктон» и 30 «Королевская креветка»" to "60 saltwater advanced: 30 \"Neon Plankton\" and 30 \"Royal Shrimp\"",
+        "40 пресных простых (20 «Зерновая крошка» и 20 «Ручейный малек»), 20 морских простых (6 «Морская водоросль» и 14 «Кольца кальмара») и 5 пресных улучшенных (3 «Луговой червь» и 2 «Серебряный живец»)" to
+            "40 freshwater basics (20 \"Grain Crumble\" and 20 \"Brook Minnow\"), 20 saltwater basics (6 \"Seaweed Strand\" and 14 \"Squid Rings\") and 5 freshwater advanced (3 \"Meadow Worm\" and 2 \"Silver Shiner\")",
+        "40 пресных простых (20 «Зерновая крошка» и 20 «Ручейный малек»), 20 морских простых (10 «Морская водоросль» и 10 «Кольца кальмара») и 5 пресных улучшенных (3 «Луговой червь» и 2 «Серебряный живец»)" to
+            "40 freshwater basics (20 \"Grain Crumble\" and 20 \"Brook Minnow\"), 20 saltwater basics (10 \"Seaweed Strand\" and 10 \"Squid Rings\") and 5 freshwater advanced (3 \"Meadow Worm\" and 2 \"Silver Shiner\")",
+        "80 пресных простых (40 «Зерновая крошка» и 40 «Ручейный малек»), 40 морских простых (12 «Морская водоросль» и 28 «Кольца кальмара»), 15 пресных улучшенных (8 «Луговой червь» и 7 «Серебряный живец») и 5 морских улучшенных (1 «Неоновый планктон» и 4 «Королевская креветка»)" to
+            "80 freshwater basics (40 \"Grain Crumble\" and 40 \"Brook Minnow\"), 40 saltwater basics (12 \"Seaweed Strand\" and 28 \"Squid Rings\"), 15 freshwater advanced (8 \"Meadow Worm\" and 7 \"Silver Shiner\") and 5 saltwater advanced (1 \"Neon Plankton\" and 4 \"Royal Shrimp\")",
+        "80 пресных простых (40 «Зерновая крошка» и 40 «Ручейный малек»), 40 морских простых (20 «Морская водоросль» и 20 «Кольца кальмара»), 15 пресных улучшенных (8 «Луговой червь» и 7 «Серебряный живец») и 5 морских улучшенных (3 «Неоновый планктон» и 2 «Королевская креветка»)" to
+            "80 freshwater basics (40 \"Grain Crumble\" and 40 \"Brook Minnow\"), 40 saltwater basics (20 \"Seaweed Strand\" and 20 \"Squid Rings\"), 15 freshwater advanced (8 \"Meadow Worm\" and 7 \"Silver Shiner\") and 5 saltwater advanced (3 \"Neon Plankton\" and 2 \"Royal Shrimp\")",
+        "200 пресных простых (100 «Зерновая крошка» и 100 «Ручейный малек»), 120 морских простых (40 «Морская водоросль» и 80 «Кольца кальмара»), 40 пресных улучшенных (20 «Луговой червь» и 20 «Серебряный живец») и 20 морских улучшенных (6 «Неоновый планктон» и 14 «Королевская креветка»)" to
+            "200 freshwater basics (100 \"Grain Crumble\" and 100 \"Brook Minnow\"), 120 saltwater basics (40 \"Seaweed Strand\" and 80 \"Squid Rings\"), 40 freshwater advanced (20 \"Meadow Worm\" and 20 \"Silver Shiner\") and 20 saltwater advanced (6 \"Neon Plankton\" and 14 \"Royal Shrimp\")",
+        "200 пресных простых (100 «Зерновая крошка» и 100 «Ручейный малек»), 120 морских простых (60 «Морская водоросль» и 60 «Кольца кальмара»), 40 пресных улучшенных (20 «Луговой червь» и 20 «Серебряный живец») и 20 морских улучшенных (10 «Неоновый планктон» и 10 «Королевская креветка»)" to
+            "200 freshwater basics (100 \"Grain Crumble\" and 100 \"Brook Minnow\"), 120 saltwater basics (60 \"Seaweed Strand\" and 60 \"Squid Rings\"), 40 freshwater advanced (20 \"Meadow Worm\" and 20 \"Silver Shiner\") and 20 saltwater advanced (10 \"Neon Plankton\" and 10 \"Royal Shrimp\")",
+        "15 «Ручейный малек»" to "15 \"Brook Minnow\"",
+        "20 «Кольца кальмара»" to "20 \"Squid Rings\"",
+        "10 морских простых: 5 «Морская водоросль» и 5 «Кольца кальмара»" to "10 saltwater basics: 5 \"Seaweed Strand\" and 5 \"Squid Rings\"",
         "Подписки" to "Subscriptions",
         "Автоловля" to "Auto Catch",
         "Робот ловит за вас целый месяц и не упустит ни одной рыбы" to "Robot catches fish for you for a whole month and won't miss any fish",
@@ -279,14 +279,14 @@ object I18n {
     }
 
     private fun oldLureName(name: String) = when (name) {
-        "Пресная мирная" -> "Freshwater Peaceful"
-        "Пресная хищная" -> "Freshwater Predator"
-        "Морская мирная" -> "Saltwater Peaceful"
-        "Морская хищная" -> "Saltwater Predator"
-        "Пресная мирная+" -> "Freshwater Peaceful+"
-        "Пресная хищная+" -> "Freshwater Predator+"
-        "Морская мирная+" -> "Saltwater Peaceful+"
-        "Морская хищная+" -> "Saltwater Predator+"
+        "Пресная мирная" -> "Grain Crumble"
+        "Пресная хищная" -> "Brook Minnow"
+        "Морская мирная" -> "Seaweed Strand"
+        "Морская хищная" -> "Squid Rings"
+        "Пресная мирная+" -> "Meadow Worm"
+        "Пресная хищная+" -> "Silver Shiner"
+        "Морская мирная+" -> "Neon Plankton"
+        "Морская хищная+" -> "Royal Shrimp"
         else -> name
     }
 
