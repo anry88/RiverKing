@@ -453,6 +453,13 @@ function App(){
       }
     }
     if(pack && typeof pack.coinPrice === 'number'){
+      const currentCoins = typeof me?.coins === 'number' ? me.coins : null;
+      if(currentCoins != null && currentCoins < Number(pack.coinPrice)){
+        setCoinPurchaseProcessing(false);
+        setCoinPurchasePack(null);
+        setCoinInsufficientOpen(true);
+        return;
+      }
       setCoinPurchaseProcessing(false);
       setCoinPurchasePack(pack);
     }
