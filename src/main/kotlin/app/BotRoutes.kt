@@ -1227,13 +1227,32 @@ Available commands:
                                 } else {
                                     ""
                                 }
+                                val coinsLine = when {
+                                    castRes.coins > 0 -> {
+                                        val amount = castRes.coins
+                                        if (lang == "ru") {
+                                            "\n🪙 +${amount} монет"
+                                        } else {
+                                            val suffix = if (amount == 1) "" else "s"
+                                            "\n🪙 +${amount} coin${suffix}"
+                                        }
+                                    }
+                                    castRes.coins == 0 -> {
+                                        if (lang == "ru") {
+                                            "\n🪙 Монеты не начислены из-за лимита"
+                                        } else {
+                                            "\n🪙 No coins due to daily cap"
+                                        }
+                                    }
+                                    else -> ""
+                                }
                                 val captionBase = buildCatchCaption(
                                     lang = lang,
                                     fishName = fishName,
                                     rarity = catch.rarity,
                                     weightKg = catch.weight,
                                     locationName = locationName,
-                                    extraLines = listOf(newLine, unlockedLine, rodLine),
+                                    extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine),
                                 )
                                 val caption = appendCatchTags(captionBase, catch)
                                 val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
