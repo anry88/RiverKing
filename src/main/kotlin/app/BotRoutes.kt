@@ -870,6 +870,44 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
+            val keywordCommandMap = mapOf(
+                "рыба" to "/cast",
+                "рыбалка" to "/cast",
+                "fish" to "/cast",
+                "fishing" to "/cast",
+                "cast" to "/cast",
+                "casting" to "/cast",
+                "bait" to "/bait",
+                "приманка" to "/bait",
+                "локация" to "/location",
+                "место" to "/location",
+                "place" to "/location",
+                "location" to "/location",
+                "удочка" to "/rod",
+                "rod" to "/rod",
+                "магазин" to "/shop",
+                "shop" to "/shop",
+                "статистика" to "/stats",
+                "статы" to "/stats",
+                "стата" to "/stats",
+                "statistics" to "/stats",
+                "stats" to "/stats",
+                "info" to "/stats",
+                "information" to "/stats",
+                "язык" to "/language",
+                "language" to "/language",
+                "ник" to "/nickname",
+                "никнейм" to "/nickname",
+                "nick" to "/nickname",
+                "nickname" to "/nickname",
+                "приз" to "/prizes",
+                "призы" to "/prizes",
+                "prize" to "/prizes",
+                "prizes" to "/prizes",
+                "турнир" to "/tournament",
+                "tournament" to "/tournament",
+            )
+
             suspend fun processUserCommand(
                 rawText: String,
                 from: TgUser?,
@@ -878,8 +916,22 @@ fun Application.botRoutes(env: Env) {
                 messageId: Long? = null,
                 sourceOverride: String? = null,
             ): Boolean {
-                if (!rawText.startsWith("/")) return false
                 val text = rawText.trim()
+                if (text.isEmpty()) return false
+
+                val keywordCommand = keywordCommandMap[text.lowercase(Locale.ROOT)]
+                if (keywordCommand != null && !text.startsWith("/")) {
+                    return processUserCommand(
+                        keywordCommand,
+                        from,
+                        chatId,
+                        isCallback,
+                        messageId,
+                        sourceOverride,
+                    )
+                }
+
+                if (!text.startsWith("/")) return false
                 val commandLine = text.lineSequence().firstOrNull()?.trim().orEmpty()
                 if (commandLine.isEmpty()) return false
                 val parts = commandLine.split(" ", limit = 2)
