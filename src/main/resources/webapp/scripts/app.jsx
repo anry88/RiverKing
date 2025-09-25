@@ -53,6 +53,12 @@ function App(){
   const [refOpen,setRefOpen] = React.useState(false);
   const [refInfo,setRefInfo] = React.useState(null);
   const [refRewards,setRefRewards] = React.useState(null);
+  const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
+  const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+  const coinPurchasePriceLabel = coinPurchasePack
+    ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
+    : '';
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
@@ -420,6 +426,7 @@ function App(){
           setShop(await shopResp.json());
         }
       }catch(err){}
+      return true;
     }catch(e){
       if(e.message==='unauthorized'){
         setError(t('authRequired'));
@@ -428,6 +435,42 @@ function App(){
       }else{
         setError(t('purchaseFailed'));
       }
+      return false;
+    }
+  }
+
+  function requestCoinPurchase(id){
+    if(!Array.isArray(shop) || shop.length===0) return;
+    let pack = null;
+    for(const category of shop){
+      if(!category?.packs) continue;
+      const found = category.packs.find(p=>p.id===id);
+      if(found){
+        pack = found;
+        break;
+      }
+    }
+    if(pack && typeof pack.coinPrice === 'number'){
+      setCoinPurchaseProcessing(false);
+      setCoinPurchasePack(pack);
+    }
+  }
+
+  function closeCoinPurchaseModal(){
+    if(coinPurchaseProcessing) return;
+    setCoinPurchasePack(null);
+  }
+
+  async function confirmCoinPurchase(){
+    if(!coinPurchasePack || coinPurchaseProcessing) return;
+    setCoinPurchaseProcessing(true);
+    try{
+      const success = await buyPackWithCoins(coinPurchasePack.id);
+      if(success){
+        setCoinPurchasePack(null);
+      }
+    }finally{
+      setCoinPurchaseProcessing(false);
     }
   }
 
@@ -813,6 +856,39 @@ function App(){
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
         {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
         {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
+        {coinPurchasePack && (
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
+            onClick={()=>{ if(!coinPurchaseProcessing) closeCoinPurchaseModal(); }}
+          >
+            <div
+              className="glass p-5 rounded-xl max-w-xs w-[90%] text-center animate-pop"
+              onClick={e=>e.stopPropagation()}
+            >
+              <div className="text-lg font-semibold mb-2">{t('confirmCoinPurchaseTitle')}</div>
+              <div className="text-sm opacity-80">
+                {t('confirmCoinPurchaseText', {
+                  name: coinPurchasePack.name || coinPurchasePack.id,
+                  price: coinPurchasePriceLabel
+                })}
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:hover:bg-red-600"
+                  onClick={closeCoinPurchaseModal}
+                  disabled={coinPurchaseProcessing}
+                >{t('cancel')}</button>
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400"
+                  onClick={confirmCoinPurchase}
+                  disabled={coinPurchaseProcessing}
+                >{t('confirmCoinPurchaseButton', coinPurchasePriceLabel)}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (
@@ -870,9 +946,9 @@ function App(){
               generateRefLink={generateRefLink}
               starterPackName={starterPackName}
               buyPack={buyPack}
-              buyPackWithCoins={buyPackWithCoins}
               dailyAvailable={me.dailyAvailable}
               onOpenDaily={openDaily}
+              onCoinPurchaseRequest={requestCoinPurchase}
             />
           )}
           {tab === 'guide' && (
