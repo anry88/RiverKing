@@ -8,7 +8,11 @@ import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.timestamp
+import util.CoinCalculator
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import org.jetbrains.exposed.sql.SortOrder
 
 object DB {
     fun init(env: Env) {
@@ -36,6 +40,7 @@ object DB {
                 ShopDiscounts,
             )
             seedIfEmpty()
+            migrateCoins()
         }
     }
 
@@ -500,6 +505,100 @@ object DB {
         // default lure
         Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }
     }
+
+    private fun migrateCoins() {
+        val needsMigration = Catches
+            .slice(Catches.id)
+            .select { Catches.coins.isNull() }
+            .limit(1)
+            .map { it[Catches.id] }
+            .isNotEmpty()
+
+        if (!needsMigration) return
+
+        val zone = ZoneId.systemDefault()
+        val tierByLocation = Locations.selectAll()
+            .map { it[Locations.id].value to it[Locations.unlockKg] }
+            .sortedBy { it.second }
+            .mapIndexed { index, (id, _) -> id to index }
+            .toMap()
+
+        val dailyTotals = mutableMapOf<Long, MutableMap<LocalDate, Long>>()
+        val processedUsers = mutableSetOf<Long>()
+
+        val catchesToMigrate = (Catches innerJoin Fish innerJoin Locations)
+            .slice(
+                Catches.id,
+                Catches.userId,
+                Catches.weight,
+                Catches.locationId,
+                Catches.createdAt,
+                Fish.rarity,
+                Fish.water,
+            )
+            .select { Catches.coins.isNull() }
+            .orderBy(
+                Catches.userId to SortOrder.ASC,
+                Catches.createdAt to SortOrder.ASC,
+                Catches.id to SortOrder.ASC,
+            )
+
+        catchesToMigrate.forEach { row ->
+            val userId = row[Catches.userId].value
+            val locationId = row[Catches.locationId].value
+            val rarity = row[Fish.rarity]
+            val water = row[Fish.water]
+            val weight = row[Catches.weight]
+            val createdAt = row[Catches.createdAt]
+            val tier = tierByLocation[locationId] ?: 0
+            val localDate = createdAt.atZone(zone).toLocalDate()
+            val earnedBefore = dailyTotals
+                .getOrPut(userId) { mutableMapOf() }
+                .getOrDefault(localDate, 0L)
+            val coinsAwarded = CoinCalculator.computeCoins(
+                weight,
+                rarity,
+                tier,
+                water,
+                earnedBefore.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            )
+            dailyTotals[userId]!![localDate] = earnedBefore + coinsAwarded
+            processedUsers += userId
+            Catches.update({ Catches.id eq row[Catches.id].value }) {
+                it[Catches.coins] = coinsAwarded
+            }
+        }
+
+        val sumExpr = Catches.coins.sum()
+        if (sumExpr == null) {
+            processedUsers.forEach { userId ->
+                Users.update({ Users.id eq userId }) {
+                    it[Users.coins] = 0L
+                }
+            }
+            return
+        }
+        val totals = Catches
+            .slice(Catches.userId, sumExpr)
+            .select { Catches.coins.isNotNull() }
+            .groupBy(Catches.userId)
+            .associate { row ->
+                val total = row[sumExpr] ?: 0
+                row[Catches.userId].value to total.toLong()
+            }
+
+        totals.forEach { (userId, total) ->
+            Users.update({ Users.id eq userId }) {
+                it[Users.coins] = total
+            }
+        }
+
+        processedUsers.filterNot { it in totals }.forEach { userId ->
+            Users.update({ Users.id eq userId }) {
+                it[Users.coins] = 0L
+            }
+        }
+    }
 }
 
 // Table definitions
@@ -513,6 +612,7 @@ object Users : LongIdTable() {
     val language = varchar("language", 10).default("en")
     val level = integer("level")
     val xp = integer("xp")
+    val coins = long("coins").default(0L)
     val createdAt = timestamp("created_at")
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val dailyStreak = integer("daily_streak").default(0)
@@ -580,6 +680,7 @@ object Catches : LongIdTable() {
     val weight = double("weight")
     val locationId = reference("location_id", Locations)
     val createdAt = timestamp("created_at")
+    val coins = integer("coins").nullable()
 }
 
 object PendingCatches : Table() {

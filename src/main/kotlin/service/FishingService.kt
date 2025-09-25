@@ -9,9 +9,11 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.CoinCalculator
 import util.Rng
 import util.sanitizeName
 import java.time.*
+import java.time.temporal.ChronoUnit
 import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
@@ -1199,6 +1201,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val autoFish: Boolean = false,
         val unlockedLocations: List<String> = emptyList(),
         val unlockedRods: List<String> = emptyList(),
+        val coins: Int = 0,
+        val totalCoins: Long? = null,
+        val todayCoins: Long? = null,
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1210,11 +1215,42 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         else -> 1.0
     }
 
-    internal fun baseEscapeChance(locId: Long): Double {
+    private fun locationTier(locId: Long): Int {
         val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
         val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
-        val tier = (rank - 1).coerceAtLeast(0)
+        return ((rank - 1).coerceAtLeast(0L)).toInt()
+    }
+
+    internal fun baseEscapeChance(locId: Long): Double {
+        val tier = locationTier(locId)
         return (0.05 * tier).coerceAtMost(0.5)
+    }
+
+    private fun coinsEarnedBetween(userId: Long, start: Instant, end: Instant): Long {
+        val sumExpr = Catches.coins.sum() ?: return 0L
+        val row = Catches
+            .slice(sumExpr)
+            .select {
+                (Catches.userId eq userId) and
+                    (Catches.createdAt greaterEq start) and
+                    (Catches.createdAt less end) and
+                    Catches.coins.isNotNull()
+            }
+            .singleOrNull()
+        val total = row?.get(sumExpr) ?: 0
+        return total.toLong()
+    }
+
+    private fun coinsEarnedOnDate(userId: Long, date: LocalDate, zone: ZoneId): Long {
+        val start = date.atStartOfDay(zone).toInstant()
+        val end = start.plus(1, ChronoUnit.DAYS)
+        return coinsEarnedBetween(userId, start, end)
+    }
+
+    fun todayCoins(userId: Long): Long = transaction {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        coinsEarnedOnDate(userId, today, zone)
     }
 
     fun hook(
@@ -1329,6 +1365,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             catch: CatchDTO? = null,
             unlockedLocations: List<String> = emptyList(),
             unlockedRods: List<String> = emptyList(),
+            coinsAwarded: Int = 0,
+            totalCoins: Long? = null,
+            todayCoins: Long? = null,
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1336,7 +1375,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return CastResultDTO(caught, catch, autoActive, unlockedLocations, unlockedRods)
+            return CastResultDTO(
+                caught,
+                catch,
+                autoActive,
+                unlockedLocations,
+                unlockedRods,
+                coinsAwarded,
+                totalCoins,
+                todayCoins,
+            )
         }
 
         if (pending == null) return@transaction finish(false)
@@ -1367,12 +1415,34 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ensureCurrentRod(userId, totalAfter)
 
         val caughtAt = Instant.now()
+        val zone = ZoneId.systemDefault()
+        val catchDate = caughtAt.atZone(zone).toLocalDate()
+        val coinsEarnedBefore = coinsEarnedOnDate(userId, catchDate, zone)
+        val tier = locationTier(locId)
+        val coinsAwarded = CoinCalculator.computeCoins(
+            weight,
+            rarity,
+            tier,
+            fishRow[Fish.water],
+            coinsEarnedBefore.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        )
+        val totalCoinsBefore = userRow[Users.coins]
+        val totalCoinsAfter = totalCoinsBefore + coinsAwarded
+        val todayCoinsAfter = coinsEarnedBefore + coinsAwarded
+
         val catchId = Catches.insertAndGetId {
             it[Catches.userId] = userId
             it[Catches.fishId] = fishId
             it[Catches.weight] = weight
             it[Catches.locationId] = locId
             it[Catches.createdAt] = caughtAt
+            it[Catches.coins] = coinsAwarded
+        }
+
+        if (coinsAwarded != 0) {
+            Users.update({ Users.id eq userId }) {
+                it[Users.coins] = totalCoinsAfter
+            }
         }
 
         finish(
@@ -1390,6 +1460,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             ),
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
+            coinsAwarded = coinsAwarded,
+            totalCoins = totalCoinsAfter,
+            todayCoins = todayCoinsAfter,
         )
     }
 

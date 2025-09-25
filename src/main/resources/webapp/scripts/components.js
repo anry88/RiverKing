@@ -55,6 +55,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
           <StatChip icon={lureIconPath ? <img src={lureIconPath} alt="" className="w-5 h-5 object-contain" /> : '🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
           <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
+          <StatChip icon={'🪙'} label={t('coins')} value={Number(me.coins||0).toLocaleString(lang==='ru'?'ru-RU':'en-US')} />
         </div>
       </div>
     </div>
