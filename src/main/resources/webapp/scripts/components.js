@@ -1,8 +1,13 @@
 function StatChip({icon,label,value,active=false,onClick}){
+  const iconContent = typeof icon === 'string'
+    ? <span className="text-base" aria-hidden="true">{icon}</span>
+    : icon
+      ? <span className="w-6 h-6 flex items-center justify-center" aria-hidden="true">{icon}</span>
+      : null;
   return (
     <button type="button" onClick={onClick}
       className={`h-10 min-w-[92px] px-3 rounded-xl flex items-center justify-center gap-2 shrink-0 glass ${onClick?'hover:bg-white/10':'pointer-events-none'} ${active?'ring-1 ring-emerald-500':''}`}>
-      {icon && <span className="text-base">{icon}</span>}
+      {iconContent}
       <div className="leading-tight">
         <div className="text-[10px] uppercase opacity-70">{label}</div>
         <div className="text-sm font-semibold whitespace-nowrap">{value}</div>
@@ -14,7 +19,9 @@ function StatChip({icon,label,value,active=false,onClick}){
 function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,onToggleLanguage}){
   const currentLoc = (me.locations.find(x=>x.id===me.locationId)||{}).name||'—';
   const curLure = me.lures.find(l=>l.id===me.currentLureId);
-  const lureVal = curLure? `${curLure.name} (${curLure.qty})` : '—';
+  const lureName = curLure?.displayName || (curLure ? translateLure(curLure.name) : null);
+  const lureVal = curLure? `${lureName} (${curLure.qty})` : '—';
+  const lureIconPath = curLure ? getLureIcon(curLure) : null;
   const currentRod = (me.rods||[]).find(r=>r.id===me.currentRodId);
   const rodVal = currentRod ? currentRod.name : '—';
   const languages = [
@@ -45,20 +52,21 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
         <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
           <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
           <StatChip icon={'🎣'} label={t('rod')} value={rodVal} onClick={onOpenRods} />
-          <StatChip icon={'🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
+          <StatChip icon={lureIconPath ? <img src={lureIconPath} alt="" className="w-5 h-5 object-contain" /> : '🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
           <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
+          <StatChip icon={'🪙'} label={t('coins')} value={Number(me.coins||0).toLocaleString(lang==='ru'?'ru-RU':'en-US')} />
         </div>
       </div>
     </div>
   );
 }
 
-function BottomNav({tab,setTab}){
+function BottomNav({tab,setTab,dailyAvailable}){
   const items = [
     {id:'fish', label:t('fishing'), icon:'/app/assets/menu/fishing.png'},
     {id:'tournaments', label:t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
-    {id:'achievements', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
+    {id:'ratings', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
     {id:'guide', label:t('guide'), icon:'/app/assets/menu/guide.png'},
     {id:'shop', label:t('shop'), icon:'/app/assets/menu/shop.png'},
   ];
@@ -74,7 +82,14 @@ function BottomNav({tab,setTab}){
             className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
             aria-current={tab===item.id ? 'page' : undefined}
           >
-            <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+            <div className="relative">
+              <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+              {dailyAvailable && item.id==='shop' && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  !
+                </span>
+              )}
+            </div>
             <span className="leading-tight text-center">{item.label}</span>
           </button>
         ))}
@@ -127,19 +142,23 @@ function BaitsDrawer({open,onClose,me,onSelect}){
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
         </div>
         <div className="space-y-2 overflow-y-auto pr-1">
-          {me.lures.map(l=> (
+          {me.lures.map(l=> {
+            const displayName = l.displayName || translateLure(l.name);
+            const desc = l.description || lureDescriptionText(l);
+            return (
             <button key={l.id} disabled={l.qty<=0}
                     onClick={()=>{ if(l.qty>0){ onSelect(l.id); onClose(); } }}
                     className={`w-full text-left p-3 rounded-xl border ${me.currentLureId===l.id? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${l.qty<=0?'opacity-50 cursor-not-allowed':''}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className={`font-semibold ${lureColor(l.name)}`}>{l.name}</div>
-                  <div className="text-xs opacity-70">{t('qty', l.qty)}</div>
+                  <div className={`font-semibold ${lureColor(l)}`}>{displayName}</div>
+                  {desc && <div className="text-xs opacity-70 mt-1">{desc}</div>}
+                  <div className="text-xs opacity-60 mt-1">{t('qty', l.qty)}</div>
                 </div>
                 {me.currentLureId===l.id && <div className="text-emerald-400 text-sm">{t('current')}</div>}
               </div>
             </button>
-          ))}
+          )})}
         </div>
       </div>
     </div>
@@ -210,15 +229,131 @@ function NicknameModal({me,onClose,onSave}){
   );
 }
 
+function CatchDetailsModal({catchData, me, onClose}){
+  const [status,setStatus] = React.useState(null);
+  const [error,setError] = React.useState(null);
+  const [sending,setSending] = React.useState(false);
+  if(!catchData) return null;
+  const weight = Number(catchData.weight||0).toFixed(2);
+  const dateLabel = catchData.at ? new Date(catchData.at).toLocaleString() : null;
+  const fishId = catchData.fishId != null ? Number(catchData.fishId) : null;
+  const unlockedFishIds = Array.isArray(me?.caughtFishIds) ? me.caughtFishIds : [];
+  const fishUnlocked = fishId == null || unlockedFishIds.some(id => Number(id) === fishId);
+  const fishImg = fishUnlocked && catchData.fish ? FISH_IMG[catchData.fish] : null;
+  const rarityClass = catchData.rarity && rarityColors[catchData.rarity] ? rarityColors[catchData.rarity] : '';
+  const isOwnCatch = catchData.userId != null && me?.id != null && Number(catchData.userId) === Number(me.id);
+  const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
+  const locationBg = React.useMemo(()=>{
+    if(catchData.locationBg) return catchData.locationBg;
+    const byId = catchData.locationId && window.LOCATION_BG ? window.LOCATION_BG[catchData.locationId] : null;
+    if(byId) return byId;
+    const locName = (catchData.location || '').trim();
+    if(!locName) return null;
+    const normalized = locName.toLowerCase();
+    if(window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]){
+      return window.LOCATION_BG_BY_NAME[normalized];
+    }
+    if(Array.isArray(me?.locations)){
+      const match = me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized);
+      if(match && window.LOCATION_BG && window.LOCATION_BG[match.id]){
+        return window.LOCATION_BG[match.id];
+      }
+    }
+    return null;
+  }, [catchData.locationBg, catchData.locationId, catchData.location, me?.locations]);
+
+  async function handleSend(){
+    if(!canSend || sending) return;
+    setSending(true);
+    setStatus(null);
+    setError(null);
+    try{
+      const res = await fetch(`/api/catches/${catchData.id}/send`,{method:'POST',credentials:'include'});
+      if(!res.ok) throw new Error('send_failed');
+      setStatus(t('catchSent'));
+    }catch(e){
+      setError(t('catchSendFailed'));
+    }finally{
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
+      <div className="relative mx-4 mt-safe flex items-center justify-center min-h-full pointer-events-none">
+        <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto relative overflow-hidden">
+          {locationBg && (
+            <>
+              <img
+                src={locationBg}
+                alt={catchData.location || ''}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={e=>{ e.currentTarget.style.display='none'; }}
+              />
+              <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
+            </>
+          )}
+          <div className="relative">
+            <div className="flex items-start justify-between mb-3">
+              <div className={`text-lg font-semibold ${rarityClass}`}>{catchData.fish || '-'}</div>
+              <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+            </div>
+            <div className="mt-3 relative w-full pb-24">
+              <div className="flex justify-center">
+                {fishUnlocked ? (
+                  fishImg ? (
+                    <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain" onError={e=>{e.currentTarget.style.display='none';}} />
+                  ) : (
+                    <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center text-4xl">🐟</div>
+                  )
+                ) : (
+                  <div className="w-32 h-32 bg-gray-800/70 rounded-xl flex items-center justify-center relative">
+                    <span className="text-5xl opacity-20">🐟</span>
+                    <span className="absolute text-3xl">?</span>
+                  </div>
+                )}
+              </div>
+              <div className="absolute bottom-0 right-0 p-2 flex flex-col items-end text-right gap-1">
+                {catchData.location && <div className={`text-sm opacity-70 ${rarityClass}`}>{t('locationLabel')} {catchData.location}</div>}
+                {catchData.user && <div className={`text-xs opacity-70 ${rarityClass}`}><bdi>{catchData.user}</bdi></div>}
+                {dateLabel && <div className={`text-xs opacity-60 ${rarityClass}`}>{dateLabel}</div>}
+                <div className={`text-2xl font-semibold ${rarityClass}`}>{weight} {t('kg')}</div>
+              </div>
+            </div>
+            {canSend && (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending}
+                className={`w-full mt-4 px-4 py-3 rounded-xl font-semibold ${sending?'bg-emerald-500/60':'bg-emerald-600 hover:bg-emerald-500'}`}
+              >
+                {sending ? t('sendingCatch') : t('sendToMe')}
+              </button>
+            )}
+            {status && <div className="text-xs text-emerald-300 mt-2">{status}</div>}
+            {error && <div className="text-xs text-red-300 mt-2">{error}</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DailyModal({streak,available,rewards,onClose,onClaim}){
   const defaultRewards = [
-    [ {name:'Пресная мирная',qty:8}, {name:'Пресная хищная',qty:4} ],
-    [ {name:'Пресная мирная',qty:10}, {name:'Пресная хищная',qty:6} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:6} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:8}, {name:'Пресная мирная+',qty:1} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:10} ],
-    [ {name:'Пресная мирная',qty:12}, {name:'Пресная хищная',qty:12}, {name:'Пресная хищная+',qty:1} ],
+    [ {name:'Зерновая крошка',qty:8}, {name:'Ручейный малек',qty:4} ],
+    [ {name:'Зерновая крошка',qty:10}, {name:'Ручейный малек',qty:6} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:6} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8}, {name:'Луговой червь',qty:1} ],
+    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:10} ],
+    [
+      {name:'Зерновая крошка',qty:12},
+      {name:'Ручейный малек',qty:12},
+      {name:'Луговой червь',qty:1},
+      {name:'Серебряный живец',qty:1},
+    ],
   ];
   const displayRewards = (rewards && rewards.length ? rewards : defaultRewards);
   const totalDays = displayRewards.length;

@@ -1,3 +1,9 @@
+const getShopIcon = id => {
+  if(!id) return '';
+  if(String(id).startsWith('autofish')) return '/app/assets/shop/autofish.png';
+  return `/app/assets/shop/${id}.png`;
+};
+
 function ShopTab({
   shop,
   toggleRef,
@@ -6,10 +12,24 @@ function ShopTab({
   copyRefLink,
   generateRefLink,
   starterPackName,
-  buyPack
+  buyPack,
+  dailyAvailable,
+  onOpenDaily,
+  onCoinPurchaseRequest
 }){
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
   return (
     <div className="mt-6">
+      {dailyAvailable && (
+        <button
+          type="button"
+          onClick={onOpenDaily}
+          className="w-full px-3 py-2 mb-3 rounded-xl glass flex items-center justify-center gap-2 text-sm"
+        >
+          <span>🎁</span>
+          <span>{t('gift')}</span>
+        </button>
+      )}
       <div className="mb-4">
         <button onClick={toggleRef} className="w-full p-3 rounded-xl border border-white/10">{t('invite')}</button>
         {refOpen && (
@@ -40,21 +60,47 @@ function ShopTab({
             <div key={cat.id}>
               <div className="font-semibold mb-1">{cat.name}</div>
               <div className="space-y-2">
-                {cat.packs.map(item=> (
-                  <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={`/app/assets/baits/${item.id}.png`} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-                      <div>
-                        <div className="font-semibold">{item.name}</div>
-                        <div className="text-xs opacity-70">{item.desc}</div>
-                        {item.until && (
-                          <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
+                {cat.packs.map(item=> {
+                  const hasDiscount = item.originalPrice != null && item.originalPrice > item.price;
+                  const discountPercent = hasDiscount ? Math.floor(((item.originalPrice - item.price) * 100) / item.originalPrice) : null;
+                  return (
+                    <div key={item.id} className="p-3 rounded-xl border border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img src={getShopIcon(item.id)} alt={item.name} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                        <div>
+                          <div className="font-semibold">{item.name}</div>
+                          <div className="text-xs opacity-70">{item.desc}</div>
+                          {item.until && (
+                            <div className="text-xs opacity-70">{t('autoFishUntil', new Date(item.until).toLocaleDateString())}. {t('autoFishExtend')}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={()=>buyPack(item.id)}
+                          className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                        >{`${item.price}★`}</button>
+                        {typeof item.coinPrice === 'number' && (
+                          <button
+                            type="button"
+                            onClick={()=>onCoinPurchaseRequest?.(item.id)}
+                            className="px-3 py-1 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 flex items-center justify-center gap-1 whitespace-nowrap"
+                          >
+                            <span className="whitespace-nowrap">{Number(item.coinPrice).toLocaleString(coinLocale)}</span>
+                            <span aria-hidden="true" className="leading-none">🪙</span>
+                          </button>
+                        )}
+                        {hasDiscount && (
+                          <div className="text-xs text-right">
+                            <div className="line-through opacity-60">{`${item.originalPrice}★`}</div>
+                            <div className="opacity-70">{t('shopDiscountInfo', { percent: discountPercent })}</div>
+                          </div>
                         )}
                       </div>
                     </div>
-                    <button onClick={()=>buyPack(item.id)} className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500">{item.price}★</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

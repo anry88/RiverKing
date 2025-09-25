@@ -9,9 +9,11 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.CoinCalculator
 import util.Rng
 import util.sanitizeName
 import java.time.*
+import java.time.temporal.ChronoUnit
 import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
@@ -34,9 +36,16 @@ data class RodDTO(
 )
 
 @Serializable
-data class RecentDTO(val fish: String, val weight: Double, val location: String, val rarity: String, val at: String)
+data class RecentDTO(
+    val id: Long,
+    val fish: String,
+    val weight: Double,
+    val location: String,
+    val rarity: String,
+    val at: String,
+)
 
-class FishingService {
+class FishingService(private val clock: Clock = Clock.systemUTC()) {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
         private const val BEGINNER_CATCH_THRESHOLD = 6
@@ -57,6 +66,7 @@ class FishingService {
         listOf(
             DailyReward("Пресная мирная", 12),
             DailyReward("Пресная хищная", 12),
+            DailyReward("Пресная мирная+", 1),
             DailyReward("Пресная хищная+", 1),
         ),
     )
@@ -97,8 +107,11 @@ class FishingService {
         listOf(
             DailyReward("Пресная мирная", 8),
             DailyReward("Пресная хищная", 10),
+            DailyReward("Морская мирная", 2),
             DailyReward("Морская хищная", 8),
+            DailyReward("Пресная мирная+", 1),
             DailyReward("Пресная хищная+", 1),
+            DailyReward("Морская мирная+", 1),
             DailyReward("Морская хищная+", 1),
         ),
     )
@@ -511,7 +524,16 @@ class FishingService {
     }
 
     @Serializable
-    data class LureDTO(val id: Long, val name: String, val qty: Int, val predator: Boolean, val water: String, val rarityBonus: Double)
+    data class LureDTO(
+        val id: Long,
+        val name: String,
+        val qty: Int,
+        val predator: Boolean,
+        val water: String,
+        val rarityBonus: Double,
+        val displayName: String = name,
+        val description: String = "",
+    )
 
     fun listLures(userId: Long): List<LureDTO> = transaction {
         ensureCurrentLure(userId)
@@ -648,20 +670,29 @@ class FishingService {
         GuideDTO(locationDtos, fishDtos, lureDtos, rodDtos)
     }
 
-    @Serializable
     data class ShopPackage(
         val id: String,
         val name: String,
         val desc: String,
         val price: Int,
         val items: List<Pair<String, Int>>,
+        val coinPrice: Int? = null,
+        val originalPrice: Int? = null,
+        val discountStart: LocalDate? = null,
+        val discountEnd: LocalDate? = null,
     )
 
-    @Serializable
     data class ShopCategory(
         val id: String,
         val name: String,
         val packs: List<ShopPackage>,
+    )
+
+    data class ShopDiscount(
+        val packageId: String,
+        val price: Int,
+        val startDate: LocalDate,
+        val endDate: LocalDate,
     )
 
     private val shopCategories = listOf(
@@ -670,12 +701,12 @@ class FishingService {
             "fresh_basic",
             "Пресные простые",
             listOf(
-                ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 мирных и 10 хищных",39,
-                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10)),
-                ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 мирных и 25 хищных",89,
-                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25)),
-                ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 мирных и 60 хищных",199,
-                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60)),
+                ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
+                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 240),
+                ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
+                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 550),
+                ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
+                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1250),
             )
         ),
 
@@ -687,23 +718,26 @@ class FishingService {
                 ShopPackage(
                     "salt_topup_s",
                     "Пополнение S",
-                    "20 морских простых: 6 мирных и 14 хищных",
+                    "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»",
                     55,
-                    listOf("Морская мирная" to 6, "Морская хищная" to 14)
+                    listOf("Морская мирная" to 6, "Морская хищная" to 14),
+                    coinPrice = 450
                 ),
                 ShopPackage(
                     "salt_stock_m",
                     "Запас M",
-                    "50 морских простых: 15 мирных и 35 хищных",
+                    "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»",
                     129,
-                    listOf("Морская мирная" to 15, "Морская хищная" to 35)
+                    listOf("Морская мирная" to 15, "Морская хищная" to 35),
+                    coinPrice = 1000
                 ),
                 ShopPackage(
                     "salt_crate_l",
                     "Ящик L",
-                    "120 морских простых: 40 мирных и 80 хищных",
+                    "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»",
                     299,
-                    listOf("Морская мирная" to 40, "Морская хищная" to 80)
+                    listOf("Морская мирная" to 40, "Морская хищная" to 80),
+                    coinPrice = 2200
                 ),
             )
         ),
@@ -713,11 +747,11 @@ class FishingService {
             "fresh_boost",
             "Пресные улучшенные",
             listOf(
-                ShopPackage("fresh_boost_s","Буст S","10 пресных улучшенных: 5 мирных и 5 хищных",69,
+                ShopPackage("fresh_boost_s","Буст S","10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»",69,
                     listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)),
-                ShopPackage("fresh_boost_m","Буст M","25 пресных улучшенных: 12 мирных и 13 хищных",159,
+                ShopPackage("fresh_boost_m","Буст M","25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»",159,
                     listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)),
-                ShopPackage("fresh_boost_l","Буст L","60 пресных улучшенных: 30 мирных и 30 хищных",349,
+                ShopPackage("fresh_boost_l","Буст L","60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»",349,
                     listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)),
             )
         ),
@@ -730,21 +764,21 @@ class FishingService {
                 ShopPackage(
                     "salt_boost_s",
                     "Буст S",
-                    "10 морских улучшенных: 4 мирные+ и 6 хищные+",
+                    "10 морских улучшенных: 4 «Неоновый планктон» и 6 «Королевская креветка»",
                     99,
                     listOf("Морская мирная+" to 4, "Морская хищная+" to 6)
                 ),
                 ShopPackage(
                     "salt_boost_m",
                     "Буст M",
-                    "25 морских улучшенных: 9 мирных+ и 16 хищных+",
+                    "25 морских улучшенных: 9 «Неоновый планктон» и 16 «Королевская креветка»",
                     239,
                     listOf("Морская мирная+" to 9, "Морская хищная+" to 16)
                 ),
                 ShopPackage(
                     "salt_boost_l",
                     "Буст L",
-                    "60 морских улучшенных: 20 мирных+ и 40 хищных+",
+                    "60 морских улучшенных: 20 «Неоновый планктон» и 40 «Королевская креветка»",
                     549,
                     listOf("Морская мирная+" to 20, "Морская хищная+" to 40)
                 ),
@@ -759,7 +793,7 @@ class FishingService {
                 ShopPackage(
                     "bundle_starter",
                     "Стартовый набор",
-                    "40 пресных простых (20 мирных и 20 хищных), 20 морских простых (6 мирных и 14 хищных) и 5 пресных улучшенных (3 мирные+ и 2 хищные+)",
+                    "40 пресных простых (20 «Зерновая крошка» и 20 «Ручейный малек»), 20 морских простых (6 «Морская водоросль» и 14 «Кольца кальмара») и 5 пресных улучшенных (3 «Луговой червь» и 2 «Серебряный живец»)",
                     129,
                     listOf(
                         "Пресная мирная" to 20,
@@ -773,7 +807,7 @@ class FishingService {
                 ShopPackage(
                     "bundle_pro",
                     "Профи рыболов",
-                    "80 пресных простых (40 мирных и 40 хищных), 40 морских простых (12 мирных и 28 хищных), 15 пресных улучшенных (8 мирных+ и 7 хищных+) и 5 морских улучшенных (1 мирная+ и 4 хищные+)",
+                    "80 пресных простых (40 «Зерновая крошка» и 40 «Ручейный малек»), 40 морских простых (12 «Морская водоросль» и 28 «Кольца кальмара»), 15 пресных улучшенных (8 «Луговой червь» и 7 «Серебряный живец») и 5 морских улучшенных (1 «Неоновый планктон» и 4 «Королевская креветка»)",
                     319,
                     listOf(
                         "Пресная мирная" to 40,
@@ -789,7 +823,7 @@ class FishingService {
                 ShopPackage(
                     "bundle_whale",
                     "Китовый ящик",
-                    "200 пресных простых (100 мирных и 100 хищных), 120 морских простых (40 мирных и 80 хищных), 40 пресных улучшенных (20 мирных+ и 20 хищных+) и 20 морских улучшенных (6 мирных+ и 14 хищных+)",
+                    "200 пресных простых (100 «Зерновая крошка» и 100 «Ручейный малек»), 120 морских простых (40 «Морская водоросль» и 80 «Кольца кальмара»), 40 пресных улучшенных (20 «Луговой червь» и 20 «Серебряный живец») и 20 морских улучшенных (6 «Неоновый планктон» и 14 «Королевская креветка»)",
                     869,
                     listOf(
                         "Пресная мирная" to 100,
@@ -813,23 +847,26 @@ class FishingService {
                 ShopPackage(
                     "micro_pred_fresh",
                     "Пополнение пресных хищных",
-                    "15 пресных хищных",
+                    "15 «Ручейный малек»",
                     29,
-                    listOf("Пресная хищная" to 15)
+                    listOf("Пресная хищная" to 15),
+                    coinPrice = 210
                 ),
                 ShopPackage(
                     "micro_salt_starter",
                     "Морской старт",
-                    "10 морских простых: 3 мирных и 7 хищных",
+                    "10 морских простых: 3 «Морская водоросль» и 7 «Кольца кальмара»",
                     25,
-                    listOf("Морская мирная" to 3, "Морская хищная" to 7)
+                    listOf("Морская мирная" to 3, "Морская хищная" to 7),
+                    coinPrice = 240
                 ),
                 ShopPackage(
                     "micro_salt_pred_refill",
                     "Морской хищный запас",
-                    "20 морских хищных",
+                    "20 «Кольца кальмара»",
                     49,
-                    listOf("Морская хищная" to 20)
+                    listOf("Морская хищная" to 20),
+                    coinPrice = 500
                 ),
             )
         ),
@@ -852,36 +889,107 @@ class FishingService {
 
     fun findPack(id: String): ShopPackage? = shopCategories.flatMap { it.packs }.find { it.id == id }
 
-    fun listShop(lang: String): List<ShopCategory> = shopCategories.map { cat ->
-        cat.copy(
-            name = I18n.text(cat.name, lang),
-            packs = cat.packs.map { p ->
-                p.copy(
-                    name = I18n.text(p.name, lang),
-                    desc = I18n.text(p.desc, lang),
-                    items = p.items.map { I18n.lure(it.first, lang) to it.second }
-                )
-            }
-        )
+    class CoinPurchaseUnavailableException : RuntimeException()
+    class NotEnoughCoinsException(val required: Int, val balance: Long) : RuntimeException()
+
+    fun listShop(lang: String): List<ShopCategory> {
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
+        val discounts = transaction {
+            ShopDiscounts.selectAll().associateBy(
+                { it[ShopDiscounts.packageId] },
+                {
+                    ShopDiscount(
+                        packageId = it[ShopDiscounts.packageId],
+                        price = it[ShopDiscounts.price],
+                        startDate = it[ShopDiscounts.startDate],
+                        endDate = it[ShopDiscounts.endDate],
+                    )
+                }
+            )
+        }
+        return shopCategories.map { cat ->
+            cat.copy(
+                name = I18n.text(cat.name, lang),
+                packs = cat.packs.map { p ->
+                    val discount = discounts[p.id]
+                    val active = discount?.let {
+                        val startInstant = it.startDate.atStartOfDay(zone).toInstant()
+                        val endInstant = it.endDate.atStartOfDay(zone).toInstant()
+                        nowInstant >= startInstant && nowInstant < endInstant
+                    } == true
+                    val finalPrice = if (active) discount!!.price else p.price
+                    val originalPrice = if (active) p.price else null
+                    val discountStart = if (active) discount!!.startDate else null
+                    val discountEnd = if (active) discount!!.endDate else null
+                    p.copy(
+                        name = I18n.text(p.name, lang),
+                        desc = I18n.text(p.desc, lang),
+                        price = finalPrice,
+                        items = p.items.map { I18n.lure(it.first, lang) to it.second },
+                        originalPrice = originalPrice,
+                        discountStart = discountStart,
+                        discountEnd = discountEnd,
+                    )
+                }
+            )
+        }
     }
 
-    fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
-        if (packageId == "autofish" || packageId == "autofish_week") {
-            val row = Users.select { Users.id eq userId }.forUpdate().single()
-            val cur = row[Users.autoFishUntil]
-            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
-            val newUntil = if (packageId == "autofish") {
-                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
-            } else {
-                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
+    fun listDiscounts(): List<ShopDiscount> {
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
+        val discounts = transaction {
+            ShopDiscounts.selectAll().map {
+                ShopDiscount(
+                    packageId = it[ShopDiscounts.packageId],
+                    price = it[ShopDiscounts.price],
+                    startDate = it[ShopDiscounts.startDate],
+                    endDate = it[ShopDiscounts.endDate],
+                )
             }
-            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
-            return@transaction Pair(emptyList(), null)
         }
+        return discounts.filter { discount ->
+            discount.endDate.atStartOfDay(zone).toInstant() > nowInstant
+        }
+    }
 
-        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
-            ?: error("bad package")
+    fun getDiscount(packageId: String): ShopDiscount? = transaction {
+        ShopDiscounts.select { ShopDiscounts.packageId eq packageId }
+            .singleOrNull()
+            ?.let {
+                ShopDiscount(
+                    packageId = it[ShopDiscounts.packageId],
+                    price = it[ShopDiscounts.price],
+                    startDate = it[ShopDiscounts.startDate],
+                    endDate = it[ShopDiscounts.endDate],
+                )
+            }
+    }
 
+    fun setDiscount(packageId: String, price: Int, start: LocalDate, end: LocalDate) = transaction {
+        val existing = ShopDiscounts.select { ShopDiscounts.packageId eq packageId }.singleOrNull()
+        if (existing == null) {
+            ShopDiscounts.insert {
+                it[ShopDiscounts.packageId] = packageId
+                it[ShopDiscounts.price] = price
+                it[ShopDiscounts.startDate] = start
+                it[ShopDiscounts.endDate] = end
+            }
+        } else {
+            ShopDiscounts.update({ ShopDiscounts.packageId eq packageId }) {
+                it[ShopDiscounts.price] = price
+                it[ShopDiscounts.startDate] = start
+                it[ShopDiscounts.endDate] = end
+            }
+        }
+    }
+
+    fun removeDiscount(packageId: String): Int = transaction {
+        ShopDiscounts.deleteWhere { ShopDiscounts.packageId eq packageId }
+    }
+
+    private fun grantPackItems(userId: Long, pack: ShopPackage): Pair<List<LureDTO>, Long?> {
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -916,7 +1024,42 @@ class FishingService {
                     it[Lures.rarityBonus],
                 )
             }
-        Pair(lures, current)
+        return Pair(lures, current)
+    }
+
+    fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
+        if (packageId == "autofish" || packageId == "autofish_week") {
+            val row = Users.select { Users.id eq userId }.forUpdate().single()
+            val cur = row[Users.autoFishUntil]
+            val base = if (cur != null && cur.isAfter(Instant.now())) cur else Instant.now()
+            val newUntil = if (packageId == "autofish") {
+                base.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant()
+            } else {
+                base.atZone(ZoneId.systemDefault()).plusDays(7).toInstant()
+            }
+            Users.update({ Users.id eq userId }) { it[autoFishUntil] = newUntil }
+            return@transaction Pair(emptyList(), null)
+        }
+
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+
+        grantPackItems(userId, pack)
+    }
+
+    fun buyPackageWithCoins(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
+        val pack = shopCategories.flatMap { it.packs }.find { it.id == packageId }
+            ?: error("bad package")
+        val coinPrice = pack.coinPrice ?: throw CoinPurchaseUnavailableException()
+        val userRow = Users.select { Users.id eq userId }.forUpdate().single()
+        val balance = userRow[Users.coins]
+        if (balance < coinPrice.toLong()) {
+            throw NotEnoughCoinsException(coinPrice, balance)
+        }
+        Users.update({ Users.id eq userId }) {
+            it[coins] = balance - coinPrice
+        }
+        grantPackItems(userId, pack)
     }
 
     fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
@@ -1066,6 +1209,7 @@ class FishingService {
 
     @Serializable
     data class CatchDTO(
+        val id: Long,
         val fish: String,
         val weight: Double,
         val location: String,
@@ -1086,6 +1230,9 @@ class FishingService {
         val autoFish: Boolean = false,
         val unlockedLocations: List<String> = emptyList(),
         val unlockedRods: List<String> = emptyList(),
+        val coins: Int = 0,
+        val totalCoins: Long? = null,
+        val todayCoins: Long? = null,
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1097,11 +1244,46 @@ class FishingService {
         else -> 1.0
     }
 
+    private fun locationTier(locId: Long): Int {
+        val ordered = Locations
+            .slice(Locations.id, Locations.unlockKg)
+            .selectAll()
+            .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+            .mapIndexed { index, row -> row[Locations.id].value to index }
+            .toMap()
+        return ordered[locId] ?: 0
+    }
+
     internal fun baseEscapeChance(locId: Long): Double {
-        val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
-        val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
-        val tier = (rank - 1).coerceAtLeast(0)
+        val tier = locationTier(locId)
         return (0.05 * tier).coerceAtMost(0.5)
+    }
+
+    private fun coinsEarnedBetween(userId: Long, start: Instant, end: Instant): Long {
+        val sumExpr = Catches.coins.sum() ?: return 0L
+        val row = Catches
+            .slice(sumExpr)
+            .select {
+                (Catches.userId eq userId) and
+                    (Catches.createdAt greaterEq start) and
+                    (Catches.createdAt less end) and
+                    Catches.coins.isNotNull()
+            }
+            .singleOrNull()
+        val total = row?.get(sumExpr) ?: 0
+        return total.toLong()
+    }
+
+    private fun coinsEarnedOnDate(userId: Long, date: LocalDate, zone: ZoneId): Long {
+        val start = date.atStartOfDay(zone).toInstant()
+        val end = start.plus(1, ChronoUnit.DAYS)
+        return coinsEarnedBetween(userId, start, end)
+    }
+
+    fun todayCoins(userId: Long): Long = transaction {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        coinsEarnedOnDate(userId, today, zone)
     }
 
     fun hook(
@@ -1109,6 +1291,7 @@ class FishingService {
         waitSeconds: Int,
         reactionTime: Double,
         extraEscapeChance: Double = 0.0,
+        applyBeginnerProtection: Boolean = true,
     ): HookResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
@@ -1169,7 +1352,7 @@ class FishingService {
             return HookResultDTO(false, auto)
         }
 
-        val isBeginner = isBeginnerUser(userId)
+        val isBeginner = applyBeginnerProtection && isBeginnerUser(userId)
 
         if (!auto && !isBeginner && reactionTime >= 5.0) return@transaction escape()
 
@@ -1197,7 +1380,13 @@ class FishingService {
         HookResultDTO(true, auto)
     }
 
-    fun cast(userId: Long, _waitSeconds: Int, _reactionTime: Double, success: Boolean): CastResultDTO = transaction {
+    fun cast(
+        userId: Long,
+        _waitSeconds: Int,
+        _reactionTime: Double,
+        success: Boolean,
+        applyBeginnerProtection: Boolean = true,
+    ): CastResultDTO = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(userRow[Users.isCasting]) { "no cast" }
         val pending = PendingCatches.select { PendingCatches.userId eq userId }.singleOrNull()
@@ -1209,6 +1398,9 @@ class FishingService {
             catch: CatchDTO? = null,
             unlockedLocations: List<String> = emptyList(),
             unlockedRods: List<String> = emptyList(),
+            coinsAwarded: Int = 0,
+            totalCoins: Long? = null,
+            todayCoins: Long? = null,
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1216,11 +1408,20 @@ class FishingService {
                 it[Users.castLureId] = null
                 it[Users.lastCastAt] = Instant.now()
             }
-            return CastResultDTO(caught, catch, autoActive, unlockedLocations, unlockedRods)
+            return CastResultDTO(
+                caught,
+                catch,
+                autoActive,
+                unlockedLocations,
+                unlockedRods,
+                coinsAwarded,
+                totalCoins,
+                todayCoins,
+            )
         }
 
         if (pending == null) return@transaction finish(false)
-        val isBeginner = isBeginnerUser(userId)
+        val isBeginner = applyBeginnerProtection && isBeginnerUser(userId)
         if (!autoCatch && !success && !isBeginner) return@transaction finish(false)
 
         val fishId = pending[PendingCatches.fishId].value
@@ -1246,37 +1447,67 @@ class FishingService {
         ensureRodInventory(userId, totalAfter)
         ensureCurrentRod(userId, totalAfter)
 
-        Catches.insert {
+        val caughtAt = Instant.now()
+        val zone = ZoneId.systemDefault()
+        val catchDate = caughtAt.atZone(zone).toLocalDate()
+        val coinsEarnedBefore = coinsEarnedOnDate(userId, catchDate, zone)
+        val tier = locationTier(locId)
+        val coinsAwarded = CoinCalculator.computeCoins(
+            weight,
+            rarity,
+            tier,
+            fishRow[Fish.water],
+            coinsEarnedBefore.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        )
+        val totalCoinsBefore = userRow[Users.coins]
+        val totalCoinsAfter = totalCoinsBefore + coinsAwarded
+        val todayCoinsAfter = coinsEarnedBefore + coinsAwarded
+
+        val catchId = Catches.insertAndGetId {
             it[Catches.userId] = userId
             it[Catches.fishId] = fishId
             it[Catches.weight] = weight
             it[Catches.locationId] = locId
-            it[Catches.createdAt] = Instant.now()
+            it[Catches.createdAt] = caughtAt
+            it[Catches.coins] = coinsAwarded
+        }
+
+        if (coinsAwarded != 0) {
+            Users.update({ Users.id eq userId }) {
+                it[Users.coins] = totalCoinsAfter
+            }
         }
 
         finish(
             true,
             CatchDTO(
+                catchId.value,
                 fishName,
                 weight,
                 locName,
                 rarity,
-                userId = null,
+                userId = userId,
                 fishId = fishId,
+                user = nameFromRow(userRow),
+                at = caughtAt.toString(),
             ),
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
+            coinsAwarded = coinsAwarded,
+            totalCoins = totalCoinsAfter,
+            todayCoins = todayCoinsAfter,
         )
     }
 
     fun recent(userId: Long, limit: Int = 5): List<RecentDTO> = transaction {
         (Catches innerJoin Fish innerJoin Locations)
-            .slice(Fish.name, Fish.rarity, Catches.weight, Catches.createdAt, Locations.name)
+            .slice(Catches.id, Fish.name, Fish.rarity, Catches.weight, Catches.createdAt, Locations.name)
             .selectAll().where { Catches.userId eq userId }
             .orderBy(Catches.createdAt, SortOrder.DESC)
             .limit(limit)
             .map {
                 RecentDTO(
+                    it[Catches.id].value,
                     it[Fish.name],
                     it[Catches.weight],
                     it[Locations.name],
@@ -1284,6 +1515,27 @@ class FishingService {
                     it[Catches.createdAt].toString()
                 )
             }
+    }
+
+    fun catchById(userId: Long, catchId: Long): CatchDTO? = transaction {
+        ((Catches leftJoin Users) innerJoin Fish)
+            .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
+            .select { (Catches.id eq catchId) and (Catches.userId eq userId) }
+            .limit(1)
+            .map {
+                CatchDTO(
+                    it[Catches.id].value,
+                    it[Fish.name],
+                    it[Catches.weight],
+                    it[Locations.name],
+                    it[Fish.rarity],
+                    it[Catches.userId].value,
+                    it[Fish.id].value,
+                    user = catchUser(it),
+                    at = it[Catches.createdAt].toString(),
+                )
+            }
+            .singleOrNull()
     }
 
     private fun rarityRank(r: String) = when (r) {
@@ -1327,14 +1579,15 @@ class FishingService {
 
     fun personalTopByLocation(
         userId: Long,
-        locationId: Long,
+        locationId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.locationId eq locationId)
+            var cond: Op<Boolean> = Catches.userId eq userId
+            if (locationId != null) cond = cond and (Catches.locationId eq locationId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1342,6 +1595,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1358,14 +1612,15 @@ class FishingService {
 
     fun personalTopBySpecies(
         userId: Long,
-        fishId: Long,
+        fishId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = (Catches.userId eq userId) and (Catches.fishId eq fishId)
+            var cond: Op<Boolean> = Catches.userId eq userId
+            if (fishId != null) cond = cond and (Catches.fishId eq fishId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1373,6 +1628,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1388,14 +1644,15 @@ class FishingService {
     }
 
     fun globalTopByLocation(
-        locationId: Long,
+        locationId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = Catches.locationId eq locationId
+            var cond: Op<Boolean> = Op.TRUE
+            if (locationId != null) cond = cond and (Catches.locationId eq locationId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1403,6 +1660,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],
@@ -1418,14 +1676,15 @@ class FishingService {
     }
 
     fun globalTopBySpecies(
-        fishId: Long,
+        fishId: Long?,
         period: String = "all",
         asc: Boolean = false,
         limit: Int = 50,
     ): List<CatchDTO> {
         val (start, end) = periodRange(period)
         val catches = transaction {
-            var cond: Op<Boolean> = Catches.fishId eq fishId
+            var cond: Op<Boolean> = Op.TRUE
+            if (fishId != null) cond = cond and (Catches.fishId eq fishId)
             if (start != null) cond = cond and (Catches.createdAt greaterEq start)
             if (end != null) cond = cond and (Catches.createdAt less end)
             ((Catches leftJoin Users) innerJoin Fish)
@@ -1433,6 +1692,7 @@ class FishingService {
                 .select { cond }
                 .map {
                     CatchDTO(
+                        it[Catches.id].value,
                         it[Fish.name],
                         it[Catches.weight],
                         it[Locations.name],

@@ -6,6 +6,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 class FishingServiceTest {
     private fun testEnv(name: String) = Env(
@@ -22,17 +27,41 @@ class FishingServiceTest {
         botName = "",
     )
 
-    private fun newService(dbName: String): FishingService {
+    private fun newService(dbName: String, clock: Clock = Clock.systemUTC()): FishingService {
         DB.init(testEnv(dbName))
-        return FishingService()
+        return FishingService(clock)
+    }
+
+    private class MutableClock(
+        private var current: Instant,
+        private val zoneId: ZoneId = ZoneOffset.UTC,
+    ) : Clock() {
+        override fun getZone(): ZoneId = zoneId
+        override fun withZone(zone: ZoneId): Clock = MutableClock(current, zone)
+        override fun instant(): Instant = current
+        fun set(instant: Instant) {
+            current = instant
+        }
     }
 
     @Test
     fun baseEscapeChanceProgressesByLocation() {
         val svc = newService("testdb_fish_escape")
         transaction {
-            val ids = Locations.selectAll().orderBy(Locations.unlockKg).map { it[Locations.id].value }
-            ids.forEachIndexed { idx, id ->
+            val idsByInsertion = Locations.selectAll().orderBy(Locations.id).map { it[Locations.id].value }
+            // Shuffle unlock weights so that the ID order is no longer the same as the unlock order.
+            idsByInsertion.reversed().forEachIndexed { idx, id ->
+                Locations.update({ Locations.id eq id }) {
+                    it[Locations.unlockKg] = (idx + 1) * 10.0
+                }
+            }
+
+            val idsByUnlock = Locations
+                .selectAll()
+                .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+                .map { it[Locations.id].value }
+
+            idsByUnlock.forEachIndexed { idx, id ->
                 val expected = (0.05 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }
@@ -94,5 +123,74 @@ class FishingServiceTest {
             assertEquals(false, userRow[Users.isCasting])
             assertEquals(null, userRow[Users.castLureId])
         }
+    }
+
+    @Test
+    fun shopDiscountsAppliedAndRemoved() {
+        val svc = newService("testdb_shop_discount")
+        val now = LocalDate.now(ZoneOffset.UTC)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = now, end = now.plusDays(2))
+
+        val discounted = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(10, discounted.price)
+        assertEquals(39, discounted.originalPrice)
+        assertEquals(now.plusDays(2), discounted.discountEnd)
+
+        val discounts = svc.listDiscounts().associateBy { it.packageId }
+        val stored = discounts[packId]
+        requireNotNull(stored)
+        assertEquals(10, stored.price)
+        assertEquals(now, stored.startDate)
+
+        svc.removeDiscount(packId)
+
+        val restored = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(39, restored.price)
+        assertEquals(null, restored.originalPrice)
+    }
+
+    @Test
+    fun discountExpiresAtStartOfEndDate() {
+        val start = LocalDate.of(2025, 9, 22)
+        val endExclusive = start.plusDays(1)
+        val zone = ZoneOffset.UTC
+        val clock = MutableClock(start.atTime(12, 0).atZone(zone).toInstant(), zone)
+        val svc = newService("testdb_discount_end_exclusive", clock)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = start, end = endExclusive)
+
+        val activePack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(10, activePack.price)
+        assertEquals(39, activePack.originalPrice)
+
+        clock.set(endExclusive.atStartOfDay(zone).toInstant())
+
+        val expiredPack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
+        assertEquals(39, expiredPack.price)
+        assertEquals(null, expiredPack.originalPrice)
+    }
+
+    @Test
+    fun listDiscountsOmitsExpiredEntries() {
+        val start = LocalDate.of(2025, 10, 1)
+        val endExclusive = start.plusDays(1)
+        val zone = ZoneOffset.UTC
+        val clock = MutableClock(start.minusDays(1).atStartOfDay(zone).toInstant(), zone)
+        val svc = newService("testdb_discount_list_filter", clock)
+        val packId = "fresh_topup_s"
+
+        svc.setDiscount(packId, price = 10, start = start, end = endExclusive)
+
+        val scheduled = svc.listDiscounts().associateBy { it.packageId }
+        assertEquals(1, scheduled.size)
+        assertEquals(10, scheduled[packId]?.price)
+
+        clock.set(endExclusive.atStartOfDay(zone).toInstant())
+
+        val expired = svc.listDiscounts()
+        assertEquals(0, expired.size)
     }
 }

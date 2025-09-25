@@ -32,6 +32,7 @@ fun Application.apiRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val bot = TelegramBot(env.botToken)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
@@ -80,7 +81,17 @@ fun Application.apiRoutes(env: Env) {
     data class HookReq(val wait: Int, val reaction: Double)
 
     @Serializable
-    data class ShopPackageDTO(val id: String, val name: String, val desc: String, val price: Int, val until: String? = null)
+    data class ShopPackageDTO(
+        val id: String,
+        val name: String,
+        val desc: String,
+        val price: Int,
+        val until: String? = null,
+        val originalPrice: Int? = null,
+        val discountStart: String? = null,
+        val discountEnd: String? = null,
+        val coinPrice: Int? = null,
+    )
 
     @Serializable
     data class ShopCategoryDTO(val id: String, val name: String, val packs: List<ShopPackageDTO>)
@@ -127,8 +138,10 @@ fun Application.apiRoutes(env: Env) {
     @Serializable
     data class LeaderboardEntryDTO(
         val rank: Int,
+        val userId: Long? = null,
         val user: String? = null,
         val value: Double,
+        val catchId: Long? = null,
         val fish: String? = null,
         val fishId: Long? = null,
         val location: String? = null,
@@ -174,7 +187,12 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             fishing.resetCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures = fishing.listLures(uid).map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures = fishing.listLures(uid).map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             val rods = fishing.listRods(uid).map { it.copy(name = I18n.rod(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
@@ -211,9 +229,12 @@ fun Application.apiRoutes(env: Env) {
                 Users.select { Users.id eq uid }.single()[Users.autoFishUntil]
                     ?.isAfter(Instant.now()) ?: false
             }
+            val totalCoins = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
+            val todayCoins = fishing.todayCoins(uid)
 
             @Serializable
             data class MeResp(
+                val id: Long,
                 val username: String?,
                 val needsNickname: Boolean,
                 val lures: List<LureDTO>,
@@ -231,9 +252,12 @@ fun Application.apiRoutes(env: Env) {
                 val dailyRewards: List<List<DailyRewardItemDTO>>,
                 val autoFish: Boolean,
                 val language: String,
+                val coins: Long,
+                val todayCoins: Long,
             )
             call.respond(
                 MeResp(
+                    uid,
                     displayName,
                     displayName == null,
                     lures,
@@ -251,6 +275,8 @@ fun Application.apiRoutes(env: Env) {
                     dailyRewards,
                     autoFish,
                     language,
+                    totalCoins,
+                    todayCoins,
                 )
             )
         }
@@ -314,8 +340,10 @@ fun Application.apiRoutes(env: Env) {
                 leaderboard = top.map {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -326,8 +354,10 @@ fun Application.apiRoutes(env: Env) {
                 mine = mine?.let {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -370,8 +400,10 @@ fun Application.apiRoutes(env: Env) {
                 leaderboard = top.map {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -382,8 +414,10 @@ fun Application.apiRoutes(env: Env) {
                 mine = mine?.let {
                     LeaderboardEntryDTO(
                         rank = it.rank,
+                        userId = it.userId,
                         user = it.user,
                         value = it.value,
+                        catchId = it.catchId,
                         fish = it.fish?.let { f -> I18n.fish(f, language) },
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
@@ -475,7 +509,12 @@ fun Application.apiRoutes(env: Env) {
                 tournaments.claimPrize(uid, id, fishing)
             } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures2 = lures.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(ShopBuyResp(lures2, current))
         }
 
@@ -495,7 +534,12 @@ fun Application.apiRoutes(env: Env) {
             @Serializable
             data class DailyResp(val lures: List<LureDTO>, val currentLureId: Long?, val dailyStreak: Int)
 
-            val lures = res.first.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures = res.first.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(DailyResp(lures, res.second, res.third))
         }
 
@@ -532,7 +576,17 @@ fun Application.apiRoutes(env: Env) {
                         val until = if (p.id == "autofish") {
                             autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
                         } else null
-                        ShopPackageDTO(p.id, p.name, p.desc, p.price, until)
+                        ShopPackageDTO(
+                            id = p.id,
+                            name = p.name,
+                            desc = p.desc,
+                            price = p.price,
+                            until = until,
+                            originalPrice = p.originalPrice,
+                            discountStart = p.discountStart?.toString(),
+                            discountEnd = p.discountEnd?.toString(),
+                            coinPrice = p.coinPrice,
+                        )
                     }
                 )
             }
@@ -579,6 +633,61 @@ fun Application.apiRoutes(env: Env) {
             Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
+        }
+
+        post("/api/shop/{id}/coins") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            log.info("coin shop purchase tgId={} pack={}", tgId, id)
+            Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to id))
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = fishing.userLanguage(uid)
+            val result = try {
+                fishing.buyPackageWithCoins(uid, id)
+            } catch (e: FishingService.NotEnoughCoinsException) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "insufficient")
+                )
+                return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "not_enough_coins",
+                        "balance" to e.balance,
+                        "required" to e.required,
+                    )
+                )
+            } catch (_: FishingService.CoinPurchaseUnavailableException) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "unavailable")
+                )
+                return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "coin_purchase_unavailable")
+                )
+            } catch (e: Exception) {
+                Metrics.counter(
+                    "coin_shop_purchase_failed_total",
+                    mapOf("pack" to id, "reason" to "error")
+                )
+                log.warn("coin shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
+            }
+            val localized = result.first.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
+            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to id))
+            log.info("coin shop purchase success tgId={} pack={}", tgId, id)
+            call.respond(ShopBuyResp(localized, result.second))
         }
 
         get("/api/referrals") {
@@ -646,7 +755,12 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val (lures, current) = ReferralService.claimAllRewards(uid, fishing)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val lures2 = lures.map { it.copy(name = I18n.lure(it.name, language)) }
+            val lures2 = lures.map {
+                it.copy(
+                    displayName = I18n.lure(it.name, language),
+                    description = I18n.lureDescription(it.name, language),
+                )
+            }
             call.respond(ShopBuyResp(lures2, current))
         }
 
@@ -725,7 +839,9 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val req = call.receive<HookReq>()
-            val res = try { fishing.hook(uid, req.wait, req.reaction) } catch (e: Exception) {
+            val res = try {
+                fishing.hook(uid, req.wait, req.reaction, applyBeginnerProtection = false)
+            } catch (e: Exception) {
                 log.warn(
                     "hook failed tgId={} wait={} reaction={} err={}",
                     tgId,
@@ -756,7 +872,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<CastReq>()
-            val res = try { fishing.cast(uid, req.wait, req.reaction, req.success) } catch (e: Exception) {
+            val res = try {
+                fishing.cast(
+                    uid,
+                    req.wait,
+                    req.reaction,
+                    req.success,
+                    applyBeginnerProtection = false,
+                )
+            } catch (e: Exception) {
                 log.warn(
                     "cast failed tgId={} wait={} reaction={} err={}",
                     tgId,
@@ -823,6 +947,55 @@ fun Application.apiRoutes(env: Env) {
             )
         }
 
+        post("/api/catches/{id}/send") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val catchId = call.parameters["id"]?.toLongOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val catch = fishing.catchById(uid, catchId)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val fishName = I18n.fish(catch.fish, language)
+            val locationName = I18n.location(catch.location, language)
+            val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+            val captionBase = buildCatchCaption(
+                lang = language,
+                fishName = fishName,
+                rarity = catch.rarity,
+                weightKg = catch.weight,
+                locationName = locationName,
+            )
+            val caption = appendCatchTags(captionBase, catch)
+            val image = generateCatchImage(
+                catch.fish,
+                catch.location,
+                fishName,
+                locationName,
+                catch.weight,
+                catch.rarity,
+                language,
+                anglerName = catch.user,
+                caughtAt = caughtAt,
+            )
+            try {
+                if (image != null) {
+                    bot.sendPhoto(tgId, image, caption)
+                } else {
+                    bot.sendMessage(tgId, caption)
+                }
+            } catch (e: Exception) {
+                log.error("send catch card failed uid={} catchId={}", uid, catchId, e)
+                return@post call.respond(HttpStatusCode.BadGateway, mapOf("error" to "send_failed"))
+            }
+            Metrics.counter("catch_share_total", mapOf("result" to "ok"))
+            call.respond(HttpStatusCode.Accepted)
+        }
+
         // Change lure
         post("/api/lure/{id}") {
             val session = call.sessions.get<AppSession>()
@@ -859,8 +1032,8 @@ fun Application.apiRoutes(env: Env) {
             }
         }
 
-        // Achievements - personal
-        get("/api/achievements/personal/location/{id}") {
+        // Ratings - personal
+        get("/api/ratings/personal/location/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -868,11 +1041,16 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val locationId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopByLocation(uid, id, period, asc).map { c ->
+            val res = fishing.personalTopByLocation(uid, locationId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -881,7 +1059,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/personal/species/{id}") {
+        get("/api/ratings/personal/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -889,11 +1067,16 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val fishId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val res = fishing.personalTopBySpecies(uid, id, period, asc).map { c ->
+            val res = fishing.personalTopBySpecies(uid, fishId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -902,8 +1085,8 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        // Achievements - global
-        get("/api/achievements/global/location/{id}") {
+        // Ratings - global
+        get("/api/ratings/global/location/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -912,10 +1095,15 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val locationId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopByLocation(id, period, asc).map { c ->
+            val res = fishing.globalTopByLocation(locationId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)
@@ -924,7 +1112,7 @@ fun Application.apiRoutes(env: Env) {
             call.respond(res)
         }
 
-        get("/api/achievements/global/species/{id}") {
+        get("/api/ratings/global/species/{id}") {
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -933,10 +1121,15 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val fishId = if (idParam.equals("all", ignoreCase = true)) {
+                null
+            } else {
+                idParam.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            }
             val period = call.request.queryParameters["period"] ?: "all"
             val asc = call.request.queryParameters["order"] == "asc"
-            val res = fishing.globalTopBySpecies(id, period, asc).map { c ->
+            val res = fishing.globalTopBySpecies(fishId, period, asc).map { c ->
                 c.copy(
                     fish = I18n.fish(c.fish, language),
                     location = I18n.location(c.location, language)

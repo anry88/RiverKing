@@ -1,5 +1,6 @@
 package app
 
+import app.RARITY_LABELS
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -28,18 +29,13 @@ import service.PrizeSpec
 import service.I18n
 import util.Metrics
 import util.sanitizeName
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import javax.imageio.ImageIO
 import kotlin.random.Random
-import kotlin.math.max
-import kotlin.math.roundToInt
 import org.slf4j.LoggerFactory
 import db.Users
 import org.jetbrains.exposed.sql.select
@@ -82,6 +78,18 @@ private data class AdminDraft(
 
 private enum class AdminStep { NAME_RU, NAME_EN, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
 
+private data class DiscountDraft(
+    var step: DiscountStep = DiscountStep.PACK,
+    var packageId: String = "",
+    var packageName: String = "",
+    var basePrice: Int = 0,
+    var price: Int? = null,
+    var start: LocalDate? = null,
+    var end: LocalDate? = null,
+)
+
+private enum class DiscountStep { PACK, PRICE, START, END }
+
 private data class BroadcastDraft(
     var step: BroadcastStep = BroadcastStep.TEXT_RU,
     var textRu: String = "",
@@ -93,159 +101,22 @@ private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
+
+private val BAIT_ORDER = listOf(
+    "Пресная мирная",
+    "Пресная хищная",
+    "Морская мирная",
+    "Морская хищная",
+    "Пресная мирная+",
+    "Пресная хищная+",
+    "Морская мирная+",
+    "Морская хищная+",
+)
+private val BAIT_ORDER_INDEX = BAIT_ORDER.withIndex().associate { it.value to it.index }
 private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
-private val RARITY_LABELS = mapOf(
-    "ru" to mapOf(
-        "common" to "Простая",
-        "uncommon" to "Необычная",
-        "rare" to "Редкая",
-        "epic" to "Эпическая",
-        "legendary" to "Легендарная",
-    ),
-    "en" to mapOf(
-        "common" to "Common",
-        "uncommon" to "Uncommon",
-        "rare" to "Rare",
-        "epic" to "Epic",
-        "legendary" to "Legendary",
-    ),
-)
-
-private val FISH_IMAGE_PATHS = mapOf(
-    "Плотва" to "webapp/assets/fish/plotva.png",
-    "Окунь" to "webapp/assets/fish/okun.png",
-    "Карась" to "webapp/assets/fish/karas.png",
-    "Лещ" to "webapp/assets/fish/lesch.png",
-    "Щука" to "webapp/assets/fish/schuka.png",
-    "Карп" to "webapp/assets/fish/karp.png",
-    "Сом" to "webapp/assets/fish/som.png",
-    "Осётр" to "webapp/assets/fish/osetr.png",
-    "Уклейка" to "webapp/assets/fish/ukleyka.png",
-    "Линь" to "webapp/assets/fish/lin.png",
-    "Ротан" to "webapp/assets/fish/rotan.png",
-    "Судак" to "webapp/assets/fish/sudak.png",
-    "Чехонь" to "webapp/assets/fish/chehon.png",
-    "Хариус" to "webapp/assets/fish/harius.png",
-    "Форель ручьевая" to "webapp/assets/fish/forel_ruchevaya.png",
-    "Таймень" to "webapp/assets/fish/taymen.png",
-    "Налим" to "webapp/assets/fish/nalim.png",
-    "Сиг" to "webapp/assets/fish/sig.png",
-    "Голавль" to "webapp/assets/fish/golavl.png",
-    "Жерех" to "webapp/assets/fish/zhereh.png",
-    "Толстолобик" to "webapp/assets/fish/tolstolobik.png",
-    "Белый амур" to "webapp/assets/fish/beliy_amur.png",
-    "Угорь европейский" to "webapp/assets/fish/ugor_evropeyskiy.png",
-    "Стерлядь" to "webapp/assets/fish/sterlyad.png",
-    "Кефаль" to "webapp/assets/fish/kefal.png",
-    "Камбала" to "webapp/assets/fish/kambala.png",
-    "Сельдь" to "webapp/assets/fish/seld.png",
-    "Ставрида" to "webapp/assets/fish/stavrida.png",
-    "Треска" to "webapp/assets/fish/treska.png",
-    "Сайда" to "webapp/assets/fish/sayda.png",
-    "Морская форель" to "webapp/assets/fish/morskaya_forel.png",
-    "Палтус" to "webapp/assets/fish/paltus.png",
-    "Корюшка" to "webapp/assets/fish/koryushka.png",
-    "Лосось атлантический" to "webapp/assets/fish/losos_atlanticheskiy.png",
-    "Лаврак" to "webapp/assets/fish/lavrak.png",
-    "Скумбрия атлантическая" to "webapp/assets/fish/skumbriya_atlanticheskaya.png",
-    "Белуга" to "webapp/assets/fish/beluga.png",
-    "Ёрш" to "webapp/assets/fish/yorsh.png",
-    "Пескарь" to "webapp/assets/fish/peskar.png",
-    "Густера" to "webapp/assets/fish/gustera.png",
-    "Краснопёрка" to "webapp/assets/fish/krasnopyorka.png",
-    "Елец" to "webapp/assets/fish/elets.png",
-    "Верхоплавка" to "webapp/assets/fish/verhoplavka.png",
-    "Гольян" to "webapp/assets/fish/golyan.png",
-    "Язь" to "webapp/assets/fish/yaz.png",
-    "Бычок" to "webapp/assets/fish/bychyok.png",
-    "Килька" to "webapp/assets/fish/kilka.png",
-    "Мойва" to "webapp/assets/fish/mojva.png",
-    "Сардина" to "webapp/assets/fish/sardina.png",
-    "Анчоус" to "webapp/assets/fish/anchous.png",
-    "Дорадо" to "webapp/assets/fish/dorado.png",
-    "Ваху" to "webapp/assets/fish/vahu.png",
-    "Парусник" to "webapp/assets/fish/parusnik.png",
-    "Рыба-меч" to "webapp/assets/fish/ryba_mech.png",
-    "Марлин синий" to "webapp/assets/fish/marlin_siniy.png",
-    "Тунец синеперый" to "webapp/assets/fish/tunets_sineperiy.png",
-    "Акула мако" to "webapp/assets/fish/akula_mako.png",
-    "Альбакор" to "webapp/assets/fish/albakor.png",
-    "Голец арктический" to "webapp/assets/fish/golets_arkticheskiy.png",
-    "Форель кумжа" to "webapp/assets/fish/forel_kumzha.png",
-    "Пикша" to "webapp/assets/fish/piksha.png",
-    "Тюрбо" to "webapp/assets/fish/tyurbo.png",
-    "Сайра" to "webapp/assets/fish/sayra.png",
-    "Летучая рыба" to "webapp/assets/fish/letuchaya_ryba.png",
-    "Рыба-луна" to "webapp/assets/fish/ryba_luna.png",
-    "Сельдяной король" to "webapp/assets/fish/seldyanoy_korol.png",
-)
-
-private val LOCATION_BACKGROUNDS = run {
-    val base = mapOf(
-        "Пруд" to "webapp/assets/originals/backgrounds/pond.png",
-        "Река" to "webapp/assets/originals/backgrounds/river.png",
-        "Озеро" to "webapp/assets/originals/backgrounds/lake.png",
-        "Болото" to "webapp/assets/originals/backgrounds/swamp.png",
-        "Горная река" to "webapp/assets/originals/backgrounds/mountain_river.png",
-        "Водохранилище" to "webapp/assets/originals/backgrounds/reservoir.png",
-        "Дельта реки" to "webapp/assets/originals/backgrounds/river_delta.png",
-        "Прибрежье моря" to "webapp/assets/originals/backgrounds/sea_coast.png",
-        "Фьорд" to "webapp/assets/originals/backgrounds/fjord.png",
-        "Открытый океан" to "webapp/assets/originals/backgrounds/open_ocean.png",
-    )
-    base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
-}
-
-private fun loadFishImage(name: String, location: String): ByteArray? {
-    val path = FISH_IMAGE_PATHS[name] ?: return null
-    val classLoader = Thread.currentThread().contextClassLoader
-    val originalPath = path.replace("webapp/assets/fish/", "webapp/assets/originals/fish/")
-    val fishStream = classLoader.getResourceAsStream(originalPath) ?: return null
-    fishStream.use { stream ->
-        val fishImage = ImageIO.read(stream) ?: return null
-        val size = 1024
-        val finalImage = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
-        val g2d = finalImage.createGraphics()
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-
-        LOCATION_BACKGROUNDS[location]?.let { bgPath ->
-            classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
-                val bgImage = ImageIO.read(bgStream)
-                if (bgImage != null) {
-                    val scale = max(size.toDouble() / bgImage.width, size.toDouble() / bgImage.height)
-                    val newWidth = (bgImage.width * scale).roundToInt()
-                    val newHeight = (bgImage.height * scale).roundToInt()
-                    val offsetX = ((size - newWidth) / 2.0).roundToInt()
-                    val offsetY = ((size - newHeight) / 2.0).roundToInt()
-                    g2d.drawImage(
-                        bgImage,
-                        offsetX,
-                        offsetY,
-                        offsetX + newWidth,
-                        offsetY + newHeight,
-                        0,
-                        0,
-                        bgImage.width,
-                        bgImage.height,
-                        null,
-                    )
-                }
-            }
-        }
-
-        val fishX = ((size - fishImage.width) / 2.0).roundToInt()
-        val fishY = ((size - fishImage.height) / 2.0).roundToInt()
-        g2d.drawImage(fishImage, fishX, fishY, null)
-        g2d.dispose()
-        val baos = ByteArrayOutputStream()
-        ImageIO.write(finalImage, "png", baos)
-        return baos.toByteArray()
-    }
-}
 
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
@@ -278,6 +149,7 @@ fun Application.botRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val adminStates = mutableMapOf<Long, AdminDraft>()
+    val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
@@ -363,6 +235,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "Buy baits with Stars",
                         assetName = "shop.png"
                     ) { _, _ -> "/shop" },
+                    InlineCommandInfo(
+                        name = "coin_shop",
+                        ruDescription = "Купить наборы за монеты",
+                        enDescription = "Buy bundles with coins",
+                        assetName = "shop.png"
+                    ) { _, _ -> "/coin_shop" },
                     InlineCommandInfo(
                         name = "tournament",
                         ruDescription = "Таблица текущего турнира и твоя позиция",
@@ -465,6 +343,16 @@ fun Application.botRoutes(env: Env) {
                 return chunks
             }
 
+            fun strikethrough(text: String): String {
+                if (text.isBlank()) return text
+                val combining = '\u0336'
+                val builder = StringBuilder(text.length * 2)
+                text.forEach { ch ->
+                    builder.append(ch).append(combining)
+                }
+                return builder.toString()
+            }
+
             fun trySend(
                 chatId: Long,
                 text: String,
@@ -556,7 +444,12 @@ fun Application.botRoutes(env: Env) {
                 val currentId = transaction {
                     Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
                 }
-                val sorted = lures.sortedBy { I18n.lure(it.name, lang) }
+                val sorted = lures.sortedWith(
+                    compareBy(
+                        { BAIT_ORDER_INDEX[it.name] ?: Int.MAX_VALUE },
+                        { I18n.lure(it.name, lang) },
+                    )
+                )
                 val currentName = sorted.find { it.id == currentId }?.let { I18n.lure(it.name, lang) }
                 val header = if (lang == "ru") {
                     "Текущая приманка: ${currentName ?: "не выбрана"}"
@@ -568,6 +461,16 @@ fun Application.botRoutes(env: Env) {
                 } else {
                     if (lang == "ru") "Выберите приманку:" else "Choose a bait:"
                 }
+                val details = sorted.joinToString("\n") { lure ->
+                    val name = I18n.lure(lure.name, lang)
+                    val desc = I18n.lureDescription(lure.name, lang)
+                    val qtyLabel = if (lang == "ru") "${lure.qty} шт." else "${lure.qty} pcs."
+                    if (desc.isBlank()) {
+                        "• $name — $qtyLabel"
+                    } else {
+                        "• $name — $desc ($qtyLabel)"
+                    }
+                }
                 val text = buildString {
                     if (!prefix.isNullOrBlank()) {
                         append(prefix)
@@ -576,6 +479,10 @@ fun Application.botRoutes(env: Env) {
                     append(header)
                     append("\n")
                     append(prompt)
+                    if (details.isNotBlank()) {
+                        append("\n")
+                        append(details)
+                    }
                 }
                 if (sorted.isEmpty()) {
                     trySend(chatId, text, replyToMessageId = replyToMessageId)
@@ -593,6 +500,61 @@ fun Application.botRoutes(env: Env) {
                 }.chunked(2)
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            fun sendDiscountMenu(chatId: Long) {
+                val discounts = fishing.listDiscounts().sortedBy { it.startDate }
+                val body = if (discounts.isEmpty()) {
+                    "Скидок сейчас нет."
+                } else {
+                    val lines = discounts.joinToString("\n") { d ->
+                        val pack = fishing.findPack(d.packageId)
+                        val name = pack?.let { I18n.text(it.name, "ru") } ?: d.packageId
+                        val basePrice = pack?.price
+                        val priceText = basePrice?.let { strikethrough("$it⭐") + " ${d.price}⭐" } ?: "${d.price}⭐"
+                        val start = d.startDate.format(DATE_FMT)
+                        val end = d.endDate.format(DATE_FMT)
+                        "• $name — $priceText ($start — $end)"
+                    }
+                    "Текущие скидки:\n$lines"
+                }
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                buttons += listOf(InlineKeyboardButton("Добавить скидку", "create_discount"))
+                discounts.forEach { d ->
+                    val pack = fishing.findPack(d.packageId)
+                    val name = pack?.let { I18n.text(it.name, "ru") } ?: d.packageId
+                    val short = if (name.length > 32) name.take(29) + "…" else name
+                    buttons += listOf(InlineKeyboardButton("Убрать: $short", "remove_discount_${d.packageId}"))
+                }
+                buttons += listOf(InlineKeyboardButton("Закрыть", "discount_cancel"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                try {
+                    bot.sendMessage(chatId, body, markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            }
+
+            fun sendDiscountPackPicker(chatId: Long) {
+                val packs = fishing.listShop("ru").flatMap { it.packs }.sortedBy { it.name }
+                if (packs.isEmpty()) {
+                    try {
+                        bot.sendMessage(chatId, "Магазин пуст, скидку добавить нельзя")
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={}", chatId, e)
+                    }
+                    return
+                }
+                val buttons = packs.map { pack ->
+                    InlineKeyboardButton(pack.name, "discount_pack_${pack.id}")
+                }.chunked(2).toMutableList()
+                buttons += listOf(InlineKeyboardButton("Отмена", "discount_cancel"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                try {
+                    bot.sendMessage(chatId, "Выберите товар для скидки", markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
             }
 
             fun sendRodMenu(
@@ -800,8 +762,21 @@ fun Application.botRoutes(env: Env) {
                             append("\n• ")
                             append(pack.name)
                             append(" — ")
-                            append(pack.price)
-                            append('⭐')
+                            val priceText = if (pack.originalPrice != null && pack.originalPrice > pack.price) {
+                                val discountPercent = ((pack.originalPrice - pack.price) * 100) / pack.originalPrice
+                                val untilPart = pack.discountEnd?.format(DATE_FMT)?.let {
+                                    if (lang == "ru") " до $it" else " until $it"
+                                } ?: ""
+                                val discountLabel = if (lang == "ru") {
+                                    "скидка $discountPercent% от полной цены$untilPart"
+                                } else {
+                                    "discount $discountPercent% off full price$untilPart"
+                                }
+                                "${pack.price}⭐ ($discountLabel)"
+                            } else {
+                                "${pack.price}⭐"
+                            }
+                            append(priceText)
                             if (pack.desc.isNotBlank()) {
                                 append("\n  ")
                                 append(pack.desc)
@@ -814,14 +789,124 @@ fun Application.botRoutes(env: Env) {
 
                 val buttons = shop.flatMap { category ->
                     category.packs.map { pack ->
-                        val label = "${pack.name} — ${pack.price}⭐"
+                        val labelPrice = "${pack.price}⭐"
+                        val label = "${pack.name} — $labelPrice"
                         InlineKeyboardButton(label, "/buy ${ownedData(uid, pack.id)}")
                     }
                 }.chunked(2)
 
                 val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
-                trySend(chatId, text, markup, replyToMessageId)
+                val parts = splitMessage(text)
+                if (parts.size == 1) {
+                    trySend(chatId, text, markup, replyToMessageId)
+                } else {
+                    parts.forEachIndexed { index, part ->
+                        val trimmedPart = part.trimEnd()
+                        val partMarkup = if (index == 0) markup else null
+                        val partReplyTo = if (index == 0) replyToMessageId else null
+                        trySend(chatId, trimmedPart, partMarkup, partReplyTo)
+                    }
+                }
             }
+
+            fun sendCoinShopMenu(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val shop = fishing.listShop(lang).map { category ->
+                    category.copy(packs = category.packs.filter { it.coinPrice != null })
+                }.filter { it.packs.isNotEmpty() }
+                if (shop.isEmpty()) {
+                    val emptyText = if (lang == "ru") {
+                        "Покупки за монеты пока недоступны."
+                    } else {
+                        "Coin shop is unavailable right now."
+                    }
+                    trySend(chatId, emptyText, replyToMessageId = replyToMessageId)
+                    return
+                }
+                val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                val formatter = NumberFormat.getIntegerInstance(locale)
+                val balance = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
+                val balanceText = formatter.format(balance)
+                val header = if (lang == "ru") {
+                    "🪙 Магазин за монеты. Баланс: $balanceText монет."
+                } else {
+                    "🪙 Coin shop. Balance: $balanceText coins."
+                }
+                val footer = if (lang == "ru") {
+                    "Чтобы купить, открой мини-приложение: https://t.me/${env.botName}?startapp"
+                } else {
+                    "To buy, open the mini app: https://t.me/${env.botName}?startapp"
+                }
+                val text = buildString {
+                    append(header)
+                    shop.forEach { category ->
+                        append("\n\n")
+                        append(category.name)
+                        category.packs.forEach { pack ->
+                            val coinPrice = pack.coinPrice ?: return@forEach
+                            val priceText = formatter.format(coinPrice)
+                            append("\n• ")
+                            append(pack.name)
+                            append(" — 🪙 ")
+                            append(priceText)
+                            if (pack.desc.isNotBlank()) {
+                                append("\n  ")
+                                append(pack.desc)
+                            }
+                        }
+                    }
+                    append("\n\n")
+                    append(footer)
+                }.trim()
+                val parts = splitMessage(text)
+                parts.forEachIndexed { index, part ->
+                    val trimmedPart = part.trimEnd()
+                    val partReplyTo = if (index == 0) replyToMessageId else null
+                    trySend(chatId, trimmedPart, replyToMessageId = partReplyTo)
+                }
+            }
+
+            val keywordCommandMap = mapOf(
+                "рыба" to "/cast",
+                "рыбалка" to "/cast",
+                "fish" to "/cast",
+                "fishing" to "/cast",
+                "cast" to "/cast",
+                "casting" to "/cast",
+                "bait" to "/bait",
+                "приманка" to "/bait",
+                "локация" to "/location",
+                "место" to "/location",
+                "place" to "/location",
+                "location" to "/location",
+                "удочка" to "/rod",
+                "rod" to "/rod",
+                "магазин" to "/shop",
+                "shop" to "/shop",
+                "статистика" to "/stats",
+                "статы" to "/stats",
+                "стата" to "/stats",
+                "statistics" to "/stats",
+                "stats" to "/stats",
+                "info" to "/stats",
+                "information" to "/stats",
+                "язык" to "/language",
+                "language" to "/language",
+                "ник" to "/nickname",
+                "никнейм" to "/nickname",
+                "nick" to "/nickname",
+                "nickname" to "/nickname",
+                "приз" to "/prizes",
+                "призы" to "/prizes",
+                "prize" to "/prizes",
+                "prizes" to "/prizes",
+                "турнир" to "/tournament",
+                "tournament" to "/tournament",
+            )
 
             suspend fun processUserCommand(
                 rawText: String,
@@ -831,8 +916,22 @@ fun Application.botRoutes(env: Env) {
                 messageId: Long? = null,
                 sourceOverride: String? = null,
             ): Boolean {
-                if (!rawText.startsWith("/")) return false
                 val text = rawText.trim()
+                if (text.isEmpty()) return false
+
+                val keywordCommand = keywordCommandMap[text.lowercase(Locale.ROOT)]
+                if (keywordCommand != null && !text.startsWith("/")) {
+                    return processUserCommand(
+                        keywordCommand,
+                        from,
+                        chatId,
+                        isCallback,
+                        messageId,
+                        sourceOverride,
+                    )
+                }
+
+                if (!text.startsWith("/")) return false
                 val commandLine = text.lineSequence().firstOrNull()?.trim().orEmpty()
                 if (commandLine.isEmpty()) return false
                 val parts = commandLine.split(" ", limit = 2)
@@ -887,6 +986,7 @@ fun Application.botRoutes(env: Env) {
 /daily — получить ежедневную награду
 /prizes — забрать призы турнира
 /shop — купить приманки за звёзды
+/coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
@@ -902,6 +1002,7 @@ Available commands:
 /daily — claim your daily reward
 /prizes — claim tournament prizes
 /shop — buy baits with Stars
+/coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
 /stats — your fishing stats
 /language — choose your language
@@ -1082,6 +1183,13 @@ Available commands:
                         sendShopMenu(uid, chatId, lang, replyToMessageId = replyTo)
                         return true
                     }
+                    "/coin_shop" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("coin_shop", mapOf("action" to "show"), source)
+                        sendCoinShopMenu(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
                     "/buy" -> {
                         val buyerTgId = from?.id ?: return false
                         val uid = ensureUserId(from) ?: return false
@@ -1183,6 +1291,7 @@ Available commands:
                         } else {
                             "The line is in the water. Waiting for a bite..."
                         }
+                        val anglerName = fishing.displayName(uid)
                         trySend(chatId, waitMessage, replyToMessageId = replyTo)
                         castScope.launch {
                             val waitSeconds = 5 + Random.nextInt(26)
@@ -1218,11 +1327,7 @@ Available commands:
                                     return@launch
                                 }
                                 val fishName = I18n.fish(catch.fish, lang)
-                                val rarityText = RARITY_LABELS[lang]?.get(catch.rarity) ?: catch.rarity
                                 val locationName = I18n.location(catch.location, lang)
-                                val weightText = "%.2f".format(Locale.US, catch.weight)
-                                val unit = if (lang == "ru") "кг" else "kg"
-                                val locationLabel = if (lang == "ru") "Локация" else "Location"
                                 val isNew = catch.fishId?.let { it !in knownFish } == true
                                 val newLine = if (isNew) {
                                     if (lang == "ru") "\n✨ Новая рыба!" else "\n✨ New fish!"
@@ -1251,24 +1356,46 @@ Available commands:
                                 } else {
                                     ""
                                 }
-                                val caption = buildString {
-                                    append("🐟 ")
-                                    append(fishName)
-                                    append(" (")
-                                    append(rarityText)
-                                    append(") — ")
-                                    append(weightText)
-                                    append(' ')
-                                    append(unit)
-                                    append("\n")
-                                    append(locationLabel)
-                                    append(": ")
-                                    append(locationName)
-                                    append(newLine)
-                                    append(unlockedLine)
-                                    append(rodLine)
+                                val coinsLine = when {
+                                    castRes.coins > 0 -> {
+                                        val amount = castRes.coins
+                                        if (lang == "ru") {
+                                            "\n🪙 +${amount} монет"
+                                        } else {
+                                            val suffix = if (amount == 1) "" else "s"
+                                            "\n🪙 +${amount} coin${suffix}"
+                                        }
+                                    }
+                                    castRes.coins == 0 -> {
+                                        if (lang == "ru") {
+                                            "\n🪙 Монеты не начислены из-за лимита"
+                                        } else {
+                                            "\n🪙 No coins due to daily cap"
+                                        }
+                                    }
+                                    else -> ""
                                 }
-                                val image = loadFishImage(catch.fish, catch.location)
+                                val captionBase = buildCatchCaption(
+                                    lang = lang,
+                                    fishName = fishName,
+                                    rarity = catch.rarity,
+                                    weightKg = catch.weight,
+                                    locationName = locationName,
+                                    extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine),
+                                )
+                                val caption = appendCatchTags(captionBase, catch)
+                                val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                                val image = generateCatchImage(
+                                    fishInternalName = catch.fish,
+                                    locationInternalName = catch.location,
+                                    displayFishName = fishName,
+                                    displayLocationName = locationName,
+                                    weightKg = catch.weight,
+                                    rarity = catch.rarity,
+                                    lang = lang,
+                                    anglerName = catch.user,
+                                    caughtAt = caughtAt,
+                                )
                                 if (image != null) {
                                     try {
                                         bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)
@@ -1691,6 +1818,62 @@ Available commands:
                                 log.error("sendMessage failed chatId={}", target, e)
                             }
                         }
+                        data == "discounts_menu" -> {
+                            sendDiscountMenu(target)
+                        }
+                        data == "create_discount" -> {
+                            discountStates[cq.from.id] = DiscountDraft(step = DiscountStep.PACK)
+                            sendDiscountPackPicker(target)
+                        }
+                        data == "discount_cancel" -> {
+                            discountStates.remove(cq.from.id)
+                        }
+                        data != null && data.startsWith("discount_pack_") -> {
+                            val id = data.removePrefix("discount_pack_")
+                            val pack = fishing.findPack(id)
+                            if (pack != null) {
+                                val name = I18n.text(pack.name, "ru")
+                                val existing = fishing.getDiscount(id)
+                                val draft = DiscountDraft(
+                                    step = DiscountStep.PRICE,
+                                    packageId = id,
+                                    packageName = name,
+                                    basePrice = pack.price,
+                                    price = existing?.price,
+                                    start = existing?.startDate,
+                                    end = existing?.endDate,
+                                )
+                                discountStates[cq.from.id] = draft
+                                val current = existing?.let {
+                                    val start = it.startDate.format(DATE_FMT)
+                                    val end = it.endDate.format(DATE_FMT)
+                                    "\nТекущая скидка: ${it.price}⭐ ($start — до $end)"
+                                } ?: ""
+                                val message = "Введите цену в звёздах для \"$name\" (обычная цена: ${pack.price}⭐)$current"
+                                try {
+                                    bot.sendMessage(target, message)
+                                } catch (e: Exception) {
+                                    log.error("sendMessage failed chatId={}", target, e)
+                                }
+                            }
+                        }
+                        data != null && data.startsWith("remove_discount_") -> {
+                            val id = data.removePrefix("remove_discount_")
+                            val removed = fishing.removeDiscount(id) > 0
+                            val packName = fishing.findPack(id)?.let { I18n.text(it.name, "ru") } ?: id
+                            val reply = if (removed) {
+                                "Скидка для \"$packName\" удалена"
+                            } else {
+                                "Скидка для \"$packName\" не найдена"
+                            }
+                            discountStates.remove(cq.from.id)
+                            try {
+                                bot.sendMessage(target, reply)
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", target, e)
+                            }
+                            sendDiscountMenu(target)
+                        }
                         data == "list_tournaments" -> {
                             val current = tournaments.currentTournament()
                             val upcoming = tournaments.upcomingTournaments()
@@ -1820,6 +2003,91 @@ Available commands:
             val userId = message.from?.id ?: return@post call.respond(HttpStatusCode.OK)
             val text = message.text ?: ""
             val commandSource = if (message.viaBot != null) "inline" else "message"
+
+            discountStates[userId]?.let { draft ->
+                if (text == "/cancel") {
+                    discountStates.remove(userId)
+                    try {
+                        bot.sendMessage(chatId, "Настройка скидки отменена")
+                    } catch (e: Exception) {
+                        log.error("sendMessage failed chatId={}", chatId, e)
+                    }
+                    return@post call.respond(HttpStatusCode.OK)
+                }
+                when (draft.step) {
+                    DiscountStep.PACK -> {
+                        try {
+                            bot.sendMessage(chatId, "Выберите товар кнопкой ниже")
+                        } catch (_: Exception) {}
+                    }
+                    DiscountStep.PRICE -> {
+                        val value = text.trim().toIntOrNull()
+                        if (value == null || value <= 0) {
+                            try {
+                                bot.sendMessage(chatId, "Укажите цену числом")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.price = value
+                            draft.step = DiscountStep.START
+                            val current = draft.start?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                            try {
+                                bot.sendMessage(chatId, "Дата начала скидки (дд.мм.гггг)$current")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                        }
+                    }
+                    DiscountStep.START -> {
+                        val date = runCatching { LocalDate.parse(text.trim(), DATE_FMT) }.getOrNull()
+                        if (date == null) {
+                            try {
+                                bot.sendMessage(chatId, "Неверный формат даты, используйте дд.мм.гггг")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.start = date
+                            draft.step = DiscountStep.END
+                            val current = draft.end?.format(DATE_FMT)?.let { " (сейчас: $it)" } ?: ""
+                            try {
+                                bot.sendMessage(chatId, "Дата окончания скидки (дд.мм.гггг)$current")
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                        }
+                    }
+                    DiscountStep.END -> {
+                        val date = runCatching { LocalDate.parse(text.trim(), DATE_FMT) }.getOrNull()
+                        val start = draft.start
+                        val price = draft.price
+                        if (date == null || start == null || price == null) {
+                            try {
+                                bot.sendMessage(chatId, "Неверный формат даты, используйте дд.мм.гггг")
+                            } catch (_: Exception) {}
+                        } else if (!date.isAfter(start)) {
+                            try {
+                                bot.sendMessage(chatId, "Дата окончания должна быть позже даты начала")
+                            } catch (_: Exception) {}
+                        } else {
+                            draft.end = date
+                            fishing.setDiscount(draft.packageId, price, start, date)
+                            val startStr = start.format(DATE_FMT)
+                            val endStr = date.format(DATE_FMT)
+                            val messageText = buildString {
+                                append("Скидка для \"${draft.packageName}\" сохранена: ")
+                                append(strikethrough("${draft.basePrice}⭐"))
+                                append(" → ${price}⭐ ($startStr — до $endStr)")
+                            }
+                            discountStates.remove(userId)
+                            try {
+                                bot.sendMessage(chatId, messageText)
+                            } catch (e: Exception) {
+                                log.error("sendMessage failed chatId={}", chatId, e)
+                            }
+                            sendDiscountMenu(chatId)
+                        }
+                    }
+                }
+                return@post call.respond(HttpStatusCode.OK)
+            }
 
             adminStates[userId]?.let { draft ->
                 when (draft.step) {
@@ -2152,8 +2420,22 @@ Available commands:
             } else if (chatId == env.adminTgId) {
                 when {
                     text.startsWith("/admin") -> {
-                        val markup = """{"inline_keyboard":[[{"text":"Создать турнир","callback_data":"create_tournament"},{"text":"Список турниров","callback_data":"list_tournaments"}],[{"text":"Разослать сообщение","callback_data":"broadcast_message"}]]}"""
+                        val markup = Json.encodeToString(
+                            InlineKeyboardMarkup(
+                                listOf(
+                                    listOf(
+                                        InlineKeyboardButton("Создать турнир", "create_tournament"),
+                                        InlineKeyboardButton("Список турниров", "list_tournaments"),
+                                    ),
+                                    listOf(
+                                        InlineKeyboardButton("Разослать сообщение", "broadcast_message"),
+                                        InlineKeyboardButton("Скидки магазина", "discounts_menu"),
+                                    ),
+                                )
+                            )
+                        )
                         try { bot.sendMessage(chatId, "Админ меню", markup) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                        discountStates.remove(userId)
                     }
                     text.startsWith("/refund") -> {
                         val id = text.split(" ").getOrNull(1)?.toLongOrNull()

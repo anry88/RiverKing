@@ -19,7 +19,8 @@ function TournamentsTab({
   setPastResult,
   prizeHint,
   setPrizeHint,
-  shop
+  shop,
+  onCatchClick
 }){
   React.useEffect(()=>{
     if(currentTournament?.mine){
@@ -44,9 +45,12 @@ function TournamentsTab({
     return packageId;
   }, [shop]);
 
-  const getPrizeImg = React.useCallback((packageId) => (
-    packageId==='autofish_week' ? '/app/assets/baits/autofish.png' : `/app/assets/baits/${packageId}.png`
-  ), []);
+  const getPrizeImg = React.useCallback((packageId) => {
+    if(!packageId) return '';
+    return String(packageId).startsWith('autofish')
+      ? '/app/assets/shop/autofish.png'
+      : `/app/assets/shop/${packageId}.png`;
+  }, []);
 
   const renderPrizeHint = (rank, prize) => (
     prizeHint?.rank===rank && (
@@ -95,17 +99,35 @@ function TournamentsTab({
               <div className="space-y-2">
                 {currentPrizeLeaderboard.map(e=> {
                   const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
+                  const catchData = (e.catchId && e.fish) ? {
+                    id: e.catchId,
+                    fish: e.fish,
+                    weight: e.value,
+                    location: e.location,
+                    at: e.at ? new Date(e.at*1000).toISOString() : null,
+                    user: e.user || '-',
+                    userId: e.userId,
+                  } : null;
                   return (
                   <div
                     key={e.rank}
                     id={isMine ? 'current-tournament-mine' : undefined}
                     className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
-                    onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                    onClick={()=>{ if(catchData && onCatchClick){ onCatchClick(catchData); } }}
                   >
                     <div className="flex items-center gap-2 w-full min-w-0">
                       <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                         <span>{e.rank}</span>
-                        {e.prize && <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                        {e.prize && (
+                          <button
+                            type="button"
+                            onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
+                            aria-label={t('prizes')}
+                          >
+                            <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          </button>
+                        )}
                       </div>
                       {currentTournament.tournament.metric==='count' ? (
                         <div className="w-8 h-8"></div>
@@ -144,16 +166,35 @@ function TournamentsTab({
                 </div>
                 );
                 })}
-                {currentTournament.mine && currentTournament.mine.rank>currentPrizeCount && (
+                {currentTournament.mine && currentTournament.mine.rank>currentPrizeCount && (()=>{
+                  const mineCatch = (currentTournament.mine.catchId && currentTournament.mine.fish) ? {
+                    id: currentTournament.mine.catchId,
+                    fish: currentTournament.mine.fish,
+                    weight: currentTournament.mine.value,
+                    location: currentTournament.mine.location,
+                    at: currentTournament.mine.at ? new Date(currentTournament.mine.at*1000).toISOString() : null,
+                    user: currentTournament.mine.user || t('you'),
+                    userId: currentTournament.mine.userId,
+                  } : null;
+                  return (
                   <div
                     id="current-tournament-mine"
                     className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===currentTournament.mine.rank ? 'z-10' : ''} border border-emerald-400`}
-                    onClick={ev=>{ev.stopPropagation(); if(currentTournament.mine.prize) setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}
+                    onClick={()=>{ if(mineCatch && onCatchClick){ onCatchClick(mineCatch); } }}
                   >
                     <div className="flex items-center gap-2 w-full min-w-0">
                       <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                         <span>{currentTournament.mine.rank}</span>
-                        {currentTournament.mine.prize && <img src={getPrizeImg(currentTournament.mine.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                        {currentTournament.mine.prize && (
+                          <button
+                            type="button"
+                            onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===currentTournament.mine.rank ? null : {rank:currentTournament.mine.rank, prize:currentTournament.mine.prize});}}
+                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
+                            aria-label={t('prizes')}
+                          >
+                            <img src={getPrizeImg(currentTournament.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          </button>
+                        )}
                       </div>
                       {currentTournament.tournament.metric==='count' ? (
                         <div className="w-8 h-8"></div>
@@ -190,7 +231,8 @@ function TournamentsTab({
                     </div>
                     {renderPrizeHint(currentTournament.mine.rank, currentTournament.mine.prize)}
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           )
@@ -229,17 +271,35 @@ function TournamentsTab({
             <div className="space-y-2">
                 {pastPrizeLeaderboard.map(e=> {
                 const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
+                const catchData = (e.catchId && e.fish) ? {
+                  id: e.catchId,
+                  fish: e.fish,
+                  weight: e.value,
+                  location: e.location,
+                  at: e.at ? new Date(e.at*1000).toISOString() : null,
+                  user: e.user || '-',
+                  userId: e.userId,
+                } : null;
                 return (
                 <div
                   key={e.rank}
                   id={isMine ? 'past-tournament-mine' : undefined}
                   className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===e.rank ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
-                  onClick={ev=>{ev.stopPropagation(); if(e.prize) setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                  onClick={()=>{ if(catchData && onCatchClick){ onCatchClick(catchData); } }}
                 >
                   <div className="flex items-center gap-2 w-full min-w-0">
                     <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                       <span>{e.rank}</span>
-                      {e.prize && <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                      {e.prize && (
+                        <button
+                          type="button"
+                          onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===e.rank ? null : {rank:e.rank, prize:e.prize});}}
+                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
+                          aria-label={t('prizes')}
+                        >
+                          <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                        </button>
+                      )}
                     </div>
                     {pastResult.tournament.metric==='count' ? (
                       <div className="w-8 h-8"></div>
@@ -278,16 +338,35 @@ function TournamentsTab({
               </div>
               );
               })}
-              {pastResult.mine && pastResult.mine.rank>pastPrizeCount && (
+              {pastResult.mine && pastResult.mine.rank>pastPrizeCount && (()=>{
+                const mineCatch = (pastResult.mine.catchId && pastResult.mine.fish) ? {
+                  id: pastResult.mine.catchId,
+                  fish: pastResult.mine.fish,
+                  weight: pastResult.mine.value,
+                  location: pastResult.mine.location,
+                  at: pastResult.mine.at ? new Date(pastResult.mine.at*1000).toISOString() : null,
+                  user: pastResult.mine.user || t('you'),
+                  userId: pastResult.mine.userId,
+                } : null;
+                return (
                 <div
                   id="past-tournament-mine"
                   className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===pastResult.mine.rank ? 'z-10' : ''} border border-emerald-400`}
-                  onClick={ev=>{ev.stopPropagation(); if(pastResult.mine.prize) setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}
+                  onClick={()=>{ if(mineCatch && onCatchClick){ onCatchClick(mineCatch); } }}
                 >
                   <div className="flex items-center gap-2 w-full min-w-0">
                     <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
                       <span>{pastResult.mine.rank}</span>
-                      {pastResult.mine.prize && <img src={getPrizeImg(pastResult.mine.prize.packageId)} alt="" className="w-6 h-6 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />}
+                      {pastResult.mine.prize && (
+                        <button
+                          type="button"
+                          onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===pastResult.mine.rank ? null : {rank:pastResult.mine.rank, prize:pastResult.mine.prize});}}
+                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
+                          aria-label={t('prizes')}
+                        >
+                          <img src={getPrizeImg(pastResult.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                        </button>
+                      )}
                     </div>
                     {pastResult.tournament.metric==='count' ? (
                       <div className="w-8 h-8"></div>
@@ -324,7 +403,8 @@ function TournamentsTab({
                   </div>
                   {renderPrizeHint(pastResult.mine.rank, pastResult.mine.prize)}
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         ) : (

@@ -48,10 +48,18 @@ function App(){
   const [nickOpen,setNickOpen] = React.useState(false);
   const [prize,setPrize] = React.useState(null);
   const [prizeHint,setPrizeHint] = React.useState(null);
+  const [catchDetails,setCatchDetails] = React.useState(null);
   const [dailyOpen,setDailyOpen] = React.useState(false);
   const [refOpen,setRefOpen] = React.useState(false);
   const [refInfo,setRefInfo] = React.useState(null);
   const [refRewards,setRefRewards] = React.useState(null);
+  const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
+  const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
+  const [coinInsufficientOpen, setCoinInsufficientOpen] = React.useState(false);
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+  const coinPurchasePriceLabel = coinPurchasePack
+    ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
+    : '';
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
@@ -76,6 +84,11 @@ function App(){
   const hasCatchAnimationBeenShown = React.useCallback(id => {
     if(id == null) return false;
     return lastCatchAnimationShownRef.current === id;
+  }, []);
+
+  const handleCatchClick = React.useCallback(data => {
+    if(!data) return;
+    setCatchDetails({...data});
   }, []);
 
   React.useEffect(()=>{
@@ -242,14 +255,14 @@ function App(){
             needsNickname:false,
             language:initLang,
             lures:[
-              {id:1,name:'Пресная мирная',qty:5,predator:false,water:'fresh',rarityBonus:0},
-              {id:2,name:'Пресная хищная',qty:5,predator:true,water:'fresh',rarityBonus:0},
-              {id:3,name:'Морская мирная',qty:5,predator:false,water:'salt',rarityBonus:0},
-              {id:4,name:'Морская хищная',qty:5,predator:true,water:'salt',rarityBonus:0},
-              {id:5,name:'Пресная мирная+',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
-              {id:6,name:'Пресная хищная+',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
-              {id:7,name:'Морская мирная+',qty:2,predator:false,water:'salt',rarityBonus:0.3},
-              {id:8,name:'Морская хищная+',qty:2,predator:true,water:'salt',rarityBonus:0.3},
+              {id:1,name:'Зерновая крошка',qty:5,predator:false,water:'fresh',rarityBonus:0},
+              {id:2,name:'Ручейный малек',qty:5,predator:true,water:'fresh',rarityBonus:0},
+              {id:3,name:'Морская водоросль',qty:5,predator:false,water:'salt',rarityBonus:0},
+              {id:4,name:'Кольца кальмара',qty:5,predator:true,water:'salt',rarityBonus:0},
+              {id:5,name:'Луговой червь',qty:2,predator:false,water:'fresh',rarityBonus:0.3},
+              {id:6,name:'Серебряный живец',qty:2,predator:true,water:'fresh',rarityBonus:0.3},
+              {id:7,name:'Неоновый планктон',qty:2,predator:false,water:'salt',rarityBonus:0.3},
+              {id:8,name:'Королевская креветка',qty:2,predator:true,water:'salt',rarityBonus:0.3},
             ],
             currentLureId:1,
             totalWeight:0, todayWeight:0, locationId:1,
@@ -260,6 +273,8 @@ function App(){
             ],
             caughtFishIds:[],
             recent:[], dailyAvailable:true, dailyStreak:0, dailyRewards:[],
+            coins:0,
+            todayCoins:0,
           });
           setShop([]);
         }
@@ -388,6 +403,90 @@ function App(){
     }
   }
 
+  async function buyPackWithCoins(id){
+    setError(null);
+    try{
+      const r = await fetch(`/api/shop/${id}/coins`,{method:'POST',credentials:'include'});
+      if(!r.ok){
+        if(r.status===401) throw new Error('unauthorized');
+        let data = null;
+        try{ data = await r.json(); }catch(err){}
+        if(data?.error==='not_enough_coins') throw new Error('not_enough_coins');
+        if(data?.error==='coin_purchase_unavailable') throw new Error('coin_unavailable');
+        throw new Error('purchase_failed');
+      }
+      try{
+        const meResp = await fetch(`/api/me`,{credentials:'include'});
+        if(meResp.ok){
+          setMe(await meResp.json());
+        }
+      }catch(err){}
+      try{
+        const shopResp = await fetch(`/api/shop`,{credentials:'include'});
+        if(shopResp.ok){
+          setShop(await shopResp.json());
+        }
+      }catch(err){}
+      return true;
+    }catch(e){
+      if(e.message==='unauthorized'){
+        setError(t('authRequired'));
+      }else if(e.message==='not_enough_coins'){
+        setCoinPurchasePack(null);
+        setCoinInsufficientOpen(true);
+      }else{
+        setError(t('purchaseFailed'));
+      }
+      return false;
+    }
+  }
+
+  function requestCoinPurchase(id){
+    if(!Array.isArray(shop) || shop.length===0) return;
+    let pack = null;
+    for(const category of shop){
+      if(!category?.packs) continue;
+      const found = category.packs.find(p=>p.id===id);
+      if(found){
+        pack = found;
+        break;
+      }
+    }
+    if(pack && typeof pack.coinPrice === 'number'){
+      const currentCoins = typeof me?.coins === 'number' ? me.coins : null;
+      if(currentCoins != null && currentCoins < Number(pack.coinPrice)){
+        setCoinPurchaseProcessing(false);
+        setCoinPurchasePack(null);
+        setCoinInsufficientOpen(true);
+        return;
+      }
+      setCoinPurchaseProcessing(false);
+      setCoinPurchasePack(pack);
+    }
+  }
+
+  function closeCoinPurchaseModal(){
+    if(coinPurchaseProcessing) return;
+    setCoinPurchasePack(null);
+  }
+
+  function closeInsufficientCoinsModal(){
+    setCoinInsufficientOpen(false);
+  }
+
+  async function confirmCoinPurchase(){
+    if(!coinPurchasePack || coinPurchaseProcessing) return;
+    setCoinPurchaseProcessing(true);
+    try{
+      const success = await buyPackWithCoins(coinPurchasePack.id);
+      if(success){
+        setCoinPurchasePack(null);
+      }
+    }finally{
+      setCoinPurchaseProcessing(false);
+    }
+  }
+
   async function selectLocation(id){
     setError(null);
     try{
@@ -473,19 +572,29 @@ function App(){
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const animationId = ++catchAnimationIdRef.current;
-        setResult({...c,newFish:isNewFish,newLocations:newLocs,newRods,animationId});
-        setMe(p=>{
-          const tot = (p.totalWeight||0)+c.weight;
-          return {
-            ...p,
-            totalWeight:tot,
-            todayWeight:(p.todayWeight||0)+c.weight,
-            locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
-            rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
-            recent:[{fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
-            caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
-          };
+        setResult({
+          ...c,
+          coins: typeof d.coins === 'number' ? d.coins : 0,
+          todayCoins: typeof d.todayCoins === 'number' ? d.todayCoins : undefined,
+          totalCoins: typeof d.totalCoins === 'number' ? d.totalCoins : undefined,
+          newFish:isNewFish,newLocations:newLocs,newRods,animationId
         });
+            setMe(p=>{
+              const tot = (p.totalWeight||0)+c.weight;
+              const totalCoins = typeof d.totalCoins === 'number' ? d.totalCoins : p.coins;
+              const todayCoins = typeof d.todayCoins === 'number' ? d.todayCoins : p.todayCoins;
+              return {
+                ...p,
+                totalWeight:tot,
+                todayWeight:(p.todayWeight||0)+c.weight,
+                coins: totalCoins,
+                todayCoins: todayCoins,
+                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
+                recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
+                caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
+              };
+            });
         try{
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
           if(ct.status===200){
@@ -759,6 +868,60 @@ function App(){
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
         {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
+        {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
+        {coinPurchasePack && (
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
+            onClick={()=>{ if(!coinPurchaseProcessing) closeCoinPurchaseModal(); }}
+          >
+            <div
+              className="glass p-5 rounded-xl max-w-xs w-[90%] text-center animate-pop"
+              onClick={e=>e.stopPropagation()}
+            >
+              <div className="text-lg font-semibold mb-2">{t('confirmCoinPurchaseTitle')}</div>
+              <div className="text-sm opacity-80">
+                {t('confirmCoinPurchaseText', {
+                  name: coinPurchasePack.name || coinPurchasePack.id,
+                  price: coinPurchasePriceLabel
+                })}
+              </div>
+              <div className="flex gap-3 mt-5 text-sm">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:hover:bg-red-600"
+                  onClick={closeCoinPurchaseModal}
+                  disabled={coinPurchaseProcessing}
+                >{t('cancel')}</button>
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60 disabled:hover:bg-yellow-400"
+                  onClick={confirmCoinPurchase}
+                  disabled={coinPurchaseProcessing}
+                >{t('confirmCoinPurchaseButton', coinPurchasePriceLabel)}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {coinInsufficientOpen && (
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/70 z-50"
+            onClick={closeInsufficientCoinsModal}
+          >
+            <div
+              className="glass p-5 rounded-xl max-w-xs w-[90%] text-center animate-pop"
+              onClick={e=>e.stopPropagation()}
+            >
+              <div className="text-lg font-semibold mb-2">{t('notEnoughCoinsTitle')}</div>
+              <div className="text-sm opacity-80 mb-4">{t('notEnoughCoins')}</div>
+              <button
+                type="button"
+                className="w-full px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                onClick={closeInsufficientCoinsModal}
+              >{t('close')}</button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (
@@ -776,13 +939,13 @@ function App(){
               onTap={handleTap}
               result={result}
               error={error}
-              onClaimDaily={openDaily}
               autoCast={autoCast}
               setAutoCast={setAutoCast}
               autoCastRef={autoCastRef}
               autoCastTimeoutRef={autoCastTimeoutRef}
               hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
               markCatchAnimationShown={markCatchAnimationShown}
+              onCatchClick={handleCatchClick}
             />
           )}
 
@@ -800,10 +963,11 @@ function App(){
               prizeHint={prizeHint}
               setPrizeHint={setPrizeHint}
               shop={shop}
+              onCatchClick={handleCatchClick}
             />
           )}
-          {tab === 'achievements' && (
-            <Achievements me={me} setMe={setMe} />
+          {tab === 'ratings' && (
+            <Ratings me={me} setMe={setMe} onCatchClick={handleCatchClick} />
           )}
           {tab === 'shop' && (
             <ShopTab
@@ -815,6 +979,9 @@ function App(){
               generateRefLink={generateRefLink}
               starterPackName={starterPackName}
               buyPack={buyPack}
+              dailyAvailable={me.dailyAvailable}
+              onOpenDaily={openDaily}
+              onCoinPurchaseRequest={requestCoinPurchase}
             />
           )}
           {tab === 'guide' && (
@@ -822,7 +989,7 @@ function App(){
           )}
         </div>
 
-        <BottomNav tab={tab} setTab={setTab} />
+        <BottomNav tab={tab} setTab={setTab} dailyAvailable={me.dailyAvailable} />
 
         <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
         <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
