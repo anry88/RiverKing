@@ -48,8 +48,20 @@ class FishingServiceTest {
     fun baseEscapeChanceProgressesByLocation() {
         val svc = newService("testdb_fish_escape")
         transaction {
-            val ids = Locations.selectAll().orderBy(Locations.unlockKg).map { it[Locations.id].value }
-            ids.forEachIndexed { idx, id ->
+            val idsByInsertion = Locations.selectAll().orderBy(Locations.id).map { it[Locations.id].value }
+            // Shuffle unlock weights so that the ID order is no longer the same as the unlock order.
+            idsByInsertion.reversed().forEachIndexed { idx, id ->
+                Locations.update({ Locations.id eq id }) {
+                    it[Locations.unlockKg] = (idx + 1) * 10.0
+                }
+            }
+
+            val idsByUnlock = Locations
+                .selectAll()
+                .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+                .map { it[Locations.id].value }
+
+            idsByUnlock.forEachIndexed { idx, id ->
                 val expected = (0.05 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }

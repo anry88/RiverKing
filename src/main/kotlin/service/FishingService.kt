@@ -1216,9 +1216,13 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun locationTier(locId: Long): Int {
-        val unlock = Locations.select { Locations.id eq locId }.single()[Locations.unlockKg]
-        val rank = Locations.select { Locations.unlockKg lessEq unlock }.count()
-        return ((rank - 1).coerceAtLeast(0L)).toInt()
+        val ordered = Locations
+            .slice(Locations.id, Locations.unlockKg)
+            .selectAll()
+            .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+            .mapIndexed { index, row -> row[Locations.id].value to index }
+            .toMap()
+        return ordered[locId] ?: 0
     }
 
     internal fun baseEscapeChance(locId: Long): Double {
