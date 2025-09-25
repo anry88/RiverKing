@@ -348,7 +348,12 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8} ],
     [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:8}, {name:'Луговой червь',qty:1} ],
     [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:10} ],
-    [ {name:'Зерновая крошка',qty:12}, {name:'Ручейный малек',qty:12}, {name:'Серебряный живец',qty:1} ],
+    [
+      {name:'Зерновая крошка',qty:12},
+      {name:'Ручейный малек',qty:12},
+      {name:'Луговой червь',qty:1},
+      {name:'Серебряный живец',qty:1},
+    ],
   ];
   const displayRewards = (rewards && rewards.length ? rewards : defaultRewards);
   const totalDays = displayRewards.length;
