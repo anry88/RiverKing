@@ -19,7 +19,7 @@ object CoinCalculator {
     fun baseCoins(weightKg: Double, rarity: String, locationTier: Int, water: String): Int {
         val rarityCoef = rarityCoefficients[rarity] ?: 1.0
         val sizeFactor = min(ln(1.0 + weightKg) * 1.8, 8.0)
-        val locationFactor = 1.0 + 0.12 * locationTier.coerceAtLeast(0)
+        val locationFactor = 1.0 + 0.05 * locationTier.coerceAtLeast(0)
         val waterFactor = if (water == "salt") 1.15 else 1.0
         val raw = BASE * rarityCoef * sizeFactor * locationFactor * waterFactor
         return ceil(raw).toInt().coerceAtLeast(0)
