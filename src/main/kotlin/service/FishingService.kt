@@ -597,13 +597,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     fun guide(lang: String): GuideDTO = transaction {
-        fun rarityRank(r: String) = when(r) {
+        fun rarityRank(r: String) = when (r) {
             "common" -> 0
             "uncommon" -> 1
             "rare" -> 2
             "epic" -> 3
-            "legendary" -> 4
-            else -> 5
+            "mythic" -> 4
+            "legendary" -> 5
+            else -> 6
         }
 
         // Locations with fish and possible lures, ordered by unlock requirement
@@ -1240,6 +1241,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         "uncommon" -> 0.6 + 0.3 * factor
         "rare" -> 0.3 + 0.4 * factor
         "epic" -> 0.2 + 0.3 * factor
+        "mythic" -> 0.15 + 0.25 * factor
         "legendary" -> 0.1 + 0.2 * factor
         else -> 1.0
     }
@@ -1539,7 +1541,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun rarityRank(r: String) = when (r) {
-        "legendary" -> 5
+        "legendary" -> 6
+        "mythic" -> 5
         "epic" -> 4
         "rare" -> 3
         "uncommon" -> 2

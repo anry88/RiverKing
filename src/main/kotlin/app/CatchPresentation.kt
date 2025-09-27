@@ -167,6 +167,7 @@ val RARITY_LABELS = mapOf(
         "uncommon" to "Необычная",
         "rare" to "Редкая",
         "epic" to "Эпическая",
+        "mythic" to "Мифическая",
         "legendary" to "Легендарная",
     ),
     "en" to mapOf(
@@ -174,6 +175,7 @@ val RARITY_LABELS = mapOf(
         "uncommon" to "Uncommon",
         "rare" to "Rare",
         "epic" to "Epic",
+        "mythic" to "Mythic",
         "legendary" to "Legendary",
     ),
 )
@@ -183,6 +185,7 @@ private val RARITY_COLORS = mapOf(
     "uncommon" to Color(0x34, 0xD3, 0x99),
     "rare" to Color(0x60, 0xA5, 0xFA),
     "epic" to Color(0xC0, 0x84, 0xFC),
+    "mythic" to Color(0xE6, 0x4B, 0x5C),
     "legendary" to Color(0xFA, 0xCC, 0x15),
 )
 

@@ -369,6 +369,36 @@ object DB {
         val fCoralTrt = upsertFish("Коралловая форель", "epic", 5.0, 2.0, true, "salt")
         val fTitanTrig= upsertFish("Спинорог-титан", "rare", 3.0, 1.0, true, "salt")
 
+        // === MYTHIC: виды между epic и legendary ===
+        // Пруд
+        val fMyKoi        = upsertFish("Кои (Кохаку)", "mythic", 2.5, 1.2, false, "fresh")
+        // Болото
+        val fMySnakehead  = upsertFish("Змееголов северный", "mythic", 4.0, 2.0, true, "fresh")
+        // Река
+        val fMyAmurPike   = upsertFish("Амурская щука", "mythic", 5.0, 2.0, true, "fresh")
+        // Озеро
+        val fMyLakeTrout  = upsertFish("Кристивомер", "mythic", 10.0, 5.0, true, "fresh")
+        // Горная река — мифик вместо "Кунджа"
+        val fMyHuchen     = upsertFish("Дунайский лосось", "mythic", 10.0, 4.0, true, "fresh")
+        // Водохранилище
+        val fMyBlackCarp  = upsertFish("Чёрный амур", "mythic", 12.0, 5.0, false, "fresh")
+        // Дельта реки (солоноватая)
+        val fMyPelingas   = upsertFish("Пеленгас", "mythic", 3.0, 1.2, false, "salt")
+        // Прибрежье моря
+        val fMyCubera     = upsertFish("Кубера", "mythic", 12.0, 5.0, true, "salt")
+        // Фьорд
+        val fMyWolffish   = upsertFish("Зубатка пятнистая", "mythic", 8.0, 3.0, true, "salt")
+        // Открытый океан
+        val fMyYFTuna     = upsertFish("Тунец желтоперый", "mythic", 50.0, 20.0, true, "salt")
+        // Амазонка
+        val fMyZungaro    = upsertFish("Зунгаро", "mythic", 25.0, 10.0, true, "fresh")
+        // Игапо
+        val fMyMotoro     = upsertFish("Скат моторо", "mythic", 12.0, 5.0, true, "fresh")
+        // Мангровые
+        val fMyBlackSnook = upsertFish("Чёрный снук", "mythic", 8.0, 3.0, true, "salt")
+        // Коралловые отмели
+        val fMyNapoleon   = upsertFish("Рыба-наполеон", "mythic", 35.0, 15.0, true, "salt")
+
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)
         upsertRod("dew",   "Роса",  15.0, "fresh", false)
@@ -383,6 +413,7 @@ object DB {
         setLFWeight(pond, fL, 0.4); setLFWeight(pond, fKa, 0.15)
         setLFWeight(pond, fUk, 0.7); setLFWeight(pond, fLi, 0.2); setLFWeight(pond, fRo, 0.6); setLFWeight(pond, fSh, 0.12)
         setLFWeight(pond, fEel, 0.06); setLFWeight(pond, fSo, 0.03)
+        setLFWeight(pond, fMyKoi, 0.040)
         setLFWeight(pond, fPe, 0.7); setLFWeight(pond, fEr, 0.6); setLFWeight(pond, fGu2, 0.5); setLFWeight(pond, fKr2, 0.7); setLFWeight(pond, fVh, 0.5)
 
         // Река
@@ -390,6 +421,7 @@ object DB {
         setLFWeight(river, fSh, 0.25); setLFWeight(river, fSo, 0.10); setLFWeight(river, fGo, 0.5)
         setLFWeight(river, fJe, 0.3); setLFWeight(river, fZu, 0.4); setLFWeight(river, fNa, 0.2)
         setLFWeight(river, fKa, 0.15); setLFWeight(river, fEel, 0.10); setLFWeight(river, fSter, 0.05); setLFWeight(river, fOs, 0.02)
+        setLFWeight(river, fMyAmurPike, 0.035)
         setLFWeight(river, fPe, 0.6); setLFWeight(river, fEr, 0.5); setLFWeight(river, fEl2, 0.4); setLFWeight(river, fKr2, 0.5); setLFWeight(river, fYa2, 0.25)
 
         // Озеро
@@ -397,17 +429,20 @@ object DB {
         setLFWeight(lake, fSh, 0.35); setLFWeight(lake, fKa, 0.3); setLFWeight(lake, fOs, 0.05)
         setLFWeight(lake, fSi, 0.35); setLFWeight(lake, fTo, 0.25); setLFWeight(lake, fGa, 0.2)
         setLFWeight(lake, fSo, 0.12); setLFWeight(lake, fEel, 0.08)
+        setLFWeight(lake, fMyLakeTrout, 0.040)
         setLFWeight(lake, fGu2, 0.6); setLFWeight(lake, fKr2, 0.6); setLFWeight(lake, fEr, 0.4); setLFWeight(lake, fPe, 0.5); setLFWeight(lake, fEl2, 0.3); setLFWeight(lake, fYa2, 0.2)
 
         // Болото
         setLFWeight(swamp, fK, 1.3); setLFWeight(swamp, fLi, 1.0); setLFWeight(swamp, fRo, 0.9)
         setLFWeight(swamp, fP, 0.5); setLFWeight(swamp, fO, 0.4); setLFWeight(swamp, fSh, 0.25); setLFWeight(swamp, fKa, 0.3)
         setLFWeight(swamp, fEel, 0.15); setLFWeight(swamp, fSo, 0.05)
+        setLFWeight(swamp, fMySnakehead, 0.040)
         setLFWeight(swamp, fGu2, 0.7); setLFWeight(swamp, fKr2, 0.8); setLFWeight(swamp, fEr, 0.4); setLFWeight(swamp, fPe, 0.4); setLFWeight(swamp, fVh, 0.5)
 
         // Горная река (с эпиками)
         setLFWeight(mtnRiver, fHa, 0.9); setLFWeight(mtnRiver, fFr, 0.8); setLFWeight(mtnRiver, fNa, 0.4); setLFWeight(mtnRiver, fGo, 0.3)
         setLFWeight(mtnRiver, fArc, 0.06); setLFWeight(mtnRiver, fKum, 0.06) // EPIC
+        setLFWeight(mtnRiver, fMyHuchen, 0.055) // вес спавна между epic (0.06) и legendary (0.05)
         setLFWeight(mtnRiver, fTa, 0.05) // легенда
         setLFWeight(mtnRiver, fEl2, 0.35); setLFWeight(mtnRiver, fPe, 0.35); setLFWeight(mtnRiver, fGly, 0.45); setLFWeight(mtnRiver, fSi, 0.10)
 
@@ -416,6 +451,7 @@ object DB {
         setLFWeight(reservoir, fKa, 0.5); setLFWeight(reservoir, fTo, 0.5); setLFWeight(reservoir, fSo, 0.22)
         setLFWeight(reservoir, fP, 0.4); setLFWeight(reservoir, fO, 0.4); setLFWeight(reservoir, fGa, 0.3)
         setLFWeight(reservoir, fSter, 0.03); setLFWeight(reservoir, fOs, 0.01)
+        setLFWeight(reservoir, fMyBlackCarp, 0.035)
         setLFWeight(reservoir, fGu2, 0.4); setLFWeight(reservoir, fEr, 0.3); setLFWeight(reservoir, fPe, 0.35); setLFWeight(reservoir, fYa2, 0.35)
 
         // Дельта реки (солоноватая)
@@ -424,6 +460,7 @@ object DB {
         setLFWeight(delta, fMu, 0.45); setLFWeight(delta, fHe, 0.35); setLFWeight(delta, fSm, 0.25)
         setLFWeight(delta, fSar, 0.25); setLFWeight(delta, fAnc, 0.20)
         setLFWeight(delta, fBas, 0.18); setLFWeight(delta, fSal, 0.12); setLFWeight(delta, fBel, 0.01)
+        setLFWeight(delta, fMyPelingas, 0.040)
         setLFWeight(delta, fBy2, 0.50); setLFWeight(delta, fKi2, 0.25); setLFWeight(delta, fMo2, 0.20)
         setLFWeight(delta, fKr2, 0.35); setLFWeight(delta, fPe, 0.25)
         // cross-seed (новые)
@@ -438,6 +475,7 @@ object DB {
         setLFWeight(coast, fDor, 0.03); setLFWeight(coast, fWah, 0.02); setLFWeight(coast, fSail, 0.01)
         setLFWeight(coast, fBel, 0.01)
         setLFWeight(coast, fTur, 0.02) // редкий мирный трофей
+        setLFWeight(coast, fMyCubera, 0.045)
         // cross-seed (новые)
         setLFWeight(coast, fNeedle, 0.30)
         setLFWeight(coast, fTreBlue, 0.05)
@@ -451,12 +489,14 @@ object DB {
         setLFWeight(amazon, fAncF, 0.60); setLFWeight(amazon, fOtoF, 0.70); setLFWeight(amazon, fNeon, 0.85); setLFWeight(amazon, fTern, 0.50)
         setLFWeight(amazon, fArap, 0.03); setLFWeight(amazon, fPirRB, 0.60); setLFWeight(amazon, fTraira, 0.25)
         setLFWeight(amazon, fAcestr, 0.20); setLFWeight(amazon, fEEel, 0.05); setLFWeight(amazon, fRTC, 0.05); setLFWeight(amazon, fPiraiba, 0.02)
+        setLFWeight(amazon, fMyZungaro, 0.040)
 
         // Игапо, затопленный лес
         setLFWeight(igapo, fDiscus, 0.05); setLFWeight(igapo, fScalar, 0.60); setLFWeight(igapo, fAgass, 0.60)
         setLFWeight(igapo, fCard, 0.85); setLFWeight(igapo, fPanda, 0.45); setLFWeight(igapo, fNanno, 0.85); setLFWeight(igapo, fRam, 0.20)
         setLFWeight(igapo, fBArow, 0.03); setLFWeight(igapo, fOscar, 0.25); setLFWeight(igapo, fAimara, 0.06)
         setLFWeight(igapo, fPSur, 0.05); setLFWeight(igapo, fPirBlack, 0.18); setLFWeight(igapo, fPikeCic, 0.20); setLFWeight(igapo, fPeacock, 0.06)
+        setLFWeight(igapo, fMyMotoro, 0.040)
         // пересечения с Руслом
         setLFWeight(igapo, fTamb, 0.02); setLFWeight(igapo, fPacuB, 0.12); setLFWeight(igapo, fEEel, 0.02)
 
@@ -465,12 +505,14 @@ object DB {
         setLFWeight(mangrove, fAnchTrop, 0.90); setLFWeight(mangrove, fSardInd, 0.80); setLFWeight(mangrove, fRabbit, 0.20); setLFWeight(mangrove, fGobyMang, 0.60)
         setLFWeight(mangrove, fBarra, 0.08); setLFWeight(mangrove, fSnook, 0.25); setLFWeight(mangrove, fSnapMang, 0.25)
         setLFWeight(mangrove, fTarpon, 0.03); setLFWeight(mangrove, fSeaCat, 0.50); setLFWeight(mangrove, fNeedle, 0.40); setLFWeight(mangrove, fTreBlue, 0.06)
+        setLFWeight(mangrove, fMyBlackSnook, 0.045)
 
         // Коралловые отмели
         setLFWeight(coralFlats, fParrot, 0.55); setLFWeight(coralFlats, fEmperor, 0.08); setLFWeight(coralFlats, fBlueTang, 0.25)
         setLFWeight(coralFlats, fButterThrd, 0.50); setLFWeight(coralFlats, fDamselBlue, 0.90); setLFWeight(coralFlats, fFusYellow, 0.85); setLFWeight(coralFlats, fGoatTrop, 0.50)
         setLFWeight(coralFlats, fBarraBig, 0.06); setLFWeight(coralFlats, fTreGiant, 0.03); setLFWeight(coralFlats, fPermit, 0.08)
         setLFWeight(coralFlats, fAlbula, 0.25); setLFWeight(coralFlats, fSpanMack, 0.25); setLFWeight(coralFlats, fCoralTrt, 0.06); setLFWeight(coralFlats, fTitanTrig, 0.22)
+        setLFWeight(coralFlats, fMyNapoleon, 0.045)
 
         // Фьорд — мирные и хищные
         setLFWeight(fjord, fFl, 0.60)
@@ -478,6 +520,7 @@ object DB {
         setLFWeight(fjord, fHe, 0.60); setLFWeight(fjord, fSar, 0.12); setLFWeight(fjord, fAnc, 0.08)
         setLFWeight(fjord, fCo, 0.70); setLFWeight(fjord, fSa, 0.55); setLFWeight(fjord, fSe, 0.35)
         setLFWeight(fjord, fHa2, 0.06); setLFWeight(fjord, fSal, 0.10)
+        setLFWeight(fjord, fMyWolffish, 0.070)
         setLFWeight(fjord, fSm, 0.12)
         setLFWeight(fjord, fTur, 0.08)
         setLFWeight(fjord, fMo2, 0.20); setLFWeight(fjord, fKi2, 0.20); setLFWeight(fjord, fBy2, 0.10)
@@ -487,6 +530,7 @@ object DB {
         setLFWeight(openOcean, fDor, 0.60); setLFWeight(openOcean, fWah, 0.50)
         setLFWeight(openOcean, fSail, 0.18); setLFWeight(openOcean, fSwf, 0.16); setLFWeight(openOcean, fMak, 0.10)
         setLFWeight(openOcean, fBmr, 0.05); setLFWeight(openOcean, fTbf, 0.04); setLFWeight(openOcean, fAlb, 0.12)
+        setLFWeight(openOcean, fMyYFTuna, 0.090)
         setLFWeight(openOcean, fSar, 0.15); setLFWeight(openOcean, fAnc, 0.12)
         setLFWeight(openOcean, fSra, 0.35); setLFWeight(openOcean, fFly, 0.25)
         setLFWeight(openOcean, fMola, 0.06) // EPIC мирный
