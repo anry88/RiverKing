@@ -2270,7 +2270,7 @@ Available commands:
                                     log.error("sendMessage failed chatId={}", uid, e)
                                 }
                                 if (index < users.lastIndex) {
-                                    delay(30_000L)
+                                    delay(5_000L)
                                 }
                             }
                         }
