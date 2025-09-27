@@ -13,6 +13,7 @@ object CoinCalculator {
         "uncommon" to 2.0,
         "rare" to 4.0,
         "epic" to 7.0,
+        "mythic" to 9.5,
         "legendary" to 12.0,
     )
 

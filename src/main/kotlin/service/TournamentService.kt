@@ -203,7 +203,7 @@ class TournamentService {
     fun leaderboard(t: Tournament, userId: Long, limit: Int = 10): Pair<List<LeaderboardEntry>, LeaderboardEntry?> = transaction {
         var cond: Op<Boolean> = (Catches.createdAt greaterEq t.startTime) and (Catches.createdAt lessEq t.endTime)
         if (t.fish != null) {
-            val rarities = setOf("common", "uncommon", "rare", "epic", "legendary")
+            val rarities = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
             cond = cond and if (t.fish in rarities) (Fish.rarity eq t.fish) else (Fish.name eq t.fish)
         }
         if (t.location != null) cond = cond and (Locations.name eq t.location)

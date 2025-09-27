@@ -2120,7 +2120,7 @@ Available commands:
                             draft.end = d.atStartOfDay(ZoneOffset.UTC).toInstant()
                             draft.step = AdminStep.FISH
                             val current = draft.fish?.let { " (сейчас: $it)" } ?: ""
-                            try { bot.sendMessage(chatId, "Введите рыбу на русском или группу (common/legendary и т.д.) (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try { bot.sendMessage(chatId, "Введите рыбу на русском или группу (common/mythic/legendary и т.д.) (или '-' для любой)$current") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }

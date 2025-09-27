@@ -124,6 +124,20 @@ object I18n {
         "Испанская скумбрия" to "Spanish Mackerel",
         "Коралловая форель" to "Coral Trout",
         "Спинорог-титан" to "Titan Triggerfish",
+        "Кои (Кохаку)" to "Koi (Kohaku)",
+        "Змееголов северный" to "Northern Snakehead",
+        "Амурская щука" to "Amur Pike",
+        "Кристивомер" to "Lake Trout (Cristivomer)",
+        "Дунайский лосось" to "Danube Salmon (Huchen)",
+        "Чёрный амур" to "Black Amur",
+        "Пеленгас" to "Pelingas Mullet",
+        "Кубера" to "Cubera Snapper",
+        "Зубатка пятнистая" to "Spotted Wolffish",
+        "Тунец желтоперый" to "Yellowfin Tuna",
+        "Зунгаро" to "Zungaro Catfish",
+        "Скат моторо" to "Motoro Stingray",
+        "Чёрный снук" to "Black Snook",
+        "Рыба-наполеон" to "Napoleon Wrasse",
     )
 
     private val locations = mapOf(
