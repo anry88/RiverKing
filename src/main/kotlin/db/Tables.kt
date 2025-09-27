@@ -371,7 +371,7 @@ object DB {
 
         // === MYTHIC: виды между epic и legendary ===
         // Пруд
-        val fMyKoi        = upsertFish("Кои (Кохаку)", "mythic", 2.5, 1.2, false, "fresh")
+        val fMyKoi        = upsertFish("Карп кои (Кохаку)", "mythic", 2.5, 1.2, false, "fresh")
         // Болото
         val fMySnakehead  = upsertFish("Змееголов северный", "mythic", 4.0, 2.0, true, "fresh")
         // Река

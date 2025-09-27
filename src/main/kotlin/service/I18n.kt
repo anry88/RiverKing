@@ -124,7 +124,7 @@ object I18n {
         "Испанская скумбрия" to "Spanish Mackerel",
         "Коралловая форель" to "Coral Trout",
         "Спинорог-титан" to "Titan Triggerfish",
-        "Кои (Кохаку)" to "Koi (Kohaku)",
+        "Карп кои (Кохаку)" to "Koi (Kohaku)",
         "Змееголов северный" to "Northern Snakehead",
         "Амурская щука" to "Amur Pike",
         "Кристивомер" to "Lake Trout (Cristivomer)",
