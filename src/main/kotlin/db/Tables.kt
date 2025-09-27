@@ -413,7 +413,8 @@ object DB {
         setLFWeight(pond, fL, 0.4); setLFWeight(pond, fKa, 0.15)
         setLFWeight(pond, fUk, 0.7); setLFWeight(pond, fLi, 0.2); setLFWeight(pond, fRo, 0.6); setLFWeight(pond, fSh, 0.12)
         setLFWeight(pond, fEel, 0.06); setLFWeight(pond, fSo, 0.03)
-        setLFWeight(pond, fMyKoi, 0.040)
+//        setLFWeight(pond, fMyKoi, 0.040)
+        setLFWeight(pond, fMyKoi, 2.040)
         setLFWeight(pond, fPe, 0.7); setLFWeight(pond, fEr, 0.6); setLFWeight(pond, fGu2, 0.5); setLFWeight(pond, fKr2, 0.7); setLFWeight(pond, fVh, 0.5)
 
         // Река
