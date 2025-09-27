@@ -46,10 +46,30 @@
   tg?.setHeaderColor?.('secondary_bg_color');
   tg?.setBottomBarColor?.('bg_color');
 
-  const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
+  const rarityColors = {
+    uncommon: 'text-green-400',
+    rare: 'text-blue-400',
+    epic: 'text-purple-400',
+    mythic: 'text-rose-400',
+    legendary: 'text-yellow-400'
+  };
   const rarityNames = {
-    ru: { common: 'Простая', uncommon: 'Необычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' },
-    en: { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
+    ru: {
+      common: 'Простая',
+      uncommon: 'Необычная',
+      rare: 'Редкая',
+      epic: 'Эпическая',
+      mythic: 'Мифическая',
+      legendary: 'Легендарная'
+    },
+    en: {
+      common: 'Common',
+      uncommon: 'Uncommon',
+      rare: 'Rare',
+      epic: 'Epic',
+      mythic: 'Mythic',
+      legendary: 'Legendary'
+    }
   };
   const LURE_INFO = {
     'Пресная мирная': {
