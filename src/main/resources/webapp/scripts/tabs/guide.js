@@ -2,6 +2,7 @@ function Guide({me}){
   const [section,setSection] = React.useState('locations');
   const [data,setData] = React.useState(null);
   const [error,setError] = React.useState(null);
+  const [fishRarityFilter,setFishRarityFilter] = React.useState('all');
   const rodBonusText = React.useCallback((rod)=>{
     if(!rod || !rod.bonusWater) return t('rodNoBonus');
     if(rod.bonusWater==='fresh' && rod.bonusPredator) return t('rodBonusFreshPredator');
@@ -17,6 +18,34 @@ function Guide({me}){
       .then(setData)
       .catch(e=> setError(e===401 ? t('authRequired') : t('loadFailed')));
   },[me.language]);
+  React.useEffect(()=>{
+    setFishRarityFilter('all');
+  },[data?.fish, me.language]);
+  const rarityDisplayName = React.useCallback((rarity)=>{
+    const names = (window.rarityNames && window.rarityNames[me.language])
+      || (window.rarityNames && window.rarityNames.en)
+      || {};
+    return names[rarity] || rarity;
+  },[me.language]);
+  const fishRarityOptions = React.useMemo(()=>{
+    if(!data?.fish) return [];
+    const order = ['common','uncommon','rare','epic','mythic','legendary'];
+    const set = new Set();
+    data.fish.forEach(f=>{ if(f?.rarity) set.add(f.rarity); });
+    return Array.from(set).sort((a,b)=>{
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
+      if(ai===-1 && bi===-1) return a.localeCompare(b);
+      if(ai===-1) return 1;
+      if(bi===-1) return -1;
+      return ai-bi;
+    });
+  },[data?.fish]);
+  const filteredFish = React.useMemo(()=>{
+    if(!data?.fish) return [];
+    if(fishRarityFilter==='all') return data.fish;
+    return data.fish.filter(f=>f.rarity===fishRarityFilter);
+  },[data?.fish, fishRarityFilter]);
   if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
   if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
   return (
@@ -68,7 +97,22 @@ function Guide({me}){
       )}
       {section==='fish' && (
         <div className="space-y-4">
-          {data.fish.map(f=>{
+          {fishRarityOptions.length>0 && (
+            <div>
+              <div className="text-sm opacity-70 mb-1">{t('rarityFilterLabel')}</div>
+              <select
+                value={fishRarityFilter}
+                onChange={e=>setFishRarityFilter(e.target.value)}
+                className="w-full p-2 rounded-lg bg-black/20 border border-white/10"
+              >
+                <option value="all">{t('allRarities')}</option>
+                {fishRarityOptions.map(r=>(
+                  <option key={r} value={r}>{rarityDisplayName(r)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {filteredFish.map(f=>{
             const caught = (me.caughtFishIds||[]).includes(f.id);
             return (
               <div key={f.id} className="p-4 glass rounded-xl text-center">
