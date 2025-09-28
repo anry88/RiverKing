@@ -509,6 +509,7 @@ object DB {
         setLFWeight(river, fEpicPredatorFreshEelEuropean, 0.1)
         setLFWeight(river, fEpicPredatorFreshSom, 0.08)
         setLFWeight(river, fMythicPredatorFreshAmurPike, 0.03)
+        setLFWeight(river, fMythicPredatorFreshNorthSnakehead, 0.02)
 
         // Озеро мирные
         setLFWeight(lake, fCommonPeaceFreshKaras, 0.9)
@@ -602,7 +603,8 @@ object DB {
         setLFWeight(delta, fRarePeaceFreshTolstolobik, 0.3)
         setLFWeight(delta, fRarePeaceFreshWhiteAmur, 0.25)
         setLFWeight(delta, fEpicPeaceFreshSterlyad, 0.08)
-        setLFWeight(delta, fLegendaryPeaceFreshOsetr, 0.05)
+        setLFWeight(delta, fMythicPeaceFreshBlackAmur, 0.04)
+        setLFWeight(delta, fLegendaryPeaceFreshOsetr, 0.03)
 
         // Дельта реки пресная хищная
         setLFWeight(delta, fCommonPredatorFreshErsch, 0.9)
@@ -616,6 +618,7 @@ object DB {
         setLFWeight(delta, fRarePredatorSaltLavrak, 0.18)
         setLFWeight(delta, fEpicPredatorFreshSom, 0.12)
         setLFWeight(delta, fEpicPredatorFreshEelEuropean, 0.07)
+        setLFWeight(river, fMythicPredatorFreshAmurPike, 0.02)
 
         // Дельта реки соленая мирная
         setLFWeight(delta, fCommonPeaceSaltSeld, 0.9)
@@ -640,23 +643,36 @@ object DB {
         setLFWeight(delta, fEpicPredatorSaltLososAtlantic, 0.1)
         setLFWeight(delta, fLegendaryPredatorSaltBeluga, 0.02)
 
-        // Прибрежье моря
-        setLFWeight(coast, fUncommonPeaceSaltKefal, 0.9); setLFWeight(coast, fCommonPeaceSaltSeld, 0.9)
-        setLFWeight(coast, fUncommonPeaceSaltKambala, 0.6); setLFWeight(coast, fCommonPredatorSaltStavrida, 0.6); setLFWeight(coast, fRarePredatorSaltSeaForel, 0.3)
-        setLFWeight(coast, fCommonPeaceSaltSardina, 0.6); setLFWeight(coast, fCommonPeaceSaltAnchous, 0.5)
-        setLFWeight(coast, fUncommonPredatorSaltAtlanticSkumbria, 0.6); setLFWeight(coast, fRarePredatorSaltLavrak, 0.25); setLFWeight(coast, fEpicPredatorSaltLososAtlantic, 0.08)
-        setLFWeight(coast, fCommonPredatorSaltBychok, 0.35); setLFWeight(coast, fCommonPeaceSaltKilka, 0.30); setLFWeight(coast, fCommonPeaceSaltMoiva, 0.25); setLFWeight(coast, fCommonPredatorSaltKoryushka, 0.10)
-        setLFWeight(coast, fRarePredatorSaltDorado, 0.03); setLFWeight(coast, fRarePredatorSaltWahoo, 0.02); setLFWeight(coast, fEpicPredatorSaltParusnik, 0.01)
-        setLFWeight(coast, fLegendaryPredatorSaltBeluga, 0.01)
-        setLFWeight(coast, fEpicPeaceSaltTurbo, 0.02) // редкий мирный трофей
-        setLFWeight(coast, fMythicPredatorSaltCubera, 0.045)
-        // cross-seed (новые)
-        setLFWeight(coast, fUncommonPredatorSaltSeaSargan, 0.30)
-        setLFWeight(coast, fEpicPredatorSaltBlueKaranks, 0.05)
+        // Прибрежье моря мирная
+        setLFWeight(coast, fCommonPeaceSaltSeld, 0.9)
+        setLFWeight(coast, fCommonPeaceSaltSardina, 0.8);
+        setLFWeight(coast, fCommonPeaceSaltAnchous, 0.8)
+        setLFWeight(coast, fCommonPeaceSaltKilka, 0.8);
+        setLFWeight(coast, fCommonPeaceSaltMoiva, 0.7);
+        setLFWeight(coast, fUncommonPeaceSaltKefal, 0.5);
+        setLFWeight(coast, fUncommonPeaceSaltBarabulkaTropic, 0.5)
+        setLFWeight(coast, fUncommonPeaceSaltKambala, 0.35);
+        setLFWeight(coast, fEpicPeaceSaltTurbo, 0.08)
+        setLFWeight(coast, fMythicPeaceSaltPelingas, 0.04)
+
+        // Прибрежье моря хищная
+        setLFWeight(coast, fCommonPredatorSaltKoryushka, 0.9)
+        setLFWeight(coast, fCommonPredatorSaltBychok, 0.8)
+        setLFWeight(coast, fCommonPredatorSaltStavrida, 0.6)
+        setLFWeight(coast, fUncommonPredatorSaltAtlanticSkumbria, 0.5)
+        setLFWeight(coast, fUncommonPredatorSaltSeaSargan, 0.45)
+        setLFWeight(coast, fRarePredatorSaltSpanishSkumbria, 0.4)
+        setLFWeight(coast, fRarePredatorSaltDorado, 0.4)
+        setLFWeight(coast, fRarePredatorSaltSeaForel, 0.35)
+        setLFWeight(coast, fRarePredatorSaltLavrak, 0.3)
+        setLFWeight(coast, fRarePredatorSaltWahoo, 0.15)
+        setLFWeight(coast, fEpicPredatorSaltLososAtlantic, 0.1)
+        setLFWeight(coast, fEpicPredatorSaltParusnik, 0.04)
+        setLFWeight(coast, fEpicPredatorSaltBlueKaranks, 0.04)
         setLFWeight(coast, fEpicPredatorSaltBigBarracuda, 0.03)
-        setLFWeight(coast, fRarePredatorSaltSpanishSkumbria, 0.15)
-        setLFWeight(coast, fUncommonPeaceSaltBarabulkaTropic, 0.20)
-        setLFWeight(coast, fLegendaryPredatorSaltTarpon, 0.01)
+        setLFWeight(coast, fMythicPredatorSaltCubera, 0.04)
+        setLFWeight(coast, fLegendaryPredatorSaltBeluga, 0.02)
+        setLFWeight(coast, fLegendaryPredatorSaltTarpon, 0.02)
 
         // Русло Амазонки
         setLFWeight(amazon, fEpicPeaceFreshTambaki, 0.06); setLFWeight(amazon, fUncommonPeaceFreshPacuBlack, 0.40); setLFWeight(amazon, fCommonPeaceFreshProhilodus, 0.85)
@@ -680,6 +696,7 @@ object DB {
         setLFWeight(mangrove, fEpicPredatorSaltBarramundi, 0.08); setLFWeight(mangrove, fRarePredatorSaltSnook, 0.25); setLFWeight(mangrove, fRarePredatorSaltMangrovesLucian, 0.25)
         setLFWeight(mangrove, fLegendaryPredatorSaltTarpon, 0.03); setLFWeight(mangrove, fUncommonPredatorSaltSeaSom, 0.50); setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.40); setLFWeight(mangrove, fEpicPredatorSaltBlueKaranks, 0.06)
         setLFWeight(mangrove, fMythicPredatorSaltBlackSnook, 0.045)
+        setLFWeight(mangrove, fMythicPredatorSaltCubera, 0.04)
 
         // Коралловые отмели
         setLFWeight(coralFlats, fUncommonPeaceSaltParrotFish, 0.55); setLFWeight(coralFlats, fEpicPeaceSaltEmperorAngel, 0.08); setLFWeight(coralFlats, fRarePeaceSaltBlueHirurg, 0.25)
@@ -687,6 +704,7 @@ object DB {
         setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06); setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.03); setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
         setLFWeight(coralFlats, fRarePredatorSaltAlbula, 0.25); setLFWeight(coralFlats, fRarePredatorSaltSpanishSkumbria, 0.25); setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06); setLFWeight(coralFlats, fRarePredatorSaltTitanSpinorog, 0.22)
         setLFWeight(coralFlats, fMythicPredatorSaltNapoleonFish, 0.045)
+        setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
 
         // Фьорд — мирные и хищные
         setLFWeight(fjord, fUncommonPeaceSaltKambala, 0.60)
