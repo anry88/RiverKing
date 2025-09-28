@@ -166,19 +166,19 @@
   };
   const LOCATION_BG = {
     1: '/app/assets/backgrounds/pond.png',
-    2: '/app/assets/backgrounds/river.png',
-    3: '/app/assets/backgrounds/lake.png',
-    4: '/app/assets/backgrounds/swamp.png',
-    5: '/app/assets/backgrounds/mountain_river.png',
-    6: '/app/assets/backgrounds/reservoir.png',
+    2: '/app/assets/backgrounds/swamp.png',
+    3: '/app/assets/backgrounds/river.png',
+    4: '/app/assets/backgrounds/lake.png',
+    5: '/app/assets/backgrounds/reservoir.png',
+    6: '/app/assets/backgrounds/mountain_river.png',
     7: '/app/assets/backgrounds/river_delta.png',
     8: '/app/assets/backgrounds/sea_coast.png',
-    9: '/app/assets/backgrounds/fjord.png',
-    10: '/app/assets/backgrounds/open_ocean.png',
-    11: '/app/assets/backgrounds/amazon_riverbed.png',
-    12: '/app/assets/backgrounds/flooded_forest.png',
-    13: '/app/assets/backgrounds/mangroves.png',
-    14: '/app/assets/backgrounds/coral_flats.png',
+    9: '/app/assets/backgrounds/amazon_riverbed.png',
+    10: '/app/assets/backgrounds/flooded_forest.png',
+    11: '/app/assets/backgrounds/mangroves.png',
+    12: '/app/assets/backgrounds/coral_flats.png',
+    13: '/app/assets/backgrounds/fjord.png',
+    14: '/app/assets/backgrounds/open_ocean.png',
   };
 
   const normalizeLocationName = value => {
@@ -188,19 +188,19 @@
 
   const LOCATION_NAMES = {
     1: ['Пруд', 'Pond'],
-    2: ['Река', 'River'],
-    3: ['Озеро', 'Lake'],
-    4: ['Болото', 'Swamp'],
-    5: ['Горная река', 'Mountain River'],
-    6: ['Водохранилище', 'Reservoir'],
+    2: ['Болото', 'Swamp'],
+    3: ['Река', 'River'],
+    4: ['Озеро', 'Lake'],
+    5: ['Водохранилище', 'Reservoir'],
+    6: ['Горная река', 'Mountain River'],
     7: ['Дельта реки', 'River Delta'],
     8: ['Прибрежье моря', 'Sea Coast'],
-    9: ['Фьорд', 'Fjord'],
-    10: ['Открытый океан', 'Open Ocean'],
-    11: ['Русло Амазонки', 'Amazon Riverbed'],
-    12: ['Игапо, затопленный лес', 'Igapo Flooded Forest'],
-    13: ['Мангровые заросли', 'Mangroves'],
-    14: ['Коралловые отмели', 'Coral Flats'],
+    9: ['Русло Амазонки', 'Amazon Riverbed'],
+    10: ['Игапо, затопленный лес', 'Igapo Flooded Forest'],
+    11: ['Мангровые заросли', 'Mangroves'],
+    12: ['Коралловые отмели', 'Coral Flats'],
+    13: ['Фьорд', 'Fjord'],
+    14: ['Открытый океан', 'Open Ocean'],
   };
 
   const LOCATION_BG_BY_NAME = {};
@@ -219,6 +219,26 @@
       LOCATION_BG_BY_NAME[normalizedSlug] = url;
     }
   });
+
+  const getLocationBackground = (id, name) => {
+    if (name) {
+      const normalized = normalizeLocationName(name);
+      if (normalized && LOCATION_BG_BY_NAME[normalized]) {
+        return LOCATION_BG_BY_NAME[normalized];
+      }
+    }
+    const numId = Number(id);
+    if (Number.isFinite(numId) && LOCATION_BG[numId]) {
+      return LOCATION_BG[numId];
+    }
+    if (name) {
+      const slug = normalizeLocationName(String(name).replace(/_/g, ' '));
+      if (slug && LOCATION_BG_BY_NAME[slug]) {
+        return LOCATION_BG_BY_NAME[slug];
+      }
+    }
+    return null;
+  };
   const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
   const ROD_CONFIG = {
     spark: {
@@ -755,6 +775,7 @@
   window.getLureIcon = getLureIcon;
   window.LOCATION_BG = LOCATION_BG;
   window.LOCATION_BG_BY_NAME = LOCATION_BG_BY_NAME;
+  window.getLocationBackground = getLocationBackground;
   window.ROD_IMAGES = ROD_IMAGES;
   window.ROD_IMG = ROD_IMG;
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;

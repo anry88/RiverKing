@@ -398,7 +398,35 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     }
   }, [casting, shorePosRel, tipX, tweenTo, w]);
 
-  const bgUrl = LOCATION_BG[me.locationId] || LOCATION_BG[1];
+  const resolveLocationBg = React.useCallback((id, name) => {
+    if(typeof window.getLocationBackground === 'function'){
+      const bg = window.getLocationBackground(id, name);
+      if(bg) return bg;
+    }
+    const normalized = typeof name === 'string' ? name.trim().toLowerCase() : '';
+    if(normalized && window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]){
+      return window.LOCATION_BG_BY_NAME[normalized];
+    }
+    const numId = Number(id);
+    if(Number.isFinite(numId) && window.LOCATION_BG && window.LOCATION_BG[numId]){
+      return window.LOCATION_BG[numId];
+    }
+    return null;
+  }, []);
+
+  const currentLocation = React.useMemo(()=>{
+    if(!Array.isArray(me?.locations)) return null;
+    const targetId = Number(me?.locationId);
+    return me.locations.find(loc=> Number(loc.id) === targetId) || null;
+  }, [me?.locations, me?.locationId]);
+
+  const bgUrl = React.useMemo(()=>{
+    const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
+    if(byCurrent) return byCurrent;
+    const byIdOnly = resolveLocationBg(me.locationId, null);
+    if(byIdOnly) return byIdOnly;
+    return LOCATION_BG[1];
+  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
   const [bgLoaded, setBgLoaded] = React.useState(false);
   React.useEffect(() => {
     setBgLoaded(false);

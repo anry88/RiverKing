@@ -245,18 +245,29 @@ function CatchDetailsModal({catchData, me, onClose}){
   const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
   const locationBg = React.useMemo(()=>{
     if(catchData.locationBg) return catchData.locationBg;
-    const byId = catchData.locationId && window.LOCATION_BG ? window.LOCATION_BG[catchData.locationId] : null;
-    if(byId) return byId;
-    const locName = (catchData.location || '').trim();
-    if(!locName) return null;
-    const normalized = locName.toLowerCase();
-    if(window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]){
-      return window.LOCATION_BG_BY_NAME[normalized];
-    }
+    const resolver = typeof window.getLocationBackground === 'function'
+      ? window.getLocationBackground
+      : (id, name) => {
+          const normalized = typeof name === 'string' ? name.trim().toLowerCase() : '';
+          if (normalized && window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]) {
+            return window.LOCATION_BG_BY_NAME[normalized];
+          }
+          const numId = Number(id);
+          if (Number.isFinite(numId) && window.LOCATION_BG && window.LOCATION_BG[numId]) {
+            return window.LOCATION_BG[numId];
+          }
+          return null;
+        };
+    const direct = resolver(catchData.locationId, catchData.location);
+    if(direct) return direct;
     if(Array.isArray(me?.locations)){
-      const match = me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized);
-      if(match && window.LOCATION_BG && window.LOCATION_BG[match.id]){
-        return window.LOCATION_BG[match.id];
+      const normalized = typeof catchData.location === 'string' ? catchData.location.trim().toLowerCase() : '';
+      const match = normalized
+        ? me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized)
+        : me.locations.find(loc=> Number(loc.id) === Number(catchData.locationId));
+      if(match){
+        const resolved = resolver(match.id, match.name);
+        if(resolved) return resolved;
       }
     }
     return null;
