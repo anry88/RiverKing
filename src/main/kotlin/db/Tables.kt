@@ -737,7 +737,6 @@ object DB {
 
         // Мангровые заросли хищные
         setLFWeight(mangrove, fUncommonPredatorSaltBychokMangroves, 0.5)
-        setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.5)
         setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.4)
         setLFWeight(mangrove, fUncommonPredatorSaltSeaSom, 0.25)
         setLFWeight(mangrove, fRarePredatorSaltSnook, 0.20)
@@ -748,13 +747,27 @@ object DB {
         setLFWeight(mangrove, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(mangrove, fLegendaryPredatorSaltTarpon, 0.02)
 
-        // Коралловые отмели
-        setLFWeight(coralFlats, fUncommonPeaceSaltParrotFish, 0.55); setLFWeight(coralFlats, fEpicPeaceSaltEmperorAngel, 0.08); setLFWeight(coralFlats, fRarePeaceSaltBlueHirurg, 0.25)
-        setLFWeight(coralFlats, fUncommonPeaceSaltButterlyThreadnose, 0.50); setLFWeight(coralFlats, fCommonPeaceSaltBlueHrisiptera, 0.90); setLFWeight(coralFlats, fCommonPeaceSaltFusilerYellowTail, 0.85); setLFWeight(coralFlats, fUncommonPeaceSaltBarabulkaTropic, 0.50)
-        setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06); setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.03); setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
-        setLFWeight(coralFlats, fRarePredatorSaltAlbula, 0.25); setLFWeight(coralFlats, fRarePredatorSaltSpanishSkumbria, 0.25); setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06); setLFWeight(coralFlats, fRarePredatorSaltTitanSpinorog, 0.22)
+        // Коралловые отмели мирные
+        setLFWeight(coralFlats, fCommonPeaceSaltBlueHrisiptera, 0.9)
+        setLFWeight(coralFlats, fCommonPeaceSaltFusilerYellowTail, 0.85)
+        setLFWeight(coralFlats, fUncommonPeaceSaltBarabulkaTropic, 0.5)
+        setLFWeight(coralFlats, fUncommonPeaceSaltButterlyThreadnose, 0.5)
+        setLFWeight(coralFlats, fUncommonPeaceSaltParrotFish, 0.45)
+        setLFWeight(coralFlats, fRarePeaceSaltGoldenSigan, 0.3)
+        setLFWeight(coralFlats, fRarePeaceSaltBlueHirurg, 0.25)
+        setLFWeight(coralFlats, fEpicPeaceSaltEmperorAngel, 0.08)
+
+        // Коралловые отмели хищные
+        setLFWeight(coralFlats, fRarePredatorSaltSpanishSkumbria, 0.5)
+        setLFWeight(coralFlats, fRarePredatorSaltAlbula, 0.25)
+        setLFWeight(coralFlats, fRarePredatorSaltTitanSpinorog, 0.22)
+        setLFWeight(coralFlats, fRarePredatorSaltMangrovesLucian, 0.17)
+        setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
+        setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06)
+        setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06)
         setLFWeight(coralFlats, fMythicPredatorSaltNapoleonFish, 0.045)
         setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
+        setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.02)
 
         // Фьорд — мирные и хищные
         setLFWeight(fjord, fUncommonPeaceSaltKambala, 0.60)
