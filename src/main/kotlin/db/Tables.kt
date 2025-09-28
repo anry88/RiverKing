@@ -769,27 +769,52 @@ object DB {
         setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.02)
 
-        // Фьорд — мирные и хищные
-        setLFWeight(fjord, fUncommonPeaceSaltKambala, 0.60)
-        setLFWeight(fjord, fUncommonPeaceSaltPiksha, 0.50)
-        setLFWeight(fjord, fCommonPeaceSaltSeld, 0.60); setLFWeight(fjord, fCommonPeaceSaltSardina, 0.12); setLFWeight(fjord, fCommonPeaceSaltAnchous, 0.08)
-        setLFWeight(fjord, fRarePredatorSaltTreska, 0.70); setLFWeight(fjord, fUncommonPredatorSaltSaida, 0.55); setLFWeight(fjord, fRarePredatorSaltSeaForel, 0.35)
-        setLFWeight(fjord, fLegendaryPredatorSaltPaltus, 0.06); setLFWeight(fjord, fEpicPredatorSaltLososAtlantic, 0.10)
-        setLFWeight(fjord, fMythicPredatorSaltWolffish, 0.070)
-        setLFWeight(fjord, fCommonPredatorSaltKoryushka, 0.12)
+        // Фьорд мирные
+        setLFWeight(fjord, fCommonPeaceSaltAnchous, 0.9)
+        setLFWeight(fjord, fCommonPeaceSaltMoiva, 0.8)
+        setLFWeight(fjord, fCommonPeaceSaltKilka, 0.85)
+        setLFWeight(fjord, fCommonPeaceSaltSeld, 0.7)
+        setLFWeight(fjord, fCommonPeaceSaltSardina, 0.7)
+        setLFWeight(fjord, fUncommonPeaceSaltKambala, 0.5)
+        setLFWeight(fjord, fUncommonPeaceSaltPiksha, 0.35)
         setLFWeight(fjord, fEpicPeaceSaltTurbo, 0.08)
-        setLFWeight(fjord, fCommonPeaceSaltMoiva, 0.20); setLFWeight(fjord, fCommonPeaceSaltKilka, 0.20); setLFWeight(fjord, fCommonPredatorSaltBychok, 0.10)
 
-        // Открытый океан — косяки + мирные эпики
-        setLFWeight(openOcean, fUncommonPredatorSaltAtlanticSkumbria, 0.80); setLFWeight(openOcean, fCommonPredatorSaltStavrida, 0.40)
-        setLFWeight(openOcean, fRarePredatorSaltDorado, 0.60); setLFWeight(openOcean, fRarePredatorSaltWahoo, 0.50)
-        setLFWeight(openOcean, fEpicPredatorSaltParusnik, 0.18); setLFWeight(openOcean, fEpicPredatorSaltSwordFish, 0.16); setLFWeight(openOcean, fEpicPredatorSaltAkulaMako, 0.10)
-        setLFWeight(openOcean, fLegendaryPredatorSaltBlueMarlin, 0.05); setLFWeight(openOcean, fLegendaryPredatorSaltBlueTunec, 0.04); setLFWeight(openOcean, fRarePredatorSaltAlbakor, 0.12)
-        setLFWeight(openOcean, fMythicPredatorSaltYellowTunec, 0.090)
-        setLFWeight(openOcean, fCommonPeaceSaltSardina, 0.15); setLFWeight(openOcean, fCommonPeaceSaltAnchous, 0.12)
-        setLFWeight(openOcean, fUncommonPeaceSaltSaira, 0.35); setLFWeight(openOcean, fUncommonPeaceSaltFlyFish, 0.25)
-        setLFWeight(openOcean, fEpicPeaceSaltMoonFish, 0.06) // EPIC мирный
-        setLFWeight(openOcean, fLegendaryPeaceSaltSeldyanoyKorol, 0.02)  // LEGENDARY мирный
+        // Фьорд хищные
+        setLFWeight(fjord, fCommonPredatorSaltBychok, 0.9)
+        setLFWeight(fjord, fCommonPredatorSaltKoryushka, 0.8)
+        setLFWeight(fjord, fUncommonPredatorSaltSaida, 0.55)
+        setLFWeight(fjord, fRarePredatorSaltTreska, 0.5)
+        setLFWeight(fjord, fRarePredatorSaltSeaForel, 0.35)
+        setLFWeight(fjord, fEpicPredatorSaltLososAtlantic, 0.1)
+        setLFWeight(fjord, fMythicPredatorSaltWolffish, 0.04)
+        setLFWeight(fjord, fLegendaryPredatorSaltPaltus, 0.02)
+
+        // Открытый океан мирные
+        setLFWeight(openOcean, fCommonPeaceSaltAnchous, 0.9)
+        setLFWeight(openOcean, fCommonPeaceSaltSardina, 0.75)
+        setLFWeight(openOcean, fCommonPeaceSaltSeld, 0.7)
+        setLFWeight(openOcean, fUncommonPeaceSaltSaira, 0.45)
+        setLFWeight(openOcean, fUncommonPeaceSaltFlyFish, 0.35)
+        setLFWeight(openOcean, fRarePredatorSaltTreska, 0.25)
+        setLFWeight(openOcean, fEpicPeaceSaltMoonFish, 0.06)
+        setLFWeight(openOcean, fLegendaryPeaceSaltSeldyanoyKorol, 0.02)
+
+        // Открытый океан хищные
+        setLFWeight(openOcean, fCommonPredatorSaltStavrida, 0.85)
+        setLFWeight(openOcean, fUncommonPredatorSaltAtlanticSkumbria, 0.8)
+        setLFWeight(openOcean, fUncommonPredatorSaltSaida, 0.55)
+        setLFWeight(openOcean, fUncommonPredatorSaltSeaSargan, 0.4)
+        setLFWeight(openOcean, fRarePredatorSaltDorado, 0.4)
+        setLFWeight(openOcean, fRarePredatorSaltAlbakor, 0.25)
+        setLFWeight(openOcean, fRarePredatorSaltWahoo, 0.2)
+        setLFWeight(openOcean, fEpicPredatorSaltParusnik, 0.1)
+        setLFWeight(openOcean, fEpicPredatorSaltSwordFish, 0.09)
+        setLFWeight(openOcean, fEpicPredatorSaltAkulaMako, 0.06)
+        setLFWeight(openOcean, fMythicPredatorSaltWolffish, 0.04)
+        setLFWeight(openOcean, fMythicPredatorSaltYellowTunec, 0.35)
+        setLFWeight(openOcean, fLegendaryPredatorSaltBlueMarlin, 0.02)
+        setLFWeight(openOcean, fLegendaryPredatorSaltBlueTunec, 0.02)
+
 
         // --- Lures ---
         val presnMir = upsertLure("Пресная мирная", false, "fresh")
