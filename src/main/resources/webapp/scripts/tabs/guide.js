@@ -61,12 +61,30 @@ function Guide({me}){
           {data.locations.map(loc=>{
             const myLoc = me.locations.find(l=>l.id===loc.id) || {};
             const unlocked = myLoc.unlocked;
+            const bgResolver = typeof window.getLocationBackground === 'function'
+              ? window.getLocationBackground
+              : (id, name) => {
+                  const normalized = typeof name === 'string' ? name.trim().toLowerCase() : '';
+                  if(normalized && window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]){
+                    return window.LOCATION_BG_BY_NAME[normalized];
+                  }
+                  const numId = Number(id);
+                  if(Number.isFinite(numId) && window.LOCATION_BG && window.LOCATION_BG[numId]){
+                    return window.LOCATION_BG[numId];
+                  }
+                  return null;
+                };
+            const bgUrl = bgResolver(loc.id, myLoc.name || loc.name);
             return (
               <div key={loc.id} className="p-4 glass rounded-xl text-center">
                 <div className="font-semibold mb-2">{myLoc.name || loc.name}</div>
                 {unlocked ? (
                   <>
-                    <img src={LOCATION_BG[loc.id]} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                    {bgUrl ? (
+                      <img src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                    ) : (
+                      <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-3xl">?</div>
+                    )}
                     <div className="text-sm opacity-80 text-left">{t('fishes')}</div>
                     <div className="text-sm mb-2 text-left">
                       {loc.fish.map((f,i)=>(
