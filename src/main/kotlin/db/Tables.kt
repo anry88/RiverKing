@@ -468,30 +468,46 @@ object DB {
         setLFWeight(swamp, fCommonPeaceFreshPlotva, 0.5)
         setLFWeight(swamp, fCommonPeaceFreshVerhoplavka, 0.5)
         setLFWeight(swamp, fCommonPeaceFreshPeskar, 0.4)
-        setLFWeight(swamp, fUncommonPeaceFreshLin, 1.0)
-        setLFWeight(swamp, fRarePeaceFreshKarp, 0.3)
+        setLFWeight(swamp, fUncommonPeaceFreshLin, 0.3)
+        setLFWeight(swamp, fRarePeaceFreshKarp, 0.2)
 
         // Болото хищные
         setLFWeight(swamp, fCommonPredatorFreshRotan, 1.0)
         setLFWeight(swamp, fCommonPredatorFreshErsch, 0.7)
         setLFWeight(swamp, fCommonPredatorFreshOkun, 0.6)
-        setLFWeight(pond, fUncommonPredatorFreshYaz, 0.4)
+        setLFWeight(swamp, fUncommonPredatorFreshYaz, 0.4)
         setLFWeight(swamp, fRarePredatorFreshSchuka, 0.2);
-        setLFWeight(swamp, fEpicPredatorFreshEelEuropean, 0.1);
+        setLFWeight(swamp, fEpicPredatorFreshEelEuropean, 0.1)
         setLFWeight(swamp, fEpicPredatorFreshSom, 0.04)
         setLFWeight(swamp, fMythicPredatorFreshNorthSnakehead, 0.02)
 
-        // Река
-        setLFWeight(river, fCommonPeaceFreshPlotva, 0.7);
-        setLFWeight(river, fCommonPredatorFreshOkun, 0.7);
-        setLFWeight(river, fUncommonPeaceFreshLesch, 0.6)
-        setLFWeight(river, fRarePredatorFreshSchuka, 0.25);
-        setLFWeight(river, fEpicPredatorFreshSom, 0.10);
-        setLFWeight(river, fUncommonPredatorFreshGolavl, 0.5)
-        setLFWeight(river, fRarePredatorFreshZhereh, 0.3); setLFWeight(river, fRarePredatorFreshSudak, 0.4); setLFWeight(river, fUncommonPredatorFreshNalim, 0.2)
-        setLFWeight(river, fRarePeaceFreshKarp, 0.15); setLFWeight(river, fEpicPredatorFreshEelEuropean, 0.10); setLFWeight(river, fEpicPeaceFreshSterlyad, 0.05); setLFWeight(river, fLegendaryPeaceFreshOsetr, 0.02)
-        setLFWeight(river, fMythicPredatorFreshAmurPike, 0.035)
-        setLFWeight(river, fCommonPeaceFreshPeskar, 0.6); setLFWeight(river, fCommonPredatorFreshErsch, 0.5); setLFWeight(river, fCommonPeaceFreshElets, 0.4); setLFWeight(river, fCommonPeaceFreshKrasnoperka, 0.5); setLFWeight(river, fUncommonPredatorFreshYaz, 0.25)
+        // Река мирные
+        setLFWeight(river, fCommonPeaceFreshPlotva, 0.9)
+        setLFWeight(swamp, fCommonPeaceFreshKaras, 0.8)
+        setLFWeight(river, fCommonPeaceFreshPeskar, 0.7)
+        setLFWeight(river, fCommonPeaceFreshGustera, 0.65)
+        setLFWeight(river, fCommonPeaceFreshElets, 0.6);
+        setLFWeight(river, fCommonPeaceFreshKrasnoperka, 0.6)
+        setLFWeight(river, fUncommonPeaceFreshLesch, 0.5)
+        setLFWeight(river, fUncommonPeaceFreshChehon, 0.4)
+        setLFWeight(river, fRarePeaceFreshKarp, 0.3)
+        setLFWeight(river, fRarePeaceFreshTolstolobik, 0.2)
+        setLFWeight(river, fRarePeaceFreshWhiteAmur, 0.15)
+        setLFWeight(river, fEpicPeaceFreshSterlyad, 0.05)
+        setLFWeight(river, fLegendaryPeaceFreshOsetr, 0.02)
+
+        // Река хищные
+        setLFWeight(river, fCommonPredatorFreshOkun, 0.9)
+        setLFWeight(river, fCommonPredatorFreshErsch, 0.8)
+        setLFWeight(river, fUncommonPredatorFreshGolavl, 0.6)
+        setLFWeight(river, fUncommonPredatorFreshYaz, 0.5)
+        setLFWeight(river, fUncommonPredatorFreshNalim, 0.4)
+        setLFWeight(river, fRarePredatorFreshSudak, 0.35)
+        setLFWeight(river, fRarePredatorFreshZhereh, 0.3)
+        setLFWeight(river, fRarePredatorFreshSchuka, 0.25)
+        setLFWeight(river, fEpicPredatorFreshEelEuropean, 0.1)
+        setLFWeight(river, fEpicPredatorFreshSom, 0.08)
+        setLFWeight(river, fMythicPredatorFreshAmurPike, 0.03)
 
         // Озеро
         setLFWeight(lake, fCommonPeaceFreshPlotva, 0.6); setLFWeight(lake, fCommonPeaceFreshKaras, 0.9); setLFWeight(lake, fUncommonPeaceFreshLesch, 0.5)
