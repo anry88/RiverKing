@@ -539,12 +539,31 @@ object DB {
         setLFWeight(lake, fMythicPredatorFreshKristivomer, 0.05)
         setLFWeight(lake, fLegendaryPredatorFreshTaimen, 0.03)
 
-        // Горная река (с эпиками)
-        setLFWeight(mtnRiver, fRarePredatorFreshHarius, 0.9); setLFWeight(mtnRiver, fRarePredatorFreshForelStream, 0.8); setLFWeight(mtnRiver, fUncommonPredatorFreshNalim, 0.4); setLFWeight(mtnRiver, fUncommonPredatorFreshGolavl, 0.3)
-        setLFWeight(mtnRiver, fEpicPredatorFreshArcticGolets, 0.06); setLFWeight(mtnRiver, fEpicPredatorFreshForelKumzha, 0.06) // EPIC
-        setLFWeight(mtnRiver, fMythicPredatorFreshDanubeLosos, 0.055) // вес спавна между epic (0.06) и legendary (0.05)
-        setLFWeight(mtnRiver, fLegendaryPredatorFreshTaimen, 0.05) // легенда
-        setLFWeight(mtnRiver, fCommonPeaceFreshElets, 0.35); setLFWeight(mtnRiver, fCommonPeaceFreshPeskar, 0.35); setLFWeight(mtnRiver, fCommonPeaceFreshGolyan, 0.45); setLFWeight(mtnRiver, fUncommonPeaceFreshSig, 0.10)
+        // Горная река мирные
+        setLFWeight(mtnRiver, fCommonPeaceFreshPlotva, 0.8)
+        setLFWeight(mtnRiver, fCommonPeaceFreshUkleyka, 0.7)
+        setLFWeight(mtnRiver, fCommonPeaceFreshGolyan, 0.65)
+        setLFWeight(mtnRiver, fCommonPeaceFreshPeskar, 0.6)
+        setLFWeight(mtnRiver, fCommonPeaceFreshKaras, 0.6)
+        setLFWeight(mtnRiver, fCommonPeaceFreshElets, 0.5)
+        setLFWeight(mtnRiver, fUncommonPeaceFreshSig, 0.4)
+        setLFWeight(mtnRiver, fRarePeaceFreshKarp, 0.35)
+        setLFWeight(mtnRiver, fEpicPeaceFreshSterlyad, 0.05)
+        setLFWeight(mtnRiver, fLegendaryPeaceFreshOsetr, 0.02)
+
+        // Горная река хищные
+        setLFWeight(mtnRiver, fCommonPredatorFreshOkun, 0.9)
+        setLFWeight(mtnRiver, fCommonPredatorFreshErsch, 0.6)
+        setLFWeight(mtnRiver, fUncommonPredatorFreshGolavl, 0.5)
+        setLFWeight(mtnRiver, fUncommonPredatorFreshNalim, 0.5)
+        setLFWeight(mtnRiver, fUncommonPredatorFreshYaz, 0.45)
+        setLFWeight(mtnRiver, fRarePredatorFreshForelStream, 0.4)
+        setLFWeight(mtnRiver, fRarePredatorFreshHarius, 0.3)
+        setLFWeight(mtnRiver, fRarePredatorFreshSchuka, 0.15)
+        setLFWeight(mtnRiver, fEpicPredatorFreshArcticGolets, 0.1)
+        setLFWeight(mtnRiver, fEpicPredatorFreshForelKumzha, 0.07)
+        setLFWeight(mtnRiver, fMythicPredatorFreshDanubeLosos, 0.04)
+        setLFWeight(mtnRiver, fLegendaryPredatorFreshTaimen, 0.03)
 
         // Водохранилище
         setLFWeight(reservoir, fRarePredatorFreshSudak, 0.9); setLFWeight(reservoir, fRarePredatorFreshZhereh, 0.6); setLFWeight(reservoir, fUncommonPeaceFreshLesch, 0.7)
