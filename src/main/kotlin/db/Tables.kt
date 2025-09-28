@@ -674,21 +674,51 @@ object DB {
         setLFWeight(coast, fLegendaryPredatorSaltBeluga, 0.02)
         setLFWeight(coast, fLegendaryPredatorSaltTarpon, 0.02)
 
-        // Русло Амазонки
-        setLFWeight(amazon, fEpicPeaceFreshTambaki, 0.06); setLFWeight(amazon, fUncommonPeaceFreshPacuBlack, 0.40); setLFWeight(amazon, fCommonPeaceFreshProhilodus, 0.85)
-        setLFWeight(amazon, fUncommonPeaceFreshAncistrus, 0.60); setLFWeight(amazon, fCommonPeaceFreshOtocinklyus, 0.70); setLFWeight(amazon, fCommonPeaceFreshNeonTetra, 0.85); setLFWeight(amazon, fUncommonPeaceFreshTernecia, 0.50)
-        setLFWeight(amazon, fLegendaryPredatorFreshArapaima, 0.03); setLFWeight(amazon, fUncommonPredatorFreshPiranhaRed, 0.60); setLFWeight(amazon, fRarePredatorFreshTraira, 0.25)
-        setLFWeight(amazon, fRarePredatorFreshAcestrinks, 0.20); setLFWeight(amazon, fEpicPredatorFreshElectricEel, 0.05); setLFWeight(amazon, fEpicPredatorFreshRedTailSom, 0.05); setLFWeight(amazon, fLegendaryPredatorFreshPiraiba, 0.02)
-        setLFWeight(amazon, fMythicPredatorFreshZungaro, 0.040)
+        // Русло Амазонки мирные
+        setLFWeight(amazon, fCommonPeaceFreshNeonTetra, 0.95)
+        setLFWeight(amazon, fCommonPeaceFreshProhilodus, 0.85)
+        setLFWeight(amazon, fCommonPeaceFreshOtocinklyus, 0.75)
+        setLFWeight(amazon, fUncommonPeaceFreshAncistrus, 0.6)
+        setLFWeight(amazon, fUncommonPeaceFreshTernecia, 0.5)
+        setLFWeight(amazon, fUncommonPeaceFreshPacuBlack, 0.4)
+        setLFWeight(amazon, fRarePeaceFreshRamiresi, 0.25)
+        setLFWeight(amazon, fEpicPeaceFreshTambaki, 0.1)
+        setLFWeight(amazon, fEpicPeaceFreshDiscus, 0.08)
+
+        // Русло Амазонки хищные
+        setLFWeight(amazon, fUncommonPredatorFreshPiranhaRed, 0.5)
+        setLFWeight(amazon, fRarePredatorFreshOscar, 0.45)
+        setLFWeight(amazon, fRarePredatorFreshSchuchyaCihlida, 0.4)
+        setLFWeight(amazon, fRarePredatorFreshAcestrinks, 0.4)
+        setLFWeight(amazon, fRarePredatorFreshPiranhaBlack, 0.35)
+        setLFWeight(amazon, fRarePredatorFreshTraira, 0.2)
+        setLFWeight(amazon, fEpicPredatorFreshPeacockOkun, 0.1)
+        setLFWeight(amazon, fEpicPredatorFreshElectricEel, 0.08)
+        setLFWeight(amazon, fEpicPredatorFreshRedTailSom, 0.06)
+        setLFWeight(amazon, fMythicPredatorFreshZungaro, 0.04)
+        setLFWeight(amazon, fLegendaryPredatorFreshPiraiba, 0.03)
+        setLFWeight(amazon, fLegendaryPredatorFreshArapaima, 0.02)
 
         // Игапо, затопленный лес
-        setLFWeight(igapo, fEpicPeaceFreshDiscus, 0.05); setLFWeight(igapo, fUncommonPeaceFreshScalaria, 0.60); setLFWeight(igapo, fUncommonPeaceFreshAgassisa, 0.60)
-        setLFWeight(igapo, fCommonPeaceFreshCardinalTetra, 0.85); setLFWeight(igapo, fUncommonPeaceFreshCoridorusPanda, 0.45); setLFWeight(igapo, fCommonPeaceFreshNannostomus, 0.85); setLFWeight(igapo, fRarePeaceFreshRamiresi, 0.20)
-        setLFWeight(igapo, fLegendaryPredatorFreshBlackArowana, 0.03); setLFWeight(igapo, fRarePredatorFreshOscar, 0.25); setLFWeight(igapo, fEpicPredatorFreshAimara, 0.06)
-        setLFWeight(igapo, fEpicPredatorFreshTigerPseudoplatistoma, 0.05); setLFWeight(igapo, fRarePredatorFreshPiranhaBlack, 0.18); setLFWeight(igapo, fRarePredatorFreshSchuchyaCihlida, 0.20); setLFWeight(igapo, fEpicPredatorFreshPeacockOkun, 0.06)
+        setLFWeight(igapo, fEpicPeaceFreshDiscus, 0.05);
+        setLFWeight(igapo, fUncommonPeaceFreshScalaria, 0.60);
+        setLFWeight(igapo, fUncommonPeaceFreshAgassisa, 0.60)
+        setLFWeight(igapo, fCommonPeaceFreshCardinalTetra, 0.85);
+        setLFWeight(igapo, fUncommonPeaceFreshCoridorusPanda, 0.45);
+        setLFWeight(igapo, fCommonPeaceFreshNannostomus, 0.85);
+        setLFWeight(igapo, fRarePeaceFreshRamiresi, 0.20)
+        setLFWeight(igapo, fLegendaryPredatorFreshBlackArowana, 0.03);
+        setLFWeight(igapo, fRarePredatorFreshOscar, 0.25);
+        setLFWeight(igapo, fEpicPredatorFreshAimara, 0.06)
+        setLFWeight(igapo, fEpicPredatorFreshTigerPseudoplatistoma, 0.05);
+        setLFWeight(igapo, fRarePredatorFreshPiranhaBlack, 0.18);
+        setLFWeight(igapo, fRarePredatorFreshSchuchyaCihlida, 0.20);
+        setLFWeight(igapo, fEpicPredatorFreshPeacockOkun, 0.06)
         setLFWeight(igapo, fMythicPredatorFreshSkatMotoro, 0.040)
         // пересечения с Руслом
-        setLFWeight(igapo, fEpicPeaceFreshTambaki, 0.02); setLFWeight(igapo, fUncommonPeaceFreshPacuBlack, 0.12); setLFWeight(igapo, fEpicPredatorFreshElectricEel, 0.02)
+        setLFWeight(igapo, fEpicPeaceFreshTambaki, 0.02);
+        setLFWeight(igapo, fUncommonPeaceFreshPacuBlack, 0.12);
+        setLFWeight(igapo, fEpicPredatorFreshElectricEel, 0.02)
 
         // Мангровые заросли
         setLFWeight(mangrove, fEpicPeaceSaltMilkfish, 0.06); setLFWeight(mangrove, fCommonPeaceSaltStainedKefal, 0.80); setLFWeight(mangrove, fUncommonPeaceSaltTilyapiaMozambik, 0.50)
