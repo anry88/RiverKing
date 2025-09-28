@@ -198,21 +198,37 @@ object DB {
             }
         }
 
-        // --- Locations (rebalance unlockKg & sizeMultiplier) ---
         val pond        = upsertLocation("Пруд",            0.0,   1.0)
-        val swamp       = upsertLocation("Болото",          5.0,   1.15)
-        val river       = upsertLocation("Река",            20.0,  1.4)
-        val lake        = upsertLocation("Озеро",           80.0,  1.8)
-        val reservoir   = upsertLocation("Водохранилище",   180.0, 2.1)
-        val mtnRiver    = upsertLocation("Горная река",     300.0, 2.3)
-        val delta       = upsertLocation("Дельта реки",     450.0, 2.5)
-        val coast       = upsertLocation("Прибрежье моря",  650.0, 2.8)
-        val amazon      = upsertLocation("Русло Амазонки",          900.0,  3.0)
-        val igapo       = upsertLocation("Игапо, затопленный лес",  1100.0, 3.05)
-        val mangrove    = upsertLocation("Мангровые заросли",       1500.0, 3.1)
-        val coralFlats  = upsertLocation("Коралловые отмели",       2000.0, 3.2)
-        val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
-        val openOcean   = upsertLocation("Открытый океан",  5000.0, 4.2)
+        val swamp       = upsertLocation("Болото",          1.0,   1.15)
+        val river       = upsertLocation("Река",            2.0,  1.4)
+        val lake        = upsertLocation("Озеро",           3.0,  1.8)
+        val reservoir   = upsertLocation("Водохранилище",   4.0, 2.1)
+        val mtnRiver    = upsertLocation("Горная река",     5.0, 2.3)
+        val delta       = upsertLocation("Дельта реки",     6.0, 2.5)
+        val coast       = upsertLocation("Прибрежье моря",  7.0, 2.8)
+        val amazon      = upsertLocation("Русло Амазонки",          8.0,  3.0)
+        val igapo       = upsertLocation("Игапо, затопленный лес",  9.0, 3.05)
+        val mangrove    = upsertLocation("Мангровые заросли",       10.0, 3.1)
+        val coralFlats  = upsertLocation("Коралловые отмели",       11.0, 3.2)
+        val fjord       = upsertLocation("Фьорд",           12.0, 3.4)
+        val openOcean   = upsertLocation("Открытый океан",  13.0, 4.2)
+
+
+        // --- Locations (rebalance unlockKg & sizeMultiplier) ---
+//        val pond        = upsertLocation("Пруд",            0.0,   1.0)
+//        val swamp       = upsertLocation("Болото",          5.0,   1.15)
+//        val river       = upsertLocation("Река",            20.0,  1.4)
+//        val lake        = upsertLocation("Озеро",           80.0,  1.8)
+//        val reservoir   = upsertLocation("Водохранилище",   180.0, 2.1)
+//        val mtnRiver    = upsertLocation("Горная река",     300.0, 2.3)
+//        val delta       = upsertLocation("Дельта реки",     450.0, 2.5)
+//        val coast       = upsertLocation("Прибрежье моря",  650.0, 2.8)
+//        val amazon      = upsertLocation("Русло Амазонки",          900.0,  3.0)
+//        val igapo       = upsertLocation("Игапо, затопленный лес",  1100.0, 3.05)
+//        val mangrove    = upsertLocation("Мангровые заросли",       1500.0, 3.1)
+//        val coralFlats  = upsertLocation("Коралловые отмели",       2000.0, 3.2)
+//        val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
+//        val openOcean   = upsertLocation("Открытый океан",  5000.0, 4.2)
 
         // --- Fish: common пресные мирные---
         val fCommonPeaceFreshPlotva  = upsertFish("Плотва", "common", 0.2, 0.05, false, "fresh")
