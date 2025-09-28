@@ -30,6 +30,7 @@ import service.I18n
 import util.Metrics
 import util.sanitizeName
 import java.text.NumberFormat
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -1036,7 +1037,18 @@ Available commands:
                             val (list, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
                             val metric = t.metric.lowercase()
                             val showFish = metric != "count"
-                            val header = "$tName\n"
+                            val remaining = Duration.between(Instant.now(), t.endTime)
+                            val safeRemaining = if (remaining.isNegative) Duration.ZERO else remaining
+                            val totalMinutes = safeRemaining.toMinutes()
+                            val days = totalMinutes / (24 * 60)
+                            val hours = (totalMinutes % (24 * 60)) / 60
+                            val minutes = totalMinutes % 60
+                            val timeText = if (lang == "ru") {
+                                "Осталось: ${days}д ${hours}ч ${minutes}м"
+                            } else {
+                                "Time left: ${days}d ${hours}h ${minutes}m"
+                            }
+                            val header = "$tName\n$timeText\n"
                             val body = if (list.isEmpty()) {
                                 if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                             } else {
@@ -1107,37 +1119,66 @@ Available commands:
                     "/daily" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
+                        val schedule = fishing.dailyRewardSchedule(uid)
                         val res = fishing.giveDailyBaits(uid)
+                        fun rewardLines(rewards: List<FishingService.DailyReward>): List<String> =
+                            rewards.map { reward ->
+                                val name = I18n.lure(reward.name, lang)
+                                "• $name x${reward.qty}"
+                            }
                         if (res == null) {
                             val params = mapOf("result" to "not_ready")
                             logCommandMetric("daily", params, source)
-                            val reply = if (lang == "ru") {
-                                "Новая ежедневная награда пока недоступна"
+                            val streak = transaction {
+                                Users.select { Users.id eq uid }.single()[Users.dailyStreak]
+                            }
+                            val displayDay = (if (streak <= 0) 1 else streak + 1).coerceAtMost(7)
+                            val rewards = schedule.getOrNull(displayDay - 1).orEmpty()
+                            val header = if (lang == "ru") {
+                                "Награда завтра (день $displayDay):"
                             } else {
-                                "Your next daily reward is not ready yet"
+                                "Tomorrow's reward (day $displayDay):"
+                            }
+                            val lines = rewardLines(rewards)
+                            val reply = buildString {
+                                append(header)
+                                if (lines.isNotEmpty()) {
+                                    append("\n")
+                                    append(lines.joinToString("\n"))
+                                }
                             }
                             trySend(chatId, reply, replyToMessageId = replyTo)
                         } else {
                             val streak = res.third
                             val params = mapOf("result" to "claimed", "streak" to streak.toString())
                             logCommandMetric("daily", params, source)
-                            val schedule = fishing.dailyRewardSchedule(uid)
                             val displayDay = streak.coerceAtMost(7)
                             val rewards = schedule.getOrNull(displayDay - 1).orEmpty()
-                            val lines = rewards.map { reward ->
-                                val name = I18n.lure(reward.name, lang)
-                                "• $name x${reward.qty}"
-                            }
-                            val body = if (lang == "ru") {
+                            val tomorrowDay = (streak + 1).coerceAtMost(7)
+                            val tomorrowRewards = schedule.getOrNull(tomorrowDay - 1).orEmpty()
+                            val todayHeader = if (lang == "ru") {
                                 "Вы получили ежедневную награду (день $displayDay):"
                             } else {
                                 "Daily reward claimed (day $displayDay):"
                             }
+                            val tomorrowHeader = if (lang == "ru") {
+                                "Награда завтра (день $tomorrowDay):"
+                            } else {
+                                "Tomorrow's reward (day $tomorrowDay):"
+                            }
+                            val todayLines = rewardLines(rewards)
+                            val tomorrowLines = rewardLines(tomorrowRewards)
                             val text = buildString {
-                                append(body)
-                                if (lines.isNotEmpty()) {
+                                append(todayHeader)
+                                if (todayLines.isNotEmpty()) {
                                     append("\n")
-                                    append(lines.joinToString("\n"))
+                                    append(todayLines.joinToString("\n"))
+                                }
+                                append("\n\n")
+                                append(tomorrowHeader)
+                                if (tomorrowLines.isNotEmpty()) {
+                                    append("\n")
+                                    append(tomorrowLines.joinToString("\n"))
                                 }
                             }
                             trySend(chatId, text, replyToMessageId = replyTo)
