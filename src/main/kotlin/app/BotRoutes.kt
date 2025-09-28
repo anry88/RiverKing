@@ -1134,6 +1134,11 @@ Available commands:
                             }
                             val displayDay = (if (streak <= 0) 1 else streak + 1).coerceAtMost(7)
                             val rewards = schedule.getOrNull(displayDay - 1).orEmpty()
+                            val alreadyClaimed = if (lang == "ru") {
+                                "Ежедневная награда уже получена."
+                            } else {
+                                "Daily reward already claimed."
+                            }
                             val header = if (lang == "ru") {
                                 "Награда завтра (день $displayDay):"
                             } else {
@@ -1141,9 +1146,11 @@ Available commands:
                             }
                             val lines = rewardLines(rewards)
                             val reply = buildString {
+                                append(alreadyClaimed)
+                                append("\n\n")
                                 append(header)
                                 if (lines.isNotEmpty()) {
-                                    append("\n")
+                                    append("\n\n")
                                     append(lines.joinToString("\n"))
                                 }
                             }
