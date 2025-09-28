@@ -701,42 +701,52 @@ object DB {
         setLFWeight(amazon, fLegendaryPredatorFreshArapaima, 0.02)
 
         // Игапо, затопленный лес мирные
-        setLFWeight(igapo, fCommonPeaceFreshNannostomus, 0.85);
-        setLFWeight(igapo, fCommonPeaceFreshCardinalTetra, 0.85);
+        setLFWeight(igapo, fCommonPeaceFreshNannostomus, 0.85)
+        setLFWeight(igapo, fCommonPeaceFreshCardinalTetra, 0.85)
         setLFWeight(igapo, fCommonPeaceFreshOtocinklyus, 0.75)
-        setLFWeight(igapo, fUncommonPeaceFreshScalaria, 0.5);
-        setLFWeight(igapo, fUncommonPeaceFreshCoridorusPanda, 0.45);
+        setLFWeight(igapo, fUncommonPeaceFreshScalaria, 0.5)
+        setLFWeight(igapo, fUncommonPeaceFreshCoridorusPanda, 0.45)
         setLFWeight(igapo, fUncommonPeaceFreshAgassisa, 0.35)
-        setLFWeight(igapo, fUncommonPeaceFreshPacuBlack, 0.3);
+        setLFWeight(igapo, fUncommonPeaceFreshPacuBlack, 0.3)
         setLFWeight(igapo, fRarePeaceFreshRamiresi, 0.2)
-        setLFWeight(igapo, fEpicPeaceFreshDiscus, 0.1);
-        setLFWeight(igapo, fEpicPeaceFreshTambaki, 0.06);
-
+        setLFWeight(igapo, fEpicPeaceFreshDiscus, 0.1)
+        setLFWeight(igapo, fEpicPeaceFreshTambaki, 0.06)
 
         // Игапо, затопленный лес хищные
         setLFWeight(igapo, fUncommonPredatorFreshPiranhaRed, 0.5)
-        setLFWeight(igapo, fRarePredatorFreshOscar, 0.25);
-        setLFWeight(igapo, fRarePredatorFreshPiranhaBlack, 0.18);
+        setLFWeight(igapo, fRarePredatorFreshOscar, 0.25)
+        setLFWeight(igapo, fRarePredatorFreshPiranhaBlack, 0.18)
         setLFWeight(igapo, fRarePredatorFreshSchuchyaCihlida, 0.5)
         setLFWeight(igapo, fRarePredatorFreshAcestrinks, 0.4)
         setLFWeight(igapo, fEpicPredatorFreshElectricEel, 0.08)
         setLFWeight(igapo, fEpicPredatorFreshPeacockOkun, 0.06)
         setLFWeight(igapo, fEpicPredatorFreshAimara, 0.06)
         setLFWeight(igapo, fEpicPredatorFreshRedTailSom, 0.05)
-        setLFWeight(igapo, fEpicPredatorFreshTigerPseudoplatistoma, 0.05);
+        setLFWeight(igapo, fEpicPredatorFreshTigerPseudoplatistoma, 0.05)
         setLFWeight(igapo, fMythicPredatorFreshSkatMotoro, 0.04)
         setLFWeight(igapo, fMythicPredatorFreshZungaro, 0.03)
-        setLFWeight(igapo, fLegendaryPredatorFreshBlackArowana, 0.02);
+        setLFWeight(igapo, fLegendaryPredatorFreshBlackArowana, 0.02)
 
+        // Мангровые заросли мирные
+        setLFWeight(mangrove, fCommonPeaceSaltTropicAnchous, 0.9)
+        setLFWeight(mangrove, fCommonPeaceSaltStainedKefal, 0.8)
+        setLFWeight(mangrove, fCommonPeaceSaltSardinaIndian, 0.8)
+        setLFWeight(mangrove, fUncommonPeaceSaltTilyapiaMozambik, 0.5)
+        setLFWeight(mangrove, fRarePeaceSaltGoldenSigan, 0.2)
+        setLFWeight(mangrove, fEpicPeaceSaltMilkfish, 0.08)
 
-
-        // Мангровые заросли
-        setLFWeight(mangrove, fEpicPeaceSaltMilkfish, 0.06); setLFWeight(mangrove, fCommonPeaceSaltStainedKefal, 0.80); setLFWeight(mangrove, fUncommonPeaceSaltTilyapiaMozambik, 0.50)
-        setLFWeight(mangrove, fCommonPeaceSaltTropicAnchous, 0.90); setLFWeight(mangrove, fCommonPeaceSaltSardinaIndian, 0.80); setLFWeight(mangrove, fRarePeaceSaltGoldenSigan, 0.20); setLFWeight(mangrove, fUncommonPredatorSaltBychokMangroves, 0.60)
-        setLFWeight(mangrove, fEpicPredatorSaltBarramundi, 0.08); setLFWeight(mangrove, fRarePredatorSaltSnook, 0.25); setLFWeight(mangrove, fRarePredatorSaltMangrovesLucian, 0.25)
-        setLFWeight(mangrove, fLegendaryPredatorSaltTarpon, 0.03); setLFWeight(mangrove, fUncommonPredatorSaltSeaSom, 0.50); setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.40); setLFWeight(mangrove, fEpicPredatorSaltBlueKaranks, 0.06)
+        // Мангровые заросли хищные
+        setLFWeight(mangrove, fUncommonPredatorSaltBychokMangroves, 0.5)
+        setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.5)
+        setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.4)
+        setLFWeight(mangrove, fUncommonPredatorSaltSeaSom, 0.25)
+        setLFWeight(mangrove, fRarePredatorSaltSnook, 0.20)
+        setLFWeight(mangrove, fRarePredatorSaltMangrovesLucian, 0.15)
+        setLFWeight(mangrove, fEpicPredatorSaltBarramundi, 0.08)
+        setLFWeight(mangrove, fEpicPredatorSaltBlueKaranks, 0.06)
         setLFWeight(mangrove, fMythicPredatorSaltBlackSnook, 0.045)
         setLFWeight(mangrove, fMythicPredatorSaltCubera, 0.04)
+        setLFWeight(mangrove, fLegendaryPredatorSaltTarpon, 0.02)
 
         // Коралловые отмели
         setLFWeight(coralFlats, fUncommonPeaceSaltParrotFish, 0.55); setLFWeight(coralFlats, fEpicPeaceSaltEmperorAngel, 0.08); setLFWeight(coralFlats, fRarePeaceSaltBlueHirurg, 0.25)
