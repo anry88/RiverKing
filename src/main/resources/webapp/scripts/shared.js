@@ -46,10 +46,30 @@
   tg?.setHeaderColor?.('secondary_bg_color');
   tg?.setBottomBarColor?.('bg_color');
 
-  const rarityColors = { uncommon: 'text-green-400', rare: 'text-blue-400', epic: 'text-purple-400', legendary: 'text-yellow-400' };
+  const rarityColors = {
+    uncommon: 'text-green-400',
+    rare: 'text-blue-400',
+    epic: 'text-purple-400',
+    mythic: 'text-rose-400',
+    legendary: 'text-yellow-400'
+  };
   const rarityNames = {
-    ru: { common: 'Простая', uncommon: 'Необычная', rare: 'Редкая', epic: 'Эпическая', legendary: 'Легендарная' },
-    en: { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', epic: 'Epic', legendary: 'Legendary' }
+    ru: {
+      common: 'Простая',
+      uncommon: 'Необычная',
+      rare: 'Редкая',
+      epic: 'Эпическая',
+      mythic: 'Мифическая',
+      legendary: 'Легендарная'
+    },
+    en: {
+      common: 'Common',
+      uncommon: 'Uncommon',
+      rare: 'Rare',
+      epic: 'Epic',
+      mythic: 'Mythic',
+      legendary: 'Legendary'
+    }
   };
   const LURE_INFO = {
     'Пресная мирная': {
@@ -146,19 +166,19 @@
   };
   const LOCATION_BG = {
     1: '/app/assets/backgrounds/pond.png',
-    2: '/app/assets/backgrounds/river.png',
-    3: '/app/assets/backgrounds/lake.png',
-    4: '/app/assets/backgrounds/swamp.png',
-    5: '/app/assets/backgrounds/mountain_river.png',
-    6: '/app/assets/backgrounds/reservoir.png',
+    2: '/app/assets/backgrounds/swamp.png',
+    3: '/app/assets/backgrounds/river.png',
+    4: '/app/assets/backgrounds/lake.png',
+    5: '/app/assets/backgrounds/reservoir.png',
+    6: '/app/assets/backgrounds/mountain_river.png',
     7: '/app/assets/backgrounds/river_delta.png',
     8: '/app/assets/backgrounds/sea_coast.png',
-    9: '/app/assets/backgrounds/fjord.png',
-    10: '/app/assets/backgrounds/open_ocean.png',
-    11: '/app/assets/backgrounds/amazon_riverbed.png',
-    12: '/app/assets/backgrounds/flooded_forest.png',
-    13: '/app/assets/backgrounds/mangroves.png',
-    14: '/app/assets/backgrounds/coral_flats.png',
+    9: '/app/assets/backgrounds/amazon_riverbed.png',
+    10: '/app/assets/backgrounds/flooded_forest.png',
+    11: '/app/assets/backgrounds/mangroves.png',
+    12: '/app/assets/backgrounds/coral_flats.png',
+    13: '/app/assets/backgrounds/fjord.png',
+    14: '/app/assets/backgrounds/open_ocean.png',
   };
 
   const normalizeLocationName = value => {
@@ -168,19 +188,19 @@
 
   const LOCATION_NAMES = {
     1: ['Пруд', 'Pond'],
-    2: ['Река', 'River'],
-    3: ['Озеро', 'Lake'],
-    4: ['Болото', 'Swamp'],
-    5: ['Горная река', 'Mountain River'],
-    6: ['Водохранилище', 'Reservoir'],
+    2: ['Болото', 'Swamp'],
+    3: ['Река', 'River'],
+    4: ['Озеро', 'Lake'],
+    5: ['Водохранилище', 'Reservoir'],
+    6: ['Горная река', 'Mountain River'],
     7: ['Дельта реки', 'River Delta'],
     8: ['Прибрежье моря', 'Sea Coast'],
-    9: ['Фьорд', 'Fjord'],
-    10: ['Открытый океан', 'Open Ocean'],
-    11: ['Русло Амазонки', 'Amazon Riverbed'],
-    12: ['Игапо, затопленный лес', 'Igapo Flooded Forest'],
-    13: ['Мангровые заросли', 'Mangroves'],
-    14: ['Коралловые отмели', 'Coral Flats'],
+    9: ['Русло Амазонки', 'Amazon Riverbed'],
+    10: ['Игапо, затопленный лес', 'Igapo Flooded Forest'],
+    11: ['Мангровые заросли', 'Mangroves'],
+    12: ['Коралловые отмели', 'Coral Flats'],
+    13: ['Фьорд', 'Fjord'],
+    14: ['Открытый океан', 'Open Ocean'],
   };
 
   const LOCATION_BG_BY_NAME = {};
@@ -199,6 +219,26 @@
       LOCATION_BG_BY_NAME[normalizedSlug] = url;
     }
   });
+
+  const getLocationBackground = (id, name) => {
+    if (name) {
+      const normalized = normalizeLocationName(name);
+      if (normalized && LOCATION_BG_BY_NAME[normalized]) {
+        return LOCATION_BG_BY_NAME[normalized];
+      }
+    }
+    const numId = Number(id);
+    if (Number.isFinite(numId) && LOCATION_BG[numId]) {
+      return LOCATION_BG[numId];
+    }
+    if (name) {
+      const slug = normalizeLocationName(String(name).replace(/_/g, ' '));
+      if (slug && LOCATION_BG_BY_NAME[slug]) {
+        return LOCATION_BG_BY_NAME[slug];
+      }
+    }
+    return null;
+  };
   const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
   const ROD_CONFIG = {
     spark: {
@@ -362,6 +402,35 @@
     'Испанская скумбрия': { en: 'Spanish Mackerel', asset: '/app/assets/fish/ispanskaya_makrel.png' },
     'Коралловая форель': { en: 'Coral Trout', asset: '/app/assets/fish/koralloviy_grupper.png' },
     'Спинорог-титан': { en: 'Titan Triggerfish', asset: '/app/assets/fish/spinorog_titan.png' },
+    'Карп кои (Кохаку)': { en: 'Koi (Kohaku)', asset: '/app/assets/fish/koi_kohaku.png' },
+    'Карп кои (Тайсё Сансёку)': { en: 'Koi (Taisho Sanshoku)', asset: '/app/assets/fish/koi_taisho_sanke.png' },
+    'Карп кои (Сёва Сансёку)': { en: 'Koi (Showa Sanshoku)', asset: '/app/assets/fish/koi_showa_sanshoku.png' },
+    'Карп кои (Уцуримоно)': { en: 'Koi (Utsurimono)', asset: '/app/assets/fish/koi_utsurimono.png' },
+    'Карп кои (Бэкко)': { en: 'Koi (Bekko)', asset: '/app/assets/fish/koi_bekko.png' },
+    'Карп кои (Тантё)': { en: 'Koi (Tancho)', asset: '/app/assets/fish/koi_tancho.png' },
+    'Карп кои (Асаги)': { en: 'Koi (Asagi)', asset: '/app/assets/fish/koi_asagi.png' },
+    'Карп кои (Сюсуй)': { en: 'Koi (Shusui)', asset: '/app/assets/fish/koi_shusui.png' },
+    'Карп кои (Коромо)': { en: 'Koi (Koromo)', asset: '/app/assets/fish/koi_koromo.png' },
+    'Карп кои (Кингинрин)': { en: 'Koi (Kinginrin)', asset: '/app/assets/fish/koi_kinginrin.png' },
+    'Карп кои (Каваримоно)': { en: 'Koi (Kawarimono)', asset: '/app/assets/fish/koi_kawarimono.png' },
+    'Карп кои (Огон)': { en: 'Koi (Ogon)', asset: '/app/assets/fish/koi_ogon.png' },
+    'Карп кои (Хикари-моёмоно)': { en: 'Koi (Hikari Moyomono)', asset: '/app/assets/fish/koi_hikari_moyomono.png' },
+    'Карп кои (Госики)': { en: 'Koi (Goshiki)', asset: '/app/assets/fish/koi_goshiki.png' },
+    'Карп кои (Кумонрю)': { en: 'Koi (Kumonryu)', asset: '/app/assets/fish/koi_kumonryu.png' },
+    'Карп кои (Дойцу-гои)': { en: 'Koi (Doitsu-goi)', asset: '/app/assets/fish/koi_doitsu.png' },
+    'Чёрный амур': { en: 'Black Amur', asset: '/app/assets/fish/cherniy_amur.png' },
+    'Змееголов северный': { en: 'Northern Snakehead', asset: '/app/assets/fish/zmeegolov_severniy.png' },
+    'Амурская щука': { en: 'Amur Pike', asset: '/app/assets/fish/amurskaya_schuka.png' },
+    'Кристивомер': { en: 'Lake Trout (Cristivomer)', asset: '/app/assets/fish/kristivomer.png' },
+    'Дунайский лосось': { en: 'Danube Salmon (Huchen)', asset: '/app/assets/fish/dunaiskiy_losos.png' },
+    'Зунгаро': { en: 'Zungaro Catfish', asset: '/app/assets/fish/zungaro.png' },
+    'Скат моторо': { en: 'Motoro Stingray', asset: '/app/assets/fish/skat_motoro.png' },
+    'Пеленгас': { en: 'Pelingas Mullet', asset: '/app/assets/fish/pelengas.png' },
+    'Кубера': { en: 'Cubera Snapper', asset: '/app/assets/fish/kubera.png' },
+    'Зубатка пятнистая': { en: 'Spotted Wolffish', asset: '/app/assets/fish/zubatka_pyatnistaya.png' },
+    'Тунец желтоперый': { en: 'Yellowfin Tuna', asset: '/app/assets/fish/tunec_zeltoperiy.png' },
+    'Чёрный снук': { en: 'Black Snook', asset: '/app/assets/fish/chyorniy_snuk.png' },
+    'Рыба-наполеон': { en: 'Napoleon Wrasse', asset: '/app/assets/fish/ryba_napoleon.png' },
   };
   const FISH_TRANSLATIONS = {};
   const FISH_IMG = {};
@@ -436,6 +505,8 @@
       rodUnavailable: 'Эта удочка недоступна',
       loading: 'Загрузка...',
       fish: 'Рыбы',
+      rarityFilterLabel: 'Редкость',
+      allRarities: 'Все',
       reachKg: kg => `Набери ${kg} кг, чтобы открыть`,
       fishes: 'Рыбы:',
       baitsLabel: 'Приманки:',
@@ -572,6 +643,8 @@
       rodUnavailable: 'This rod is not available',
       loading: 'Loading...',
       fish: 'Fish',
+      rarityFilterLabel: 'Rarity',
+      allRarities: 'All',
       reachKg: kg => `Reach ${kg} kg to unlock`,
       fishes: 'Fish:',
       baitsLabel: 'Baits:',
@@ -702,6 +775,7 @@
   window.getLureIcon = getLureIcon;
   window.LOCATION_BG = LOCATION_BG;
   window.LOCATION_BG_BY_NAME = LOCATION_BG_BY_NAME;
+  window.getLocationBackground = getLocationBackground;
   window.ROD_IMAGES = ROD_IMAGES;
   window.ROD_IMG = ROD_IMG;
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;

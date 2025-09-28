@@ -597,13 +597,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     fun guide(lang: String): GuideDTO = transaction {
-        fun rarityRank(r: String) = when(r) {
+        fun rarityRank(r: String) = when (r) {
             "common" -> 0
             "uncommon" -> 1
             "rare" -> 2
             "epic" -> 3
-            "legendary" -> 4
-            else -> 5
+            "mythic" -> 4
+            "legendary" -> 5
+            else -> 6
         }
 
         // Locations with fish and possible lures, ordered by unlock requirement
@@ -702,11 +703,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "Пресные простые",
             listOf(
                 ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
-                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 240),
+                    listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 360),
                 ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
-                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 550),
+                    listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 825),
                 ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
-                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1250),
+                    listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1875),
             )
         ),
 
@@ -721,7 +722,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»",
                     55,
                     listOf("Морская мирная" to 6, "Морская хищная" to 14),
-                    coinPrice = 450
+                    coinPrice = 675
                 ),
                 ShopPackage(
                     "salt_stock_m",
@@ -729,7 +730,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»",
                     129,
                     listOf("Морская мирная" to 15, "Морская хищная" to 35),
-                    coinPrice = 1000
+                    coinPrice = 1500
                 ),
                 ShopPackage(
                     "salt_crate_l",
@@ -737,7 +738,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»",
                     299,
                     listOf("Морская мирная" to 40, "Морская хищная" to 80),
-                    coinPrice = 2200
+                    coinPrice = 3300
                 ),
             )
         ),
@@ -850,7 +851,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "15 «Ручейный малек»",
                     29,
                     listOf("Пресная хищная" to 15),
-                    coinPrice = 210
+                    coinPrice = 315
                 ),
                 ShopPackage(
                     "micro_salt_starter",
@@ -858,7 +859,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "10 морских простых: 3 «Морская водоросль» и 7 «Кольца кальмара»",
                     25,
                     listOf("Морская мирная" to 3, "Морская хищная" to 7),
-                    coinPrice = 240
+                    coinPrice = 360
                 ),
                 ShopPackage(
                     "micro_salt_pred_refill",
@@ -866,7 +867,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "20 «Кольца кальмара»",
                     49,
                     listOf("Морская хищная" to 20),
-                    coinPrice = 500
+                    coinPrice = 750
                 ),
             )
         ),
@@ -1240,6 +1241,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         "uncommon" -> 0.6 + 0.3 * factor
         "rare" -> 0.3 + 0.4 * factor
         "epic" -> 0.2 + 0.3 * factor
+        "mythic" -> 0.15 + 0.25 * factor
         "legendary" -> 0.1 + 0.2 * factor
         else -> 1.0
     }
@@ -1539,7 +1541,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun rarityRank(r: String) = when (r) {
-        "legendary" -> 5
+        "legendary" -> 6
+        "mythic" -> 5
         "epic" -> 4
         "rare" -> 3
         "uncommon" -> 2

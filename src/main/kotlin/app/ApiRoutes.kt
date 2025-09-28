@@ -33,7 +33,7 @@ fun Application.apiRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val bot = TelegramBot(env.botToken)
-    val rarityGroups = setOf("common", "uncommon", "rare", "epic", "legendary")
+    val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
