@@ -482,7 +482,7 @@ object DB {
         setLFWeight(reservoir, fRarePeaceFreshKarp, 0.5); setLFWeight(reservoir, fRarePeaceFreshTolstolobik, 0.5); setLFWeight(reservoir, fEpicPredatorFreshSom, 0.22)
         setLFWeight(reservoir, fCommonPeaceFreshPlotva, 0.4); setLFWeight(reservoir, fCommonPredatorFreshOkun, 0.4); setLFWeight(reservoir, fRarePeaceFreshWhiteAmur, 0.3)
         setLFWeight(reservoir, fEpicPeaceFreshSterlyad, 0.03); setLFWeight(reservoir, fLegendaryPeaceFreshOsetr, 0.01)
-        setLFWeight(reservoir, fMyBlackCarp, 0.035)
+        setLFWeight(reservoir, fMythicPeaceFreshBlackAmur, 0.035)
         setLFWeight(reservoir, fCommonPeaceFreshGustera, 0.4); setLFWeight(reservoir, fCommonPredatorFreshErsch, 0.3); setLFWeight(reservoir, fCommonPeaceFreshPeskar, 0.35); setLFWeight(reservoir, fUncommonPredatorFreshYaz, 0.35)
 
         // Дельта реки (солоноватая)
@@ -491,7 +491,7 @@ object DB {
         setLFWeight(delta, fUncommonPeaceSaltKefal, 0.45); setLFWeight(delta, fCommonPeaceSaltSeld, 0.35); setLFWeight(delta, fCommonPredatorSaltKoryushka, 0.25)
         setLFWeight(delta, fCommonPeaceSaltSardina, 0.25); setLFWeight(delta, fCommonPeaceSaltAnchous, 0.20)
         setLFWeight(delta, fRarePredatorSaltLavrak, 0.18); setLFWeight(delta, fEpicPredatorSaltLososAtlantic, 0.12); setLFWeight(delta, fLegendaryPredatorSaltBeluga, 0.01)
-        setLFWeight(delta, fMyPelingas, 0.040)
+        setLFWeight(delta, fMythicPeaceSaltPelingas, 0.040)
         setLFWeight(delta, fCommonPredatorSaltBychok, 0.50); setLFWeight(delta, fCommonPeaceSaltKilka, 0.25); setLFWeight(delta, fCommonPeaceSaltMoiva, 0.20)
         setLFWeight(delta, fCommonPeaceFreshKrasnoperka, 0.35); setLFWeight(delta, fCommonPeaceFreshPeskar, 0.25)
         // cross-seed (новые)
