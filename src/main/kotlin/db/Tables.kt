@@ -539,6 +539,33 @@ object DB {
         setLFWeight(lake, fMythicPredatorFreshKristivomer, 0.05)
         setLFWeight(lake, fLegendaryPredatorFreshTaimen, 0.03)
 
+        // Водохранилище мирные
+        setLFWeight(reservoir, fCommonPeaceFreshPlotva, 0.8);
+        setLFWeight(reservoir, fCommonPeaceFreshKaras, 0.75)
+        setLFWeight(reservoir, fCommonPeaceFreshKrasnoperka, 0.75)
+        setLFWeight(reservoir, fCommonPeaceFreshUkleyka, 0.7)
+        setLFWeight(reservoir, fCommonPeaceFreshGustera, 0.6);
+        setLFWeight(reservoir, fCommonPeaceFreshPeskar, 0.5);
+        setLFWeight(reservoir, fUncommonPeaceFreshLesch, 0.45)
+        setLFWeight(reservoir, fUncommonPeaceFreshLin, 0.25)
+        setLFWeight(reservoir, fRarePeaceFreshKarp, 0.25);
+        setLFWeight(reservoir, fRarePeaceFreshTolstolobik, 0.2);
+        setLFWeight(reservoir, fRarePeaceFreshWhiteAmur, 0.2)
+        setLFWeight(reservoir, fEpicPeaceFreshSterlyad, 0.05);
+        setLFWeight(reservoir, fMythicPeaceFreshBlackAmur, 0.035)
+        setLFWeight(reservoir, fLegendaryPeaceFreshOsetr, 0.02)
+
+        // Водохранилище хищные
+        setLFWeight(reservoir, fCommonPredatorFreshOkun, 0.9);
+        setLFWeight(reservoir, fCommonPredatorFreshErsch, 0.75);
+        setLFWeight(reservoir, fUncommonPredatorFreshYaz, 0.5)
+        setLFWeight(reservoir, fUncommonPredatorFreshNalim, 0.45)
+        setLFWeight(reservoir, fRarePredatorFreshSchuka, 0.3)
+        setLFWeight(reservoir, fRarePredatorFreshSudak, 0.25);
+        setLFWeight(reservoir, fRarePredatorFreshZhereh, 0.25);
+        setLFWeight(reservoir, fEpicPredatorFreshSom, 0.15)
+        setLFWeight(reservoir, fEpicPredatorFreshEelEuropean, 0.1)
+
         // Горная река мирные
         setLFWeight(mtnRiver, fCommonPeaceFreshPlotva, 0.8)
         setLFWeight(mtnRiver, fCommonPeaceFreshUkleyka, 0.7)
@@ -564,14 +591,6 @@ object DB {
         setLFWeight(mtnRiver, fEpicPredatorFreshForelKumzha, 0.07)
         setLFWeight(mtnRiver, fMythicPredatorFreshDanubeLosos, 0.04)
         setLFWeight(mtnRiver, fLegendaryPredatorFreshTaimen, 0.03)
-
-        // Водохранилище
-        setLFWeight(reservoir, fRarePredatorFreshSudak, 0.9); setLFWeight(reservoir, fRarePredatorFreshZhereh, 0.6); setLFWeight(reservoir, fUncommonPeaceFreshLesch, 0.7)
-        setLFWeight(reservoir, fRarePeaceFreshKarp, 0.5); setLFWeight(reservoir, fRarePeaceFreshTolstolobik, 0.5); setLFWeight(reservoir, fEpicPredatorFreshSom, 0.22)
-        setLFWeight(reservoir, fCommonPeaceFreshPlotva, 0.4); setLFWeight(reservoir, fCommonPredatorFreshOkun, 0.4); setLFWeight(reservoir, fRarePeaceFreshWhiteAmur, 0.3)
-        setLFWeight(reservoir, fEpicPeaceFreshSterlyad, 0.03); setLFWeight(reservoir, fLegendaryPeaceFreshOsetr, 0.01)
-        setLFWeight(reservoir, fMythicPeaceFreshBlackAmur, 0.035)
-        setLFWeight(reservoir, fCommonPeaceFreshGustera, 0.4); setLFWeight(reservoir, fCommonPredatorFreshErsch, 0.3); setLFWeight(reservoir, fCommonPeaceFreshPeskar, 0.35); setLFWeight(reservoir, fUncommonPredatorFreshYaz, 0.35)
 
         // Дельта реки (солоноватая)
         setLFWeight(delta, fUncommonPeaceFreshChehon, 0.7); setLFWeight(delta, fRarePredatorFreshSudak, 0.6); setLFWeight(delta, fUncommonPeaceFreshLesch, 0.5)
