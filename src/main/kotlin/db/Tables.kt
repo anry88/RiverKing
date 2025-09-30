@@ -822,10 +822,10 @@ object DB {
         upsertLure("Пресная хищная", true, "fresh")
         upsertLure("Морская мирная", false, "salt")
         upsertLure("Морская хищная", true, "salt")
-        upsertLure("Пресная мирная+", false, "fresh", 0.3)
-        upsertLure("Пресная хищная+", true, "fresh", 0.3)
-        upsertLure("Морская мирная+", false, "salt", 0.3)
-        upsertLure("Морская хищная+", true, "salt", 0.3)
+        upsertLure("Пресная мирная+", false, "fresh", 1.0)
+        upsertLure("Пресная хищная+", true, "fresh", 1.0)
+        upsertLure("Морская мирная+", false, "salt", 1.0)
+        upsertLure("Морская хищная+", true, "salt", 1.0)
 
         // default lure
         Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }
