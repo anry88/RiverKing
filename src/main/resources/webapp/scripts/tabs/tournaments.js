@@ -38,27 +38,56 @@ function TournamentsTab({
     }
   },[pastResult]);
 
-  const getPrizeName = React.useCallback((packageId) => {
-    const pack = shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===packageId);
-    if(pack?.name) return pack.name;
-    if(packageId==='autofish_week') return t('autofishWeek');
-    return packageId;
-  }, [shop]);
+  const shopPacks = React.useMemo(() => shop.reduce((acc,c)=>acc.concat(c.packs),[]), [shop]);
+  const locale = (typeof document !== 'undefined' && document.documentElement.lang === 'ru') ? 'ru-RU' : 'en-US';
 
-  const getPrizeImg = React.useCallback((packageId) => {
-    if(!packageId) return '';
-    return String(packageId).startsWith('autofish')
+  const formatPrize = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      const amount = Number(prize.coins ?? prize.qty);
+      if(!Number.isFinite(amount) || amount <= 0) return null;
+      return { label: t('coins'), amount, isCoins: true };
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const pack = shopPacks.find(p=>p.id===packageId);
+    const label = pack?.name
+      || (packageId==='autofish_week' ? t('autofishWeek') : packageId);
+    const amount = prize.qty || 1;
+    return { label, amount, isCoins: false };
+  }, [shopPacks]);
+
+  const renderPrizeIcon = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      return <span className="text-lg">🪙</span>;
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const src = String(packageId).startsWith('autofish')
       ? '/app/assets/shop/autofish.png'
       : `/app/assets/shop/${packageId}.png`;
+    return <img src={src} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />;
   }, []);
 
-  const renderPrizeHint = (rank, prize) => (
-    prizeHint?.rank===rank && (
+  const renderPrizeHint = (rank, prize) => {
+    if(prizeHint?.rank !== rank) return null;
+    const info = formatPrize(prize);
+    if(!info) return null;
+    const amountText = info.isCoins
+      ? `+${Number(info.amount).toLocaleString(locale)}`
+      : (info.amount > 1 ? `x${info.amount}` : '');
+    const content = info.isCoins
+      ? `🪙 ${amountText}`
+      : `${info.label}${amountText ? ` ${amountText}` : ''}`;
+    return (
       <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
-        {getPrizeName(prize.packageId)} x{prize.qty}
+        {content}
       </div>
-    )
-  );
+    );
+  };
 
   const currentPrizeLeaderboard = React.useMemo(() => {
     if (!currentTournament) return [];
@@ -125,7 +154,9 @@ function TournamentsTab({
                             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                             aria-label={t('prizes')}
                           >
-                            <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                            <span className="w-5 h-5 flex items-center justify-center">
+                              {renderPrizeIcon(e.prize)}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -192,7 +223,9 @@ function TournamentsTab({
                             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                             aria-label={t('prizes')}
                           >
-                            <img src={getPrizeImg(currentTournament.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                            <span className="w-5 h-5 flex items-center justify-center">
+                              {renderPrizeIcon(currentTournament.mine.prize)}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -297,7 +330,9 @@ function TournamentsTab({
                           className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                           aria-label={t('prizes')}
                         >
-                          <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <span className="w-5 h-5 flex items-center justify-center">
+                            {renderPrizeIcon(e.prize)}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -364,7 +399,9 @@ function TournamentsTab({
                           className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                           aria-label={t('prizes')}
                         >
-                          <img src={getPrizeImg(pastResult.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <span className="w-5 h-5 flex items-center justify-center">
+                            {renderPrizeIcon(pastResult.mine.prize)}
+                          </span>
                         </button>
                       )}
                     </div>

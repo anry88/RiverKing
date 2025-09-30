@@ -20,6 +20,7 @@ import service.FishingService.CatchDTO
 import service.TournamentService
 import service.I18n
 import service.PrizeSpec
+import service.COIN_PRIZE_ID
 import service.ReferralService
 import db.Users
 import service.PayService
@@ -114,10 +115,10 @@ fun Application.apiRoutes(env: Env) {
     data class InvoiceResp(val invoice_url: String)
 
     @Serializable
-    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int)
+    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int, val coins: Int? = null)
 
     @Serializable
-    data class PrizeSpecDTO(val packageId: String, val qty: Int)
+    data class PrizeSpecDTO(val packageId: String, val qty: Int, val coins: Int? = null)
 
     @Serializable
     data class ReferralRewardDTO(val packageId: String, val qty: Int, val name: String)
@@ -148,6 +149,18 @@ fun Application.apiRoutes(env: Env) {
         val at: Long? = null,
         val prize: PrizeSpecDTO? = null,
     )
+
+    fun PrizeSpec.toDtoOrNull(): PrizeSpecDTO? {
+        val isCoins = pack == COIN_PRIZE_ID || coins != null
+        return when {
+            isCoins -> {
+                val amount = coins ?: qty
+                if (amount <= 0) null else PrizeSpecDTO(COIN_PRIZE_ID, amount, amount)
+            }
+            pack.isBlank() -> null
+            else -> PrizeSpecDTO(pack, qty, coins)
+        }
+    }
 
     @Serializable
     data class CurrentTournamentDTO(
@@ -348,7 +361,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
                 mine = mine?.let {
@@ -362,7 +375,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
             )
@@ -408,7 +421,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
                 mine = mine?.let {
@@ -422,7 +435,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
             )
@@ -492,7 +505,7 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank) }
+            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank, it.coins) }
             call.respond(prizes)
         }
 

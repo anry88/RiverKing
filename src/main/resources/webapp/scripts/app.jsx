@@ -821,13 +821,19 @@ function App(){
               <img src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
               <div className="text-lg font-semibold mb-1">
-                {
-                  (
-                    shop
-                      .reduce((acc, c) => acc.concat(c.packs), [])
-                      .find(p => p.id === prize.packageId)?.name
-                  ) || (prize.packageId === 'autofish_week' ? t('autofishWeek') : prize.packageId)
-                } x{prize.qty}
+                {prize.packageId === 'coins' || typeof prize.coins === 'number'
+                  ? <>🪙 +{Number(prize.coins ?? prize.qty).toLocaleString(coinLocale)}</>
+                  : (<>
+                    {
+                      (
+                        shop
+                          .reduce((acc, c) => acc.concat(c.packs), [])
+                          .find(p => p.id === prize.packageId)?.name
+                      ) || (prize.packageId === 'autofish_week' ? t('autofishWeek') : prize.packageId)
+                    }
+                    {prize.qty > 1 ? ` x${prize.qty}` : ''}
+                  </>)
+                }
               </div>
               <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
             </div>

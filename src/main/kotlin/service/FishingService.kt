@@ -1063,6 +1063,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         grantPackItems(userId, pack)
     }
 
+    fun addCoins(userId: Long, amount: Int): Long = transaction {
+        val delta = amount.coerceAtLeast(0)
+        val row = Users.select { Users.id eq userId }.forUpdate().single()
+        val current = row[Users.coins]
+        if (delta == 0) return@transaction current
+        val updated = (current + delta.toLong()).coerceAtMost(Long.MAX_VALUE)
+        Users.update({ Users.id eq userId }) { it[coins] = updated }
+        updated
+    }
+
     fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
