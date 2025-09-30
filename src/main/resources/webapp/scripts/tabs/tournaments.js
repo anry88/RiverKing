@@ -7,6 +7,9 @@ function tournamentFish(name, rarity){
   return <span className={cls}>{(rn[rarity]||rarity)} {t('fishWord')}</span>;
 }
 
+const AGGREGATE_METRICS = new Set(['count', 'total_weight']);
+const isAggregateMetric = metric => AGGREGATE_METRICS.has(metric);
+
 function TournamentsTab({
   me,
   tournamentTab,
@@ -128,7 +131,7 @@ function TournamentsTab({
               <div className="space-y-2">
                 {currentPrizeLeaderboard.map(e=> {
                   const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
-                  const catchData = (e.catchId && e.fish) ? {
+                  const catchData = (!isAggregateMetric(currentTournament.tournament.metric) && e.catchId && e.fish) ? {
                     id: e.catchId,
                     fish: e.fish,
                     weight: e.value,
@@ -160,7 +163,7 @@ function TournamentsTab({
                           </button>
                         )}
                       </div>
-                      {currentTournament.tournament.metric==='count' ? (
+                      {isAggregateMetric(currentTournament.tournament.metric) ? (
                         <div className="w-8 h-8"></div>
                       ) : e.fish ? (
                         (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -180,7 +183,7 @@ function TournamentsTab({
                         <div className="flex items-center gap-1 flex-wrap min-w-0">
                           <bdi className="truncate">{e.user||'-'}</bdi>
                         </div>
-                        {currentTournament.tournament.metric!=='count' && (
+                        {!isAggregateMetric(currentTournament.tournament.metric) && (
                           e.fish ? (
                             <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                           ) : (
@@ -198,7 +201,7 @@ function TournamentsTab({
                 );
                 })}
                 {currentTournament.mine && currentTournament.mine.rank>currentPrizeCount && (()=>{
-                  const mineCatch = (currentTournament.mine.catchId && currentTournament.mine.fish) ? {
+                  const mineCatch = (!isAggregateMetric(currentTournament.tournament.metric) && currentTournament.mine.catchId && currentTournament.mine.fish) ? {
                     id: currentTournament.mine.catchId,
                     fish: currentTournament.mine.fish,
                     weight: currentTournament.mine.value,
@@ -229,7 +232,7 @@ function TournamentsTab({
                           </button>
                         )}
                       </div>
-                      {currentTournament.tournament.metric==='count' ? (
+                      {isAggregateMetric(currentTournament.tournament.metric) ? (
                         <div className="w-8 h-8"></div>
                       ) : currentTournament.mine.fish ? (
                         (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
@@ -249,7 +252,7 @@ function TournamentsTab({
                         <div className="flex items-center gap-1 flex-wrap min-w-0">
                           <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                         </div>
-                        {currentTournament.tournament.metric!=='count' && (
+                        {!isAggregateMetric(currentTournament.tournament.metric) && (
                           currentTournament.mine.fish ? (
                             <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
                           ) : (
@@ -304,7 +307,7 @@ function TournamentsTab({
             <div className="space-y-2">
                 {pastPrizeLeaderboard.map(e=> {
                 const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
-                const catchData = (e.catchId && e.fish) ? {
+                const catchData = (!isAggregateMetric(pastResult.tournament.metric) && e.catchId && e.fish) ? {
                   id: e.catchId,
                   fish: e.fish,
                   weight: e.value,
@@ -336,7 +339,7 @@ function TournamentsTab({
                         </button>
                       )}
                     </div>
-                    {pastResult.tournament.metric==='count' ? (
+                    {isAggregateMetric(pastResult.tournament.metric) ? (
                       <div className="w-8 h-8"></div>
                     ) : e.fish ? (
                       (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -356,7 +359,7 @@ function TournamentsTab({
                       <div className="flex items-center gap-1 flex-wrap min-w-0">
                         <bdi className="truncate">{e.user||'-'}</bdi>
                       </div>
-                      {pastResult.tournament.metric!=='count' && (
+                      {!isAggregateMetric(pastResult.tournament.metric) && (
                         e.fish ? (
                           <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                         ) : (
@@ -374,7 +377,7 @@ function TournamentsTab({
               );
               })}
               {pastResult.mine && pastResult.mine.rank>pastPrizeCount && (()=>{
-                const mineCatch = (pastResult.mine.catchId && pastResult.mine.fish) ? {
+                const mineCatch = (!isAggregateMetric(pastResult.tournament.metric) && pastResult.mine.catchId && pastResult.mine.fish) ? {
                   id: pastResult.mine.catchId,
                   fish: pastResult.mine.fish,
                   weight: pastResult.mine.value,
@@ -405,7 +408,7 @@ function TournamentsTab({
                         </button>
                       )}
                     </div>
-                    {pastResult.tournament.metric==='count' ? (
+                    {isAggregateMetric(pastResult.tournament.metric) ? (
                       <div className="w-8 h-8"></div>
                     ) : pastResult.mine.fish ? (
                       (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
@@ -425,7 +428,7 @@ function TournamentsTab({
                       <div className="flex items-center gap-1 flex-wrap min-w-0">
                         <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                       </div>
-                      {pastResult.tournament.metric!=='count' && (
+                      {!isAggregateMetric(pastResult.tournament.metric) && (
                         pastResult.mine.fish ? (
                           <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>
                         ) : (
