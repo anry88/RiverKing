@@ -304,6 +304,25 @@ object I18n {
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
     fun location(name: String, lang: String) = if (lang == "en") locations[name] ?: name else name
+    fun tournamentMetric(metric: String, lang: String): String {
+        val normalized = metric.lowercase()
+        return when (lang) {
+            "ru" -> when (normalized) {
+                "count" -> "Количество"
+                "total_weight" -> "Вес"
+                "largest" -> "Самая большая"
+                "smallest" -> "Самая маленькая"
+                else -> normalized
+            }
+            else -> when (normalized) {
+                "count" -> "Count"
+                "total_weight" -> "Total weight"
+                "largest" -> "Largest"
+                "smallest" -> "Smallest"
+                else -> normalized
+            }
+        }
+    }
     fun lure(name: String, lang: String): String {
         val texts = lures[name]
         return when {
