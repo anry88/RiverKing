@@ -678,6 +678,7 @@ fun Application.botRoutes(env: Env) {
                     tournaments.pendingPrizes(uid)
                 }
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
+                val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
                 fun displayName(prize: UserPrize): String {
                     val name = packNames[prize.packageId]
                     if (name != null) return name
@@ -707,25 +708,28 @@ fun Application.botRoutes(env: Env) {
                     }
                     "$header\n$lines"
                 }
-                val text = buildString {
-                    if (!prefix.isNullOrBlank()) {
-                        append(prefix.trim())
+                val baseText = buildString {
+                    if (!prefixText.isNullOrBlank()) {
+                        append(prefixText)
                         if (body.isNotBlank()) append("\n\n")
                     }
                     append(body)
                 }
-                val markup = if (actual.isEmpty()) {
-                    null
-                } else {
-                    val buttons = actual.map { prize ->
-                        val name = displayName(prize)
-                        val short = if (name.length > 32) name.take(29) + "…" else name
-                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
-                        listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
-                    }
-                    Json.encodeToString(InlineKeyboardMarkup(buttons))
+                if (actual.isEmpty()) {
+                    trySend(chatId, baseText, replyToMessageId = replyToMessageId)
+                    return
                 }
-                trySend(chatId, text, markup, replyToMessageId)
+                val markup = Json.encodeToString(
+                    InlineKeyboardMarkup(
+                        actual.map { prize ->
+                            val name = displayName(prize)
+                            val short = if (name.length > 32) name.take(29) + "…" else name
+                            val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                            listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
+                        }
+                    )
+                )
+                trySend(chatId, baseText, markup, replyToMessageId)
             }
 
             suspend fun sendShopMenu(
@@ -838,9 +842,9 @@ fun Application.botRoutes(env: Env) {
                     "🪙 Coin shop. Balance: $balanceText coins."
                 }
                 val footer = if (lang == "ru") {
-                    "Чтобы купить, открой мини-приложение: https://t.me/${env.botName}?startapp"
+                    "Нажми на кнопку, чтобы купить за монеты. Или открой мини-приложение: https://t.me/${env.botName}?startapp"
                 } else {
-                    "To buy, open the mini app: https://t.me/${env.botName}?startapp"
+                    "Tap a button to buy with coins. Or open the mini app: https://t.me/${env.botName}?startapp"
                 }
                 val text = buildString {
                     append(header)
@@ -863,12 +867,16 @@ fun Application.botRoutes(env: Env) {
                     append("\n\n")
                     append(footer)
                 }.trim()
-                val parts = splitMessage(text)
-                parts.forEachIndexed { index, part ->
-                    val trimmedPart = part.trimEnd()
-                    val partReplyTo = if (index == 0) replyToMessageId else null
-                    trySend(chatId, trimmedPart, replyToMessageId = partReplyTo)
-                }
+                val buttons = shop.flatMap { category ->
+                    category.packs.map { pack ->
+                        val coinPrice = pack.coinPrice ?: return@map null
+                        val priceText = formatter.format(coinPrice)
+                        val label = "${pack.name} — 🪙 $priceText"
+                        InlineKeyboardButton(label, "/coinbuy ${ownedData(uid, pack.id)}")
+                    }.filterNotNull()
+                }.chunked(2)
+                val markup = if (buttons.isEmpty()) null else Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
             val keywordCommandMap = mapOf(
@@ -1310,6 +1318,125 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                         }
                         return true
+                    }
+                    "/coinbuy" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val packId = value
+                        if (packId.isNullOrBlank()) {
+                            logCommandMetric("coin_buy", mapOf("result" to "missing_arg"), source)
+                            val reply = if (lang == "ru") {
+                                "Укажи набор или воспользуйся командой /coin_shop."
+                            } else {
+                                "Specify a bundle id or use /coin_shop."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val pack = fishing.listShop(lang).flatMap { it.packs }.find { it.id == packId }
+                        if (pack == null || pack.coinPrice == null) {
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "invalid_pack", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Этот набор нельзя купить за монеты."
+                            } else {
+                                "This bundle can't be purchased with coins."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                        val formatter = NumberFormat.getIntegerInstance(locale)
+                        Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to packId))
+                        return try {
+                            fishing.buyPackageWithCoins(uid, packId)
+                            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to packId))
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "purchased", "pack" to packId),
+                                source,
+                            )
+                            val balance = transaction {
+                                Users.select { Users.id eq uid }.single()[Users.coins]
+                            }
+                            val priceText = formatter.format(pack.coinPrice)
+                            val balanceText = formatter.format(balance)
+                            val header = if (lang == "ru") {
+                                "Набор \"${pack.name}\" куплен за 🪙 $priceText. Баланс: $balanceText монет."
+                            } else {
+                                "Bundle \"${pack.name}\" bought for 🪙 $priceText. Balance: $balanceText coins."
+                            }
+                            val details = if (pack.items.isEmpty()) {
+                                header
+                            } else {
+                                val lines = pack.items.joinToString("\n") { (lure, qty) ->
+                                    "• $lure x$qty"
+                                }
+                                "$header\n$lines"
+                            }
+                            trySend(chatId, details, replyToMessageId = replyTo)
+                            true
+                        } catch (e: FishingService.NotEnoughCoinsException) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "reason" to "insufficient"),
+                            )
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "insufficient", "pack" to packId),
+                                source,
+                            )
+                            val requiredText = formatter.format(e.required)
+                            val balanceText = formatter.format(e.balance)
+                            val reply = if (lang == "ru") {
+                                "Недостаточно монет: нужно 🪙 $requiredText, у тебя только 🪙 $balanceText."
+                            } else {
+                                val coinWord = if (e.balance == 1L) "coin" else "coins"
+                                "Not enough coins: 🪙 $requiredText required, you only have 🪙 $balanceText $coinWord."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        } catch (_: FishingService.CoinPurchaseUnavailableException) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "reason" to "unavailable"),
+                            )
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "unavailable", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Покупка этого набора за монеты временно недоступна."
+                            } else {
+                                "Buying this bundle with coins is temporarily unavailable."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        } catch (e: Exception) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "reason" to "error"),
+                            )
+                            log.error("coin buy failed chatId={} pack={}", chatId, packId, e)
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "error", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Не удалось купить набор. Попробуй ещё раз позже."
+                            } else {
+                                "Failed to buy the bundle. Please try again later."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        }
                     }
                     "/cast" -> {
                         val uid = ensureUserId(from) ?: return false
