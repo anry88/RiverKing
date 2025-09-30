@@ -354,7 +354,7 @@ fun Application.botRoutes(env: Env) {
                 return builder.toString()
             }
 
-            fun trySend(
+            suspend fun trySend(
                 chatId: Long,
                 text: String,
                 replyMarkup: String? = null,
@@ -375,7 +375,7 @@ fun Application.botRoutes(env: Env) {
 
             fun ownedData(ownerUid: Long, payload: Any): String = "$ownerUid:${payload.toString()}"
 
-            fun sendLanguageMenu(
+            suspend fun sendLanguageMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -434,7 +434,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendBaitMenu(
+            suspend fun sendBaitMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -503,7 +503,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendDiscountMenu(chatId: Long) {
+            suspend fun sendDiscountMenu(chatId: Long) {
                 val discounts = fishing.listDiscounts().sortedBy { it.startDate }
                 val body = if (discounts.isEmpty()) {
                     "Скидок сейчас нет."
@@ -536,7 +536,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendDiscountPackPicker(chatId: Long) {
+            suspend fun sendDiscountPackPicker(chatId: Long) {
                 val packs = fishing.listShop("ru").flatMap { it.packs }.sortedBy { it.name }
                 if (packs.isEmpty()) {
                     try {
@@ -558,7 +558,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendRodMenu(
+            suspend fun sendRodMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -612,7 +612,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendLocationMenu(
+            suspend fun sendLocationMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -665,7 +665,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendPrizes(
+            suspend fun sendPrizes(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -728,7 +728,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendShopMenu(
+            suspend fun sendShopMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -810,7 +810,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendCoinShopMenu(
+            suspend fun sendCoinShopMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
