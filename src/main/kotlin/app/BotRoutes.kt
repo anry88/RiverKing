@@ -1208,7 +1208,23 @@ Available commands:
                             } else {
                                 "Time left: ${days}d ${hours}h ${minutes}m"
                             }
-                            val header = "$tName\n$timeText\n"
+                            val fishName = t.fish?.takeIf { it.isNotBlank() }?.let { I18n.fish(it, lang) }
+                                ?: if (lang == "ru") "любая" else "any"
+                            val locationName = t.location?.takeIf { it.isNotBlank() }
+                                ?.let { I18n.location(it, lang) }
+                                ?: if (lang == "ru") "любая" else "any"
+                            val metricText = I18n.tournamentMetric(t.metric, lang)
+                            val conditions = if (lang == "ru") {
+                                "Рыба: $fishName\nЛокация: $locationName\nТип: $metricText"
+                            } else {
+                                "Fish: $fishName\nLocation: $locationName\nType: $metricText"
+                            }
+                            val header = buildString {
+                                appendLine(tName)
+                                appendLine(timeText)
+                                appendLine(conditions)
+                                appendLine()
+                            }
                             val body = if (list.isEmpty()) {
                                 if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                             } else {
