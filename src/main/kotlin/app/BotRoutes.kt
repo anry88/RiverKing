@@ -32,6 +32,8 @@ import service.I18n
 import service.COIN_PRIZE_ID
 import util.Metrics
 import util.sanitizeName
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.time.Duration
 import java.time.Instant
@@ -1291,6 +1293,48 @@ Available commands:
                         }
                         val params = t?.let { mapOf("metric" to it.metric.lowercase()) } ?: emptyMap()
                         logCommandMetric("tournament", params, source)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/daily_rating" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val positions = fishing.dailyRatingPositions(uid)
+                        val reply = if (positions.isEmpty()) {
+                            if (lang == "ru") {
+                                "Сегодня ты ещё не участвовал в ежедневном рейтинге."
+                            } else {
+                                "You haven't entered today's daily rating yet."
+                            }
+                        } else {
+                            val header = if (lang == "ru") {
+                                "Твои места в сегодняшнем ежедневном рейтинге:"
+                            } else {
+                                "Your positions in today's daily rating:"
+                            }
+                            val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                            val numberFormat = NumberFormat.getIntegerInstance(locale)
+                            val weightFormat = DecimalFormat("#,##0.00", DecimalFormatSymbols(locale))
+                            val body = positions.joinToString("\n") { pos ->
+                                val locationName = I18n.location(pos.location, lang)
+                                val fishName = I18n.fish(pos.bestFish, lang)
+                                val rarityName = RARITY_LABELS[lang]?.get(pos.bestRarity)
+                                    ?: RARITY_LABELS["en"]?.get(pos.bestRarity)
+                                    ?: pos.bestRarity
+                                val weightText = weightFormat.format(pos.bestWeight)
+                                val coins = pos.prizeCoins?.let {
+                                    val coinsText = numberFormat.format(it)
+                                    if (lang == "ru") {
+                                        " — награда: 🪙 $coinsText"
+                                    } else {
+                                        " — prize: 🪙 $coinsText"
+                                    }
+                                } ?: ""
+                                "• $locationName — ${pos.rank}/${pos.participants}. $fishName (${rarityName}), $weightText ${if (lang == "ru") "кг" else "kg"}$coins"
+                            }
+                            "$header\n$body"
+                        }
+                        logCommandMetric("daily_rating", source = source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }

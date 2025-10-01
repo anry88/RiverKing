@@ -121,7 +121,7 @@ function Ratings({me, setMe, onCatchClick}){
                       <span className="text-lg">🪙</span>
                     </button>
                     {prizeHint?.index===i && (
-                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap rounded-lg text-amber-300">
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap rounded-lg text-amber-300">
                         🪙 +{Number(prizeHint.coins).toLocaleString(coinLocale)}
                       </div>
                     )}
