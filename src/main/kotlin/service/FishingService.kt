@@ -1239,6 +1239,18 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     @Serializable
+    data class DailyRatingPosition(
+        val locationId: Long,
+        val location: String,
+        val rank: Int,
+        val participants: Int,
+        val bestFish: String,
+        val bestRarity: String,
+        val bestWeight: Double,
+        val prizeCoins: Int? = null,
+    )
+
+    @Serializable
     data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
 
     @Serializable
@@ -1575,6 +1587,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val userId: Long,
     )
 
+    private data class DailyRatingCatch(
+        val locationId: Long,
+        val location: String,
+        val rarity: String,
+        val weight: Double,
+        val userId: Long,
+        val fish: String,
+    )
+
     private fun dailyPrizePreview(locationId: Long, date: LocalDate): Map<Int, Int> {
         val start = date.atStartOfDay(ratingZone).toInstant()
         val end = start.plus(Duration.ofDays(1))
@@ -1610,6 +1631,56 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 rank to coins
             }
             .toMap()
+    }
+
+    fun dailyRatingPositions(userId: Long, date: LocalDate = ZonedDateTime.now(ratingZone).toLocalDate()): List<DailyRatingPosition> {
+        val start = date.atStartOfDay(ratingZone).toInstant()
+        val end = start.plus(Duration.ofDays(1))
+        val catches = transaction {
+            (Catches innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
+                .select {
+                    (Catches.createdAt greaterEq start) and
+                        (Catches.createdAt less end)
+                }
+                .map {
+                    DailyRatingCatch(
+                        locationId = it[Catches.locationId].value,
+                        location = it[Locations.name],
+                        rarity = it[Fish.rarity],
+                        weight = it[Catches.weight],
+                        userId = it[Catches.userId].value,
+                        fish = it[Fish.name],
+                    )
+                }
+        }
+        if (catches.isEmpty()) return emptyList()
+        val comparator = compareByDescending<DailyRatingCatch> { rarityRank(it.rarity) }
+            .thenByDescending { it.weight }
+        return catches
+            .groupBy { it.locationId }
+            .mapNotNull { (locationId, entries) ->
+                val myBest = entries.filter { it.userId == userId }.maxWithOrNull(comparator) ?: return@mapNotNull null
+                val bestByUser = entries
+                    .groupBy { it.userId }
+                    .mapValues { (_, list) -> list.maxWithOrNull(comparator)!! }
+                val sorted = bestByUser.values.sortedWith(comparator)
+                val rank = sorted.indexOfFirst { it.userId == userId }
+                if (rank == -1) return@mapNotNull null
+                val prizeDate = date
+                val coinsByRank = dailyPrizePreview(locationId, prizeDate)
+                DailyRatingPosition(
+                    locationId = locationId,
+                    location = myBest.location,
+                    rank = rank + 1,
+                    participants = sorted.size,
+                    bestFish = myBest.fish,
+                    bestRarity = myBest.rarity,
+                    bestWeight = myBest.weight,
+                    prizeCoins = coinsByRank[rank + 1],
+                )
+            }
+            .sortedBy { it.rank }
     }
 
     private fun sortCatches(list: List<CatchDTO>, limit: Int, asc: Boolean = false) =
