@@ -18,6 +18,8 @@ import service.RodDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.TournamentService
+import service.PrizeService
+import service.RatingPrizeService
 import service.I18n
 import service.PrizeSpec
 import service.COIN_PRIZE_ID
@@ -33,6 +35,8 @@ fun Application.apiRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val ratingPrizes = RatingPrizeService()
+    val prizeService = PrizeService(tournaments, ratingPrizes)
     val bot = TelegramBot(env.botToken)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
 
@@ -497,7 +501,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/prizes") {
-            tournaments.distributePrizes()
+            prizeService.distributePrizes()
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -505,8 +509,8 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank, it.coins) }
-            call.respond(prizes)
+            val pending = prizeService.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank, it.coins) }
+            call.respond(pending)
         }
 
         post("/api/prizes/{id}/claim") {
@@ -519,7 +523,7 @@ fun Application.apiRoutes(env: Env) {
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val uid = fishing.ensureUserByTgId(tgId)
             val (lures, current) = try {
-                tournaments.claimPrize(uid, id, fishing)
+                prizeService.claimPrize(uid, id, fishing)
             } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures2 = lures.map {

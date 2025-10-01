@@ -24,6 +24,8 @@ import service.PayService
 import service.StarsPaymentService
 import service.ReferralService
 import service.TournamentService
+import service.RatingPrizeService
+import service.PrizeService
 import service.UserPrize
 import service.PrizeSpec
 import service.I18n
@@ -169,6 +171,8 @@ fun Application.botRoutes(env: Env) {
     val fishing = FishingService()
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val ratingPrizes = RatingPrizeService()
+    val prizeService = PrizeService(tournaments, ratingPrizes)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
@@ -694,8 +698,8 @@ fun Application.botRoutes(env: Env) {
                 replyToMessageId: Long? = null,
             ) {
                 val actual = prizes ?: run {
-                    tournaments.distributePrizes()
-                    tournaments.pendingPrizes(uid)
+                    prizeService.distributePrizes()
+                    prizeService.pendingPrizes(uid)
                 }
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
                 val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
@@ -1286,8 +1290,8 @@ Available commands:
                     "/prizes" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        tournaments.distributePrizes()
-                        val prizes = tournaments.pendingPrizes(uid)
+                        prizeService.distributePrizes()
+                        val prizes = prizeService.pendingPrizes(uid)
                         logCommandMetric("prizes", mapOf("count" to prizes.size.toString()), source)
                         sendPrizes(uid, chatId, lang, prizes = prizes, replyToMessageId = replyTo)
                         return true
@@ -2068,8 +2072,8 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        tournaments.distributePrizes()
-                        val pending = tournaments.pendingPrizes(uid)
+                        prizeService.distributePrizes()
+                        val pending = prizeService.pendingPrizes(uid)
                         val prize = pending.find { it.id == prizeId }
                         if (prize == null) {
                             logCommandMetric("prizes_claim", mapOf("result" to "not_found"), source)
@@ -2092,7 +2096,7 @@ Available commands:
                                 ?: prize.packageId.replace('_', ' ')
                         }
                         val success = try {
-                            tournaments.claimPrize(uid, prizeId, fishing)
+                            prizeService.claimPrize(uid, prizeId, fishing)
                             logCommandMetric(
                                 "prizes_claim",
                                 mapOf(
