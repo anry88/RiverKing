@@ -1664,34 +1664,55 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val comparator = compareByDescending<DailyRatingCatch> { rarityRank(it.rarity) }
             .thenByDescending { it.weight }
             .thenBy { it.catchId }
+        data class RankedCatch(val catch: DailyRatingCatch, val rank: Int)
+
         return catches
             .groupBy { it.locationId }
-            .mapNotNull { (locationId, entries) ->
+            .flatMap { (locationId, entries) ->
+                if (entries.isEmpty()) return@flatMap emptyList<DailyRatingPosition>()
+
                 val sorted = entries.sortedWith(comparator)
-                val bestPerUser = LinkedHashMap<Long, DailyRatingCatch>()
-                for (catch in sorted) {
-                    bestPerUser.putIfAbsent(catch.userId, catch)
+                val uniquePlayers = entries.map { it.userId }.toSet().size
+                if (uniquePlayers <= 0) return@flatMap emptyList<DailyRatingPosition>()
+
+                val prizePlaces = minOf(sorted.size, uniquePlayers, 10)
+                val rankedCatches = sorted.mapIndexedNotNull { index, catch ->
+                    if (catch.userId != userId) {
+                        null
+                    } else {
+                        RankedCatch(catch, index + 1)
+                    }
                 }
-                val rankedEntries = bestPerUser.values.toList()
-                val myCatch = bestPerUser[userId] ?: return@mapNotNull null
-                val rank = rankedEntries.indexOf(myCatch) + 1
-                val participants = rankedEntries.size
-                val prizePlaces = minOf(participants, 10)
-                val prizeCoins = if (rank <= prizePlaces) {
-                    (prizePlaces - rank + 1) * 50
-                } else {
-                    null
+
+                if (rankedCatches.isEmpty()) return@flatMap emptyList<DailyRatingPosition>()
+
+                val prizeCatches = rankedCatches.filter { it.rank <= prizePlaces }
+                val topNonPrize = rankedCatches.firstOrNull { it.rank > prizePlaces }
+                val selected = when {
+                    prizeCatches.isNotEmpty() && topNonPrize != null -> prizeCatches + topNonPrize
+                    prizeCatches.isNotEmpty() -> prizeCatches
+                    topNonPrize != null -> listOf(topNonPrize)
+                    else -> emptyList()
                 }
-                DailyRatingPosition(
-                    locationId = locationId,
-                    location = myCatch.location,
-                    rank = rank,
-                    participants = participants,
-                    bestFish = myCatch.fish,
-                    bestRarity = myCatch.rarity,
-                    bestWeight = myCatch.weight,
-                    prizeCoins = prizeCoins,
-                )
+
+                selected.map { ranked ->
+                    val rank = ranked.rank
+                    val prizeCoins = if (rank <= prizePlaces) {
+                        (prizePlaces - rank + 1) * 50
+                    } else {
+                        null
+                    }
+                    DailyRatingPosition(
+                        locationId = locationId,
+                        location = ranked.catch.location,
+                        rank = rank,
+                        participants = uniquePlayers,
+                        bestFish = ranked.catch.fish,
+                        bestRarity = ranked.catch.rarity,
+                        bestWeight = ranked.catch.weight,
+                        prizeCoins = prizeCoins,
+                    )
+                }
             }
             .sortedWith(compareBy<DailyRatingPosition> { it.location }.thenBy { it.rank })
     }
