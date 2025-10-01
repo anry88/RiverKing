@@ -1315,6 +1315,25 @@ Available commands:
                             val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
                             val numberFormat = NumberFormat.getIntegerInstance(locale)
                             val weightFormat = DecimalFormat("#,##0.00", DecimalFormatSymbols(locale))
+                            fun englishOrdinal(rank: Int): String {
+                                val mod100 = rank % 100
+                                val suffix = if (mod100 in 11..13) {
+                                    "th"
+                                } else {
+                                    when (rank % 10) {
+                                        1 -> "st"
+                                        2 -> "nd"
+                                        3 -> "rd"
+                                        else -> "th"
+                                    }
+                                }
+                                return "$rank$suffix"
+                            }
+                            fun formatPlace(rank: Int): String = if (lang == "ru") {
+                                "$rank место"
+                            } else {
+                                "${englishOrdinal(rank)} place"
+                            }
                             val body = positions.joinToString("\n") { pos ->
                                 val locationName = I18n.location(pos.location, lang)
                                 val fishName = I18n.fish(pos.bestFish, lang)
@@ -1325,12 +1344,12 @@ Available commands:
                                 val coins = pos.prizeCoins?.let {
                                     val coinsText = numberFormat.format(it)
                                     if (lang == "ru") {
-                                        " — награда: 🪙 $coinsText"
+                                        ", $coinsText монет"
                                     } else {
-                                        " — prize: 🪙 $coinsText"
+                                        ", $coinsText coins"
                                     }
                                 } ?: ""
-                                "• $locationName — ${pos.rank}/${pos.participants}. $fishName (${rarityName}), $weightText ${if (lang == "ru") "кг" else "kg"}$coins"
+                                "• $locationName — ${formatPlace(pos.rank)}. $fishName (${rarityName}), $weightText ${if (lang == "ru") "кг" else "kg"}$coins"
                             }
                             "$header\n$body"
                         }
