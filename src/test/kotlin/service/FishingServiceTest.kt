@@ -244,11 +244,11 @@ class FishingServiceTest {
         val prizeSummary = results.take(5).map { it.userId to (it.rank to it.prizeCoins) }
         assertEquals(
             listOf(
-                mainUser to (1 to 250),
-                rivalA to (2 to 200),
-                mainUser to (3 to 150),
-                rivalB to (4 to 100),
-                mainUser to (5 to 50),
+                mainUser to (1 to 150),
+                rivalA to (2 to 100),
+                mainUser to (3 to 50),
+                rivalB to (null to null),
+                mainUser to (null to null),
             ),
             prizeSummary,
         )

@@ -1572,6 +1572,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     private data class DailyPrizeCatch(
         val rarity: String,
         val weight: Double,
+        val userId: Long,
     )
 
     private fun dailyPrizePreview(locationId: Long, date: LocalDate): Map<Int, Int> {
@@ -1588,11 +1589,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     DailyPrizeCatch(
                         rarity = it[Fish.rarity],
                         weight = it[Catches.weight],
+                        userId = it[Catches.userId].value,
                     )
                 }
         }
         if (rows.isEmpty()) return emptyMap()
-        val maxPlaces = minOf(rows.size, 10)
+        val playerCount = rows.map { it.userId }.toSet().size
+        if (playerCount == 0) return emptyMap()
+        val maxPlaces = minOf(playerCount, 10)
         if (maxPlaces <= 0) return emptyMap()
         return rows
             .sortedWith(
