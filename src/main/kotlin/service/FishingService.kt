@@ -14,6 +14,7 @@ import util.Rng
 import util.sanitizeName
 import java.time.*
 import java.time.temporal.ChronoUnit
+import java.util.LinkedHashMap
 import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
@@ -1667,26 +1668,31 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .groupBy { it.locationId }
             .mapNotNull { (locationId, entries) ->
                 val sorted = entries.sortedWith(comparator)
-                val uniquePlayers = entries.map { it.userId }.toSet().size
-                val maxPlaces = minOf(sorted.size, uniquePlayers, 10)
-                if (maxPlaces <= 0) return@mapNotNull null
-                val prizeEntries = sorted.take(maxPlaces)
-                val myEntries = prizeEntries.withIndex().filter { it.value.userId == userId }
-                if (myEntries.isEmpty()) return@mapNotNull null
-                myEntries.map { (index, catch) ->
-                    DailyRatingPosition(
-                        locationId = locationId,
-                        location = catch.location,
-                        rank = index + 1,
-                        participants = maxPlaces,
-                        bestFish = catch.fish,
-                        bestRarity = catch.rarity,
-                        bestWeight = catch.weight,
-                        prizeCoins = (maxPlaces - index) * 50,
-                    )
+                val bestPerUser = LinkedHashMap<Long, DailyRatingCatch>()
+                for (catch in sorted) {
+                    bestPerUser.putIfAbsent(catch.userId, catch)
                 }
+                val rankedEntries = bestPerUser.values.toList()
+                val myCatch = bestPerUser[userId] ?: return@mapNotNull null
+                val rank = rankedEntries.indexOf(myCatch) + 1
+                val participants = rankedEntries.size
+                val prizePlaces = minOf(participants, 10)
+                val prizeCoins = if (rank <= prizePlaces) {
+                    (prizePlaces - rank + 1) * 50
+                } else {
+                    null
+                }
+                DailyRatingPosition(
+                    locationId = locationId,
+                    location = myCatch.location,
+                    rank = rank,
+                    participants = participants,
+                    bestFish = myCatch.fish,
+                    bestRarity = myCatch.rarity,
+                    bestWeight = myCatch.weight,
+                    prizeCoins = prizeCoins,
+                )
             }
-            .flatten()
             .sortedWith(compareBy<DailyRatingPosition> { it.location }.thenBy { it.rank })
     }
 

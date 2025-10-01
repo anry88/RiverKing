@@ -1162,6 +1162,7 @@ fun Application.botRoutes(env: Env) {
 /shop — купить приманки за звёзды
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
+/daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
@@ -1178,6 +1179,7 @@ Available commands:
 /shop — buy baits with Stars
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
+/daily_rating — view the current placement of your best catch in today's daily rating
 /stats — your fishing stats
 /language — choose your language
 /nickname — change your nickname""".trimIndent()
