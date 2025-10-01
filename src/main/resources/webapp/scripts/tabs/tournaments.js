@@ -7,6 +7,9 @@ function tournamentFish(name, rarity){
   return <span className={cls}>{(rn[rarity]||rarity)} {t('fishWord')}</span>;
 }
 
+const AGGREGATE_METRICS = new Set(['count', 'total_weight']);
+const isAggregateMetric = metric => AGGREGATE_METRICS.has(metric);
+
 function TournamentsTab({
   me,
   tournamentTab,
@@ -38,27 +41,56 @@ function TournamentsTab({
     }
   },[pastResult]);
 
-  const getPrizeName = React.useCallback((packageId) => {
-    const pack = shop.reduce((acc,c)=>acc.concat(c.packs),[]).find(p=>p.id===packageId);
-    if(pack?.name) return pack.name;
-    if(packageId==='autofish_week') return t('autofishWeek');
-    return packageId;
-  }, [shop]);
+  const shopPacks = React.useMemo(() => shop.reduce((acc,c)=>acc.concat(c.packs),[]), [shop]);
+  const locale = (typeof document !== 'undefined' && document.documentElement.lang === 'ru') ? 'ru-RU' : 'en-US';
 
-  const getPrizeImg = React.useCallback((packageId) => {
-    if(!packageId) return '';
-    return String(packageId).startsWith('autofish')
+  const formatPrize = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      const amount = Number(prize.coins ?? prize.qty);
+      if(!Number.isFinite(amount) || amount <= 0) return null;
+      return { label: t('coins'), amount, isCoins: true };
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const pack = shopPacks.find(p=>p.id===packageId);
+    const label = pack?.name
+      || (packageId==='autofish_week' ? t('autofishWeek') : packageId);
+    const amount = prize.qty || 1;
+    return { label, amount, isCoins: false };
+  }, [shopPacks]);
+
+  const renderPrizeIcon = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      return <span className="text-lg">🪙</span>;
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const src = String(packageId).startsWith('autofish')
       ? '/app/assets/shop/autofish.png'
       : `/app/assets/shop/${packageId}.png`;
+    return <img src={src} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />;
   }, []);
 
-  const renderPrizeHint = (rank, prize) => (
-    prizeHint?.rank===rank && (
+  const renderPrizeHint = (rank, prize) => {
+    if(prizeHint?.rank !== rank) return null;
+    const info = formatPrize(prize);
+    if(!info) return null;
+    const amountText = info.isCoins
+      ? `+${Number(info.amount).toLocaleString(locale)}`
+      : (info.amount > 1 ? `x${info.amount}` : '');
+    const content = info.isCoins
+      ? `🪙 ${amountText}`
+      : `${info.label}${amountText ? ` ${amountText}` : ''}`;
+    return (
       <div className="absolute right-0 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap z-10 rounded-lg text-amber-300">
-        {getPrizeName(prize.packageId)} x{prize.qty}
+        {content}
       </div>
-    )
-  );
+    );
+  };
 
   const currentPrizeLeaderboard = React.useMemo(() => {
     if (!currentTournament) return [];
@@ -99,7 +131,7 @@ function TournamentsTab({
               <div className="space-y-2">
                 {currentPrizeLeaderboard.map(e=> {
                   const isMine = currentTournament.mine && e.rank===currentTournament.mine.rank;
-                  const catchData = (e.catchId && e.fish) ? {
+                  const catchData = (!isAggregateMetric(currentTournament.tournament.metric) && e.catchId && e.fish) ? {
                     id: e.catchId,
                     fish: e.fish,
                     weight: e.value,
@@ -125,11 +157,13 @@ function TournamentsTab({
                             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                             aria-label={t('prizes')}
                           >
-                            <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                            <span className="w-5 h-5 flex items-center justify-center">
+                              {renderPrizeIcon(e.prize)}
+                            </span>
                           </button>
                         )}
                       </div>
-                      {currentTournament.tournament.metric==='count' ? (
+                      {isAggregateMetric(currentTournament.tournament.metric) ? (
                         <div className="w-8 h-8"></div>
                       ) : e.fish ? (
                         (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -149,7 +183,7 @@ function TournamentsTab({
                         <div className="flex items-center gap-1 flex-wrap min-w-0">
                           <bdi className="truncate">{e.user||'-'}</bdi>
                         </div>
-                        {currentTournament.tournament.metric!=='count' && (
+                        {!isAggregateMetric(currentTournament.tournament.metric) && (
                           e.fish ? (
                             <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                           ) : (
@@ -167,7 +201,7 @@ function TournamentsTab({
                 );
                 })}
                 {currentTournament.mine && currentTournament.mine.rank>currentPrizeCount && (()=>{
-                  const mineCatch = (currentTournament.mine.catchId && currentTournament.mine.fish) ? {
+                  const mineCatch = (!isAggregateMetric(currentTournament.tournament.metric) && currentTournament.mine.catchId && currentTournament.mine.fish) ? {
                     id: currentTournament.mine.catchId,
                     fish: currentTournament.mine.fish,
                     weight: currentTournament.mine.value,
@@ -192,11 +226,13 @@ function TournamentsTab({
                             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                             aria-label={t('prizes')}
                           >
-                            <img src={getPrizeImg(currentTournament.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                            <span className="w-5 h-5 flex items-center justify-center">
+                              {renderPrizeIcon(currentTournament.mine.prize)}
+                            </span>
                           </button>
                         )}
                       </div>
-                      {currentTournament.tournament.metric==='count' ? (
+                      {isAggregateMetric(currentTournament.tournament.metric) ? (
                         <div className="w-8 h-8"></div>
                       ) : currentTournament.mine.fish ? (
                         (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
@@ -216,7 +252,7 @@ function TournamentsTab({
                         <div className="flex items-center gap-1 flex-wrap min-w-0">
                           <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
                         </div>
-                        {currentTournament.tournament.metric!=='count' && (
+                        {!isAggregateMetric(currentTournament.tournament.metric) && (
                           currentTournament.mine.fish ? (
                             <div className="text-xs opacity-70 truncate">{currentTournament.mine.fish} — {currentTournament.mine.location} — {new Date(currentTournament.mine.at*1000).toLocaleString()}</div>
                           ) : (
@@ -271,7 +307,7 @@ function TournamentsTab({
             <div className="space-y-2">
                 {pastPrizeLeaderboard.map(e=> {
                 const isMine = pastResult.mine && e.rank===pastResult.mine.rank;
-                const catchData = (e.catchId && e.fish) ? {
+                const catchData = (!isAggregateMetric(pastResult.tournament.metric) && e.catchId && e.fish) ? {
                   id: e.catchId,
                   fish: e.fish,
                   weight: e.value,
@@ -297,11 +333,13 @@ function TournamentsTab({
                           className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                           aria-label={t('prizes')}
                         >
-                          <img src={getPrizeImg(e.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <span className="w-5 h-5 flex items-center justify-center">
+                            {renderPrizeIcon(e.prize)}
+                          </span>
                         </button>
                       )}
                     </div>
-                    {pastResult.tournament.metric==='count' ? (
+                    {isAggregateMetric(pastResult.tournament.metric) ? (
                       <div className="w-8 h-8"></div>
                     ) : e.fish ? (
                       (me.caughtFishIds||[]).includes(e.fishId) ? (
@@ -321,7 +359,7 @@ function TournamentsTab({
                       <div className="flex items-center gap-1 flex-wrap min-w-0">
                         <bdi className="truncate">{e.user||'-'}</bdi>
                       </div>
-                      {pastResult.tournament.metric!=='count' && (
+                      {!isAggregateMetric(pastResult.tournament.metric) && (
                         e.fish ? (
                           <div className="text-xs opacity-70 truncate">{e.fish} — {e.location} — {new Date(e.at*1000).toLocaleString()}</div>
                         ) : (
@@ -339,7 +377,7 @@ function TournamentsTab({
               );
               })}
               {pastResult.mine && pastResult.mine.rank>pastPrizeCount && (()=>{
-                const mineCatch = (pastResult.mine.catchId && pastResult.mine.fish) ? {
+                const mineCatch = (!isAggregateMetric(pastResult.tournament.metric) && pastResult.mine.catchId && pastResult.mine.fish) ? {
                   id: pastResult.mine.catchId,
                   fish: pastResult.mine.fish,
                   weight: pastResult.mine.value,
@@ -364,11 +402,13 @@ function TournamentsTab({
                           className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
                           aria-label={t('prizes')}
                         >
-                          <img src={getPrizeImg(pastResult.mine.prize.packageId)} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <span className="w-5 h-5 flex items-center justify-center">
+                            {renderPrizeIcon(pastResult.mine.prize)}
+                          </span>
                         </button>
                       )}
                     </div>
-                    {pastResult.tournament.metric==='count' ? (
+                    {isAggregateMetric(pastResult.tournament.metric) ? (
                       <div className="w-8 h-8"></div>
                     ) : pastResult.mine.fish ? (
                       (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
@@ -388,7 +428,7 @@ function TournamentsTab({
                       <div className="flex items-center gap-1 flex-wrap min-w-0">
                         <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
                       </div>
-                      {pastResult.tournament.metric!=='count' && (
+                      {!isAggregateMetric(pastResult.tournament.metric) && (
                         pastResult.mine.fish ? (
                           <div className="text-xs opacity-70 truncate">{pastResult.mine.fish} — {pastResult.mine.location} — {new Date(pastResult.mine.at*1000).toLocaleString()}</div>
                         ) : (

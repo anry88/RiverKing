@@ -18,8 +18,11 @@ import service.RodDTO
 import service.FishingService.LureDTO
 import service.FishingService.CatchDTO
 import service.TournamentService
+import service.PrizeService
+import service.RatingPrizeService
 import service.I18n
 import service.PrizeSpec
+import service.COIN_PRIZE_ID
 import service.ReferralService
 import db.Users
 import service.PayService
@@ -32,6 +35,8 @@ fun Application.apiRoutes(env: Env) {
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val ratingPrizes = RatingPrizeService()
+    val prizeService = PrizeService(tournaments, ratingPrizes)
     val bot = TelegramBot(env.botToken)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
 
@@ -114,10 +119,10 @@ fun Application.apiRoutes(env: Env) {
     data class InvoiceResp(val invoice_url: String)
 
     @Serializable
-    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int)
+    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int, val coins: Int? = null)
 
     @Serializable
-    data class PrizeSpecDTO(val packageId: String, val qty: Int)
+    data class PrizeSpecDTO(val packageId: String, val qty: Int, val coins: Int? = null)
 
     @Serializable
     data class ReferralRewardDTO(val packageId: String, val qty: Int, val name: String)
@@ -148,6 +153,18 @@ fun Application.apiRoutes(env: Env) {
         val at: Long? = null,
         val prize: PrizeSpecDTO? = null,
     )
+
+    fun PrizeSpec.toDtoOrNull(): PrizeSpecDTO? {
+        val isCoins = pack == COIN_PRIZE_ID || coins != null
+        return when {
+            isCoins -> {
+                val amount = coins ?: qty
+                if (amount <= 0) null else PrizeSpecDTO(COIN_PRIZE_ID, amount, amount)
+            }
+            pack.isBlank() -> null
+            else -> PrizeSpecDTO(pack, qty, coins)
+        }
+    }
 
     @Serializable
     data class CurrentTournamentDTO(
@@ -348,7 +365,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
                 mine = mine?.let {
@@ -362,7 +379,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
             )
@@ -408,7 +425,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
                 mine = mine?.let {
@@ -422,7 +439,7 @@ fun Application.apiRoutes(env: Env) {
                         fishId = it.fishId,
                         location = it.location?.let { l -> I18n.location(l, language) },
                         at = it.at?.epochSecond,
-                        prize = prizes.getOrNull(it.rank - 1)?.let { p -> PrizeSpecDTO(p.pack, p.qty) },
+                        prize = prizes.getOrNull(it.rank - 1)?.toDtoOrNull(),
                     )
                 },
             )
@@ -484,7 +501,6 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/prizes") {
-            tournaments.distributePrizes()
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId
@@ -492,8 +508,8 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val prizes = tournaments.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank) }
-            call.respond(prizes)
+            val pending = prizeService.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank, it.coins) }
+            call.respond(pending)
         }
 
         post("/api/prizes/{id}/claim") {
@@ -506,7 +522,7 @@ fun Application.apiRoutes(env: Env) {
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val uid = fishing.ensureUserByTgId(tgId)
             val (lures, current) = try {
-                tournaments.claimPrize(uid, id, fishing)
+                prizeService.claimPrize(uid, id, fishing)
             } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures2 = lures.map {
@@ -602,16 +618,25 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             log.info("shop purchase click tgId={} pack={}", tgId, id)
-            Metrics.counter("shop_purchase_click_total", mapOf("pack" to id))
+            Metrics.counter(
+                "shop_purchase_click_total",
+                mapOf("pack" to id, "currency" to "stars"),
+            )
             val uid = fishing.ensureUserByTgId(tgId)
             val paymentReq = if (!env.devMode) {
                 try { call.receive<PaymentReq>() } catch (_: Exception) {
-                    Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
+                    Metrics.counter(
+                        "shop_purchase_denied_total",
+                        mapOf("pack" to id, "currency" to "stars"),
+                    )
                     return@post call.respond(HttpStatusCode.PaymentRequired)
                 }
             } else try { call.receive<PaymentReq>() } catch (_: Exception) { null }
             val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
-                Metrics.counter("shop_purchase_failed_total", mapOf("pack" to id))
+                Metrics.counter(
+                    "shop_purchase_failed_total",
+                    mapOf("pack" to id, "currency" to "stars"),
+                )
                 log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
             }
@@ -630,7 +655,10 @@ fun Application.apiRoutes(env: Env) {
             fishing.findPack(id)?.let { pack ->
                 ReferralService.onPurchase(uid, pack)
             }
-            Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
+            Metrics.counter(
+                "shop_purchase_complete_total",
+                mapOf("pack" to id, "currency" to "stars"),
+            )
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
         }
@@ -644,7 +672,10 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             log.info("coin shop purchase tgId={} pack={}", tgId, id)
-            Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to id))
+            Metrics.counter(
+                "coin_shop_purchase_click_total",
+                mapOf("pack" to id, "currency" to "coins"),
+            )
             val uid = fishing.ensureUserByTgId(tgId)
             val language = fishing.userLanguage(uid)
             val result = try {
@@ -652,7 +683,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (e: FishingService.NotEnoughCoinsException) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "insufficient")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "insufficient")
                 )
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
@@ -665,7 +696,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (_: FishingService.CoinPurchaseUnavailableException) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "unavailable")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "unavailable")
                 )
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
@@ -674,7 +705,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (e: Exception) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "error")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "error")
                 )
                 log.warn("coin shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
@@ -685,7 +716,10 @@ fun Application.apiRoutes(env: Env) {
                     description = I18n.lureDescription(it.name, language),
                 )
             }
-            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to id))
+            Metrics.counter(
+                "coin_shop_purchase_complete_total",
+                mapOf("pack" to id, "currency" to "coins"),
+            )
             log.info("coin shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(localized, result.second))
         }

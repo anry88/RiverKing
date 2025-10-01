@@ -14,6 +14,7 @@ import util.Rng
 import util.sanitizeName
 import java.time.*
 import java.time.temporal.ChronoUnit
+import java.util.LinkedHashMap
 import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
@@ -51,6 +52,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         private const val BEGINNER_CATCH_THRESHOLD = 6
     }
     data class DailyReward(val name: String, val qty: Int)
+
+    private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
 
     private val freshDailyRewards: List<List<DailyReward>> = listOf(
         listOf(DailyReward("Пресная мирная", 8), DailyReward("Пресная хищная", 4)),
@@ -136,13 +139,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         refToken: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
+        val now = clock.instant()
         if (existing == null) {
             val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
             val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
             val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
             val newId = Users.insertAndGetId {
                 it[Users.tgId] = tgId
-                it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
+                it[level] = 1; it[xp] = 0; it[createdAt] = now
+                it[Users.lastSeenAt] = now
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.username] = username
@@ -171,11 +176,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             newId
         } else {
             val id = existing[Users.id].value
-            if (firstName != null || lastName != null || username != null) {
+            val lastSeen = existing[Users.lastSeenAt]
+            val shouldUpdateLastSeen = lastSeen == null || Duration.between(lastSeen, now) >= Duration.ofMinutes(1)
+            if (firstName != null || lastName != null || username != null || shouldUpdateLastSeen) {
                 Users.update({ Users.id eq id }) {
                     if (firstName != null) it[Users.firstName] = firstName
                     if (lastName != null) it[Users.lastName] = lastName
                     if (username != null) it[Users.username] = username
+                    if (shouldUpdateLastSeen) it[Users.lastSeenAt] = now
                 }
             }
             val total = totalKg(id)
@@ -285,7 +293,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     fun totalCaughtKg(userId: Long): Double = transaction { totalKg(userId) }
 
     fun todayCaughtKg(userId: Long): Double = transaction {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = LocalDate.now(ratingZone).atStartOfDay(ratingZone).toInstant()
         Catches.slice(Catches.weight.sum()).selectAll()
             .where { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
@@ -294,7 +302,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     fun totalCaughtCount(userId: Long): Long = transaction { totalCatchCount(userId) }
 
     fun todayCaughtCount(userId: Long): Long = transaction {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = LocalDate.now(ratingZone).atStartOfDay(ratingZone).toInstant()
         Catches.select { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }.count()
     }
 
@@ -702,11 +710,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "fresh_basic",
             "Пресные простые",
             listOf(
-                ShopPackage("fresh_topup_s","Пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
+                ShopPackage("fresh_topup_s","Пресное пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
                     listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 360),
-                ShopPackage("fresh_stock_m","Запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
+                ShopPackage("fresh_stock_m","Пресный запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
                     listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 825),
-                ShopPackage("fresh_crate_l","Ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
+                ShopPackage("fresh_crate_l","Пресный ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
                     listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1875),
             )
         ),
@@ -718,7 +726,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             listOf(
                 ShopPackage(
                     "salt_topup_s",
-                    "Пополнение S",
+                    "Морское пополнение S",
                     "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»",
                     55,
                     listOf("Морская мирная" to 6, "Морская хищная" to 14),
@@ -726,7 +734,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ),
                 ShopPackage(
                     "salt_stock_m",
-                    "Запас M",
+                    "Морской запас M",
                     "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»",
                     129,
                     listOf("Морская мирная" to 15, "Морская хищная" to 35),
@@ -734,7 +742,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ),
                 ShopPackage(
                     "salt_crate_l",
-                    "Ящик L",
+                    "Морской ящик L",
                     "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»",
                     299,
                     listOf("Морская мирная" to 40, "Морская хищная" to 80),
@@ -748,11 +756,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "fresh_boost",
             "Пресные улучшенные",
             listOf(
-                ShopPackage("fresh_boost_s","Буст S","10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»",69,
+                ShopPackage("fresh_boost_s","Пресный буст S","10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»",69,
                     listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)),
-                ShopPackage("fresh_boost_m","Буст M","25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»",159,
+                ShopPackage("fresh_boost_m","Пресный буст M","25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»",159,
                     listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)),
-                ShopPackage("fresh_boost_l","Буст L","60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»",349,
+                ShopPackage("fresh_boost_l","Пресный буст L","60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»",349,
                     listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)),
             )
         ),
@@ -764,21 +772,21 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             listOf(
                 ShopPackage(
                     "salt_boost_s",
-                    "Буст S",
+                    "Морской буст S",
                     "10 морских улучшенных: 4 «Неоновый планктон» и 6 «Королевская креветка»",
                     99,
                     listOf("Морская мирная+" to 4, "Морская хищная+" to 6)
                 ),
                 ShopPackage(
                     "salt_boost_m",
-                    "Буст M",
+                    "Морской буст M",
                     "25 морских улучшенных: 9 «Неоновый планктон» и 16 «Королевская креветка»",
                     239,
                     listOf("Морская мирная+" to 9, "Морская хищная+" to 16)
                 ),
                 ShopPackage(
                     "salt_boost_l",
-                    "Буст L",
+                    "Морской буст L",
                     "60 морских улучшенных: 20 «Неоновый планктон» и 40 «Королевская креветка»",
                     549,
                     listOf("Морская мирная+" to 20, "Морская хищная+" to 40)
@@ -1063,6 +1071,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         grantPackItems(userId, pack)
     }
 
+    fun addCoins(userId: Long, amount: Int): Long = transaction {
+        val delta = amount.coerceAtLeast(0)
+        val row = Users.select { Users.id eq userId }.forUpdate().single()
+        val current = row[Users.coins]
+        if (delta == 0) return@transaction current
+        val updated = (current + delta.toLong()).coerceAtMost(Long.MAX_VALUE)
+        Users.update({ Users.id eq userId }) { it[coins] = updated }
+        updated
+    }
+
     fun addLures(userId: Long, items: List<Pair<Long, Int>>): Pair<List<LureDTO>, Long?> = transaction {
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
@@ -1219,6 +1237,20 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val fishId: Long? = null,
         val user: String? = null,
         val at: String? = null,
+        val rank: Int? = null,
+        val prizeCoins: Int? = null,
+    )
+
+    @Serializable
+    data class DailyRatingPosition(
+        val locationId: Long,
+        val location: String,
+        val rank: Int,
+        val participants: Int,
+        val bestFish: String,
+        val bestRarity: String,
+        val bestWeight: Double,
+        val prizeCoins: Int? = null,
     )
 
     @Serializable
@@ -1283,7 +1315,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     fun todayCoins(userId: Long): Long = transaction {
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
         val today = LocalDate.now(zone)
         coinsEarnedOnDate(userId, today, zone)
     }
@@ -1450,7 +1482,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ensureCurrentRod(userId, totalAfter)
 
         val caughtAt = Instant.now()
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
         val catchDate = caughtAt.atZone(zone).toLocalDate()
         val coinsEarnedBefore = coinsEarnedOnDate(userId, catchDate, zone)
         val tier = locationTier(locId)
@@ -1550,6 +1582,141 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         else -> 0
     }
 
+    private data class DailyPrizeCatch(
+        val catchId: Long,
+        val rarity: String,
+        val weight: Double,
+        val userId: Long,
+    )
+
+    private data class DailyRatingCatch(
+        val catchId: Long,
+        val locationId: Long,
+        val location: String,
+        val rarity: String,
+        val weight: Double,
+        val userId: Long,
+        val fish: String,
+    )
+
+    private fun dailyPrizePreview(locationId: Long, date: LocalDate): Map<Int, Int> {
+        val start = date.atStartOfDay(ratingZone).toInstant()
+        val end = start.plus(Duration.ofDays(1))
+        val rows = transaction {
+            (Catches innerJoin Fish)
+                .select {
+                    (Catches.locationId eq locationId) and
+                        (Catches.createdAt greaterEq start) and
+                        (Catches.createdAt less end)
+                }
+                .map {
+                    DailyPrizeCatch(
+                        catchId = it[Catches.id].value,
+                        rarity = it[Fish.rarity],
+                        weight = it[Catches.weight],
+                        userId = it[Catches.userId].value,
+                    )
+                }
+        }
+        if (rows.isEmpty()) return emptyMap()
+        val playerCount = rows.map { it.userId }.toSet().size
+        if (playerCount == 0) return emptyMap()
+        val maxPlaces = minOf(playerCount, 10)
+        if (maxPlaces <= 0) return emptyMap()
+        return rows
+            .sortedWith(
+                compareByDescending<DailyPrizeCatch> { rarityRank(it.rarity) }
+                    .thenByDescending { it.weight }
+                    .thenBy { it.catchId }
+            )
+            .take(maxPlaces)
+            .mapIndexed { index, _ ->
+                val rank = index + 1
+                val coins = (maxPlaces - index) * 50
+                rank to coins
+            }
+            .toMap()
+    }
+
+    fun dailyRatingPositions(userId: Long, date: LocalDate = ZonedDateTime.now(ratingZone).toLocalDate()): List<DailyRatingPosition> {
+        val start = date.atStartOfDay(ratingZone).toInstant()
+        val end = start.plus(Duration.ofDays(1))
+        val catches = transaction {
+            (Catches innerJoin Fish)
+                .join(Locations, JoinType.INNER, onColumn = Catches.locationId, otherColumn = Locations.id)
+                .select {
+                    (Catches.createdAt greaterEq start) and
+                        (Catches.createdAt less end)
+                }
+                .map {
+                    DailyRatingCatch(
+                        catchId = it[Catches.id].value,
+                        locationId = it[Catches.locationId].value,
+                        location = it[Locations.name],
+                        rarity = it[Fish.rarity],
+                        weight = it[Catches.weight],
+                        userId = it[Catches.userId].value,
+                        fish = it[Fish.name],
+                    )
+                }
+        }
+        if (catches.isEmpty()) return emptyList()
+        val comparator = compareByDescending<DailyRatingCatch> { rarityRank(it.rarity) }
+            .thenByDescending { it.weight }
+            .thenBy { it.catchId }
+        data class RankedCatch(val catch: DailyRatingCatch, val rank: Int)
+
+        return catches
+            .groupBy { it.locationId }
+            .flatMap { (locationId, entries) ->
+                if (entries.isEmpty()) return@flatMap emptyList<DailyRatingPosition>()
+
+                val sorted = entries.sortedWith(comparator)
+                val uniquePlayers = entries.map { it.userId }.toSet().size
+                if (uniquePlayers <= 0) return@flatMap emptyList<DailyRatingPosition>()
+
+                val prizePlaces = minOf(sorted.size, uniquePlayers, 10)
+                val rankedCatches = sorted.mapIndexedNotNull { index, catch ->
+                    if (catch.userId != userId) {
+                        null
+                    } else {
+                        RankedCatch(catch, index + 1)
+                    }
+                }
+
+                if (rankedCatches.isEmpty()) return@flatMap emptyList<DailyRatingPosition>()
+
+                val prizeCatches = rankedCatches.filter { it.rank <= prizePlaces }
+                val topNonPrize = rankedCatches.firstOrNull { it.rank > prizePlaces }
+                val selected = when {
+                    prizeCatches.isNotEmpty() && topNonPrize != null -> prizeCatches + topNonPrize
+                    prizeCatches.isNotEmpty() -> prizeCatches
+                    topNonPrize != null -> listOf(topNonPrize)
+                    else -> emptyList()
+                }
+
+                selected.map { ranked ->
+                    val rank = ranked.rank
+                    val prizeCoins = if (rank <= prizePlaces) {
+                        (prizePlaces - rank + 1) * 50
+                    } else {
+                        null
+                    }
+                    DailyRatingPosition(
+                        locationId = locationId,
+                        location = ranked.catch.location,
+                        rank = rank,
+                        participants = uniquePlayers,
+                        bestFish = ranked.catch.fish,
+                        bestRarity = ranked.catch.rarity,
+                        bestWeight = ranked.catch.weight,
+                        prizeCoins = prizeCoins,
+                    )
+                }
+            }
+            .sortedWith(compareBy<DailyRatingPosition> { it.location }.thenBy { it.rank })
+    }
+
     private fun sortCatches(list: List<CatchDTO>, limit: Int, asc: Boolean = false) =
         if (asc) {
             list.sortedWith(
@@ -1564,13 +1731,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
     private fun periodRange(period: String): Pair<Instant?, Instant?> {
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
+        val today = LocalDate.now(zone)
         val start = when (period) {
-            "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
-            "yesterday" -> LocalDate.now().minusDays(1).atStartOfDay(zone).toInstant()
-            "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
-            "month" -> LocalDate.now().minusMonths(1).atStartOfDay(zone).toInstant()
-            "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
+            "today" -> today.atStartOfDay(zone).toInstant()
+            "yesterday" -> today.minusDays(1).atStartOfDay(zone).toInstant()
+            "week" -> today.minusWeeks(1).atStartOfDay(zone).toInstant()
+            "month" -> today.minusMonths(1).atStartOfDay(zone).toInstant()
+            "year" -> today.minusYears(1).atStartOfDay(zone).toInstant()
             else -> null
         }
         val end = when (period) {
@@ -1675,7 +1843,30 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     )
                 }
         }
-        return sortCatches(catches, limit, asc)
+        val sorted = sortCatches(catches, limit, asc)
+        if (!asc && locationId != null) {
+            val nowInZone = ZonedDateTime.now(ratingZone)
+            val prizeDate = when (period) {
+                "today" -> nowInZone.toLocalDate()
+                "yesterday" -> nowInZone.minusDays(1).toLocalDate()
+                else -> null
+            }
+            if (prizeDate != null) {
+                val coinsByRank = dailyPrizePreview(locationId, prizeDate)
+                if (coinsByRank.isNotEmpty()) {
+                    return sorted.mapIndexed { index, catch ->
+                        val rank = index + 1
+                        val coins = coinsByRank[rank]
+                        if (coins != null) {
+                            catch.copy(rank = rank, prizeCoins = coins)
+                        } else {
+                            catch
+                        }
+                    }
+                }
+            }
+        }
+        return sorted
     }
 
     fun globalTopBySpecies(

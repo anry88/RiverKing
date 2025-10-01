@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import service.FishingService
 import util.Metrics
+import util.UserMetrics
 
 fun main() {
     val env = Env.fromConfig()
@@ -70,7 +71,10 @@ fun main() {
                 call.respondRedirect(target, permanent = false)
             }
             get("/health") { call.respondText("OK") }
-            get("/metrics") { call.respondText(Metrics.dump(), ContentType.Text.Plain) }
+            get("/metrics") {
+                UserMetrics.update()
+                call.respondText(Metrics.dump(), ContentType.Text.Plain)
+            }
         }
 
         Scheduler.install(this)

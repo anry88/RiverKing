@@ -24,11 +24,16 @@ import service.PayService
 import service.StarsPaymentService
 import service.ReferralService
 import service.TournamentService
+import service.RatingPrizeService
+import service.PrizeService
 import service.UserPrize
 import service.PrizeSpec
 import service.I18n
+import service.COIN_PRIZE_ID
 import util.Metrics
 import util.sanitizeName
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.time.Duration
 import java.time.Instant
@@ -75,6 +80,8 @@ private data class AdminDraft(
     var prizePlaces: Int = 0,
     var prizes: MutableList<PrizeSpec> = mutableListOf(),
     var currentPrize: Int = 1,
+    var awaitingPrizeQuantity: Boolean = false,
+    var pendingPrize: PrizeSpec? = null,
 )
 
 private enum class AdminStep { NAME_RU, NAME_EN, START, END, FISH, LOCATION, METRIC, PRIZE_PLACES, PRIZE }
@@ -99,8 +106,8 @@ private data class BroadcastDraft(
 
 private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 
-private val METRIC_OPTIONS = listOf("largest", "smallest", "count")
-private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count"]],"one_time_keyboard":true,"resize_keyboard":true}"""
+private val METRIC_OPTIONS = listOf("largest", "smallest", "count", "total_weight")
+private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count","total_weight"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
 
 private val BAIT_ORDER = listOf(
@@ -123,10 +130,22 @@ private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
         Json.parseToJsonElement(str).jsonArray.map { el ->
             val obj = el.jsonObject
-            PrizeSpec(
-                obj["pack"]?.jsonPrimitive?.content ?: "",
-                obj["qty"]?.jsonPrimitive?.int ?: 1
-            )
+            val pack = obj["pack"]?.jsonPrimitive?.content?.trim().orEmpty()
+            val qty = obj["qty"]?.jsonPrimitive?.int ?: 1
+            val coins = obj["coins"]?.jsonPrimitive?.content?.toIntOrNull()
+            when {
+                coins != null && (pack.isBlank() || pack == COIN_PRIZE_ID) -> PrizeSpec(
+                    pack = COIN_PRIZE_ID,
+                    qty = coins,
+                    coins = coins
+                )
+                pack == COIN_PRIZE_ID -> PrizeSpec(
+                    pack = COIN_PRIZE_ID,
+                    qty = qty,
+                    coins = coins ?: qty
+                )
+                else -> PrizeSpec(pack = pack, qty = qty, coins = coins)
+            }
         }.toMutableList()
     } catch (_: Exception) {
         str.split(Regex("""[,\n]+"""))
@@ -134,9 +153,14 @@ private fun parsePrizes(str: String): MutableList<PrizeSpec> {
             .filter { it.isNotEmpty() }
             .map { s ->
                 val parts = s.split(Regex("""[:\s]+""")).filter { it.isNotBlank() }
-                val pack = parts.getOrNull(0) ?: s
+                val packRaw = parts.getOrNull(0) ?: s
                 val qty = parts.getOrNull(1)?.toIntOrNull() ?: 1
-                PrizeSpec(pack, qty)
+                val normalized = if (packRaw.equals(COIN_PRIZE_ID, ignoreCase = true)) COIN_PRIZE_ID else packRaw
+                if (normalized == COIN_PRIZE_ID) {
+                    PrizeSpec(COIN_PRIZE_ID, qty, qty)
+                } else {
+                    PrizeSpec(normalized, qty)
+                }
             }
             .toMutableList()
     }
@@ -149,6 +173,8 @@ fun Application.botRoutes(env: Env) {
     val fishing = FishingService()
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
+    val ratingPrizes = RatingPrizeService()
+    val prizeService = PrizeService(tournaments, ratingPrizes)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
@@ -354,7 +380,7 @@ fun Application.botRoutes(env: Env) {
                 return builder.toString()
             }
 
-            fun trySend(
+            suspend fun trySend(
                 chatId: Long,
                 text: String,
                 replyMarkup: String? = null,
@@ -375,7 +401,7 @@ fun Application.botRoutes(env: Env) {
 
             fun ownedData(ownerUid: Long, payload: Any): String = "$ownerUid:${payload.toString()}"
 
-            fun sendLanguageMenu(
+            suspend fun sendLanguageMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -434,7 +460,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendBaitMenu(
+            suspend fun sendBaitMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -503,7 +529,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendDiscountMenu(chatId: Long) {
+            suspend fun sendDiscountMenu(chatId: Long) {
                 val discounts = fishing.listDiscounts().sortedBy { it.startDate }
                 val body = if (discounts.isEmpty()) {
                     "Скидок сейчас нет."
@@ -536,7 +562,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendDiscountPackPicker(chatId: Long) {
+            suspend fun sendDiscountPackPicker(chatId: Long) {
                 val packs = fishing.listShop("ru").flatMap { it.packs }.sortedBy { it.name }
                 if (packs.isEmpty()) {
                     try {
@@ -558,7 +584,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendRodMenu(
+            suspend fun sendRodMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -612,7 +638,7 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendLocationMenu(
+            suspend fun sendLocationMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -665,33 +691,51 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
-            fun sendPrizes(
+            suspend fun sendPrizes(
                 uid: Long,
                 chatId: Long,
                 lang: String,
                 prizes: List<UserPrize>? = null,
                 prefix: String? = null,
                 replyToMessageId: Long? = null,
+                showWhenEmpty: Boolean = false,
             ) {
-                val actual = prizes ?: run {
-                    tournaments.distributePrizes()
-                    tournaments.pendingPrizes(uid)
-                }
+                val actual = prizes ?: prizeService.pendingPrizes(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
+                val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
+                val emptyBody = if (lang == "ru") {
+                    "Нет призов для получения."
+                } else {
+                    "No prizes to claim."
+                }
                 fun displayName(prize: UserPrize): String {
+                    if (prize.packageId == COIN_PRIZE_ID) {
+                        return if (lang == "ru") "Монеты" else "Coins"
+                    }
+                    if (prize.packageId == "autofish_week") {
+                        return if (lang == "ru") "Автоловля (неделя)" else "Auto Catch (week)"
+                    }
                     val name = packNames[prize.packageId]
                     if (name != null) return name
                     val lureName = I18n.lure(prize.packageId, lang)
                     if (lureName != prize.packageId) return lureName
                     return prize.packageId.replace('_', ' ')
                 }
-                val body = if (actual.isEmpty()) {
-                    if (lang == "ru") {
-                        "Нет призов для получения."
-                    } else {
-                        "No prizes to claim."
+                if (actual.isEmpty()) {
+                    val body = if (showWhenEmpty) emptyBody else ""
+                    val baseText = buildString {
+                        if (!prefixText.isNullOrBlank()) append(prefixText)
+                        if (body.isNotBlank()) {
+                            if (!prefixText.isNullOrBlank()) append("\n\n")
+                            append(body)
+                        }
                     }
-                } else {
+                    if (baseText.isNotBlank()) {
+                        trySend(chatId, baseText, replyToMessageId = replyToMessageId)
+                    }
+                    return
+                }
+                val body = run {
                     val header = if (lang == "ru") {
                         "Призы, которые можно получить:"
                     } else {
@@ -699,7 +743,14 @@ fun Application.botRoutes(env: Env) {
                     }
                     val lines = actual.joinToString("\n") { prize ->
                         val name = displayName(prize)
-                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                        val qty = if (prize.packageId == COIN_PRIZE_ID) {
+                            val amount = prize.coins ?: prize.qty
+                            " +$amount"
+                        } else if (prize.qty > 1) {
+                            " x${prize.qty}"
+                        } else {
+                            ""
+                        }
                         val place = if (prize.rank > 0) {
                             if (lang == "ru") " (место #${prize.rank})" else " (place #${prize.rank})"
                         } else ""
@@ -707,28 +758,146 @@ fun Application.botRoutes(env: Env) {
                     }
                     "$header\n$lines"
                 }
-                val text = buildString {
-                    if (!prefix.isNullOrBlank()) {
-                        append(prefix.trim())
+                val baseText = buildString {
+                    if (!prefixText.isNullOrBlank()) {
+                        append(prefixText)
                         if (body.isNotBlank()) append("\n\n")
                     }
                     append(body)
                 }
-                val markup = if (actual.isEmpty()) {
-                    null
-                } else {
-                    val buttons = actual.map { prize ->
-                        val name = displayName(prize)
-                        val short = if (name.length > 32) name.take(29) + "…" else name
-                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
-                        listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
-                    }
-                    Json.encodeToString(InlineKeyboardMarkup(buttons))
-                }
-                trySend(chatId, text, markup, replyToMessageId)
+                val markup = Json.encodeToString(
+                    InlineKeyboardMarkup(
+                        actual.map { prize ->
+                            val name = displayName(prize)
+                            val short = if (name.length > 32) name.take(29) + "…" else name
+                            val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                            listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
+                        }
+                    )
+                )
+                trySend(chatId, baseText, markup, replyToMessageId)
             }
 
-            fun sendShopMenu(
+            fun packNamesRu(): MutableMap<String, String> {
+                val names = fishing.listShop("ru").flatMap { it.packs }.associate { it.id to it.name }.toMutableMap()
+                if (!names.containsKey("autofish_week")) {
+                    names["autofish_week"] = "Автоловля (неделя)"
+                }
+                return names
+            }
+
+            fun formatAdminPrize(prize: PrizeSpec?, packNames: Map<String, String>): String? {
+                if (prize == null) return null
+                return when {
+                    prize.pack == COIN_PRIZE_ID || prize.coins != null -> {
+                        val amount = prize.coins ?: prize.qty
+                        if (amount <= 0) null else "Монеты $amount"
+                    }
+                    prize.pack.isBlank() -> null
+                    else -> {
+                        val name = packNames[prize.pack] ?: prize.pack
+                        val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                        "$name$qty"
+                    }
+                }
+            }
+
+            fun storePrize(draft: AdminDraft, prize: PrizeSpec) {
+                val idx = draft.currentPrize - 1
+                if (idx < 0) return
+                while (draft.prizes.size <= idx) {
+                    draft.prizes.add(PrizeSpec())
+                }
+                draft.prizes[idx] = prize
+            }
+
+            suspend fun finalizeTournamentDraft(chatId: Long, userId: Long, draft: AdminDraft) {
+                val start = draft.start
+                val end = draft.end
+                if (start != null && end != null) {
+                    val prizesJson = Json.encodeToString(draft.prizes.take(draft.prizePlaces))
+                    try {
+                        if (draft.id == null) {
+                            tournaments.createTournament(
+                                draft.nameRu,
+                                draft.nameEn,
+                                start,
+                                end,
+                                draft.fish,
+                                draft.location,
+                                draft.metric,
+                                draft.prizePlaces,
+                                prizesJson,
+                            )
+                            bot.sendMessage(chatId, "Турнир создан")
+                        } else {
+                            tournaments.updateTournament(
+                                draft.id!!,
+                                draft.nameRu,
+                                draft.nameEn,
+                                start,
+                                end,
+                                draft.fish,
+                                draft.location,
+                                draft.metric,
+                                draft.prizePlaces,
+                                prizesJson,
+                            )
+                            bot.sendMessage(chatId, "Турнир обновлен")
+                        }
+                    } catch (e: Exception) {
+                        log.error("tournament save failed", e)
+                    }
+                }
+                adminStates.remove(userId)
+            }
+
+            suspend fun sendPrizePrompt(chatId: Long, draft: AdminDraft) {
+                draft.awaitingPrizeQuantity = false
+                draft.pendingPrize = null
+                val packNames = packNamesRu()
+                val current = formatAdminPrize(draft.prizes.getOrNull(draft.currentPrize - 1), packNames)
+                    ?.let { " (сейчас: $it)" } ?: ""
+                val message = "Награда за ${draft.currentPrize} место$current\nВыберите кнопку или введите вручную (pack qty)."
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                buttons += listOf(listOf(InlineKeyboardButton("🪙 Монеты", "prize_coins")))
+                val packButtons = packNames.entries
+                    .sortedBy { it.value.lowercase() }
+                    .map { InlineKeyboardButton(it.value, "prize_pack_${it.key}") }
+                    .chunked(2)
+                buttons += packButtons
+                buttons += listOf(listOf(InlineKeyboardButton("Без приза", "prize_skip")))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                try {
+                    bot.sendMessage(chatId, message, markup)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            }
+
+            suspend fun promptPrizeQuantity(chatId: Long, label: String, isCoins: Boolean) {
+                val text = if (isCoins) {
+                    "Введите количество монет для \"$label\""
+                } else {
+                    "Введите количество для \"$label\""
+                }
+                try {
+                    bot.sendMessage(chatId, text)
+                } catch (e: Exception) {
+                    log.error("sendMessage failed chatId={}", chatId, e)
+                }
+            }
+
+            suspend fun proceedToNextPrize(chatId: Long, userId: Long, draft: AdminDraft) {
+                if (draft.currentPrize < draft.prizePlaces) {
+                    draft.currentPrize += 1
+                    sendPrizePrompt(chatId, draft)
+                } else {
+                    finalizeTournamentDraft(chatId, userId, draft)
+                }
+            }
+
+            suspend fun sendShopMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -810,7 +979,7 @@ fun Application.botRoutes(env: Env) {
                 }
             }
 
-            fun sendCoinShopMenu(
+            suspend fun sendCoinShopMenu(
                 uid: Long,
                 chatId: Long,
                 lang: String,
@@ -838,9 +1007,9 @@ fun Application.botRoutes(env: Env) {
                     "🪙 Coin shop. Balance: $balanceText coins."
                 }
                 val footer = if (lang == "ru") {
-                    "Чтобы купить, открой мини-приложение: https://t.me/${env.botName}?startapp"
+                    "Нажми на кнопку, чтобы купить за монеты. Или открой мини-приложение: https://t.me/${env.botName}?startapp"
                 } else {
-                    "To buy, open the mini app: https://t.me/${env.botName}?startapp"
+                    "Tap a button to buy with coins. Or open the mini app: https://t.me/${env.botName}?startapp"
                 }
                 val text = buildString {
                     append(header)
@@ -863,12 +1032,16 @@ fun Application.botRoutes(env: Env) {
                     append("\n\n")
                     append(footer)
                 }.trim()
-                val parts = splitMessage(text)
-                parts.forEachIndexed { index, part ->
-                    val trimmedPart = part.trimEnd()
-                    val partReplyTo = if (index == 0) replyToMessageId else null
-                    trySend(chatId, trimmedPart, replyToMessageId = partReplyTo)
-                }
+                val buttons = shop.flatMap { category ->
+                    category.packs.map { pack ->
+                        val coinPrice = pack.coinPrice ?: return@map null
+                        val priceText = formatter.format(coinPrice)
+                        val label = "${pack.name} — 🪙 $priceText"
+                        InlineKeyboardButton(label, "/coinbuy ${ownedData(uid, pack.id)}")
+                    }.filterNotNull()
+                }.chunked(2)
+                val markup = if (buttons.isEmpty()) null else Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
             val keywordCommandMap = mapOf(
@@ -989,6 +1162,7 @@ fun Application.botRoutes(env: Env) {
 /shop — купить приманки за звёзды
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
+/daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
@@ -1005,6 +1179,7 @@ Available commands:
 /shop — buy baits with Stars
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
+/daily_rating — view the current placement of your best catch in today's daily rating
 /stats — your fishing stats
 /language — choose your language
 /nickname — change your nickname""".trimIndent()
@@ -1048,7 +1223,23 @@ Available commands:
                             } else {
                                 "Time left: ${days}d ${hours}h ${minutes}m"
                             }
-                            val header = "$tName\n$timeText\n"
+                            val fishName = t.fish?.takeIf { it.isNotBlank() }?.let { I18n.fish(it, lang) }
+                                ?: if (lang == "ru") "любая" else "any"
+                            val locationName = t.location?.takeIf { it.isNotBlank() }
+                                ?.let { I18n.location(it, lang) }
+                                ?: if (lang == "ru") "любая" else "any"
+                            val metricText = I18n.tournamentMetric(t.metric, lang)
+                            val conditions = if (lang == "ru") {
+                                "Рыба: $fishName\nЛокация: $locationName\nТип: $metricText"
+                            } else {
+                                "Fish: $fishName\nLocation: $locationName\nType: $metricText"
+                            }
+                            val header = buildString {
+                                appendLine(tName)
+                                appendLine(timeText)
+                                appendLine(conditions)
+                                appendLine()
+                            }
                             val body = if (list.isEmpty()) {
                                 if (lang == "ru") "Список пуст" else "Leaderboard is empty"
                             } else {
@@ -1107,13 +1298,80 @@ Available commands:
                         trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
+                    "/daily_rating" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val positions = fishing.dailyRatingPositions(uid)
+                        val reply = if (positions.isEmpty()) {
+                            if (lang == "ru") {
+                                "Сегодня ты ещё не участвовал в ежедневном рейтинге."
+                            } else {
+                                "You haven't entered today's daily rating yet."
+                            }
+                        } else {
+                            val header = if (lang == "ru") {
+                                "Твои места в сегодняшнем ежедневном рейтинге:"
+                            } else {
+                                "Your positions in today's daily rating:"
+                            }
+                            val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                            val numberFormat = NumberFormat.getIntegerInstance(locale)
+                            val weightFormat = DecimalFormat("#,##0.00", DecimalFormatSymbols(locale))
+                            fun englishOrdinal(rank: Int): String {
+                                val mod100 = rank % 100
+                                val suffix = if (mod100 in 11..13) {
+                                    "th"
+                                } else {
+                                    when (rank % 10) {
+                                        1 -> "st"
+                                        2 -> "nd"
+                                        3 -> "rd"
+                                        else -> "th"
+                                    }
+                                }
+                                return "$rank$suffix"
+                            }
+                            fun formatPlace(rank: Int): String = if (lang == "ru") {
+                                "$rank место"
+                            } else {
+                                "${englishOrdinal(rank)} place"
+                            }
+                            val body = positions.joinToString("\n") { pos ->
+                                val locationName = I18n.location(pos.location, lang)
+                                val fishName = I18n.fish(pos.bestFish, lang)
+                                val rarityName = RARITY_LABELS[lang]?.get(pos.bestRarity)
+                                    ?: RARITY_LABELS["en"]?.get(pos.bestRarity)
+                                    ?: pos.bestRarity
+                                val weightText = weightFormat.format(pos.bestWeight)
+                                val coins = pos.prizeCoins?.let {
+                                    val coinsText = numberFormat.format(it)
+                                    if (lang == "ru") {
+                                        ", $coinsText монет"
+                                    } else {
+                                        ", $coinsText coins"
+                                    }
+                                } ?: ""
+                                "• $locationName — ${formatPlace(pos.rank)}. $fishName (${rarityName}), $weightText ${if (lang == "ru") "кг" else "kg"}$coins"
+                            }
+                            "$header\n$body"
+                        }
+                        logCommandMetric("daily_rating", source = source)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
                     "/prizes" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        tournaments.distributePrizes()
-                        val prizes = tournaments.pendingPrizes(uid)
+                        val prizes = prizeService.pendingPrizes(uid)
                         logCommandMetric("prizes", mapOf("count" to prizes.size.toString()), source)
-                        sendPrizes(uid, chatId, lang, prizes = prizes, replyToMessageId = replyTo)
+                        sendPrizes(
+                            uid,
+                            chatId,
+                            lang,
+                            prizes = prizes,
+                            replyToMessageId = replyTo,
+                            showWhenEmpty = true,
+                        )
                         return true
                     }
                     "/daily" -> {
@@ -1310,6 +1568,131 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                         }
                         return true
+                    }
+                    "/coinbuy" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val packId = value
+                        if (packId.isNullOrBlank()) {
+                            logCommandMetric("coin_buy", mapOf("result" to "missing_arg"), source)
+                            val reply = if (lang == "ru") {
+                                "Укажи набор или воспользуйся командой /coin_shop."
+                            } else {
+                                "Specify a bundle id or use /coin_shop."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val pack = fishing.listShop(lang).flatMap { it.packs }.find { it.id == packId }
+                        if (pack == null || pack.coinPrice == null) {
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "invalid_pack", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Этот набор нельзя купить за монеты."
+                            } else {
+                                "This bundle can't be purchased with coins."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                        val formatter = NumberFormat.getIntegerInstance(locale)
+                        Metrics.counter(
+                            "coin_shop_purchase_click_total",
+                            mapOf("pack" to packId, "currency" to "coins"),
+                        )
+                        return try {
+                            fishing.buyPackageWithCoins(uid, packId)
+                            Metrics.counter(
+                                "coin_shop_purchase_complete_total",
+                                mapOf("pack" to packId, "currency" to "coins"),
+                            )
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "purchased", "pack" to packId),
+                                source,
+                            )
+                            val balance = transaction {
+                                Users.select { Users.id eq uid }.single()[Users.coins]
+                            }
+                            val priceText = formatter.format(pack.coinPrice)
+                            val balanceText = formatter.format(balance)
+                            val header = if (lang == "ru") {
+                                "Набор \"${pack.name}\" куплен за 🪙 $priceText. Баланс: $balanceText монет."
+                            } else {
+                                "Bundle \"${pack.name}\" bought for 🪙 $priceText. Balance: $balanceText coins."
+                            }
+                            val details = if (pack.items.isEmpty()) {
+                                header
+                            } else {
+                                val lines = pack.items.joinToString("\n") { (lure, qty) ->
+                                    "• $lure x$qty"
+                                }
+                                "$header\n$lines"
+                            }
+                            trySend(chatId, details, replyToMessageId = replyTo)
+                            true
+                        } catch (e: FishingService.NotEnoughCoinsException) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "insufficient"),
+                            )
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "insufficient", "pack" to packId),
+                                source,
+                            )
+                            val requiredText = formatter.format(e.required)
+                            val balanceText = formatter.format(e.balance)
+                            val reply = if (lang == "ru") {
+                                "Недостаточно монет: нужно 🪙 $requiredText, у тебя только 🪙 $balanceText."
+                            } else {
+                                val coinWord = if (e.balance == 1L) "coin" else "coins"
+                                "Not enough coins: 🪙 $requiredText required, you only have 🪙 $balanceText $coinWord."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        } catch (_: FishingService.CoinPurchaseUnavailableException) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "unavailable"),
+                            )
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "unavailable", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Покупка этого набора за монеты временно недоступна."
+                            } else {
+                                "Buying this bundle with coins is temporarily unavailable."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        } catch (e: Exception) {
+                            Metrics.counter(
+                                "coin_shop_purchase_failed_total",
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "error"),
+                            )
+                            log.error("coin buy failed chatId={} pack={}", chatId, packId, e)
+                            logCommandMetric(
+                                "coin_buy",
+                                mapOf("result" to "error", "pack" to packId),
+                                source,
+                            )
+                            val reply = if (lang == "ru") {
+                                "Не удалось купить набор. Попробуй ещё раз позже."
+                            } else {
+                                "Failed to buy the bundle. Please try again later."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        }
                     }
                     "/cast" -> {
                         val uid = ensureUserId(from) ?: return false
@@ -1773,8 +2156,7 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        tournaments.distributePrizes()
-                        val pending = tournaments.pendingPrizes(uid)
+                        val pending = prizeService.pendingPrizes(uid)
                         val prize = pending.find { it.id == prizeId }
                         if (prize == null) {
                             logCommandMetric("prizes_claim", mapOf("result" to "not_found"), source)
@@ -1783,47 +2165,69 @@ Available commands:
                             } else {
                                 "Prize not found or already claimed."
                             }
-                            sendPrizes(uid, chatId, lang, prizes = pending, prefix = reply, replyToMessageId = replyTo)
+                            sendPrizes(
+                                uid,
+                                chatId,
+                                lang,
+                                prizes = pending,
+                                prefix = reply,
+                                replyToMessageId = replyTo,
+                                showWhenEmpty = true,
+                            )
                             return true
                         }
-                        val pack = fishing.findPack(prize.packageId)
+                        val isCoins = prize.packageId == COIN_PRIZE_ID
+                        val pack = if (isCoins) null else fishing.findPack(prize.packageId)
                         val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
-                        val displayName = packNames[prize.packageId]
-                            ?: pack?.name?.let { I18n.text(it, lang) }
-                            ?: prize.packageId.replace('_', ' ')
+                        val displayName = if (isCoins) {
+                            if (lang == "ru") "Монеты" else "Coins"
+                        } else {
+                            packNames[prize.packageId]
+                                ?: pack?.name?.let { I18n.text(it, lang) }
+                                ?: prize.packageId.replace('_', ' ')
+                        }
                         val success = try {
-                            tournaments.claimPrize(uid, prizeId, fishing)
+                            prizeService.claimPrize(uid, prizeId, fishing)
                             logCommandMetric(
                                 "prizes_claim",
                                 mapOf(
                                     "result" to "claimed",
-                                    "pack" to prize.packageId,
+                                    "pack" to (if (isCoins) COIN_PRIZE_ID else prize.packageId),
                                     "qty" to prize.qty.toString()
                                 ),
                                 source
                             )
-                            val items = pack?.items.orEmpty()
-                            val header = if (lang == "ru") {
-                                val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
-                                "Приз \"$label\" получен."
-                            } else {
-                                val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
-                                "Prize \"$label\" claimed."
-                            }
-                            if (items.isEmpty()) {
-                                header
-                            } else {
-                                val lines = items.joinToString("\n") { (lure, qty) ->
-                                    val lureName = I18n.lure(lure, lang)
-                                    val total = qty * prize.qty
-                                    "• $lureName x$total"
+                            if (isCoins) {
+                                val amount = prize.coins ?: prize.qty
+                                if (lang == "ru") {
+                                    "Начислено $amount монет."
+                                } else {
+                                    "$amount coins added."
                                 }
-                                "$header\n$lines"
+                            } else {
+                                val items = pack?.items.orEmpty()
+                                val header = if (lang == "ru") {
+                                    val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
+                                    "Приз \"$label\" получен."
+                                } else {
+                                    val label = if (prize.qty > 1) "$displayName x${prize.qty}" else displayName
+                                    "Prize \"$label\" claimed."
+                                }
+                                if (items.isEmpty()) {
+                                    header
+                                } else {
+                                    val lines = items.joinToString("\n") { (lure, qty) ->
+                                        val lureName = I18n.lure(lure, lang)
+                                        val total = qty * prize.qty
+                                        "• $lureName x$total"
+                                    }
+                                    "$header\n$lines"
+                                }
                             }
                         } catch (e: Exception) {
                             logCommandMetric(
                                 "prizes_claim",
-                                mapOf("result" to "error", "pack" to prize.packageId),
+                                mapOf("result" to "error", "pack" to (if (isCoins) COIN_PRIZE_ID else prize.packageId)),
                                 source
                             )
                             if (lang == "ru") {
@@ -1832,7 +2236,14 @@ Available commands:
                                 "Couldn't claim the prize. Please try again later."
                             }
                         }
-                        sendPrizes(uid, chatId, lang, prefix = success, replyToMessageId = replyTo)
+                        sendPrizes(
+                            uid,
+                            chatId,
+                            lang,
+                            prefix = success,
+                            replyToMessageId = replyTo,
+                            showWhenEmpty = true,
+                        )
                         return true
                     }
                 }
@@ -1903,6 +2314,34 @@ Available commands:
                                 } catch (e: Exception) {
                                     log.error("sendMessage failed chatId={}", target, e)
                                 }
+                            }
+                        }
+                        data != null && data.startsWith("prize_pack_") -> {
+                            val draft = adminStates[cq.from.id]
+                            if (draft != null && draft.step == AdminStep.PRIZE) {
+                                val id = data.removePrefix("prize_pack_")
+                                val names = packNamesRu()
+                                val label = names[id] ?: id
+                                draft.pendingPrize = PrizeSpec(id, 1)
+                                draft.awaitingPrizeQuantity = true
+                                promptPrizeQuantity(target, label, false)
+                            }
+                        }
+                        data == "prize_coins" -> {
+                            val draft = adminStates[cq.from.id]
+                            if (draft != null && draft.step == AdminStep.PRIZE) {
+                                draft.pendingPrize = PrizeSpec(COIN_PRIZE_ID, 0, 0)
+                                draft.awaitingPrizeQuantity = true
+                                promptPrizeQuantity(target, "Монеты", true)
+                            }
+                        }
+                        data == "prize_skip" -> {
+                            val draft = adminStates[cq.from.id]
+                            if (draft != null && draft.step == AdminStep.PRIZE) {
+                                draft.pendingPrize = null
+                                draft.awaitingPrizeQuantity = false
+                                storePrize(draft, PrizeSpec())
+                                proceedToNextPrize(target, cq.from.id, draft)
                             }
                         }
                         data != null && data.startsWith("remove_discount_") -> {
@@ -2186,7 +2625,7 @@ Available commands:
                         draft.step = AdminStep.METRIC
                         val current = if (draft.metric.isNotBlank()) " (сейчас: ${draft.metric})" else ""
                         try {
-                            bot.sendMessage(chatId, "Метрика (largest/smallest/count)$current", METRIC_KEYBOARD)
+                            bot.sendMessage(chatId, "Метрика (largest/smallest/count/total_weight)$current", METRIC_KEYBOARD)
                         } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                     }
                     AdminStep.METRIC -> {
@@ -2199,80 +2638,56 @@ Available commands:
                                 bot.sendMessage(chatId, "Количество призовых мест$current", REMOVE_KEYBOARD)
                             } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         } else {
-                            try { bot.sendMessage(chatId, "Неверная метрика, выберите largest, smallest или count", METRIC_KEYBOARD) } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            try {
+                                bot.sendMessage(chatId, "Неверная метрика, выберите largest, smallest, count или total_weight", METRIC_KEYBOARD)
+                            } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         }
                     }
                     AdminStep.PRIZE_PLACES -> {
                         val n = text.toIntOrNull()
                         if (n != null) {
                             draft.prizePlaces = n
-                            draft.prizes = MutableList(n) { i -> draft.prizes.getOrNull(i) ?: PrizeSpec("", 1) }
+                            draft.prizes = MutableList(n) { i -> draft.prizes.getOrNull(i) ?: PrizeSpec() }
                             draft.currentPrize = 1
                             draft.step = AdminStep.PRIZE
-                            val currentPrize = draft.prizes.getOrNull(0)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
-                            try { bot.sendMessage(chatId, "Награда за 1 место (pack qty)$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
+                            sendPrizePrompt(chatId, draft)
                         } else {
                             try { bot.sendMessage(chatId, "Неверный ввод, повторите") } catch (_: Exception) {}
                         }
                     }
                     AdminStep.PRIZE -> {
-                        val p = text.trim().split(' ', ':')
-                        val pack = p.getOrNull(0)?.takeIf { it.isNotBlank() }
-                        val qty = p.getOrNull(1)?.toIntOrNull() ?: 1
-                        if (pack == null || qty <= 0) {
-                            try { bot.sendMessage(chatId, "Неверный ввод, укажите приз как 'pack qty'") } catch (_: Exception) {}
-                            return@post call.respond(HttpStatusCode.OK)
-                        }
-                        val prize = PrizeSpec(pack, qty)
-                        val idx = draft.currentPrize - 1
-                        if (draft.prizes.size > idx) {
-                            draft.prizes[idx] = prize
-                        } else {
-                            draft.prizes.add(prize)
-                        }
-                        if (draft.currentPrize < draft.prizePlaces) {
-                            draft.currentPrize += 1
-                            val currentPrize = draft.prizes.getOrNull(draft.currentPrize - 1)?.takeIf { it.pack.isNotBlank() }?.let { " (сейчас: ${it.pack} x${it.qty})" } ?: ""
-                            try { bot.sendMessage(chatId, "Награда за ${draft.currentPrize} место (pack qty)$currentPrize") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
-                        } else {
-                            val start = draft.start
-                            val end = draft.end
-                            if (start != null && end != null) {
-                                val prizesJson = draft.prizes.take(draft.prizePlaces).joinToString(prefix = "[", postfix = "]") { Json.encodeToString(it) }
-                                try {
-                                    if (draft.id == null) {
-                                        tournaments.createTournament(
-                                            draft.nameRu,
-                                            draft.nameEn,
-                                            start,
-                                            end,
-                                            draft.fish,
-                                            draft.location,
-                                            draft.metric,
-                                            draft.prizePlaces,
-        prizesJson,
-                                        )
-                                        bot.sendMessage(chatId, "Турнир создан")
-                                    } else {
-                                        tournaments.updateTournament(
-                                            draft.id!!,
-                                            draft.nameRu,
-                                            draft.nameEn,
-                                            start,
-                                            end,
-                                            draft.fish,
-                                            draft.location,
-                                            draft.metric,
-                                            draft.prizePlaces,
-                                            prizesJson,
-                                        )
-                                        bot.sendMessage(chatId, "Турнир обновлен")
-                                    }
-                                } catch (e: Exception) {
-                                    log.error("tournament save failed", e)
-                                }
+                        if (draft.awaitingPrizeQuantity && draft.pendingPrize != null) {
+                            val amount = text.trim().toIntOrNull()
+                            if (amount == null || amount <= 0) {
+                                try { bot.sendMessage(chatId, "Неверный ввод, укажите положительное число") } catch (_: Exception) {}
+                                return@post call.respond(HttpStatusCode.OK)
                             }
-                            adminStates.remove(userId)
+                            val pending = draft.pendingPrize!!
+                            val prize = if (pending.pack == COIN_PRIZE_ID) {
+                                pending.copy(qty = amount, coins = amount)
+                            } else {
+                                pending.copy(qty = amount)
+                            }
+                            storePrize(draft, prize)
+                            draft.pendingPrize = null
+                            draft.awaitingPrizeQuantity = false
+                            proceedToNextPrize(chatId, userId, draft)
+                        } else {
+                            val parts = text.trim().split(' ', ':')
+                            val pack = parts.getOrNull(0)?.takeIf { it.isNotBlank() }
+                            val qty = parts.getOrNull(1)?.toIntOrNull() ?: 1
+                            if (pack == null || qty <= 0) {
+                                try { bot.sendMessage(chatId, "Неверный ввод, укажите приз как 'pack qty'") } catch (_: Exception) {}
+                                return@post call.respond(HttpStatusCode.OK)
+                            }
+                            val normalized = if (pack.equals(COIN_PRIZE_ID, ignoreCase = true)) COIN_PRIZE_ID else pack
+                            val prize = if (normalized == COIN_PRIZE_ID) {
+                                PrizeSpec(normalized, qty, qty)
+                            } else {
+                                PrizeSpec(normalized, qty)
+                            }
+                            storePrize(draft, prize)
+                            proceedToNextPrize(chatId, userId, draft)
                         }
                     }
                 }

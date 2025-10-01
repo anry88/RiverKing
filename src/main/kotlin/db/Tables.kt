@@ -35,13 +35,28 @@ object DB {
                 PaySupportRequests,
                 Tournaments,
                 UserPrizes,
+                RatingPrizes,
                 ReferralLinks,
                 ReferralRewards,
                 ShopDiscounts,
             )
             seedIfEmpty()
             migrateCoins()
+            backfillLastSeenAt()
         }
+    }
+
+    private fun backfillLastSeenAt() {
+        Users
+            .slice(Users.id, Users.createdAt)
+            .select { Users.lastSeenAt.isNull() }
+            .forEach { row ->
+                val userId = row[Users.id].value
+                val createdAt = row[Users.createdAt]
+                Users.update({ Users.id eq userId }) {
+                    it[Users.lastSeenAt] = createdAt
+                }
+            }
     }
 
     private fun ensureRodCodeColumn() {
@@ -822,10 +837,10 @@ object DB {
         upsertLure("Пресная хищная", true, "fresh")
         upsertLure("Морская мирная", false, "salt")
         upsertLure("Морская хищная", true, "salt")
-        upsertLure("Пресная мирная+", false, "fresh", 0.3)
-        upsertLure("Пресная хищная+", true, "fresh", 0.3)
-        upsertLure("Морская мирная+", false, "salt", 0.3)
-        upsertLure("Морская хищная+", true, "salt", 0.3)
+        upsertLure("Пресная мирная+", false, "fresh", 1.0)
+        upsertLure("Пресная хищная+", true, "fresh", 1.0)
+        upsertLure("Морская мирная+", false, "salt", 1.0)
+        upsertLure("Морская хищная+", true, "salt", 1.0)
 
         // default lure
         Users.update({ Users.currentLureId.isNull() }) { it[Users.currentLureId] = presnMir }
@@ -939,6 +954,7 @@ object Users : LongIdTable() {
     val xp = integer("xp")
     val coins = long("coins").default(0L)
     val createdAt = timestamp("created_at")
+    val lastSeenAt = timestamp("last_seen_at").nullable()
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
@@ -1066,6 +1082,16 @@ object UserPrizes : LongIdTable() {
     val packageId = varchar("package_id", 100)
     val qty = integer("qty").default(1)
     val claimed = bool("claimed").default(false)
+}
+
+object RatingPrizes : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val locationId = reference("location_id", Locations)
+    val prizeDate = date("prize_date")
+    val rank = integer("rank")
+    val coins = integer("coins")
+    val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
 
 object ReferralLinks : LongIdTable() {

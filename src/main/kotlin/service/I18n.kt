@@ -245,12 +245,18 @@ object I18n {
         "Морские улучшенные" to "Saltwater Advanced",
         "Смешанные" to "Mixed",
         "Стартовые" to "Starter",
-        "Пополнение S" to "Top-up S",
-        "Запас M" to "Stock M",
-        "Ящик L" to "Crate L",
-        "Буст S" to "Boost S",
-        "Буст M" to "Boost M",
-        "Буст L" to "Boost L",
+        "Пресное пополнение S" to "Freshwater Top-up S",
+        "Пресный запас M" to "Freshwater Stock M",
+        "Морское пополнение S" to "Saltwater Top-up S",
+        "Морской запас M" to "Saltwater Stock M",
+        "Пресный ящик L" to "Freshwater Crate L",
+        "Морской ящик L" to "Saltwater Crate L",
+        "Пресный буст S" to "Fresh Boost S",
+        "Пресный буст M" to "Fresh Boost M",
+        "Пресный буст L" to "Fresh Boost L",
+        "Морской буст S" to "Saltwater Boost S",
+        "Морской буст M" to "Saltwater Boost M",
+        "Морской буст L" to "Saltwater Boost L",
         "Стартовый набор" to "Starter Pack",
         "Профи рыболов" to "Pro Angler",
         "Китовый ящик" to "Whale Crate",
@@ -298,6 +304,25 @@ object I18n {
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name
     fun location(name: String, lang: String) = if (lang == "en") locations[name] ?: name else name
+    fun tournamentMetric(metric: String, lang: String): String {
+        val normalized = metric.lowercase()
+        return when (lang) {
+            "ru" -> when (normalized) {
+                "count" -> "Количество"
+                "total_weight" -> "Вес"
+                "largest" -> "Самая большая"
+                "smallest" -> "Самая маленькая"
+                else -> normalized
+            }
+            else -> when (normalized) {
+                "count" -> "Count"
+                "total_weight" -> "Total weight"
+                "largest" -> "Largest"
+                "smallest" -> "Smallest"
+                else -> normalized
+            }
+        }
+    }
     fun lure(name: String, lang: String): String {
         val texts = lures[name]
         return when {

@@ -12,6 +12,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import util.sanitizeName
 import java.time.Instant
 
+const val COIN_PRIZE_ID = "coins"
+
 data class Tournament(
     val id: Long,
     val nameRu: String,
@@ -26,9 +28,19 @@ data class Tournament(
 )
 
 @Serializable
-data class PrizeSpec(val pack: String, val qty: Int)
+data class PrizeSpec(
+    val pack: String = "",
+    val qty: Int = 1,
+    val coins: Int? = null,
+)
 
-data class UserPrize(val id: Long, val packageId: String, val qty: Int, val rank: Int)
+data class UserPrize(
+    val id: Long,
+    val packageId: String,
+    val qty: Int,
+    val rank: Int,
+    val coins: Int? = null,
+)
 
 class TournamentService {
     fun createTournament(
@@ -239,11 +251,13 @@ class TournamentService {
                 val chosen = when (t.metric.lowercase()) {
                     "smallest" -> list.minByOrNull { it.weight }
                     "count" -> list.maxByOrNull { it.at }
+                    "total_weight" -> list.maxByOrNull { it.weight }
                     else -> list.maxByOrNull { it.weight }
                 }
                 val value = when (t.metric.lowercase()) {
                     "smallest" -> chosen?.weight ?: 0.0
                     "count" -> list.size.toDouble()
+                    "total_weight" -> list.sumOf { it.weight }
                     else -> chosen?.weight ?: 0.0
                 }
                 val hideFish = t.metric.lowercase() == "count" && t.fish == null
@@ -262,6 +276,7 @@ class TournamentService {
         val sorted = when (t.metric.lowercase()) {
             "smallest" -> grouped.sortedBy { it.value }
             "count" -> grouped.sortedByDescending { it.value }
+            "total_weight" -> grouped.sortedByDescending { it.value }
             else -> grouped.sortedByDescending { it.value }
         }
         val ranked = sorted.mapIndexed { index, e -> e.copy(rank = index + 1) }
@@ -286,7 +301,8 @@ class TournamentService {
         return rows.map { row ->
             val t = getTournament(row.tournamentId)
             val rank = t?.let { leaderboard(it, userId).second?.rank } ?: 0
-            UserPrize(row.id, row.packageId, row.qty, rank)
+            val coins = if (row.packageId == COIN_PRIZE_ID) row.qty else null
+            UserPrize(row.id, row.packageId, row.qty, rank, coins)
         }
     }
 
@@ -297,9 +313,13 @@ class TournamentService {
             UserPrizes.update({ UserPrizes.id eq prizeId }) { it[claimed] = true }
             row[UserPrizes.packageId] to row[UserPrizes.qty]
         }
+        if (pack == COIN_PRIZE_ID) {
+            if (qty > 0) fishing.addCoins(userId, qty)
+            return Pair(emptyList(), null)
+        }
         var res: Pair<List<FishingService.LureDTO>, Long?>? = null
         repeat(qty) { res = fishing.buyPackage(userId, pack) }
-        return res!!
+        return res ?: Pair(emptyList(), null)
     }
 
     fun distributePrizes(now: Instant = Instant.now()) {
@@ -326,13 +346,21 @@ class TournamentService {
             val prizes = try { Json.decodeFromString<List<PrizeSpec>>(t.prizesJson) } catch (_: Exception) { emptyList() }
             for ((idx, lb) in top.withIndex()) {
                 val prize = prizes.getOrNull(idx) ?: continue
+                val packageId = when {
+                    prize.pack.isNotBlank() -> prize.pack
+                    prize.coins != null && prize.coins > 0 -> COIN_PRIZE_ID
+                    else -> null
+                }
+                if (packageId == null) continue
+                val qty = if (packageId == COIN_PRIZE_ID) (prize.coins ?: 0) else prize.qty
+                if (qty <= 0) continue
                 transaction {
                     UserPrizes.insert {
-                        it[userId] = lb.userId
-                        it[tournamentId] = t.id
-                        it[packageId] = prize.pack
-                        it[qty] = prize.qty
-                        it[claimed] = false
+                        it[UserPrizes.userId] = lb.userId
+                        it[UserPrizes.tournamentId] = t.id
+                        it[UserPrizes.packageId] = packageId
+                        it[UserPrizes.qty] = qty
+                        it[UserPrizes.claimed] = false
                     }
                 }
             }
