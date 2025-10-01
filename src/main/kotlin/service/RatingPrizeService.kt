@@ -11,6 +11,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
+const val RATING_AGGREGATE_PRIZE_ID: Long = Long.MIN_VALUE
+
 class RatingPrizeService {
     private data class CatchRow(
         val userId: Long,
@@ -88,20 +90,41 @@ class RatingPrizeService {
     }
 
     fun pendingPrizes(userId: Long): List<UserPrize> = transaction {
-        RatingPrizes.select {
-            (RatingPrizes.userId eq userId) and (RatingPrizes.claimed eq false)
-        }
-            .orderBy(RatingPrizes.createdAt, SortOrder.ASC)
-            .map { row ->
-                val coins = row[RatingPrizes.coins]
-                UserPrize(
-                    id = -row[RatingPrizes.id].value,
-                    packageId = COIN_PRIZE_ID,
-                    qty = coins,
-                    rank = row[RatingPrizes.rank],
-                    coins = coins,
+        val rows = RatingPrizes
+            .select { (RatingPrizes.userId eq userId) and (RatingPrizes.claimed eq false) }
+            .toList()
+        if (rows.isEmpty()) {
+            emptyList()
+        } else {
+            val totalCoins = rows.sumOf { it[RatingPrizes.coins] }
+            if (totalCoins <= 0) {
+                emptyList()
+            } else {
+                listOf(
+                    UserPrize(
+                        id = RATING_AGGREGATE_PRIZE_ID,
+                        packageId = COIN_PRIZE_ID,
+                        qty = totalCoins,
+                        rank = 0,
+                        coins = totalCoins,
+                    )
                 )
             }
+        }
+    }
+
+    fun claimAll(userId: Long): Int = transaction {
+        val rows = RatingPrizes
+            .select { (RatingPrizes.userId eq userId) and (RatingPrizes.claimed eq false) }
+            .toList()
+        if (rows.isEmpty()) {
+            0
+        } else {
+            RatingPrizes.update({
+                (RatingPrizes.userId eq userId) and (RatingPrizes.claimed eq false)
+            }) { it[claimed] = true }
+            rows.sumOf { it[RatingPrizes.coins] }
+        }
     }
 
     fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService) {

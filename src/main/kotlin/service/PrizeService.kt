@@ -19,11 +19,19 @@ class PrizeService(
     }
 
     fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {
-        return if (prizeId >= 0) {
-            tournaments.claimPrize(userId, prizeId, fishing)
-        } else {
-            ratingPrizes.claimPrize(userId, -prizeId, fishing)
-            Pair(emptyList(), null)
+        return when {
+            prizeId >= 0 -> tournaments.claimPrize(userId, prizeId, fishing)
+            prizeId == RATING_AGGREGATE_PRIZE_ID -> {
+                val coins = ratingPrizes.claimAll(userId)
+                if (coins > 0) {
+                    fishing.addCoins(userId, coins)
+                }
+                Pair(emptyList(), null)
+            }
+            else -> {
+                ratingPrizes.claimPrize(userId, -prizeId, fishing)
+                Pair(emptyList(), null)
+            }
         }
     }
 }

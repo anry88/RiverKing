@@ -585,7 +585,9 @@
       prizePlacesLabel: 'Призовых мест:',
       day: 'День',
       tapToClaim: 'Нажмите, чтобы получить',
-      prizeCongrats: rank => `Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`,
+      prizeCongrats: rank => rank > 0
+        ? `Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`
+        : 'Поздравляем! Ваши призы за рейтинги готовы.',
       hintFastBite: 'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
       hintWaitRare: 'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
       hintTapPrize: 'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
@@ -724,7 +726,9 @@
       prizePlacesLabel: 'Prize places:',
       day: 'Day',
       tapToClaim: 'Tap to claim',
-      prizeCongrats: rank => `Congratulations! You placed ${rank} in the tournament. Your prize:`,
+      prizeCongrats: rank => rank > 0
+        ? `Congratulations! You placed ${rank} in the tournament. Your prize:`
+        : 'Congratulations! Your rating prizes are ready.',
       hintFastBite: 'React to bites quickly for a better catch chance',
       hintWaitRare: 'Waiting longer for a bite increases the odds of rare fish',
       hintTapPrize: 'Tap a leaderboard card to see its potential prize',
