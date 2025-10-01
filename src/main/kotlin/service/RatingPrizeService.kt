@@ -20,6 +20,7 @@ class RatingPrizeService {
     private val distributionLock = Any()
 
     private data class CatchRow(
+        val catchId: Long,
         val userId: Long,
         val locationId: Long,
         val rarity: String,
@@ -59,6 +60,7 @@ class RatingPrizeService {
                     .select { (Catches.createdAt greaterEq start) and (Catches.createdAt less end) }
                     .map { row ->
                         CatchRow(
+                            catchId = row[Catches.id].value,
                             userId = row[Catches.userId].value,
                             locationId = row[Catches.locationId].value,
                             rarity = row[Fish.rarity],
@@ -69,19 +71,12 @@ class RatingPrizeService {
                 val byLocation = rows.groupBy { it.locationId }
                 for ((locationId, list) in byLocation) {
                     if (locationId in awarded) continue
-                    val byUser = list.groupBy { it.userId }
-                    val playerCount = byUser.size
-                    if (playerCount == 0) continue
-                    val bestPerUser = byUser.mapNotNull { (_, catchesByUser) ->
-                        catchesByUser.maxWithOrNull(
-                            compareBy<CatchRow>({ rarityRank(it.rarity) }, { it.weight })
-                        )
-                    }
-                    if (bestPerUser.isEmpty()) continue
-                    val maxPlaces = minOf(playerCount, 10)
-                    val sorted = bestPerUser.sortedWith(
+                    if (list.isEmpty()) continue
+                    val maxPlaces = minOf(list.size, 10)
+                    val sorted = list.sortedWith(
                         compareByDescending<CatchRow> { rarityRank(it.rarity) }
                             .thenByDescending { it.weight }
+                            .thenBy { it.catchId }
                     )
                     sorted.take(maxPlaces).forEachIndexed { index, catch ->
                         val coins = (maxPlaces - index) * 50
