@@ -53,6 +53,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
     data class DailyReward(val name: String, val qty: Int)
 
+    private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
+
     private val freshDailyRewards: List<List<DailyReward>> = listOf(
         listOf(DailyReward("Пресная мирная", 8), DailyReward("Пресная хищная", 4)),
         listOf(DailyReward("Пресная мирная", 10), DailyReward("Пресная хищная", 6)),
@@ -291,7 +293,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     fun totalCaughtKg(userId: Long): Double = transaction { totalKg(userId) }
 
     fun todayCaughtKg(userId: Long): Double = transaction {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = LocalDate.now(ratingZone).atStartOfDay(ratingZone).toInstant()
         Catches.slice(Catches.weight.sum()).selectAll()
             .where { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
@@ -300,7 +302,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     fun totalCaughtCount(userId: Long): Long = transaction { totalCatchCount(userId) }
 
     fun todayCaughtCount(userId: Long): Long = transaction {
-        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val start = LocalDate.now(ratingZone).atStartOfDay(ratingZone).toInstant()
         Catches.select { (Catches.userId eq userId) and (Catches.createdAt greaterEq start) }.count()
     }
 
@@ -1313,7 +1315,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     fun todayCoins(userId: Long): Long = transaction {
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
         val today = LocalDate.now(zone)
         coinsEarnedOnDate(userId, today, zone)
     }
@@ -1480,7 +1482,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ensureCurrentRod(userId, totalAfter)
 
         val caughtAt = Instant.now()
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
         val catchDate = caughtAt.atZone(zone).toLocalDate()
         val coinsEarnedBefore = coinsEarnedOnDate(userId, catchDate, zone)
         val tier = locationTier(locId)
@@ -1569,8 +1571,6 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             }
             .singleOrNull()
     }
-
-    private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
 
     private fun rarityRank(r: String) = when (r) {
         "legendary" -> 6
@@ -1731,13 +1731,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
     private fun periodRange(period: String): Pair<Instant?, Instant?> {
-        val zone = ZoneId.systemDefault()
+        val zone = ratingZone
+        val today = LocalDate.now(zone)
         val start = when (period) {
-            "today" -> LocalDate.now().atStartOfDay(zone).toInstant()
-            "yesterday" -> LocalDate.now().minusDays(1).atStartOfDay(zone).toInstant()
-            "week" -> LocalDate.now().minusWeeks(1).atStartOfDay(zone).toInstant()
-            "month" -> LocalDate.now().minusMonths(1).atStartOfDay(zone).toInstant()
-            "year" -> LocalDate.now().minusYears(1).atStartOfDay(zone).toInstant()
+            "today" -> today.atStartOfDay(zone).toInstant()
+            "yesterday" -> today.minusDays(1).atStartOfDay(zone).toInstant()
+            "week" -> today.minusWeeks(1).atStartOfDay(zone).toInstant()
+            "month" -> today.minusMonths(1).atStartOfDay(zone).toInstant()
+            "year" -> today.minusYears(1).atStartOfDay(zone).toInstant()
             else -> null
         }
         val end = when (period) {
