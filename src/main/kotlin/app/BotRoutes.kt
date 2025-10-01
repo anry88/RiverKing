@@ -696,10 +696,16 @@ fun Application.botRoutes(env: Env) {
                 prizes: List<UserPrize>? = null,
                 prefix: String? = null,
                 replyToMessageId: Long? = null,
+                showWhenEmpty: Boolean = false,
             ) {
                 val actual = prizes ?: prizeService.pendingPrizes(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
                 val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
+                val emptyBody = if (lang == "ru") {
+                    "Нет призов для получения."
+                } else {
+                    "No prizes to claim."
+                }
                 fun displayName(prize: UserPrize): String {
                     if (prize.packageId == COIN_PRIZE_ID) {
                         return if (lang == "ru") "Монеты" else "Coins"
@@ -713,13 +719,21 @@ fun Application.botRoutes(env: Env) {
                     if (lureName != prize.packageId) return lureName
                     return prize.packageId.replace('_', ' ')
                 }
-                val body = if (actual.isEmpty()) {
-                    if (lang == "ru") {
-                        "Нет призов для получения."
-                    } else {
-                        "No prizes to claim."
+                if (actual.isEmpty()) {
+                    val body = if (showWhenEmpty) emptyBody else ""
+                    val baseText = buildString {
+                        if (!prefixText.isNullOrBlank()) append(prefixText)
+                        if (body.isNotBlank()) {
+                            if (!prefixText.isNullOrBlank()) append("\n\n")
+                            append(body)
+                        }
                     }
-                } else {
+                    if (baseText.isNotBlank()) {
+                        trySend(chatId, baseText, replyToMessageId = replyToMessageId)
+                    }
+                    return
+                }
+                val body = run {
                     val header = if (lang == "ru") {
                         "Призы, которые можно получить:"
                     } else {
@@ -748,10 +762,6 @@ fun Application.botRoutes(env: Env) {
                         if (body.isNotBlank()) append("\n\n")
                     }
                     append(body)
-                }
-                if (actual.isEmpty()) {
-                    trySend(chatId, baseText, replyToMessageId = replyToMessageId)
-                    return
                 }
                 val markup = Json.encodeToString(
                     InlineKeyboardMarkup(
@@ -1289,7 +1299,14 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         val prizes = prizeService.pendingPrizes(uid)
                         logCommandMetric("prizes", mapOf("count" to prizes.size.toString()), source)
-                        sendPrizes(uid, chatId, lang, prizes = prizes, replyToMessageId = replyTo)
+                        sendPrizes(
+                            uid,
+                            chatId,
+                            lang,
+                            prizes = prizes,
+                            replyToMessageId = replyTo,
+                            showWhenEmpty = true,
+                        )
                         return true
                     }
                     "/daily" -> {
@@ -2083,7 +2100,15 @@ Available commands:
                             } else {
                                 "Prize not found or already claimed."
                             }
-                            sendPrizes(uid, chatId, lang, prizes = pending, prefix = reply, replyToMessageId = replyTo)
+                            sendPrizes(
+                                uid,
+                                chatId,
+                                lang,
+                                prizes = pending,
+                                prefix = reply,
+                                replyToMessageId = replyTo,
+                                showWhenEmpty = true,
+                            )
                             return true
                         }
                         val isCoins = prize.packageId == COIN_PRIZE_ID
@@ -2146,7 +2171,14 @@ Available commands:
                                 "Couldn't claim the prize. Please try again later."
                             }
                         }
-                        sendPrizes(uid, chatId, lang, prefix = success, replyToMessageId = replyTo)
+                        sendPrizes(
+                            uid,
+                            chatId,
+                            lang,
+                            prefix = success,
+                            replyToMessageId = replyTo,
+                            showWhenEmpty = true,
+                        )
                         return true
                     }
                 }
