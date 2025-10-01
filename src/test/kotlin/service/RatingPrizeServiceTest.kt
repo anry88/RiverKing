@@ -146,16 +146,17 @@ class RatingPrizeServiceTest {
             }
         }
 
-        // Pond results: main user takes 1st and 3rd, rivalA is 2nd.
+        // Pond results: three unique players, main user holds the 1st and 3rd largest fish.
         insertCatch(mainUser, pondId, 10.0, 1)
         insertCatch(rivalA, pondId, 9.5, 2)
         insertCatch(mainUser, pondId, 9.0, 3)
+        insertCatch(rivalB, pondId, 8.5, 4)
 
-        // Swamp results: main user takes 1st and 4th, rivals take the middle spots.
-        insertCatch(mainUser, swampId, 8.0, 4)
-        insertCatch(rivalB, swampId, 7.5, 5)
-        insertCatch(rivalA, swampId, 7.0, 6)
-        insertCatch(mainUser, swampId, 6.0, 7)
+        // Swamp results: three unique players, main user holds the two heaviest fish.
+        insertCatch(mainUser, swampId, 8.0, 5)
+        insertCatch(mainUser, swampId, 7.8, 6)
+        insertCatch(rivalB, swampId, 7.5, 7)
+        insertCatch(rivalA, swampId, 7.0, 8)
 
         val distributionInstant = prizeDate.plusDays(1).atStartOfDay(zone).toInstant()
         rating.distributeDailyPrizes(now = distributionInstant, zone = zone)
@@ -167,9 +168,9 @@ class RatingPrizeServiceTest {
                 .orderBy(RatingPrizes.locationId to SortOrder.ASC, RatingPrizes.rank to SortOrder.ASC)
                 .map { it[RatingPrizes.rank] to it[RatingPrizes.coins] }
             assertEquals(
-                listOf(1 to 150, 3 to 50, 1 to 200, 4 to 50),
+                listOf(1 to 150, 3 to 50, 1 to 150, 2 to 100),
                 prizes,
-                "Expected two prize placements per location for the main user",
+                "Expected prize count to match unique player count per location",
             )
         }
 

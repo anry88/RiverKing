@@ -76,7 +76,9 @@ class RatingPrizeService {
                 for ((locationId, list) in byLocation) {
                     if (locationId in awarded) continue
                     if (list.isEmpty()) continue
-                    val maxPlaces = minOf(list.size, 10)
+                    val uniquePlayerCount = list.map { it.userId }.toSet().size
+                    if (uniquePlayerCount <= 0) continue
+                    val maxPlaces = minOf(list.size, uniquePlayerCount)
                     val sorted = list.sortedWith(
                         compareByDescending<CatchRow> { rarityRank(it.rarity) }
                             .thenByDescending { it.weight }
