@@ -41,7 +41,21 @@ object DB {
             )
             seedIfEmpty()
             migrateCoins()
+            backfillLastSeenAt()
         }
+    }
+
+    private fun backfillLastSeenAt() {
+        Users
+            .slice(Users.id, Users.createdAt)
+            .select { Users.lastSeenAt.isNull() }
+            .forEach { row ->
+                val userId = row[Users.id].value
+                val createdAt = row[Users.createdAt]
+                Users.update({ Users.id eq userId }) {
+                    it[Users.lastSeenAt] = createdAt
+                }
+            }
     }
 
     private fun ensureRodCodeColumn() {
@@ -939,6 +953,7 @@ object Users : LongIdTable() {
     val xp = integer("xp")
     val coins = long("coins").default(0L)
     val createdAt = timestamp("created_at")
+    val lastSeenAt = timestamp("last_seen_at").nullable()
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()

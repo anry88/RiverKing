@@ -136,13 +136,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         refToken: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
+        val now = clock.instant()
         if (existing == null) {
             val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
             val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
             val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
             val newId = Users.insertAndGetId {
                 it[Users.tgId] = tgId
-                it[level] = 1; it[xp] = 0; it[createdAt] = Instant.now()
+                it[level] = 1; it[xp] = 0; it[createdAt] = now
+                it[Users.lastSeenAt] = now
                 it[Users.firstName] = firstName
                 it[Users.lastName] = lastName
                 it[Users.username] = username
@@ -171,11 +173,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             newId
         } else {
             val id = existing[Users.id].value
-            if (firstName != null || lastName != null || username != null) {
+            val lastSeen = existing[Users.lastSeenAt]
+            val shouldUpdateLastSeen = lastSeen == null || Duration.between(lastSeen, now) >= Duration.ofMinutes(1)
+            if (firstName != null || lastName != null || username != null || shouldUpdateLastSeen) {
                 Users.update({ Users.id eq id }) {
                     if (firstName != null) it[Users.firstName] = firstName
                     if (lastName != null) it[Users.lastName] = lastName
                     if (username != null) it[Users.username] = username
+                    if (shouldUpdateLastSeen) it[Users.lastSeenAt] = now
                 }
             }
             val total = totalKg(id)
