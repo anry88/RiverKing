@@ -1582,12 +1582,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private data class DailyPrizeCatch(
+        val catchId: Long,
         val rarity: String,
         val weight: Double,
         val userId: Long,
     )
 
     private data class DailyRatingCatch(
+        val catchId: Long,
         val locationId: Long,
         val location: String,
         val rarity: String,
@@ -1608,6 +1610,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 }
                 .map {
                     DailyPrizeCatch(
+                        catchId = it[Catches.id].value,
                         rarity = it[Fish.rarity],
                         weight = it[Catches.weight],
                         userId = it[Catches.userId].value,
@@ -1623,6 +1626,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .sortedWith(
                 compareByDescending<DailyPrizeCatch> { rarityRank(it.rarity) }
                     .thenByDescending { it.weight }
+                    .thenBy { it.catchId }
             )
             .take(maxPlaces)
             .mapIndexed { index, _ ->
@@ -1645,6 +1649,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 }
                 .map {
                     DailyRatingCatch(
+                        catchId = it[Catches.id].value,
                         locationId = it[Catches.locationId].value,
                         location = it[Locations.name],
                         rarity = it[Fish.rarity],
@@ -1657,30 +1662,32 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         if (catches.isEmpty()) return emptyList()
         val comparator = compareByDescending<DailyRatingCatch> { rarityRank(it.rarity) }
             .thenByDescending { it.weight }
+            .thenBy { it.catchId }
         return catches
             .groupBy { it.locationId }
             .mapNotNull { (locationId, entries) ->
-                val myBest = entries.filter { it.userId == userId }.maxWithOrNull(comparator) ?: return@mapNotNull null
-                val bestByUser = entries
-                    .groupBy { it.userId }
-                    .mapValues { (_, list) -> list.maxWithOrNull(comparator)!! }
-                val sorted = bestByUser.values.sortedWith(comparator)
-                val rank = sorted.indexOfFirst { it.userId == userId }
-                if (rank == -1) return@mapNotNull null
-                val prizeDate = date
-                val coinsByRank = dailyPrizePreview(locationId, prizeDate)
-                DailyRatingPosition(
-                    locationId = locationId,
-                    location = myBest.location,
-                    rank = rank + 1,
-                    participants = sorted.size,
-                    bestFish = myBest.fish,
-                    bestRarity = myBest.rarity,
-                    bestWeight = myBest.weight,
-                    prizeCoins = coinsByRank[rank + 1],
-                )
+                val sorted = entries.sortedWith(comparator)
+                val uniquePlayers = entries.map { it.userId }.toSet().size
+                val maxPlaces = minOf(sorted.size, uniquePlayers, 10)
+                if (maxPlaces <= 0) return@mapNotNull null
+                val prizeEntries = sorted.take(maxPlaces)
+                val myEntries = prizeEntries.withIndex().filter { it.value.userId == userId }
+                if (myEntries.isEmpty()) return@mapNotNull null
+                myEntries.map { (index, catch) ->
+                    DailyRatingPosition(
+                        locationId = locationId,
+                        location = catch.location,
+                        rank = index + 1,
+                        participants = maxPlaces,
+                        bestFish = catch.fish,
+                        bestRarity = catch.rarity,
+                        bestWeight = catch.weight,
+                        prizeCoins = (maxPlaces - index) * 50,
+                    )
+                }
             }
-            .sortedBy { it.rank }
+            .flatten()
+            .sortedWith(compareBy<DailyRatingPosition> { it.location }.thenBy { it.rank })
     }
 
     private fun sortCatches(list: List<CatchDTO>, limit: Int, asc: Boolean = false) =
