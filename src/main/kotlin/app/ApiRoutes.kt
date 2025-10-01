@@ -619,16 +619,25 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             log.info("shop purchase click tgId={} pack={}", tgId, id)
-            Metrics.counter("shop_purchase_click_total", mapOf("pack" to id))
+            Metrics.counter(
+                "shop_purchase_click_total",
+                mapOf("pack" to id, "currency" to "stars"),
+            )
             val uid = fishing.ensureUserByTgId(tgId)
             val paymentReq = if (!env.devMode) {
                 try { call.receive<PaymentReq>() } catch (_: Exception) {
-                    Metrics.counter("shop_purchase_denied_total", mapOf("pack" to id))
+                    Metrics.counter(
+                        "shop_purchase_denied_total",
+                        mapOf("pack" to id, "currency" to "stars"),
+                    )
                     return@post call.respond(HttpStatusCode.PaymentRequired)
                 }
             } else try { call.receive<PaymentReq>() } catch (_: Exception) { null }
             val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
-                Metrics.counter("shop_purchase_failed_total", mapOf("pack" to id))
+                Metrics.counter(
+                    "shop_purchase_failed_total",
+                    mapOf("pack" to id, "currency" to "stars"),
+                )
                 log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
             }
@@ -647,7 +656,10 @@ fun Application.apiRoutes(env: Env) {
             fishing.findPack(id)?.let { pack ->
                 ReferralService.onPurchase(uid, pack)
             }
-            Metrics.counter("shop_purchase_complete_total", mapOf("pack" to id))
+            Metrics.counter(
+                "shop_purchase_complete_total",
+                mapOf("pack" to id, "currency" to "stars"),
+            )
             log.info("shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(res.first, res.second))
         }
@@ -661,7 +673,10 @@ fun Application.apiRoutes(env: Env) {
             }
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             log.info("coin shop purchase tgId={} pack={}", tgId, id)
-            Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to id))
+            Metrics.counter(
+                "coin_shop_purchase_click_total",
+                mapOf("pack" to id, "currency" to "coins"),
+            )
             val uid = fishing.ensureUserByTgId(tgId)
             val language = fishing.userLanguage(uid)
             val result = try {
@@ -669,7 +684,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (e: FishingService.NotEnoughCoinsException) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "insufficient")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "insufficient")
                 )
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
@@ -682,7 +697,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (_: FishingService.CoinPurchaseUnavailableException) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "unavailable")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "unavailable")
                 )
                 return@post call.respond(
                     HttpStatusCode.BadRequest,
@@ -691,7 +706,7 @@ fun Application.apiRoutes(env: Env) {
             } catch (e: Exception) {
                 Metrics.counter(
                     "coin_shop_purchase_failed_total",
-                    mapOf("pack" to id, "reason" to "error")
+                    mapOf("pack" to id, "currency" to "coins", "reason" to "error")
                 )
                 log.warn("coin shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
@@ -702,7 +717,10 @@ fun Application.apiRoutes(env: Env) {
                     description = I18n.lureDescription(it.name, language),
                 )
             }
-            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to id))
+            Metrics.counter(
+                "coin_shop_purchase_complete_total",
+                mapOf("pack" to id, "currency" to "coins"),
+            )
             log.info("coin shop purchase success tgId={} pack={}", tgId, id)
             call.respond(ShopBuyResp(localized, result.second))
         }

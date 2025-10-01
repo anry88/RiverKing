@@ -1524,10 +1524,16 @@ Available commands:
                         }
                         val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
                         val formatter = NumberFormat.getIntegerInstance(locale)
-                        Metrics.counter("coin_shop_purchase_click_total", mapOf("pack" to packId))
+                        Metrics.counter(
+                            "coin_shop_purchase_click_total",
+                            mapOf("pack" to packId, "currency" to "coins"),
+                        )
                         return try {
                             fishing.buyPackageWithCoins(uid, packId)
-                            Metrics.counter("coin_shop_purchase_complete_total", mapOf("pack" to packId))
+                            Metrics.counter(
+                                "coin_shop_purchase_complete_total",
+                                mapOf("pack" to packId, "currency" to "coins"),
+                            )
                             logCommandMetric(
                                 "coin_buy",
                                 mapOf("result" to "purchased", "pack" to packId),
@@ -1556,7 +1562,7 @@ Available commands:
                         } catch (e: FishingService.NotEnoughCoinsException) {
                             Metrics.counter(
                                 "coin_shop_purchase_failed_total",
-                                mapOf("pack" to packId, "reason" to "insufficient"),
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "insufficient"),
                             )
                             logCommandMetric(
                                 "coin_buy",
@@ -1576,7 +1582,7 @@ Available commands:
                         } catch (_: FishingService.CoinPurchaseUnavailableException) {
                             Metrics.counter(
                                 "coin_shop_purchase_failed_total",
-                                mapOf("pack" to packId, "reason" to "unavailable"),
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "unavailable"),
                             )
                             logCommandMetric(
                                 "coin_buy",
@@ -1593,7 +1599,7 @@ Available commands:
                         } catch (e: Exception) {
                             Metrics.counter(
                                 "coin_shop_purchase_failed_total",
-                                mapOf("pack" to packId, "reason" to "error"),
+                                mapOf("pack" to packId, "currency" to "coins", "reason" to "error"),
                             )
                             log.error("coin buy failed chatId={} pack={}", chatId, packId, e)
                             logCommandMetric(
