@@ -11,6 +11,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 
 class FishingServiceTest {
     private fun testEnv(name: String) = Env(
@@ -192,5 +193,64 @@ class FishingServiceTest {
 
         val expired = svc.listDiscounts()
         assertEquals(0, expired.size)
+    }
+
+    @Test
+    fun globalTopDailyPrizePreviewAllowsMultiplePlacementsPerPlayer() {
+        val svc = newService("testdb_daily_preview")
+        val mainUser = svc.ensureUserByTgId(200L)
+        val rivalA = svc.ensureUserByTgId(201L)
+        val rivalB = svc.ensureUserByTgId(202L)
+
+        val locationId = transaction {
+            Locations.selectAll()
+                .orderBy(Locations.id to SortOrder.ASC)
+                .limit(1)
+                .single()[Locations.id].value
+        }
+
+        val fishId = transaction {
+            Fish.selectAll()
+                .orderBy(Fish.id to SortOrder.ASC)
+                .limit(1)
+                .single()[Fish.id].value
+        }
+
+        val zone = ZoneId.of("Europe/Belgrade")
+        val today = ZonedDateTime.now(zone).toLocalDate()
+        val base = today.atStartOfDay(zone).toInstant()
+
+        fun insertCatch(userId: Long, weight: Double, offsetHours: Long) {
+            transaction {
+                Catches.insert {
+                    it[Catches.userId] = userId
+                    it[Catches.fishId] = fishId
+                    it[Catches.weight] = weight
+                    it[Catches.locationId] = locationId
+                    it[Catches.createdAt] = base.plusSeconds(offsetHours * 3600)
+                    it[Catches.coins] = null
+                }
+            }
+        }
+
+        insertCatch(mainUser, 10.0, 1)
+        insertCatch(rivalA, 9.5, 2)
+        insertCatch(mainUser, 9.0, 3)
+        insertCatch(rivalB, 8.5, 4)
+        insertCatch(mainUser, 8.0, 5)
+
+        val results = svc.globalTopByLocation(locationId, period = "today")
+
+        val prizeSummary = results.take(5).map { it.userId to (it.rank to it.prizeCoins) }
+        assertEquals(
+            listOf(
+                mainUser to (1 to 250),
+                rivalA to (2 to 200),
+                mainUser to (3 to 150),
+                rivalB to (4 to 100),
+                mainUser to (5 to 50),
+            ),
+            prizeSummary,
+        )
     }
 }

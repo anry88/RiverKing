@@ -1570,7 +1570,6 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private data class DailyPrizeCatch(
-        val userId: Long,
         val rarity: String,
         val weight: Double,
     )
@@ -1587,24 +1586,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 }
                 .map {
                     DailyPrizeCatch(
-                        userId = it[Catches.userId].value,
                         rarity = it[Fish.rarity],
                         weight = it[Catches.weight],
                     )
                 }
         }
         if (rows.isEmpty()) return emptyMap()
-        val bestPerUser = rows
-            .groupBy { it.userId }
-            .mapNotNull { (_, catches) ->
-                catches.maxWithOrNull(
-                    compareBy<DailyPrizeCatch>({ rarityRank(it.rarity) }, { it.weight })
-                )
-            }
-        if (bestPerUser.isEmpty()) return emptyMap()
-        val maxPlaces = minOf(bestPerUser.size, 10)
+        val maxPlaces = minOf(rows.size, 10)
         if (maxPlaces <= 0) return emptyMap()
-        return bestPerUser
+        return rows
             .sortedWith(
                 compareByDescending<DailyPrizeCatch> { rarityRank(it.rarity) }
                     .thenByDescending { it.weight }
@@ -1754,24 +1744,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             if (prizeDate != null) {
                 val coinsByRank = dailyPrizePreview(locationId, prizeDate)
                 if (coinsByRank.isNotEmpty()) {
-                    val seenUsers = mutableMapOf<Long, Int>()
-                    var nextRank = 1
-                    return sorted.map { catch ->
-                        val (rank, coins) = if (catch.userId != null) {
-                            val userId = catch.userId
-                            val existing = seenUsers[userId]
-                            if (existing != null) {
-                                existing to null
-                            } else {
-                                val assigned = nextRank
-                                seenUsers[userId] = assigned
-                                nextRank += 1
-                                assigned to coinsByRank[assigned]
-                            }
-                        } else {
-                            null to null
-                        }
-                        if (rank != null || coins != null) {
+                    return sorted.mapIndexed { index, catch ->
+                        val rank = index + 1
+                        val coins = coinsByRank[rank]
+                        if (coins != null) {
                             catch.copy(rank = rank, prizeCoins = coins)
                         } else {
                             catch
