@@ -7,6 +7,7 @@ function Ratings({me, setMe, onCatchClick}){
   const [fishId,setFishId] = React.useState('all');
   const [list,setList] = React.useState([]);
   const [order,setOrder] = React.useState('desc');
+  const [prizeHint,setPrizeHint] = React.useState(null);
 
   React.useEffect(()=>{
     setLocId(defaultLocationId);
@@ -40,7 +41,13 @@ function Ratings({me, setMe, onCatchClick}){
       .catch(()=>setList([]));
   },[mode,locId,fishId,period,order,me.needsNickname,me.language,me.locations]);
 
+  React.useEffect(()=>{
+    setPrizeHint(null);
+  },[mode,locId,fishId,period,order,list]);
+
   const usingSpecies = fishId !== 'all';
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='ru') ? 'ru-RU' : 'en-US';
+  const showPrizePreview = mode==='global' && fishId==='all' && locId!=='all' && order==='desc';
 
   return (
     <div className="mt-4 space-y-4">
@@ -91,14 +98,36 @@ function Ratings({me, setMe, onCatchClick}){
             className="w-full p-3 glass rounded-xl flex justify-between text-left"
           >
             <div className="flex items-center gap-3">
-              {(me.caughtFishIds||[]).includes(c.fishId) ? (
-                <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
-              ) : (
-                <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
-                  <span className="text-xl opacity-20">🐟</span>
-                  <span className="absolute">?</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {(me.caughtFishIds||[]).includes(c.fishId) ? (
+                  <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                ) : (
+                  <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
+                    <span className="text-xl opacity-20">🐟</span>
+                    <span className="absolute">?</span>
+                  </div>
+                )}
+                {showPrizePreview && typeof c.prizeCoins === 'number' && c.prizeCoins>0 && (
+                  <div className={`relative ${prizeHint?.index===i?'z-10':''}`}>
+                    <button
+                      type="button"
+                      onClick={ev=>{
+                        ev.stopPropagation();
+                        setPrizeHint(p=>p && p.index===i ? null : {index:i, coins:c.prizeCoins});
+                      }}
+                      className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10"
+                      aria-label={t('prizes')}
+                    >
+                      <span className="text-lg">🪙</span>
+                    </button>
+                    {prizeHint?.index===i && (
+                      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 text-xs bg-gray-800 border border-white/10 p-2 whitespace-nowrap rounded-lg text-amber-300">
+                        🪙 +{Number(prizeHint.coins).toLocaleString(coinLocale)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div>
                 <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
                 <div className="text-xs opacity-70">

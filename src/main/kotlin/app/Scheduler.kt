@@ -14,6 +14,7 @@ object Scheduler {
         val ratingPrizes = RatingPrizeService()
         val prizeService = PrizeService(tournaments, ratingPrizes)
         scope.launch {
+            prizeService.distributePrizes()
             while (isActive) {
                 val tz = ZoneId.of("Europe/Belgrade")
                 val now = ZonedDateTime.now(tz)

@@ -8,12 +8,17 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
 const val RATING_AGGREGATE_PRIZE_ID: Long = Long.MIN_VALUE
 
 class RatingPrizeService {
+    @Volatile
+    private var lastDistributedDate: LocalDate? = null
+    private val distributionLock = Any()
+
     private data class CatchRow(
         val userId: Long,
         val locationId: Long,
@@ -34,58 +39,67 @@ class RatingPrizeService {
     fun distributeDailyPrizes(now: Instant = Instant.now(), zone: ZoneId = ZoneId.of("Europe/Belgrade")) {
         val zoned = ZonedDateTime.ofInstant(now, zone)
         val targetDate = zoned.minusDays(1).toLocalDate()
-        val start = targetDate.atStartOfDay(zone).toInstant()
-        val end = start.plus(Duration.ofDays(1))
-
-        transaction {
-            val awarded = RatingPrizes
-                .slice(RatingPrizes.locationId)
-                .select { RatingPrizes.prizeDate eq targetDate }
-                .map { it[RatingPrizes.locationId].value }
-                .toMutableSet()
-
-            val rows = ((Catches innerJoin Fish) innerJoin Locations)
-                .select { (Catches.createdAt greaterEq start) and (Catches.createdAt less end) }
-                .map { row ->
-                    CatchRow(
-                        userId = row[Catches.userId].value,
-                        locationId = row[Catches.locationId].value,
-                        rarity = row[Fish.rarity],
-                        weight = row[Catches.weight],
-                    )
-                }
-
-            val byLocation = rows.groupBy { it.locationId }
-            for ((locationId, list) in byLocation) {
-                if (locationId in awarded) continue
-                val byUser = list.groupBy { it.userId }
-                val playerCount = byUser.size
-                if (playerCount == 0) continue
-                val bestPerUser = byUser.mapNotNull { (_, catchesByUser) ->
-                    catchesByUser.maxWithOrNull(
-                        compareBy<CatchRow>({ rarityRank(it.rarity) }, { it.weight })
-                    )
-                }
-                if (bestPerUser.isEmpty()) continue
-                val maxPlaces = minOf(playerCount, 10)
-                val sorted = bestPerUser.sortedWith(
-                    compareByDescending<CatchRow> { rarityRank(it.rarity) }
-                        .thenByDescending { it.weight }
-                )
-                sorted.take(maxPlaces).forEachIndexed { index, catch ->
-                    val coins = (maxPlaces - index) * 50
-                    RatingPrizes.insert {
-                        it[RatingPrizes.userId] = catch.userId
-                        it[RatingPrizes.locationId] = locationId
-                        it[prizeDate] = targetDate
-                        it[rank] = index + 1
-                        it[RatingPrizes.coins] = coins
-                        it[claimed] = false
-                        it[createdAt] = now
-                    }
-                }
-                awarded += locationId
+        synchronized(distributionLock) {
+            val lastDate = lastDistributedDate
+            if (lastDate != null && !targetDate.isAfter(lastDate)) {
+                return
             }
+
+            val start = targetDate.atStartOfDay(zone).toInstant()
+            val end = start.plus(Duration.ofDays(1))
+
+            transaction {
+                val awarded = RatingPrizes
+                    .slice(RatingPrizes.locationId)
+                    .select { RatingPrizes.prizeDate eq targetDate }
+                    .map { it[RatingPrizes.locationId].value }
+                    .toMutableSet()
+
+                val rows = ((Catches innerJoin Fish) innerJoin Locations)
+                    .select { (Catches.createdAt greaterEq start) and (Catches.createdAt less end) }
+                    .map { row ->
+                        CatchRow(
+                            userId = row[Catches.userId].value,
+                            locationId = row[Catches.locationId].value,
+                            rarity = row[Fish.rarity],
+                            weight = row[Catches.weight],
+                        )
+                    }
+
+                val byLocation = rows.groupBy { it.locationId }
+                for ((locationId, list) in byLocation) {
+                    if (locationId in awarded) continue
+                    val byUser = list.groupBy { it.userId }
+                    val playerCount = byUser.size
+                    if (playerCount == 0) continue
+                    val bestPerUser = byUser.mapNotNull { (_, catchesByUser) ->
+                        catchesByUser.maxWithOrNull(
+                            compareBy<CatchRow>({ rarityRank(it.rarity) }, { it.weight })
+                        )
+                    }
+                    if (bestPerUser.isEmpty()) continue
+                    val maxPlaces = minOf(playerCount, 10)
+                    val sorted = bestPerUser.sortedWith(
+                        compareByDescending<CatchRow> { rarityRank(it.rarity) }
+                            .thenByDescending { it.weight }
+                    )
+                    sorted.take(maxPlaces).forEachIndexed { index, catch ->
+                        val coins = (maxPlaces - index) * 50
+                        RatingPrizes.insert {
+                            it[RatingPrizes.userId] = catch.userId
+                            it[RatingPrizes.locationId] = locationId
+                            it[prizeDate] = targetDate
+                            it[rank] = index + 1
+                            it[RatingPrizes.coins] = coins
+                            it[claimed] = false
+                            it[createdAt] = now
+                        }
+                    }
+                    awarded += locationId
+                }
+            }
+
+            lastDistributedDate = targetDate
         }
     }
 
