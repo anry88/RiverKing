@@ -12,7 +12,11 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-const val RATING_AGGREGATE_PRIZE_ID: Long = Long.MIN_VALUE
+// The aggregate rating prize identifier is exposed via JSON to the web client,
+// which parses numbers using double precision. Any value outside the
+// JavaScript "safe" integer range (±2^53-1) would lose precision and break the
+// claim endpoint. Keep this identifier within the safe range to avoid that.
+const val RATING_AGGREGATE_PRIZE_ID: Long = -1L
 
 class RatingPrizeService {
     @Volatile
@@ -113,7 +117,7 @@ class RatingPrizeService {
                     UserPrize(
                         id = RATING_AGGREGATE_PRIZE_ID,
                         packageId = COIN_PRIZE_ID,
-                        qty = totalCoins,
+                        qty = 1,
                         rank = 0,
                         coins = totalCoins,
                     )
