@@ -501,7 +501,6 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/prizes") {
-            prizeService.distributePrizes()
             val session = call.sessions.get<AppSession>()
             val tgId = when {
                 session != null -> session.tgId

@@ -1234,6 +1234,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val fishId: Long? = null,
         val user: String? = null,
         val at: String? = null,
+        val rank: Int? = null,
+        val prizeCoins: Int? = null,
     )
 
     @Serializable
@@ -1555,6 +1557,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .singleOrNull()
     }
 
+    private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
+
     private fun rarityRank(r: String) = when (r) {
         "legendary" -> 6
         "mythic" -> 5
@@ -1563,6 +1567,55 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         "uncommon" -> 2
         "common" -> 1
         else -> 0
+    }
+
+    private data class DailyPrizeCatch(
+        val userId: Long,
+        val rarity: String,
+        val weight: Double,
+    )
+
+    private fun dailyPrizePreview(locationId: Long, date: LocalDate): Map<Int, Int> {
+        val start = date.atStartOfDay(ratingZone).toInstant()
+        val end = start.plus(Duration.ofDays(1))
+        val rows = transaction {
+            (Catches innerJoin Fish)
+                .select {
+                    (Catches.locationId eq locationId) and
+                        (Catches.createdAt greaterEq start) and
+                        (Catches.createdAt less end)
+                }
+                .map {
+                    DailyPrizeCatch(
+                        userId = it[Catches.userId].value,
+                        rarity = it[Fish.rarity],
+                        weight = it[Catches.weight],
+                    )
+                }
+        }
+        if (rows.isEmpty()) return emptyMap()
+        val bestPerUser = rows
+            .groupBy { it.userId }
+            .mapNotNull { (_, catches) ->
+                catches.maxWithOrNull(
+                    compareBy<DailyPrizeCatch>({ rarityRank(it.rarity) }, { it.weight })
+                )
+            }
+        if (bestPerUser.isEmpty()) return emptyMap()
+        val maxPlaces = minOf(bestPerUser.size, 10)
+        if (maxPlaces <= 0) return emptyMap()
+        return bestPerUser
+            .sortedWith(
+                compareByDescending<DailyPrizeCatch> { rarityRank(it.rarity) }
+                    .thenByDescending { it.weight }
+            )
+            .take(maxPlaces)
+            .mapIndexed { index, _ ->
+                val rank = index + 1
+                val coins = (maxPlaces - index) * 50
+                rank to coins
+            }
+            .toMap()
     }
 
     private fun sortCatches(list: List<CatchDTO>, limit: Int, asc: Boolean = false) =
@@ -1690,7 +1743,44 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     )
                 }
         }
-        return sortCatches(catches, limit, asc)
+        val sorted = sortCatches(catches, limit, asc)
+        if (!asc && locationId != null) {
+            val nowInZone = ZonedDateTime.now(ratingZone)
+            val prizeDate = when (period) {
+                "today" -> nowInZone.toLocalDate()
+                "yesterday" -> nowInZone.minusDays(1).toLocalDate()
+                else -> null
+            }
+            if (prizeDate != null) {
+                val coinsByRank = dailyPrizePreview(locationId, prizeDate)
+                if (coinsByRank.isNotEmpty()) {
+                    val seenUsers = mutableMapOf<Long, Int>()
+                    var nextRank = 1
+                    return sorted.map { catch ->
+                        val (rank, coins) = if (catch.userId != null) {
+                            val userId = catch.userId
+                            val existing = seenUsers[userId]
+                            if (existing != null) {
+                                existing to null
+                            } else {
+                                val assigned = nextRank
+                                seenUsers[userId] = assigned
+                                nextRank += 1
+                                assigned to coinsByRank[assigned]
+                            }
+                        } else {
+                            null to null
+                        }
+                        if (rank != null || coins != null) {
+                            catch.copy(rank = rank, prizeCoins = coins)
+                        } else {
+                            catch
+                        }
+                    }
+                }
+            }
+        }
+        return sorted
     }
 
     fun globalTopBySpecies(

@@ -697,10 +697,7 @@ fun Application.botRoutes(env: Env) {
                 prefix: String? = null,
                 replyToMessageId: Long? = null,
             ) {
-                val actual = prizes ?: run {
-                    prizeService.distributePrizes()
-                    prizeService.pendingPrizes(uid)
-                }
+                val actual = prizes ?: prizeService.pendingPrizes(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
                 val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
                 fun displayName(prize: UserPrize): String {
@@ -1290,7 +1287,6 @@ Available commands:
                     "/prizes" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        prizeService.distributePrizes()
                         val prizes = prizeService.pendingPrizes(uid)
                         logCommandMetric("prizes", mapOf("count" to prizes.size.toString()), source)
                         sendPrizes(uid, chatId, lang, prizes = prizes, replyToMessageId = replyTo)
@@ -2078,7 +2074,6 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        prizeService.distributePrizes()
                         val pending = prizeService.pendingPrizes(uid)
                         val prize = pending.find { it.id == prizeId }
                         if (prize == null) {
