@@ -117,7 +117,7 @@ class RatingPrizeService {
                     UserPrize(
                         id = RATING_AGGREGATE_PRIZE_ID,
                         packageId = COIN_PRIZE_ID,
-                        qty = totalCoins,
+                        qty = 1,
                         rank = 0,
                         coins = totalCoins,
                     )
