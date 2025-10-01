@@ -35,6 +35,7 @@ object DB {
                 PaySupportRequests,
                 Tournaments,
                 UserPrizes,
+                RatingPrizes,
                 ReferralLinks,
                 ReferralRewards,
                 ShopDiscounts,
@@ -1081,6 +1082,16 @@ object UserPrizes : LongIdTable() {
     val packageId = varchar("package_id", 100)
     val qty = integer("qty").default(1)
     val claimed = bool("claimed").default(false)
+}
+
+object RatingPrizes : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val locationId = reference("location_id", Locations)
+    val prizeDate = date("prize_date")
+    val rank = integer("rank")
+    val coins = integer("coins")
+    val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
 
 object ReferralLinks : LongIdTable() {

@@ -1,11 +1,16 @@
 function Ratings({me, setMe, onCatchClick}){
-  const [mode,setMode] = React.useState('personal');
-  const [period,setPeriod] = React.useState('all');
-  const [locId,setLocId] = React.useState(String(me.locationId ?? 'all'));
+  const [mode,setMode] = React.useState('global');
+  const [period,setPeriod] = React.useState('today');
+  const defaultLocationId = String(me.locationId ?? 'all');
+  const [locId,setLocId] = React.useState(defaultLocationId);
   const [fishList,setFishList] = React.useState([]);
   const [fishId,setFishId] = React.useState('all');
   const [list,setList] = React.useState([]);
   const [order,setOrder] = React.useState('desc');
+
+  React.useEffect(()=>{
+    setLocId(defaultLocationId);
+  },[defaultLocationId]);
 
   React.useEffect(()=>{
     fetch('/api/guide',{credentials:'include'})
