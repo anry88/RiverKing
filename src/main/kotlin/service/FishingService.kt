@@ -933,7 +933,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ShopPackage(
                     id = "rod_dew",
                     name = "Удочка «Роса»",
-                    desc = "Разблокирует удочку «Роса»",
+                    desc = "Разблокирует удочку «Роса».\nБонус: −50% шанс побега пресноводных мирных рыб.",
                     price = 15,
                     items = emptyList(),
                     rodCode = "dew",
@@ -941,7 +941,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ShopPackage(
                     id = "rod_stream",
                     name = "Удочка «Поток»",
-                    desc = "Разблокирует удочку «Поток»",
+                    desc = "Разблокирует удочку «Поток».\nБонус: −50% шанс побега пресноводных хищных рыб.",
                     price = 75,
                     items = emptyList(),
                     rodCode = "stream",
@@ -949,7 +949,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ShopPackage(
                     id = "rod_abyss",
                     name = "Удочка «Глубь»",
-                    desc = "Разблокирует удочку «Глубь»",
+                    desc = "Разблокирует удочку «Глубь».\nБонус: −50% шанс побега морских мирных рыб.",
                     price = 145,
                     items = emptyList(),
                     rodCode = "abyss",
@@ -957,7 +957,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 ShopPackage(
                     id = "rod_storm",
                     name = "Удочка «Шторм»",
-                    desc = "Разблокирует удочку «Шторм»",
+                    desc = "Разблокирует удочку «Шторм».\nБонус: −50% шанс побега морских хищных рыб.",
                     price = 235,
                     items = emptyList(),
                     rodCode = "storm",

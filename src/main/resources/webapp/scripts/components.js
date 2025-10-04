@@ -194,9 +194,13 @@ function RodsDrawer({open,onClose,me,onSelect,onUnlock}){
             const unlockKg = Number(rod.unlockKg).toFixed(0);
             const price = typeof rod.priceStars === 'number' ? rod.priceStars : null;
             const priceText = price != null ? `${price}⭐` : null;
+            const bonusText = rodBonusText(rod);
+            const bonusLine = bonusText ? t('rodBonusLine', bonusText) : '';
             const info = locked
-              ? (priceText ? t('rodLockedStars', {kg: unlockKg, stars: priceText}) : t('requiresKg', unlockKg))
-              : rodBonusText(rod);
+              ? [priceText ? t('rodLockedStars', {kg: unlockKg, stars: priceText}) : t('requiresKg', unlockKg), bonusLine]
+                  .filter(Boolean)
+                  .join('\n')
+              : bonusText;
             const canUnlock = locked && rod.packId && priceText;
             return (
               <div key={rod.id}

@@ -608,8 +608,9 @@ fun Application.botRoutes(env: Env) {
                         append(localizedName)
                         if (rod.id == currentId) append(" ✅")
                     }
+                    val bonusLine = rodBonusLabel(rod.bonusWater, rod.bonusPredator, lang)
                     val infoLine = if (rod.unlocked) {
-                        rodBonusLabel(rod.bonusWater, rod.bonusPredator, lang)
+                        bonusLine
                     } else {
                         val weightPart = if (rod.unlockKg > 0) {
                             val template = if (lang == "ru") "Требуется %.0f кг" else "Requires %.0f kg"
@@ -622,9 +623,15 @@ fun Application.botRoutes(env: Env) {
                             if (lang == "ru") "или $priceText" else "or $priceText"
                         }
                         val combined = listOfNotNull(weightPart.takeIf { it.isNotBlank() }, pricePart).joinToString(" ")
-                        "🔒 ${combined.trim()}"
+                        val requirement = combined.ifBlank {
+                            if (lang == "ru") "Доступна сразу" else "Available immediately"
+                        }
+                        val bonusPrefix = if (lang == "ru") "Бонус: " else "Bonus: "
+                        listOf("🔒 ${requirement.trim()}", bonusPrefix + bonusLine.trim())
+                            .joinToString("\n")
                     }
-                    "$nameLine\n  $infoLine"
+                    val formattedInfo = infoLine.replace("\n", "\n  ")
+                    "$nameLine\n  $formattedInfo"
                 }
                 val text = buildString {
                     if (!prefix.isNullOrBlank()) {
