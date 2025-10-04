@@ -275,6 +275,12 @@ fun Application.botRoutes(env: Env) {
                         assetName = "tournament.png"
                     ) { _, _ -> "/tournament" },
                     InlineCommandInfo(
+                        name = "daily_rating",
+                        ruDescription = "Твои места в сегодняшнем ежедневном рейтинге",
+                        enDescription = "View your positions in today's daily rating",
+                        assetName = "daily_rating.png"
+                    ) { _, _ -> "/daily_rating" },
+                    InlineCommandInfo(
                         name = "stats",
                         ruDescription = "Статистика по пойманной рыбе",
                         enDescription = "Your fishing stats",
@@ -1119,6 +1125,9 @@ fun Application.botRoutes(env: Env) {
                 "призы" to "/prizes",
                 "prize" to "/prizes",
                 "prizes" to "/prizes",
+                "рейтинг" to "/daily_rating",
+                "rating" to "/daily_rating",
+                "leaderboard" to "/daily_rating",
                 "турнир" to "/tournament",
                 "tournament" to "/tournament",
             )
