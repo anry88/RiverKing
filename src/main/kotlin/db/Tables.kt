@@ -478,7 +478,7 @@ object DB {
         setLFWeight(pond, fEpicPredatorFreshSom, 0.03)
 
         // Болото мирные
-        setLFWeight(swamp, fCommonPeaceFreshKaras, 1.3)
+        setLFWeight(swamp, fCommonPeaceFreshKaras, 0.9)
         setLFWeight(swamp, fCommonPeaceFreshKrasnoperka, 0.8)
         setLFWeight(swamp, fCommonPeaceFreshGustera, 0.7)
         setLFWeight(swamp, fCommonPeaceFreshPlotva, 0.5)
