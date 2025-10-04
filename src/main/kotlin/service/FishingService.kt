@@ -372,8 +372,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .select { InventoryRods.userId eq userId }
             .map { it[InventoryRods.rodId].value }
             .toSet()
-        Rods.selectAll().orderBy(Rods.unlockKg).map { row ->
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
+        val rodRows = Rods.selectAll().orderBy(Rods.unlockKg).toList()
+        val packIds = rodRows.mapNotNull { rodPackId(it[Rods.code]) }.toSet()
+        val discounts = loadActiveDiscounts(packIds, nowInstant, zone)
+        rodRows.map { row ->
             val id = row[Rods.id].value
+            val packId = rodPackId(row[Rods.code])
+            val price = packId?.let { discounts[it] } ?: row[Rods.priceStars]
             RodDTO(
                 id = id,
                 code = row[Rods.code],
@@ -382,8 +389,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 unlocked = id in owned,
                 bonusWater = row[Rods.bonusWater],
                 bonusPredator = row[Rods.bonusPredator],
-                priceStars = row[Rods.priceStars],
-                packId = rodPackId(row[Rods.code]),
+                priceStars = price,
+                packId = packId,
             )
         }
     }
@@ -400,6 +407,26 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         .flatMap { it.packs }
         .find { it.rodCode == code }
         ?.id
+
+    private fun loadActiveDiscounts(
+        packIds: Set<String>,
+        nowInstant: Instant,
+        zone: ZoneId,
+    ): Map<String, Int> {
+        if (packIds.isEmpty()) return emptyMap()
+        return ShopDiscounts
+            .select { ShopDiscounts.packageId inList packIds }
+            .mapNotNull { row ->
+                val startInstant = row[ShopDiscounts.startDate].atStartOfDay(zone).toInstant()
+                val endInstant = row[ShopDiscounts.endDate].atStartOfDay(zone).toInstant()
+                if (nowInstant >= startInstant && nowInstant < endInstant) {
+                    row[ShopDiscounts.packageId] to row[ShopDiscounts.price]
+                } else {
+                    null
+                }
+            }
+            .toMap()
+    }
 
     private fun ensureCurrentLure(userId: Long): Long? {
         val current = Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
@@ -1309,6 +1336,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         var recommendedRodUnlocked: Boolean? = null
         var recommendedRodPrice: Int? = null
         var recommendedRodPackId: String? = null
+        val discountZone = ZoneOffset.UTC
+        val nowInstant = Instant.now(clock)
         if (lureChanged && newLure != null) {
             val newLureRow = Lures.select { Lures.id eq newLure }.singleOrNull()
             if (newLureRow != null) {
@@ -1322,8 +1351,12 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     recommendedRodId = recId
                     recommendedRodCode = recommended[Rods.code]
                     recommendedRodName = recommended[Rods.name]
-                    recommendedRodPrice = recommended[Rods.priceStars]
-                    recommendedRodPackId = recommendedRodCode?.let { rodPackId(it) }
+                    val packId = recommendedRodCode?.let { rodPackId(it) }
+                    recommendedRodPackId = packId
+                    val discountPrice = packId?.let {
+                        loadActiveDiscounts(setOf(it), nowInstant, discountZone)[it]
+                    }
+                    recommendedRodPrice = discountPrice ?: recommended[Rods.priceStars]
                     recommendedRodUnlocked = InventoryRods.select {
                         (InventoryRods.userId eq userId) and
                             (InventoryRods.rodId eq recId)
