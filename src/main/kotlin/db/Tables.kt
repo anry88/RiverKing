@@ -476,7 +476,7 @@ object DB {
         val fRarePredatorSaltSpanishSkumbria= upsertFish("Скумбрия испанская", "rare", 4.0, 2.0, true, "salt")
         val fRarePredatorSaltTitanSpinorog= upsertFish("Спинорог-титан", "rare", 3.0, 1.0, true, "salt")
         val fRarePredatorSaltKeta = upsertFish("Кета","rare", 4.5, 2.0, true, "salt")
-        val fRarePredatorSaltMorayStarry   = upsertFish("Мурена звёздчатая",  "rare", 1.2, 0.5, true, "salt")
+        val fRarePredatorSaltMorayStarry= upsertFish("Мурена звёздчатая",  "rare", 1.2, 0.5, true, "salt")
 
         // --- Fish: epic морские мирные---
         val fEpicPeaceSaltTurbo = upsertFish("Тюрбо", "epic", 6.0, 3.0, false, "salt")
