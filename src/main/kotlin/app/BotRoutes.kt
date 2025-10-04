@@ -266,7 +266,7 @@ fun Application.botRoutes(env: Env) {
                         name = "coin_shop",
                         ruDescription = "Купить наборы за монеты",
                         enDescription = "Buy bundles with coins",
-                        assetName = "shop.png"
+                        assetName = "coin_shop.png"
                     ) { _, _ -> "/coin_shop" },
                     InlineCommandInfo(
                         name = "tournament",
@@ -278,7 +278,7 @@ fun Application.botRoutes(env: Env) {
                         name = "daily_rating",
                         ruDescription = "Твои места в сегодняшнем ежедневном рейтинге",
                         enDescription = "View your positions in today's daily rating",
-                        assetName = "daily_rating.png"
+                        assetName = "daily_ratings.png"
                     ) { _, _ -> "/daily_rating" },
                     InlineCommandInfo(
                         name = "stats",
