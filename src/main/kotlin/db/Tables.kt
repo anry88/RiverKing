@@ -476,7 +476,7 @@ object DB {
         val fRarePredatorSaltSpanishSkumbria= upsertFish("Скумбрия испанская", "rare", 4.0, 2.0, true, "salt")
         val fRarePredatorSaltTitanSpinorog= upsertFish("Спинорог-титан", "rare", 3.0, 1.0, true, "salt")
         val fRarePredatorSaltKeta = upsertFish("Кета","rare", 4.5, 2.0, true, "salt")
-
+        val fRarePredatorSaltMorayStarry   = upsertFish("Мурена звёздчатая",  "rare", 1.2, 0.5, true, "salt")
 
         // --- Fish: epic морские мирные---
         val fEpicPeaceSaltTurbo = upsertFish("Тюрбо", "epic", 6.0, 3.0, false, "salt")
@@ -495,6 +495,7 @@ object DB {
         val fEpicPredatorSaltPermit   = upsertFish("Пермит", "epic", 6.0, 3.0, true, "salt")
         val fEpicPredatorSaltCoralForel = upsertFish("Форель коралловая", "epic", 5.0, 2.0, true, "salt")
         val fEpicPredatorSaltKatran= upsertFish("Катран обыкновенный","epic",     7.0,  3.0,  true, "salt")
+        val fEpicPredatorSaltMorayEuropean = upsertFish("Мурена европейская", "epic", 3.0, 1.2, true, "salt")
 
         // --- Fish: mythic морские мирные---
         val fMythicPeaceSaltPelingas= upsertFish("Пеленгас","mythic", 3.0, 1.2, false, "salt")
@@ -506,6 +507,7 @@ object DB {
         val fMythicPredatorSaltBlackSnook = upsertFish("Снук чёрный", "mythic", 8.0, 3.0, true, "salt")
         val fMythicPredatorSaltNapoleonFish   = upsertFish("Рыба-наполеон", "mythic", 35.0, 15.0, true, "salt")
         val fMythicPredatorSaltKonger= upsertFish("Конгер", "mythic",6.0,  3.0,  true, "salt")
+        val fMythicPredatorSaltMorayGiant    = upsertFish("Мурена гигантская",  "mythic", 14.0, 6.0, true, "salt")
 
         // --- Fish: legendary морские мирные---
         val fLegendaryPeaceSaltSeldyanoyKorol = upsertFish("Сельдяной король", "legendary", 120.0, 50.0, false, "salt")
@@ -807,6 +809,7 @@ object DB {
         setLFWeight(coast, fRarePredatorSaltWahoo, 0.15)
         setLFWeight(coast, fEpicPredatorSaltLososAtlantic, 0.1)
         setLFWeight(coast, fEpicPredatorSaltKatran, 0.07)
+        setLFWeight(coast, fEpicPredatorSaltMorayEuropean, 0.05)
         setLFWeight(coast, fEpicPredatorSaltParusnik, 0.04)
         setLFWeight(coast, fEpicPredatorSaltBlueKaranks, 0.04)
         setLFWeight(coast, fEpicPredatorSaltBigBarracuda, 0.03)
@@ -881,9 +884,11 @@ object DB {
         setLFWeight(mangrove, fUncommonPredatorSaltSeaSargan, 0.4)
         setLFWeight(mangrove, fUncommonPredatorSaltSeaSom, 0.25)
         setLFWeight(mangrove, fRarePredatorSaltSnook, 0.20)
+        setLFWeight(mangrove, fRarePredatorSaltMorayStarry, 0.2)
         setLFWeight(mangrove, fRarePredatorSaltMangrovesLucian, 0.15)
         setLFWeight(mangrove, fEpicPredatorSaltBarramundi, 0.08)
         setLFWeight(mangrove, fEpicPredatorSaltBlueKaranks, 0.06)
+        setLFWeight(mangrove, fMythicPredatorSaltMorayGiant,  0.05)
         setLFWeight(mangrove, fMythicPredatorSaltBlackSnook, 0.045)
         setLFWeight(mangrove, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(mangrove, fLegendaryPredatorSaltTarpon, 0.02)
@@ -902,10 +907,12 @@ object DB {
         setLFWeight(coralFlats, fRarePredatorSaltSpanishSkumbria, 0.5)
         setLFWeight(coralFlats, fRarePredatorSaltAlbula, 0.25)
         setLFWeight(coralFlats, fRarePredatorSaltTitanSpinorog, 0.22)
+        setLFWeight(coralFlats, fRarePredatorSaltMorayStarry, 0.2)
         setLFWeight(coralFlats, fRarePredatorSaltMangrovesLucian, 0.17)
         setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
         setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06)
         setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06)
+        setLFWeight(coralFlats, fMythicPredatorSaltMorayGiant,  0.45)
         setLFWeight(coralFlats, fMythicPredatorSaltNapoleonFish, 0.045)
         setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.02)
