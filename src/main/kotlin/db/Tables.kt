@@ -187,6 +187,7 @@ object DB {
             unlock: Double,
             bonusWater: String? = null,
             bonusPredator: Boolean? = null,
+            priceStars: Int? = null,
         ): Long {
             val row = Rods.select { Rods.code eq code }.singleOrNull()
                 ?: Rods.select { Rods.name eq name }.singleOrNull()
@@ -194,7 +195,7 @@ object DB {
                 Rods.insertAndGetId {
                     it[Rods.code] = code
                     it[Rods.name] = name
-                    it[priceStars] = null
+                    it[Rods.priceStars] = priceStars
                     it[modsJson] = "{}"
                     it[unlockKg] = unlock
                     it[Rods.bonusWater] = bonusWater
@@ -208,6 +209,7 @@ object DB {
                     it[unlockKg] = unlock
                     it[Rods.bonusWater] = bonusWater
                     it[Rods.bonusPredator] = bonusPredator
+                    it[Rods.priceStars] = priceStars
                 }
                 id
             }
@@ -432,10 +434,10 @@ object DB {
 
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)
-        upsertRod("dew",   "Роса",  15.0, "fresh", false)
-        upsertRod("stream","Поток", 150.0, "fresh", true)
-        upsertRod("abyss", "Глубь", 450.0, "salt",  false)
-        upsertRod("storm", "Шторм", 1000.0, "salt", true)
+        upsertRod("dew",   "Роса",  15.0, "fresh", false, priceStars = 15)
+        upsertRod("stream","Поток", 150.0, "fresh", true, priceStars = 75)
+        upsertRod("abyss", "Глубь", 450.0, "salt",  false, priceStars = 145)
+        upsertRod("storm", "Шторм", 1000.0, "salt", true, priceStars = 235)
 
         // --- Weights per location ---
 

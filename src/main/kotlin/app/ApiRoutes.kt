@@ -96,6 +96,7 @@ fun Application.apiRoutes(env: Env) {
         val discountStart: String? = null,
         val discountEnd: String? = null,
         val coinPrice: Int? = null,
+        val rodCode: String? = null,
     )
 
     @Serializable
@@ -567,6 +568,10 @@ fun Application.apiRoutes(env: Env) {
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized) }
             val uid = fishing.ensureUserByTgId(tgUser.id)
             val language = fishing.userLanguage(uid)
+            val packInfo = fishing.findPack(req.productId)
+            if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
+                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "rod_unlocked"))
+            }
             val url = try { stars.createInvoiceLink(tgUser.id, req.productId, language) }
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
             Metrics.counter("create_invoice_total", mapOf("pack" to req.productId))
@@ -584,28 +589,33 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val autoUntil = transaction { Users.select { Users.id eq uid }.single()[Users.autoFishUntil] }
-            val items = fishing.listShop(language).map { cat ->
-                ShopCategoryDTO(
-                    cat.id,
-                    cat.name,
-                    cat.packs.map { p ->
-                        val until = if (p.id == "autofish") {
-                            autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
-                        } else null
-                        ShopPackageDTO(
-                            id = p.id,
-                            name = p.name,
-                            desc = p.desc,
-                            price = p.price,
-                            until = until,
-                            originalPrice = p.originalPrice,
-                            discountStart = p.discountStart?.toString(),
-                            discountEnd = p.discountEnd?.toString(),
-                            coinPrice = p.coinPrice,
-                        )
-                    }
-                )
-            }
+            val lockedRodCodes = fishing.listRods(uid).filterNot { it.unlocked }.map { it.code }.toSet()
+            val items = fishing.listShop(language)
+                .map { cat ->
+                    val packs = cat.packs.filter { it.rodCode == null || it.rodCode in lockedRodCodes }
+                    ShopCategoryDTO(
+                        cat.id,
+                        cat.name,
+                        packs.map { p ->
+                            val until = if (p.id == "autofish") {
+                                autoUntil?.takeIf { it.isAfter(Instant.now()) }?.toString()
+                            } else null
+                            ShopPackageDTO(
+                                id = p.id,
+                                name = p.name,
+                                desc = p.desc,
+                                price = p.price,
+                                until = until,
+                                originalPrice = p.originalPrice,
+                                discountStart = p.discountStart?.toString(),
+                                discountEnd = p.discountEnd?.toString(),
+                                coinPrice = p.coinPrice,
+                                rodCode = p.rodCode,
+                            )
+                        }
+                    )
+                }
+                .filter { it.packs.isNotEmpty() }
             call.respond(items)
         }
 
@@ -623,6 +633,14 @@ fun Application.apiRoutes(env: Env) {
                 mapOf("pack" to id, "currency" to "stars"),
             )
             val uid = fishing.ensureUserByTgId(tgId)
+            val packInfo = fishing.findPack(id)
+            if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
+                Metrics.counter(
+                    "shop_purchase_denied_total",
+                    mapOf("pack" to id, "currency" to "stars", "reason" to "rod_unlocked"),
+                )
+                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "rod_unlocked"))
+            }
             val paymentReq = if (!env.devMode) {
                 try { call.receive<PaymentReq>() } catch (_: Exception) {
                     Metrics.counter(
@@ -854,8 +872,8 @@ fun Application.apiRoutes(env: Env) {
             }
             val uid = fishing.ensureUserByTgId(tgId)
             try {
-                val newLure = fishing.startCast(uid)
-                call.respond(mapOf("currentLureId" to newLure))
+                val result = fishing.startCast(uid)
+                call.respond(result)
             } catch (e: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
             } catch (e: Exception) {
