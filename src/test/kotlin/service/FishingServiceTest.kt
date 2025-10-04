@@ -196,6 +196,45 @@ class FishingServiceTest {
     }
 
     @Test
+    fun listRodsAppliesDiscountPriceWhenActive() {
+        val zone = ZoneOffset.UTC
+        val start = LocalDate.of(2025, 1, 15)
+        val clock = MutableClock(start.atTime(12, 0).atZone(zone).toInstant(), zone)
+        val svc = newService("testdb_rod_discount_price", clock)
+        val userId = svc.ensureUserByTgId(400L)
+
+        svc.setDiscount("rod_dew", price = 7, start = start, end = start.plusDays(1))
+
+        val rods = svc.listRods(userId).associateBy { it.code }
+        assertEquals(7, rods["dew"]?.priceStars)
+        assertEquals(75, rods["stream"]?.priceStars)
+    }
+
+    @Test
+    fun startCastReturnsDiscountedRecommendedRodPrice() {
+        val zone = ZoneOffset.UTC
+        val start = LocalDate.of(2025, 2, 1)
+        val clock = MutableClock(start.atTime(12, 0).atZone(zone).toInstant(), zone)
+        val svc = newService("testdb_recommended_rod_discount", clock)
+        val userId = svc.ensureUserByTgId(500L)
+
+        svc.setDiscount("rod_stream", price = 50, start = start, end = start.plusDays(1))
+
+        transaction {
+            val freshPeaceId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
+            InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq freshPeaceId) }) {
+                it[InventoryLures.qty] = 1
+            }
+        }
+
+        val result = svc.startCast(userId)
+
+        assertEquals("stream", result.recommendedRodCode)
+        assertEquals("rod_stream", result.recommendedRodPackId)
+        assertEquals(50, result.recommendedRodPriceStars)
+    }
+
+    @Test
     fun globalTopDailyPrizePreviewAllowsMultiplePlacementsPerPlayer() {
         val svc = newService("testdb_daily_preview")
         val mainUser = svc.ensureUserByTgId(200L)
