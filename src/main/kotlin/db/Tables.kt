@@ -319,11 +319,14 @@ object DB {
         val fCommonPeaceFreshNeonTetra = upsertFish("Тетра неоновая", "common", 0.003, 0.0015, false, "fresh")
         val fCommonPeaceFreshCardinalTetra   = upsertFish("Тетра кардинальная", "common", 0.003, 0.0015, false, "fresh")
         val fCommonPeaceFreshNannostomus  = upsertFish("Нанностомус трифасциатус", "common", 0.004, 0.002, false, "fresh")
+        val fCommonPeaceFreshVyun   = upsertFish("Вьюн обыкновенный",   "common",   0.12, 0.05, false, "fresh")
+        val fCommonPeaceFreshVobla  = upsertFish("Вобла",  "common",   0.35, 0.15, false, "fresh")
 
         // --- Fish: common пресные хищные---
         val fCommonPredatorFreshOkun  = upsertFish("Окунь", "common", 0.25, 0.07, true, "fresh")
         val fCommonPredatorFreshRotan  = upsertFish("Ротан", "common", 0.15, 0.05, true, "fresh")
         val fCommonPredatorFreshErsch  = upsertFish("Ёрш", "common", 0.08, 0.03, true, "fresh")
+        val fCommonPredatorFreshBersh = upsertFish("Берш", "common", 1.1, 0.5, true, "fresh")
 
         // --- Fish: uncommon пресные мирные---
         val fUncommonPeaceFreshLin  = upsertFish("Линь", "uncommon", 0.7, 0.3, false, "fresh")
@@ -336,6 +339,7 @@ object DB {
         val fUncommonPeaceFreshScalaria = upsertFish("Скалярия обыкновенная", "uncommon", 0.15, 0.08, false, "fresh")
         val fUncommonPeaceFreshAgassisa  = upsertFish("Апистограмма Агассиза", "uncommon", 0.05, 0.02, false, "fresh")
         val fUncommonPeaceFreshCoridorusPanda  = upsertFish("Коридорас панда", "uncommon", 0.05, 0.02, false, "fresh")
+        val fUncommonPeaceFreshPelyad = upsertFish("Пелядь", "uncommon", 1.3,  0.6,  false, "fresh")
 
         // --- Fish: uncommon пресные хищные---
         val fUncommonPredatorFreshNalim  = upsertFish("Налим", "uncommon", 1.5, 0.8, true, "fresh")
@@ -348,6 +352,8 @@ object DB {
         val fRarePeaceFreshWhiteAmur  = upsertFish("Амур белый", "rare", 3.5, 1.5, false, "fresh")
         val fRarePeaceFreshKarp = upsertFish("Карп", "rare", 2.5, 1.0, false, "fresh")
         val fRarePeaceFreshRamiresi    = upsertFish("Рамирези", "rare", 0.05, 0.02, false, "fresh")
+        val fRarePeaceFreshOmul    = upsertFish("Омуль арктический",   "rare",     1.2,  0.5,  false, "fresh")
+        val fRarePeaceFreshMuksun  = upsertFish("Муксун",  "rare",     2.2,  1.0,  false, "fresh")
 
         // --- Fish: rare пресные хищные---
         val fRarePredatorFreshSudak  = upsertFish("Судак", "rare", 2.0, 1.0, true, "fresh")
@@ -375,6 +381,7 @@ object DB {
         val fEpicPredatorFreshAimara = upsertFish("Аймара", "epic", 8.0, 4.0, true, "fresh")
         val fEpicPredatorFreshTigerPseudoplatistoma   = upsertFish("Псевдоплатистома тигровая", "epic", 10.0, 5.0, true, "fresh")
         val fEpicPredatorFreshPeacockOkun = upsertFish("Павлиний окунь", "epic", 4.0, 2.0, true, "fresh")
+        val fEpicPredatorFreshLenok = upsertFish("Ленок", "epic", 2.8, 1.2, true, "fresh")
 
         // --- Fish: mythic пресные мирные---
         val fKoiKohaku      = upsertFish("Карп кои (Кохаку)",           "mythic", 2.5, 1.2, false, "fresh")
@@ -423,11 +430,13 @@ object DB {
         val fCommonPeaceSaltSardinaIndian  = upsertFish("Сардина индийская", "common", 0.10, 0.05, false, "salt")
         val fCommonPeaceSaltBlueHrisiptera = upsertFish("Хризиптера синяя", "common", 0.04, 0.02, false, "salt")
         val fCommonPeaceSaltFusilerYellowTail  = upsertFish("Фузилёр жёлтохвостый", "common", 0.3, 0.1, false, "salt")
+        val fCommonPeaceSaltTaran  = upsertFish("Тарань",  "common", 0.30, 0.12, false, "salt")
 
         // --- Fish: common морские хищные---
         val fCommonPredatorSaltStavrida  = upsertFish("Ставрида", "common", 0.25, 0.1, true, "salt")
         val fCommonPredatorSaltKoryushka  = upsertFish("Корюшка", "common", 0.06, 0.02, true, "salt")
         val fCommonPredatorSaltBychok = upsertFish("Бычок-кругляк", "common", 0.12, 0.06, true, "salt")
+        val fCommonPredatorSaltPacificOceanPerch = upsertFish("Тихоокеанский клювач", "common",     1.6,  0.7,  true, "salt")
 
         // --- Fish: uncommon морские мирные---
         val fUncommonPeaceSaltKefal  = upsertFish("Кефаль-лобан", "uncommon", 1.0, 0.5, false, "salt")
@@ -446,10 +455,13 @@ object DB {
         val fUncommonPredatorSaltSeaSom   = upsertFish("Сом морской", "uncommon", 1.2, 0.6, true, "salt")
         val fUncommonPredatorSaltSeaSargan   = upsertFish("Сарган морской", "uncommon", 0.7, 0.3, true, "salt")
         val fUncommonPredatorSaltBychokMangroves = upsertFish("Бычок-пчёлка", "uncommon", 0.07, 0.03, true, "salt")
+        val fUncommonPredatorSaltMerlang   = upsertFish("Мерланг","uncommon", 0.9,  0.4,  true, "salt")
+        val fUncommonPredatorSaltGorbusha = upsertFish("Горбуша", "uncommon", 1.8, 0.8, true, "salt")
 
         // --- Fish: rare морские мирные---
         val fRarePeaceSaltGoldenSigan   = upsertFish("Сиган золотистый", "rare", 0.5, 0.2, false, "salt")
         val fRarePeaceSaltBlueHirurg   = upsertFish("Хирург голубой", "rare", 0.4, 0.15, false, "salt")
+        val fRarePeaceSaltVyrezub  = upsertFish("Вырезуб", "rare",   1.4,  0.6,  false, "salt")
 
         // --- Fish: rare морские хищные---
         val fRarePredatorSaltTreska  = upsertFish("Треска", "rare", 3.0, 1.5, true, "salt")
@@ -463,6 +475,8 @@ object DB {
         val fRarePredatorSaltAlbula= upsertFish("Альбула", "rare", 3.0, 1.0, true, "salt")
         val fRarePredatorSaltSpanishSkumbria= upsertFish("Скумбрия испанская", "rare", 4.0, 2.0, true, "salt")
         val fRarePredatorSaltTitanSpinorog= upsertFish("Спинорог-титан", "rare", 3.0, 1.0, true, "salt")
+        val fRarePredatorSaltKeta = upsertFish("Кета","rare", 4.5, 2.0, true, "salt")
+
 
         // --- Fish: epic морские мирные---
         val fEpicPeaceSaltTurbo = upsertFish("Тюрбо", "epic", 6.0, 3.0, false, "salt")
@@ -480,6 +494,7 @@ object DB {
         val fEpicPredatorSaltBigBarracuda = upsertFish("Барракуда большая", "epic", 12.0, 6.0, true, "salt")
         val fEpicPredatorSaltPermit   = upsertFish("Пермит", "epic", 6.0, 3.0, true, "salt")
         val fEpicPredatorSaltCoralForel = upsertFish("Форель коралловая", "epic", 5.0, 2.0, true, "salt")
+        val fEpicPredatorSaltKatran= upsertFish("Катран обыкновенный","epic",     7.0,  3.0,  true, "salt")
 
         // --- Fish: mythic морские мирные---
         val fMythicPeaceSaltPelingas= upsertFish("Пеленгас","mythic", 3.0, 1.2, false, "salt")
@@ -490,6 +505,7 @@ object DB {
         val fMythicPredatorSaltYellowTunec     = upsertFish("Тунец желтоперый", "mythic", 50.0, 20.0, true, "salt")
         val fMythicPredatorSaltBlackSnook = upsertFish("Снук чёрный", "mythic", 8.0, 3.0, true, "salt")
         val fMythicPredatorSaltNapoleonFish   = upsertFish("Рыба-наполеон", "mythic", 35.0, 15.0, true, "salt")
+        val fMythicPredatorSaltKonger= upsertFish("Конгер", "mythic",6.0,  3.0,  true, "salt")
 
         // --- Fish: legendary морские мирные---
         val fLegendaryPeaceSaltSeldyanoyKorol = upsertFish("Сельдяной король", "legendary", 120.0, 50.0, false, "salt")
@@ -521,7 +537,9 @@ object DB {
         setLFWeight(pond, fCommonPeaceFreshKrasnoperka, 0.7)
         setLFWeight(pond, fCommonPeaceFreshGustera, 0.5)
         setLFWeight(pond, fCommonPeaceFreshVerhoplavka, 0.5)
+        setLFWeight(pond, fCommonPeaceFreshVyun, 0.45)
         setLFWeight(pond, fUncommonPeaceFreshLesch, 0.4)
+        setLFWeight(pond, fUncommonPeaceFreshPelyad, 0.03)
         setLFWeight(pond, fUncommonPeaceFreshLin, 0.2)
         setLFWeight(pond, fRarePeaceFreshKarp, 0.15)
         setLFWeight(pond, fKoiKohaku, 0.01)
@@ -554,6 +572,7 @@ object DB {
         setLFWeight(swamp, fCommonPeaceFreshKaras, 0.9)
         setLFWeight(swamp, fCommonPeaceFreshKrasnoperka, 0.8)
         setLFWeight(swamp, fCommonPeaceFreshGustera, 0.7)
+        setLFWeight(swamp, fCommonPeaceFreshVyun, 0.6)
         setLFWeight(swamp, fCommonPeaceFreshPlotva, 0.5)
         setLFWeight(swamp, fCommonPeaceFreshVerhoplavka, 0.5)
         setLFWeight(swamp, fCommonPeaceFreshPeskar, 0.4)
@@ -577,10 +596,15 @@ object DB {
         setLFWeight(river, fCommonPeaceFreshGustera, 0.65)
         setLFWeight(river, fCommonPeaceFreshElets, 0.6);
         setLFWeight(river, fCommonPeaceFreshKrasnoperka, 0.6)
+        setLFWeight(river, fCommonPeaceFreshVyun, 0.5)
+        setLFWeight(river, fCommonPeaceFreshVobla, 0.5)
         setLFWeight(river, fUncommonPeaceFreshLesch, 0.5)
         setLFWeight(river, fUncommonPeaceFreshSig, 0.45);
         setLFWeight(river, fUncommonPeaceFreshChehon, 0.4)
+        setLFWeight(river, fUncommonPeaceFreshPelyad, 0.04)
         setLFWeight(river, fRarePeaceFreshKarp, 0.3)
+        setLFWeight(river, fRarePeaceFreshOmul, 0.25)
+        setLFWeight(river, fRarePeaceFreshMuksun, 0.2)
         setLFWeight(river, fRarePeaceFreshTolstolobik, 0.2)
         setLFWeight(river, fRarePeaceFreshWhiteAmur, 0.15)
         setLFWeight(river, fEpicPeaceFreshSterlyad, 0.05)
@@ -589,6 +613,7 @@ object DB {
         // Река хищные
         setLFWeight(river, fCommonPredatorFreshOkun, 0.9)
         setLFWeight(river, fCommonPredatorFreshErsch, 0.8)
+        setLFWeight(river, fCommonPredatorFreshBersh, 0.75)
         setLFWeight(river, fUncommonPredatorFreshGolavl, 0.6)
         setLFWeight(river, fUncommonPredatorFreshYaz, 0.5)
         setLFWeight(river, fUncommonPredatorFreshNalim, 0.4)
@@ -608,10 +633,13 @@ object DB {
         setLFWeight(lake, fCommonPeaceFreshPeskar, 0.3)
         setLFWeight(lake, fCommonPeaceFreshElets, 0.3)
         setLFWeight(lake, fUncommonPeaceFreshLesch, 0.5)
+        setLFWeight(lake, fUncommonPeaceFreshPelyad, 0.45)
         setLFWeight(lake, fUncommonPeaceFreshSig, 0.4)
         setLFWeight(lake, fUncommonPeaceFreshChehon, 0.35)
         setLFWeight(lake, fRarePeaceFreshKarp, 0.35)
         setLFWeight(lake, fRarePeaceFreshTolstolobik, 0.3)
+        setLFWeight(lake, fRarePeaceFreshOmul, 0.25)
+        setLFWeight(lake, fRarePeaceFreshMuksun, 0.2)
         setLFWeight(lake, fRarePeaceFreshWhiteAmur, 0.2)
         setLFWeight(lake, fEpicPeaceFreshSterlyad, 0.07)
         setLFWeight(lake, fLegendaryPeaceFreshOsetr, 0.05)
@@ -619,6 +647,7 @@ object DB {
         // Озеро хищные
         setLFWeight(lake, fCommonPredatorFreshOkun, 0.9)
         setLFWeight(lake, fCommonPredatorFreshErsch, 0.8)
+        setLFWeight(lake, fCommonPredatorFreshBersh, 0.6)
         setLFWeight(lake, fUncommonPredatorFreshYaz, 0.55)
         setLFWeight(lake, fUncommonPredatorFreshGolavl, 0.5)
         setLFWeight(lake, fUncommonPredatorFreshNalim, 0.4)
@@ -626,6 +655,7 @@ object DB {
         setLFWeight(lake, fRarePredatorFreshHarius, 0.3)
         setLFWeight(lake, fEpicPredatorFreshSom, 0.12)
         setLFWeight(lake, fEpicPredatorFreshEelEuropean, 0.08)
+        setLFWeight(lake, fEpicPredatorFreshLenok, 0.06)
         setLFWeight(lake, fMythicPredatorFreshKristivomer, 0.05)
         setLFWeight(lake, fLegendaryPredatorFreshTaimen, 0.03)
 
@@ -636,11 +666,14 @@ object DB {
         setLFWeight(reservoir, fCommonPeaceFreshUkleyka, 0.7)
         setLFWeight(reservoir, fCommonPeaceFreshGustera, 0.6)
         setLFWeight(reservoir, fCommonPeaceFreshPeskar, 0.5)
+        setLFWeight(reservoir, fCommonPeaceFreshVyun, 0.45)
         setLFWeight(reservoir, fUncommonPeaceFreshLesch, 0.45)
+        setLFWeight(reservoir, fUncommonPeaceFreshPelyad, 0.4)
         setLFWeight(reservoir, fUncommonPeaceFreshLin, 0.25)
         setLFWeight(reservoir, fRarePeaceFreshKarp, 0.25)
         setLFWeight(reservoir, fRarePeaceFreshTolstolobik, 0.2)
         setLFWeight(reservoir, fRarePeaceFreshWhiteAmur, 0.2)
+        setLFWeight(reservoir, fRarePeaceFreshMuksun, 0.15)
         setLFWeight(reservoir, fEpicPeaceFreshSterlyad, 0.05)
         setLFWeight(reservoir, fMythicPeaceFreshBlackAmur, 0.035)
         setLFWeight(reservoir, fLegendaryPeaceFreshOsetr, 0.02)
@@ -648,6 +681,7 @@ object DB {
         // Водохранилище хищные
         setLFWeight(reservoir, fCommonPredatorFreshOkun, 0.9)
         setLFWeight(reservoir, fCommonPredatorFreshErsch, 0.75)
+        setLFWeight(reservoir, fCommonPredatorFreshBersh, 0.65)
         setLFWeight(reservoir, fUncommonPredatorFreshYaz, 0.5)
         setLFWeight(reservoir, fUncommonPredatorFreshNalim, 0.45)
         setLFWeight(reservoir, fRarePredatorFreshSchuka, 0.3)
@@ -664,6 +698,7 @@ object DB {
         setLFWeight(mtnRiver, fCommonPeaceFreshKaras, 0.6)
         setLFWeight(mtnRiver, fCommonPeaceFreshElets, 0.5)
         setLFWeight(mtnRiver, fUncommonPeaceFreshSig, 0.4)
+        setLFWeight(mtnRiver, fRarePeaceFreshOmul, 0.4)
         setLFWeight(mtnRiver, fRarePeaceFreshKarp, 0.35)
         setLFWeight(mtnRiver, fEpicPeaceFreshSterlyad, 0.05)
         setLFWeight(mtnRiver, fLegendaryPeaceFreshOsetr, 0.02)
@@ -679,18 +714,22 @@ object DB {
         setLFWeight(mtnRiver, fRarePredatorFreshSchuka, 0.15)
         setLFWeight(mtnRiver, fEpicPredatorFreshArcticGolets, 0.1)
         setLFWeight(mtnRiver, fEpicPredatorFreshForelKumzha, 0.07)
+        setLFWeight(mtnRiver, fEpicPredatorFreshLenok, 0.06)
         setLFWeight(mtnRiver, fMythicPredatorFreshDanubeLosos, 0.04)
         setLFWeight(mtnRiver, fLegendaryPredatorFreshTaimen, 0.03)
 
         // Дельта реки пресная мирная
+        setLFWeight(delta, fCommonPeaceFreshVobla, 0.85)
         setLFWeight(delta, fCommonPeaceFreshPlotva, 0.8)
         setLFWeight(delta, fCommonPeaceFreshGustera, 0.75)
         setLFWeight(delta, fCommonPeaceFreshKrasnoperka, 0.75)
         setLFWeight(delta, fCommonPeaceFreshPeskar, 0.6)
         setLFWeight(delta, fUncommonPeaceFreshChehon, 0.5)
         setLFWeight(delta, fUncommonPeaceFreshLesch, 0.5)
+        setLFWeight(delta, fUncommonPeaceFreshPelyad, 0.3)
         setLFWeight(delta, fRarePeaceFreshTolstolobik, 0.3)
         setLFWeight(delta, fRarePeaceFreshWhiteAmur, 0.25)
+        setLFWeight(delta, fRarePeaceFreshOmul, 0.2)
         setLFWeight(delta, fEpicPeaceFreshSterlyad, 0.08)
         setLFWeight(delta, fMythicPeaceFreshBlackAmur, 0.04)
         setLFWeight(delta, fLegendaryPeaceFreshOsetr, 0.03)
@@ -698,6 +737,7 @@ object DB {
         // Дельта реки пресная хищная
         setLFWeight(delta, fCommonPredatorFreshErsch, 0.9)
         setLFWeight(delta, fCommonPredatorFreshOkun, 0.9)
+        setLFWeight(delta, fCommonPredatorFreshBersh, 0.7)
         setLFWeight(delta, fUncommonPredatorFreshYaz, 0.55)
         setLFWeight(delta, fUncommonPredatorFreshGolavl, 0.5)
         setLFWeight(delta, fUncommonPredatorFreshNalim, 0.5)
@@ -715,10 +755,12 @@ object DB {
         setLFWeight(delta, fCommonPeaceSaltSardina, 0.6)
         setLFWeight(delta, fCommonPeaceSaltMoiva, 0.6)
         setLFWeight(delta, fCommonPeaceSaltAnchous, 0.55)
+        setLFWeight(delta, fCommonPeaceSaltTaran, 0.45)
         setLFWeight(delta, fCommonPeaceSaltStainedKefal, 0.4)
         setLFWeight(delta, fCommonPeaceSaltSardinaIndian, 0.2)
         setLFWeight(delta, fUncommonPeaceSaltKefal, 0.45)
         setLFWeight(delta, fUncommonPeaceSaltKambala, 0.2)
+        setLFWeight(delta, fRarePeaceSaltVyrezub, 0.2)
         setLFWeight(delta, fEpicPeaceSaltMilkfish, 0.08)
         setLFWeight(delta, fMythicPeaceSaltPelingas, 0.03)
 
@@ -726,7 +768,9 @@ object DB {
         setLFWeight(delta, fCommonPredatorSaltBychok, 0.9)
         setLFWeight(delta, fCommonPredatorSaltKoryushka, 0.85)
         setLFWeight(delta, fUncommonPredatorSaltSeaSargan, 0.5)
+        setLFWeight(delta, fUncommonPredatorSaltGorbusha, 0.4)
         setLFWeight(delta, fUncommonPredatorSaltSeaSom, 0.35)
+        setLFWeight(delta, fRarePredatorSaltKeta, 0.3)
         setLFWeight(delta, fRarePredatorSaltSeaForel, 0.25)
         setLFWeight(delta, fRarePredatorSaltLavrak, 0.2)
         setLFWeight(delta, fEpicPredatorSaltLososAtlantic, 0.1)
@@ -734,31 +778,39 @@ object DB {
 
         // Прибрежье моря мирная
         setLFWeight(coast, fCommonPeaceSaltSeld, 0.9)
-        setLFWeight(coast, fCommonPeaceSaltSardina, 0.8);
+        setLFWeight(coast, fCommonPeaceSaltSardina, 0.8)
         setLFWeight(coast, fCommonPeaceSaltAnchous, 0.8)
-        setLFWeight(coast, fCommonPeaceSaltKilka, 0.8);
-        setLFWeight(coast, fCommonPeaceSaltMoiva, 0.7);
-        setLFWeight(coast, fUncommonPeaceSaltKefal, 0.5);
+        setLFWeight(coast, fCommonPeaceSaltKilka, 0.8)
+        setLFWeight(coast, fCommonPeaceSaltMoiva, 0.7)
+        setLFWeight(coast, fCommonPeaceSaltTaran, 0.65)
+        setLFWeight(coast, fUncommonPeaceSaltKefal, 0.5)
         setLFWeight(coast, fUncommonPeaceSaltBarabulkaTropic, 0.5)
-        setLFWeight(coast, fUncommonPeaceSaltKambala, 0.35);
+        setLFWeight(coast, fUncommonPeaceSaltKambala, 0.35)
+        setLFWeight(coast, fRarePeaceSaltVyrezub, 0.25)
         setLFWeight(coast, fEpicPeaceSaltTurbo, 0.08)
         setLFWeight(coast, fMythicPeaceSaltPelingas, 0.04)
 
         // Прибрежье моря хищная
         setLFWeight(coast, fCommonPredatorSaltKoryushka, 0.9)
         setLFWeight(coast, fCommonPredatorSaltBychok, 0.8)
+        setLFWeight(coast, fCommonPredatorSaltPacificOceanPerch, 0.7)
         setLFWeight(coast, fCommonPredatorSaltStavrida, 0.6)
         setLFWeight(coast, fUncommonPredatorSaltAtlanticSkumbria, 0.5)
         setLFWeight(coast, fUncommonPredatorSaltSeaSargan, 0.45)
+        setLFWeight(coast, fUncommonPredatorSaltGorbusha, 0.4)
+        setLFWeight(coast, fUncommonPredatorSaltMerlang, 0.4)
         setLFWeight(coast, fRarePredatorSaltSpanishSkumbria, 0.4)
         setLFWeight(coast, fRarePredatorSaltDorado, 0.4)
         setLFWeight(coast, fRarePredatorSaltSeaForel, 0.35)
         setLFWeight(coast, fRarePredatorSaltLavrak, 0.3)
+        setLFWeight(coast, fRarePredatorSaltKeta, 0.25)
         setLFWeight(coast, fRarePredatorSaltWahoo, 0.15)
         setLFWeight(coast, fEpicPredatorSaltLososAtlantic, 0.1)
+        setLFWeight(coast, fEpicPredatorSaltKatran, 0.07)
         setLFWeight(coast, fEpicPredatorSaltParusnik, 0.04)
         setLFWeight(coast, fEpicPredatorSaltBlueKaranks, 0.04)
         setLFWeight(coast, fEpicPredatorSaltBigBarracuda, 0.03)
+        setLFWeight(coast, fMythicPredatorSaltKonger, 0.05)
         setLFWeight(coast, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(coast, fLegendaryPredatorSaltBeluga, 0.02)
         setLFWeight(coast, fLegendaryPredatorSaltTarpon, 0.02)
@@ -864,6 +916,7 @@ object DB {
         setLFWeight(fjord, fCommonPeaceSaltKilka, 0.85)
         setLFWeight(fjord, fCommonPeaceSaltSeld, 0.7)
         setLFWeight(fjord, fCommonPeaceSaltSardina, 0.7)
+        setLFWeight(fjord, fCommonPredatorSaltPacificOceanPerch, 0.65)
         setLFWeight(fjord, fUncommonPeaceSaltKambala, 0.5)
         setLFWeight(fjord, fUncommonPeaceSaltPiksha, 0.35)
         setLFWeight(fjord, fEpicPeaceSaltTurbo, 0.08)
@@ -872,10 +925,13 @@ object DB {
         setLFWeight(fjord, fCommonPredatorSaltBychok, 0.9)
         setLFWeight(fjord, fCommonPredatorSaltKoryushka, 0.8)
         setLFWeight(fjord, fUncommonPredatorSaltSaida, 0.55)
+        setLFWeight(fjord, fUncommonPredatorSaltMerlang, 0.4)
         setLFWeight(fjord, fRarePredatorSaltTreska, 0.5)
         setLFWeight(fjord, fRarePredatorSaltSeaForel, 0.35)
         setLFWeight(fjord, fEpicPredatorSaltLososAtlantic, 0.1)
+        setLFWeight(fjord, fEpicPredatorSaltKatran, 0.07)
         setLFWeight(fjord, fMythicPredatorSaltWolffish, 0.04)
+        setLFWeight(fjord, fMythicPredatorSaltKonger, 0.04)
         setLFWeight(fjord, fLegendaryPredatorSaltPaltus, 0.02)
 
         // Открытый океан мирные
@@ -889,8 +945,10 @@ object DB {
 
         // Открытый океан хищные
         setLFWeight(openOcean, fCommonPredatorSaltStavrida, 0.85)
+        setLFWeight(openOcean, fCommonPredatorSaltPacificOceanPerch, 0.7)
         setLFWeight(openOcean, fUncommonPredatorSaltSaida, 0.55)
         setLFWeight(openOcean, fUncommonPredatorSaltAtlanticSkumbria, 0.5)
+        setLFWeight(openOcean, fUncommonPredatorSaltMerlang, 0.4)
         setLFWeight(openOcean, fUncommonPredatorSaltSeaSargan, 0.4)
         setLFWeight(openOcean, fRarePredatorSaltDorado, 0.4)
         setLFWeight(openOcean, fRarePredatorSaltAlbakor, 0.25)
@@ -898,6 +956,7 @@ object DB {
         setLFWeight(openOcean, fRarePredatorSaltWahoo, 0.2)
         setLFWeight(openOcean, fEpicPredatorSaltParusnik, 0.1)
         setLFWeight(openOcean, fEpicPredatorSaltSwordFish, 0.09)
+        setLFWeight(openOcean, fEpicPredatorSaltKatran, 0.07)
         setLFWeight(openOcean, fEpicPredatorSaltAkulaMako, 0.06)
         setLFWeight(openOcean, fMythicPredatorSaltWolffish, 0.04)
         setLFWeight(openOcean, fMythicPredatorSaltYellowTunec, 0.35)
