@@ -783,6 +783,7 @@ object DB {
         setLFWeight(amazon, fEpicPredatorFreshPeacockOkun, 0.1)
         setLFWeight(amazon, fEpicPredatorFreshElectricEel, 0.08)
         setLFWeight(amazon, fEpicPredatorFreshRedTailSom, 0.06)
+        setLFWeight(amazon, fEpicPredatorFreshAimara, 0.05)
         setLFWeight(amazon, fMythicPredatorFreshZungaro, 0.04)
         setLFWeight(amazon, fMythicPredatorFreshSkatMotoro, 0.04)
         setLFWeight(amazon, fLegendaryPredatorFreshPiraiba, 0.03)
