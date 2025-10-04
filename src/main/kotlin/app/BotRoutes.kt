@@ -1703,15 +1703,36 @@ Available commands:
                         } catch (e: Exception) {
                             val reason = e.message ?: "error"
                             val text = when (reason) {
-                                "casting" -> if (lang == "ru") "Заброс уже выполняется." else "You are already casting."
-                                "No lure selected" -> if (lang == "ru") "Сначала выберите приманку." else "Select a bait first."
-                                "No baits" -> if (lang == "ru") "Приманки закончились." else "You have no baits left."
-                                "No suitable fish" -> if (lang == "ru") {
-                                    "На выбранной локации нет подходящей рыбы для этой приманки."
+                                "casting" -> if (lang == "ru") {
+                                    "Заброс уже выполняется. Дождись окончания текущей попытки."
                                 } else {
-                                    "No suitable fish at this location for the selected bait."
+                                    "You are already casting. Wait for the current attempt to finish."
                                 }
-                                else -> if (lang == "ru") "Не удалось забросить снасть." else "Failed to start the cast."
+                                "No lure selected" -> if (lang == "ru") {
+                                    "Сначала выбери приманку через /bait и попробуй снова."
+                                } else {
+                                    "Select a bait with /bait first and try again."
+                                }
+                                "No baits" -> if (lang == "ru") {
+                                    "Приманки закончились. Забери ежедневную награду через /daily или купи новые в /shop."
+                                } else {
+                                    "You have no baits left. Claim the daily reward with /daily or buy more in /shop."
+                                }
+                                "No suitable fish" -> if (lang == "ru") {
+                                    "На выбранной локации нет подходящей рыбы для этой приманки. Сменить локацию можно через /location, а приманку — через /bait."
+                                } else {
+                                    "No suitable fish at this location for the selected bait. Switch location with /location or change bait with /bait."
+                                }
+                                "locked" -> if (lang == "ru") {
+                                    "Локация заблокирована. Сменить локацию можно через /location или продолжай ловить, чтобы открыть новую."
+                                } else {
+                                    "This location is locked. Change your location with /location or keep fishing to unlock a new one."
+                                }
+                                else -> if (lang == "ru") {
+                                    "Не удалось забросить снасть. Попробуй ещё раз позже."
+                                } else {
+                                    "Failed to start the cast. Please try again later."
+                                }
                             }
                             logCommandMetric("cast", mapOf("result" to "error", "stage" to "start", "reason" to reason), source)
                             trySend(chatId, text, replyToMessageId = replyTo)
