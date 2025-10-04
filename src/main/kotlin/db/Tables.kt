@@ -319,7 +319,7 @@ object DB {
         val fCommonPeaceFreshNeonTetra = upsertFish("Тетра неоновая", "common", 0.003, 0.0015, false, "fresh")
         val fCommonPeaceFreshCardinalTetra   = upsertFish("Тетра кардинальная", "common", 0.003, 0.0015, false, "fresh")
         val fCommonPeaceFreshNannostomus  = upsertFish("Нанностомус трифасциатус", "common", 0.004, 0.002, false, "fresh")
-        val fCommonPeaceFreshVyun   = upsertFish("Вьюн обыкновенный",   "common",   0.12, 0.05, false, "fresh")
+        val fCommonPeaceFreshVyun   = upsertFish("Вьюн",   "common",   0.12, 0.05, false, "fresh")
         val fCommonPeaceFreshVobla  = upsertFish("Вобла",  "common",   0.35, 0.15, false, "fresh")
 
         // --- Fish: common пресные хищные---
