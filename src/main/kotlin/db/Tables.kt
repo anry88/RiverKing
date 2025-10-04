@@ -806,6 +806,7 @@ object DB {
         setLFWeight(coast, fRarePredatorSaltSeaForel, 0.35)
         setLFWeight(coast, fRarePredatorSaltLavrak, 0.3)
         setLFWeight(coast, fRarePredatorSaltKeta, 0.25)
+        setLFWeight(coast, fRarePredatorSaltMorayStarry, 0.17)
         setLFWeight(coast, fRarePredatorSaltWahoo, 0.15)
         setLFWeight(coast, fEpicPredatorSaltLososAtlantic, 0.1)
         setLFWeight(coast, fEpicPredatorSaltKatran, 0.07)
