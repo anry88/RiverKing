@@ -456,7 +456,6 @@ object DB {
         val fUncommonPredatorSaltSeaSargan   = upsertFish("Сарган морской", "uncommon", 0.7, 0.3, true, "salt")
         val fUncommonPredatorSaltBychokMangroves = upsertFish("Бычок-пчёлка", "uncommon", 0.07, 0.03, true, "salt")
         val fUncommonPredatorSaltMerlang   = upsertFish("Мерланг","uncommon", 0.9,  0.4,  true, "salt")
-        val fUncommonPredatorSaltGorbusha = upsertFish("Горбуша", "uncommon", 1.8, 0.8, true, "salt")
 
         // --- Fish: rare морские мирные---
         val fRarePeaceSaltGoldenSigan   = upsertFish("Сиган золотистый", "rare", 0.5, 0.2, false, "salt")
@@ -475,6 +474,7 @@ object DB {
         val fRarePredatorSaltAlbula= upsertFish("Альбула", "rare", 3.0, 1.0, true, "salt")
         val fRarePredatorSaltSpanishSkumbria= upsertFish("Скумбрия испанская", "rare", 4.0, 2.0, true, "salt")
         val fRarePredatorSaltTitanSpinorog= upsertFish("Спинорог-титан", "rare", 3.0, 1.0, true, "salt")
+        val fRarePredatorSaltGorbusha = upsertFish("Горбуша", "rare", 1.8, 0.8, true, "salt")
         val fRarePredatorSaltKeta = upsertFish("Кета","rare", 4.5, 2.0, true, "salt")
         val fRarePredatorSaltMorayStarry= upsertFish("Мурена звёздчатая",  "rare", 1.2, 0.5, true, "salt")
 
@@ -770,8 +770,8 @@ object DB {
         setLFWeight(delta, fCommonPredatorSaltBychok, 0.9)
         setLFWeight(delta, fCommonPredatorSaltKoryushka, 0.85)
         setLFWeight(delta, fUncommonPredatorSaltSeaSargan, 0.5)
-        setLFWeight(delta, fUncommonPredatorSaltGorbusha, 0.4)
         setLFWeight(delta, fUncommonPredatorSaltSeaSom, 0.35)
+        setLFWeight(delta, fRarePredatorSaltGorbusha, 0.35)
         setLFWeight(delta, fRarePredatorSaltKeta, 0.3)
         setLFWeight(delta, fRarePredatorSaltSeaForel, 0.25)
         setLFWeight(delta, fRarePredatorSaltLavrak, 0.2)
@@ -799,11 +799,11 @@ object DB {
         setLFWeight(coast, fCommonPredatorSaltStavrida, 0.6)
         setLFWeight(coast, fUncommonPredatorSaltAtlanticSkumbria, 0.5)
         setLFWeight(coast, fUncommonPredatorSaltSeaSargan, 0.45)
-        setLFWeight(coast, fUncommonPredatorSaltGorbusha, 0.4)
         setLFWeight(coast, fUncommonPredatorSaltMerlang, 0.4)
         setLFWeight(coast, fRarePredatorSaltSpanishSkumbria, 0.4)
         setLFWeight(coast, fRarePredatorSaltDorado, 0.4)
         setLFWeight(coast, fRarePredatorSaltSeaForel, 0.35)
+        setLFWeight(coast, fRarePredatorSaltGorbusha, 0.35)
         setLFWeight(coast, fRarePredatorSaltLavrak, 0.3)
         setLFWeight(coast, fRarePredatorSaltKeta, 0.25)
         setLFWeight(coast, fRarePredatorSaltMorayStarry, 0.17)
