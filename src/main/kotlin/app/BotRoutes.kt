@@ -1209,7 +1209,7 @@ fun Application.botRoutes(env: Env) {
 /location — сменить локацию
 /daily — получить ежедневную награду
 /prizes — забрать призы турнира
-                /shop — купить приманки и удочки за звёзды
+/shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
 /daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
@@ -1226,7 +1226,7 @@ Available commands:
 /location — change your location
 /daily — claim your daily reward
 /prizes — claim tournament prizes
-                /shop — buy baits and rods with Stars
+/shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
 /daily_rating — view the current placement of your best catch in today's daily rating
