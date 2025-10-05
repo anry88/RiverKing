@@ -379,6 +379,12 @@ function App(){
       });
       if(!r.ok){
         if(r.status===401) throw new Error('unauthorized');
+        let data = null;
+        try{ data = await r.json(); }catch(err){}
+        if(data?.error==='rod_unlocked'){
+          setError(t('rodAlreadyUnlocked'));
+          return;
+        }
         throw 0;
       }
       const {invoice_url} = await r.json();
@@ -1012,7 +1018,8 @@ function App(){
               : t('selectBaitFailed'));
           }
         }} />
-        <RodsDrawer open={rodsOpen} onClose={()=>setRodsOpen(false)} me={me} onSelect={async id=>{
+        <RodsDrawer open={rodsOpen} onClose={()=>setRodsOpen(false)} me={me}
+          onSelect={async id=>{
           try{
             const r = await fetch(`/api/rod/`+id,{method:'POST',credentials:'include'});
             if(!r.ok){
@@ -1030,7 +1037,12 @@ function App(){
               : reason==='no rod' ? t('rodUnavailable')
               : t('selectRodFailed'));
           }
-        }} />
+        }}
+          onUnlock={rod=>{
+            if(!rod?.packId) return;
+            buyPack(rod.packId);
+          }}
+        />
       </div>
     </div>
   );

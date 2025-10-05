@@ -258,15 +258,15 @@ fun Application.botRoutes(env: Env) {
                     ) { _, _ -> "/prizes" },
                     InlineCommandInfo(
                         name = "shop",
-                        ruDescription = "Купить приманки за звёзды",
-                        enDescription = "Buy baits with Stars",
+                        ruDescription = "Купить приманки и удочки за звёзды",
+                        enDescription = "Buy baits and rods with Stars",
                         assetName = "shop.png"
                     ) { _, _ -> "/shop" },
                     InlineCommandInfo(
                         name = "coin_shop",
                         ruDescription = "Купить наборы за монеты",
                         enDescription = "Buy bundles with coins",
-                        assetName = "shop.png"
+                        assetName = "coin_shop.png"
                     ) { _, _ -> "/coin_shop" },
                     InlineCommandInfo(
                         name = "tournament",
@@ -274,6 +274,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "View the current tournament leaderboard and your rank",
                         assetName = "tournament.png"
                     ) { _, _ -> "/tournament" },
+                    InlineCommandInfo(
+                        name = "daily_rating",
+                        ruDescription = "Твои места в сегодняшнем ежедневном рейтинге",
+                        enDescription = "View your positions in today's daily rating",
+                        assetName = "daily_ratings.png"
+                    ) { _, _ -> "/daily_rating" },
                     InlineCommandInfo(
                         name = "stats",
                         ruDescription = "Статистика по пойманной рыбе",
@@ -600,7 +606,7 @@ fun Application.botRoutes(env: Env) {
                 } else {
                     "Current rod: ${currentId?.let { id -> rods.find { it.id == id }?.let { I18n.rod(it.name, lang) } } ?: "not selected"}"
                 }
-                val prompt = if (lang == "ru") "Выберите удочку:" else "Choose a rod:"
+                val prompt = if (lang == "ru") "Выберите удочку или разблокируйте новую:" else "Choose a rod or unlock a new one:"
                 val details = rods.joinToString("\n") { rod ->
                     val localizedName = I18n.rod(rod.name, lang)
                     val nameLine = buildString {
@@ -608,13 +614,30 @@ fun Application.botRoutes(env: Env) {
                         append(localizedName)
                         if (rod.id == currentId) append(" ✅")
                     }
+                    val bonusLine = rodBonusLabel(rod.bonusWater, rod.bonusPredator, lang)
                     val infoLine = if (rod.unlocked) {
-                        rodBonusLabel(rod.bonusWater, rod.bonusPredator, lang)
+                        bonusLine
                     } else {
-                        val req = if (lang == "ru") "Требуется %.0f кг" else "Requires %.0f kg"
-                        req.format(Locale.US, rod.unlockKg)
+                        val weightPart = if (rod.unlockKg > 0) {
+                            val template = if (lang == "ru") "Требуется %.0f кг" else "Requires %.0f kg"
+                            template.format(Locale.US, rod.unlockKg)
+                        } else {
+                            if (lang == "ru") "Доступна сразу" else "Available immediately"
+                        }
+                        val pricePart = rod.priceStars?.let {
+                            val priceText = "${it}⭐"
+                            if (lang == "ru") "или $priceText" else "or $priceText"
+                        }
+                        val combined = listOfNotNull(weightPart.takeIf { it.isNotBlank() }, pricePart).joinToString(" ")
+                        val requirement = combined.ifBlank {
+                            if (lang == "ru") "Доступна сразу" else "Available immediately"
+                        }
+                        val bonusPrefix = if (lang == "ru") "Бонус: " else "Bonus: "
+                        listOf("🔒 ${requirement.trim()}", bonusPrefix + bonusLine.trim())
+                            .joinToString("\n")
                     }
-                    "$nameLine\n  $infoLine"
+                    val formattedInfo = infoLine.replace("\n", "\n  ")
+                    "$nameLine\n  $formattedInfo"
                 }
                 val text = buildString {
                     if (!prefix.isNullOrBlank()) {
@@ -629,10 +652,25 @@ fun Application.botRoutes(env: Env) {
                         append(details)
                     }
                 }
-                val buttons = rods.filter { it.unlocked }.map { rod ->
+                val buttons = rods.mapNotNull { rod ->
                     val localizedName = I18n.rod(rod.name, lang)
-                    val label = if (rod.id == currentId) "$localizedName ✅" else localizedName
-                    listOf(InlineKeyboardButton(label, "/rod ${ownedData(uid, rod.id)}"))
+                    if (rod.unlocked) {
+                        val label = if (rod.id == currentId) "$localizedName ✅" else localizedName
+                        listOf(InlineKeyboardButton(label, "/rod ${ownedData(uid, rod.id)}"))
+                    } else {
+                        val packId = fishing.rodPackId(rod.code)
+                        val price = rod.priceStars
+                        if (packId != null && price != null) {
+                            val label = if (lang == "ru") {
+                                "🔓 $localizedName — ${price}⭐"
+                            } else {
+                                "🔓 $localizedName — ${price}⭐"
+                            }
+                            listOf(InlineKeyboardButton(label, "/buy ${ownedData(uid, packId)}"))
+                        } else {
+                            null
+                        }
+                    }
                 }
                 val markup = if (buttons.isEmpty()) null else Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
@@ -903,7 +941,16 @@ fun Application.botRoutes(env: Env) {
                 lang: String,
                 replyToMessageId: Long? = null,
             ) {
+                val lockedRodCodes = fishing.listRods(uid).filterNot { it.unlocked }.map { it.code }.toSet()
                 val shop = fishing.listShop(lang)
+                    .map { category ->
+                        category.copy(
+                            packs = category.packs.filter { pack ->
+                                pack.rodCode == null || pack.rodCode in lockedRodCodes
+                            }
+                        )
+                    }
+                    .filter { it.packs.isNotEmpty() }
                 if (shop.isEmpty()) {
                     val emptyText = if (lang == "ru") {
                         "Магазин пока пуст."
@@ -914,9 +961,9 @@ fun Application.botRoutes(env: Env) {
                     return
                 }
                 val header = if (lang == "ru") {
-                    "Магазин приманок за звёзды. Выберите набор:"
+                    "Магазин за звёзды. Выберите товар:"
                 } else {
-                    "Star shop. Choose a bundle:"
+                    "Star shop. Choose an item:"
                 }
                 val footer = if (lang == "ru") {
                     "Нажми на кнопку, чтобы получить счёт в звёздах."
@@ -1078,6 +1125,9 @@ fun Application.botRoutes(env: Env) {
                 "призы" to "/prizes",
                 "prize" to "/prizes",
                 "prizes" to "/prizes",
+                "рейтинг" to "/daily_rating",
+                "rating" to "/daily_rating",
+                "leaderboard" to "/daily_rating",
                 "турнир" to "/tournament",
                 "tournament" to "/tournament",
             )
@@ -1159,7 +1209,7 @@ fun Application.botRoutes(env: Env) {
 /location — сменить локацию
 /daily — получить ежедневную награду
 /prizes — забрать призы турнира
-/shop — купить приманки за звёзды
+                /shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
 /daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
@@ -1176,7 +1226,7 @@ Available commands:
 /location — change your location
 /daily — claim your daily reward
 /prizes — claim tournament prizes
-/shop — buy baits with Stars
+                /shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
 /daily_rating — view the current placement of your best catch in today's daily rating
@@ -1513,6 +1563,16 @@ Available commands:
                             return true
                         }
                         val packId = value ?: return true
+                        val packInfo = fishing.findPack(packId)
+                        if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
+                            val reply = if (lang == "ru") {
+                                "Эта удочка уже разблокирована."
+                            } else {
+                                "You already unlocked this rod."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
                         val invoiceChatId = if (chatId < 0) buyerTgId else chatId
                         try {
                             stars.sendPackageInvoice(invoiceChatId, buyerTgId, packId, lang)
@@ -1698,24 +1758,123 @@ Available commands:
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
                         val knownFish = fishing.caughtFishIds(uid)
-                        try {
+                        val startRes = try {
                             fishing.startCast(uid)
                         } catch (e: Exception) {
                             val reason = e.message ?: "error"
                             val text = when (reason) {
-                                "casting" -> if (lang == "ru") "Заброс уже выполняется." else "You are already casting."
-                                "No lure selected" -> if (lang == "ru") "Сначала выберите приманку." else "Select a bait first."
-                                "No baits" -> if (lang == "ru") "Приманки закончились." else "You have no baits left."
-                                "No suitable fish" -> if (lang == "ru") {
-                                    "На выбранной локации нет подходящей рыбы для этой приманки."
+                                "casting" -> if (lang == "ru") {
+                                    "Заброс уже выполняется. Дождись окончания текущей попытки."
                                 } else {
-                                    "No suitable fish at this location for the selected bait."
+                                    "You are already casting. Wait for the current attempt to finish."
                                 }
-                                else -> if (lang == "ru") "Не удалось забросить снасть." else "Failed to start the cast."
+                                "No lure selected" -> if (lang == "ru") {
+                                    "Сначала выбери приманку через /bait и попробуй снова."
+                                } else {
+                                    "Select a bait with /bait first and try again."
+                                }
+                                "No baits" -> if (lang == "ru") {
+                                    "Приманки закончились. Забери ежедневную награду через /daily или купи новые в /shop."
+                                } else {
+                                    "You have no baits left. Claim the daily reward with /daily or buy more in /shop."
+                                }
+                                "No suitable fish" -> if (lang == "ru") {
+                                    "На выбранной локации нет подходящей рыбы для этой приманки. Сменить локацию можно через /location, а приманку — через /bait."
+                                } else {
+                                    "No suitable fish at this location for the selected bait. Switch location with /location or change bait with /bait."
+                                }
+                                "locked" -> if (lang == "ru") {
+                                    "Локация заблокирована. Сменить локацию можно через /location или продолжай ловить, чтобы открыть новую."
+                                } else {
+                                    "This location is locked. Change your location with /location or keep fishing to unlock a new one."
+                                }
+                                else -> if (lang == "ru") {
+                                    "Не удалось забросить снасть. Попробуй ещё раз позже."
+                                } else {
+                                    "Failed to start the cast. Please try again later."
+                                }
                             }
                             logCommandMetric("cast", mapOf("result" to "error", "stage" to "start", "reason" to reason), source)
                             trySend(chatId, text, replyToMessageId = replyTo)
                             return true
+                        }
+                        if (startRes.lureChanged) {
+                            val lureName = startRes.newLureName?.let { I18n.lure(it, lang) }
+                            val baseLine = if (lang == "ru") {
+                                if (lureName != null) {
+                                    "🎣 Приманка закончилась, переключились на «$lureName»."
+                                } else {
+                                    "🎣 Приманка закончилась."
+                                }
+                            } else {
+                                if (lureName != null) {
+                                    "🎣 Bait ran out, switched to \"$lureName\"."
+                                } else {
+                                    "🎣 Bait ran out."
+                                }
+                            }
+                            val (extraLine, button) = when {
+                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == true &&
+                                    startRes.recommendedRodId != null -> {
+                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                                    val promptLine = if (lang == "ru") {
+                                        "Эта приманка лучше всего работает с удочкой «$rodName». Сменить удочку?"
+                                    } else {
+                                        "This bait works best with the \"$rodName\" rod. Switch rods?"
+                                    }
+                                    val buttonLabel = if (lang == "ru") {
+                                        "Сменить на «$rodName»"
+                                    } else {
+                                        "Use \"$rodName\""
+                                    }
+                                    val btn = InlineKeyboardButton(
+                                        buttonLabel,
+                                        "/rod ${ownedData(uid, startRes.recommendedRodId)}"
+                                    )
+                                    Pair(promptLine, btn)
+                                }
+                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false &&
+                                    startRes.recommendedRodPackId != null && startRes.recommendedRodPriceStars != null -> {
+                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                                    val priceText = "${startRes.recommendedRodPriceStars}⭐"
+                                    val infoLine = if (lang == "ru") {
+                                        "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована. Можно открыть за $priceText."
+                                    } else {
+                                        "The \"$rodName\" rod for this bait is still locked. You can unlock it for $priceText."
+                                    }
+                                    val buttonLabel = if (lang == "ru") {
+                                        "🔓 Разблокировать «$rodName» — $priceText"
+                                    } else {
+                                        "🔓 Unlock \"$rodName\" — $priceText"
+                                    }
+                                    val btn = InlineKeyboardButton(
+                                        buttonLabel,
+                                        "/buy ${ownedData(uid, startRes.recommendedRodPackId)}"
+                                    )
+                                    Pair(infoLine, btn)
+                                }
+                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false -> {
+                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                                    val infoLine = if (lang == "ru") {
+                                        "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована."
+                                    } else {
+                                        "The \"$rodName\" rod for this bait is still locked."
+                                    }
+                                    Pair(infoLine, null)
+                                }
+                                else -> Pair(null, null)
+                            }
+                            val message = buildString {
+                                append(baseLine)
+                                if (!extraLine.isNullOrBlank()) {
+                                    append('\n')
+                                    append(extraLine)
+                                }
+                            }
+                            val markup = button?.let { btn ->
+                                Json.encodeToString(InlineKeyboardMarkup(listOf(listOf(btn))))
+                            }
+                            trySend(chatId, message, markup, replyToMessageId = replyTo)
                         }
                         val waitMessage = if (lang == "ru") {
                             "Забросили снасть. Ждём поклёвку..."

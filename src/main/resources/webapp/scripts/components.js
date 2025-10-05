@@ -175,7 +175,7 @@ function rodBonusText(rod){
   return t('rodNoBonus');
 }
 
-function RodsDrawer({open,onClose,me,onSelect}){
+function RodsDrawer({open,onClose,me,onSelect,onUnlock}){
   const rods = me.rods || [];
   return (
     <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
@@ -191,19 +191,58 @@ function RodsDrawer({open,onClose,me,onSelect}){
           {rods.map(rod=>{
             const locked = !rod.unlocked;
             const isCurrent = me.currentRodId===rod.id;
-            const info = locked ? t('requiresKg', Number(rod.unlockKg).toFixed(0)) : rodBonusText(rod);
+            const unlockKg = Number(rod.unlockKg).toFixed(0);
+            const price = typeof rod.priceStars === 'number' ? rod.priceStars : null;
+            const priceText = price != null ? `${price}⭐` : null;
+            const bonusText = rodBonusText(rod);
+            const bonusLine = bonusText ? t('rodBonusLine', bonusText) : '';
+            const info = locked
+              ? [priceText ? t('rodLockedStars', {kg: unlockKg, stars: priceText}) : t('requiresKg', unlockKg), bonusLine]
+                  .filter(Boolean)
+                  .join('\n')
+              : bonusText;
+            const canUnlock = locked && rod.packId && priceText;
             return (
-              <button key={rod.id} disabled={locked}
-                      onClick={()=>{ if(!locked){ onSelect(rod.id); onClose(); } }}
-                      className={`w-full text-left p-3 rounded-xl border ${isCurrent? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${locked?'opacity-50 cursor-not-allowed':''}`}>
-                <div className="flex items-center justify-between">
+              <div key={rod.id}
+                   className={`p-3 rounded-xl border ${isCurrent? 'border-emerald-500 bg-emerald-500/10':'border-white/10'} ${locked?'opacity-80':''}`}>
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold">{rod.name}</div>
-                    <div className="text-xs opacity-70">{info}</div>
+                    <div className="text-xs opacity-70 mt-1 whitespace-pre-line">{info}</div>
                   </div>
-                  {isCurrent && <div className="text-emerald-400 text-sm">{t('current')}</div>}
+                  {isCurrent && rod.unlocked && (
+                    <div className="text-emerald-400 text-sm">{t('current')}</div>
+                  )}
                 </div>
-              </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {rod.unlocked ? (
+                    <button
+                      onClick={()=>{ onSelect(rod.id); onClose(); }}
+                      className={`flex-1 min-w-[120px] py-2 rounded-xl ${isCurrent? 'glass border border-emerald-400 text-emerald-100':'bg-emerald-600 hover:bg-emerald-500'}`}
+                      disabled={isCurrent}
+                    >
+                      {isCurrent ? t('current') : t('useRod')}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        disabled
+                        className="flex-1 min-w-[140px] py-2 rounded-xl border border-white/10 bg-white/5 text-sm"
+                      >
+                        {t('rodLocked')}
+                      </button>
+                      {canUnlock && (
+                        <button
+                          onClick={()=>{ onUnlock && onUnlock(rod); }}
+                          className="flex-1 min-w-[160px] py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+                        >
+                          {t('unlockRodFor', priceText)}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>

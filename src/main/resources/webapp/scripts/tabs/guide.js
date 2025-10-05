@@ -179,7 +179,11 @@ function Guide({me}){
           {data.rods.map(rod=>{
             const myRod = (me.rods||[]).find(r=>r.code===rod.code) || {};
             const unlocked = myRod.unlocked;
-            const status = unlocked ? t('unlocked') : t('requiresKg', Number(rod.unlockKg).toFixed(0));
+            const price = typeof myRod.priceStars === 'number' ? `${myRod.priceStars}⭐` : null;
+            const kgRequired = Number(rod.unlockKg).toFixed(0);
+            const status = unlocked
+              ? t('unlocked')
+              : price ? t('rodLockedStars', {kg: kgRequired, stars: price}) : t('requiresKg', kgRequired);
             const rodImage = (window.ROD_IMAGES && (window.ROD_IMAGES[rod.code] || window.ROD_IMAGES.default)) || ROD_IMG;
             return (
               <div key={rod.code} className="p-4 glass rounded-xl">

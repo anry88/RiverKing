@@ -6,8 +6,10 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.CoinCalculator
 import util.Rng
@@ -34,6 +36,8 @@ data class RodDTO(
     val unlocked: Boolean,
     val bonusWater: String? = null,
     val bonusPredator: Boolean? = null,
+    val priceStars: Int? = null,
+    val packId: String? = null,
 )
 
 @Serializable
@@ -54,6 +58,19 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     data class DailyReward(val name: String, val qty: Int)
 
     private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
+
+    @Serializable
+    data class StartCastResult(
+        val currentLureId: Long?,
+        val lureChanged: Boolean = false,
+        val newLureName: String? = null,
+        val recommendedRodId: Long? = null,
+        val recommendedRodCode: String? = null,
+        val recommendedRodName: String? = null,
+        val recommendedRodUnlocked: Boolean? = null,
+        val recommendedRodPriceStars: Int? = null,
+        val recommendedRodPackId: String? = null,
+    )
 
     private val freshDailyRewards: List<List<DailyReward>> = listOf(
         listOf(DailyReward("Пресная мирная", 8), DailyReward("Пресная хищная", 4)),
@@ -350,17 +367,65 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val total = totalKg(userId)
         ensureRodInventory(userId, total)
         ensureCurrentRod(userId, total)
-        Rods.selectAll().orderBy(Rods.unlockKg).map {
+        val owned = InventoryRods
+            .slice(InventoryRods.rodId)
+            .select { InventoryRods.userId eq userId }
+            .map { it[InventoryRods.rodId].value }
+            .toSet()
+        val nowInstant = Instant.now(clock)
+        val zone = ZoneOffset.UTC
+        val rodRows = Rods.selectAll().orderBy(Rods.unlockKg).toList()
+        val packIds = rodRows.mapNotNull { rodPackId(it[Rods.code]) }.toSet()
+        val discounts = loadActiveDiscounts(packIds, nowInstant, zone)
+        rodRows.map { row ->
+            val id = row[Rods.id].value
+            val packId = rodPackId(row[Rods.code])
+            val price = packId?.let { discounts[it] } ?: row[Rods.priceStars]
             RodDTO(
-                it[Rods.id].value,
-                it[Rods.code],
-                it[Rods.name],
-                it[Rods.unlockKg],
-                it[Rods.unlockKg] <= total,
-                it[Rods.bonusWater],
-                it[Rods.bonusPredator],
+                id = id,
+                code = row[Rods.code],
+                name = row[Rods.name],
+                unlockKg = row[Rods.unlockKg],
+                unlocked = id in owned,
+                bonusWater = row[Rods.bonusWater],
+                bonusPredator = row[Rods.bonusPredator],
+                priceStars = price,
+                packId = packId,
             )
         }
+    }
+
+    fun hasRod(userId: Long, rodCode: String): Boolean = transaction {
+        val rodId = Rods.select { Rods.code eq rodCode }.singleOrNull()?.get(Rods.id)?.value
+            ?: return@transaction false
+        InventoryRods.select {
+            (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
+        }.any()
+    }
+
+    fun rodPackId(code: String): String? = shopCategories
+        .flatMap { it.packs }
+        .find { it.rodCode == code }
+        ?.id
+
+    private fun loadActiveDiscounts(
+        packIds: Set<String>,
+        nowInstant: Instant,
+        zone: ZoneId,
+    ): Map<String, Int> {
+        if (packIds.isEmpty()) return emptyMap()
+        return ShopDiscounts
+            .select { ShopDiscounts.packageId inList packIds }
+            .mapNotNull { row ->
+                val startInstant = row[ShopDiscounts.startDate].atStartOfDay(zone).toInstant()
+                val endInstant = row[ShopDiscounts.endDate].atStartOfDay(zone).toInstant()
+                if (nowInstant >= startInstant && nowInstant < endInstant) {
+                    row[ShopDiscounts.packageId] to row[ShopDiscounts.price]
+                } else {
+                    null
+                }
+            }
+            .toMap()
     }
 
     private fun ensureCurrentLure(userId: Long): Long? {
@@ -386,10 +451,13 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val total = totalKg(userId)
         ensureRodInventory(userId, total)
         val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull() ?: error("bad rod")
-        require(rodRow[Rods.unlockKg] <= total) { "locked" }
         val has = InventoryRods.select {
             (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
         }.any()
+        val unlockedByWeight = rodRow[Rods.unlockKg] <= total
+        if (!unlockedByWeight && !has) {
+            throw IllegalArgumentException("locked")
+        }
         require(has) { "no rod" }
         Users.update({ Users.id eq userId }) { it[currentRodId] = rodId }
     }
@@ -416,19 +484,22 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     private fun ensureCurrentRod(userId: Long, totalWeight: Double? = null): Long {
         val total = totalWeight ?: totalKg(userId)
         ensureRodInventory(userId, total)
+        val ownedIds = InventoryRods
+            .slice(InventoryRods.rodId)
+            .select { InventoryRods.userId eq userId }
+            .map { it[InventoryRods.rodId].value }
         val row = Users.select { Users.id eq userId }.single()
         val current = row[Users.currentRodId]?.value
-        if (current != null) {
-            val rodRow = Rods.select { Rods.id eq current }.singleOrNull()
-            if (rodRow != null && rodRow[Rods.unlockKg] <= total) {
-                return current
-            }
+        if (current != null && ownedIds.contains(current)) {
+            return current
         }
-        val fallback = Rods
-            .select { Rods.unlockKg lessEq total }
-            .orderBy(Rods.unlockKg)
-            .firstOrNull()?.get(Rods.id)?.value
-            ?: Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
+        val fallback = if (ownedIds.isNotEmpty()) {
+            Rods.select { Rods.id inList ownedIds }
+                .orderBy(Rods.unlockKg)
+                .first()[Rods.id].value
+        } else {
+            Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
+        }
         Users.update({ Users.id eq userId }) { it[currentRodId] = fallback }
         return fallback
     }
@@ -685,6 +756,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val desc: String,
         val price: Int,
         val items: List<Pair<String, Int>>,
+        val rodCode: String? = null,
         val coinPrice: Int? = null,
         val originalPrice: Int? = null,
         val discountStart: LocalDate? = null,
@@ -880,6 +952,46 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             )
         ),
 
+        // --- Удочки ---
+        ShopCategory(
+            "rods",
+            "Удочки",
+            listOf(
+                ShopPackage(
+                    id = "rod_dew",
+                    name = "Удочка «Роса»",
+                    desc = "Разблокирует удочку «Роса».\nБонус: −50% шанс побега пресноводных мирных рыб.",
+                    price = 15,
+                    items = emptyList(),
+                    rodCode = "dew",
+                ),
+                ShopPackage(
+                    id = "rod_stream",
+                    name = "Удочка «Поток»",
+                    desc = "Разблокирует удочку «Поток».\nБонус: −50% шанс побега пресноводных хищных рыб.",
+                    price = 75,
+                    items = emptyList(),
+                    rodCode = "stream",
+                ),
+                ShopPackage(
+                    id = "rod_abyss",
+                    name = "Удочка «Глубь»",
+                    desc = "Разблокирует удочку «Глубь».\nБонус: −50% шанс побега морских мирных рыб.",
+                    price = 145,
+                    items = emptyList(),
+                    rodCode = "abyss",
+                ),
+                ShopPackage(
+                    id = "rod_storm",
+                    name = "Удочка «Шторм»",
+                    desc = "Разблокирует удочку «Шторм».\nБонус: −50% шанс побега морских хищных рыб.",
+                    price = 235,
+                    items = emptyList(),
+                    rodCode = "storm",
+                ),
+            )
+        ),
+
         // --- Подписки (без изменений) ---
         ShopCategory(
             "subscriptions",
@@ -999,6 +1111,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun grantPackItems(userId: Long, pack: ShopPackage): Pair<List<LureDTO>, Long?> {
+        if (pack.rodCode != null) {
+            unlockRod(userId, pack.rodCode)
+            return Pair(emptyList(), null)
+        }
         fun add(id: Long, qty: Int) {
             val cur = InventoryLures.select {
                 (InventoryLures.userId eq userId) and (InventoryLures.lureId eq id)
@@ -1034,6 +1150,25 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 )
             }
         return Pair(lures, current)
+    }
+
+    private fun unlockRod(userId: Long, rodCode: String) {
+        val rodRow = Rods.select { Rods.code eq rodCode }.singleOrNull() ?: return
+        val rodId = rodRow[Rods.id].value
+        val has = InventoryRods.select {
+            (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
+        }.forUpdate().singleOrNull()
+        if (has == null) {
+            InventoryRods.insert {
+                it[InventoryRods.userId] = userId
+                it[InventoryRods.rodId] = rodId
+                it[InventoryRods.qty] = 1
+            }
+        }
+        val userRow = Users.select { Users.id eq userId }.forUpdate().single()
+        if (userRow[Users.currentRodId] == null) {
+            Users.update({ Users.id eq userId }) { it[currentRodId] = rodId }
+        }
     }
 
     fun buyPackage(userId: Long, packageId: String): Pair<List<LureDTO>, Long?> = transaction {
@@ -1159,7 +1294,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
      * Consume a lure and validate that it can be used at the current location.
      * Returns the new current lure id if changed after consumption.
      */
-    fun startCast(userId: Long): Long? = transaction {
+    fun startCast(userId: Long): StartCastResult = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(!userRow[Users.isCasting]) { "casting" }
         PendingCatches.deleteWhere { PendingCatches.userId eq userId }
@@ -1193,7 +1328,53 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Users.isCasting] = true
             it[Users.castLureId] = lureId
         }
-        newLure
+        val lureChanged = newLure != lureId
+        var newLureName: String? = null
+        var recommendedRodId: Long? = null
+        var recommendedRodCode: String? = null
+        var recommendedRodName: String? = null
+        var recommendedRodUnlocked: Boolean? = null
+        var recommendedRodPrice: Int? = null
+        var recommendedRodPackId: String? = null
+        val discountZone = ZoneOffset.UTC
+        val nowInstant = Instant.now(clock)
+        if (lureChanged && newLure != null) {
+            val newLureRow = Lures.select { Lures.id eq newLure }.singleOrNull()
+            if (newLureRow != null) {
+                newLureName = newLureRow[Lures.name]
+                val recommended = Rods.select {
+                    (Rods.bonusWater eq newLureRow[Lures.water]) and
+                        (Rods.bonusPredator eq newLureRow[Lures.predator])
+                }.singleOrNull()
+                if (recommended != null) {
+                    val recId = recommended[Rods.id].value
+                    recommendedRodId = recId
+                    recommendedRodCode = recommended[Rods.code]
+                    recommendedRodName = recommended[Rods.name]
+                    val packId = recommendedRodCode?.let { rodPackId(it) }
+                    recommendedRodPackId = packId
+                    val discountPrice = packId?.let {
+                        loadActiveDiscounts(setOf(it), nowInstant, discountZone)[it]
+                    }
+                    recommendedRodPrice = discountPrice ?: recommended[Rods.priceStars]
+                    recommendedRodUnlocked = InventoryRods.select {
+                        (InventoryRods.userId eq userId) and
+                            (InventoryRods.rodId eq recId)
+                    }.any()
+                }
+            }
+        }
+        StartCastResult(
+            currentLureId = newLure,
+            lureChanged = lureChanged,
+            newLureName = newLureName,
+            recommendedRodId = recommendedRodId,
+            recommendedRodCode = recommendedRodCode,
+            recommendedRodName = recommendedRodName,
+            recommendedRodUnlocked = recommendedRodUnlocked,
+            recommendedRodPriceStars = recommendedRodPrice,
+            recommendedRodPackId = recommendedRodPackId,
+        )
     }
 
     data class LocationEscapeChance(
