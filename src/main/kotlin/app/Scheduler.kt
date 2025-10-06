@@ -16,10 +16,7 @@ object Scheduler {
         scope.launch {
             prizeService.distributePrizes()
             while (isActive) {
-                val tz = ZoneId.of("Europe/Belgrade")
-                val now = ZonedDateTime.now(tz)
-                val next = now.with(LocalTime.of(0, 5)).let { if (it.isBefore(now)) it.plusDays(1) else it }
-                delay(Duration.between(now, next).toMillis())
+                delay(Duration.ofMinutes(5).toMillis())
                 prizeService.distributePrizes()
                 // TODO: daily weather/bonuses if needed later
             }
