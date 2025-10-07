@@ -541,7 +541,7 @@ object DB {
         setLFWeight(pond, fCommonPeaceFreshVerhoplavka, 0.5)
         setLFWeight(pond, fCommonPeaceFreshVyun, 0.45)
         setLFWeight(pond, fUncommonPeaceFreshLesch, 0.4)
-        setLFWeight(pond, fUncommonPeaceFreshPelyad, 0.03)
+        setLFWeight(pond, fUncommonPeaceFreshPelyad, 0.3)
         setLFWeight(pond, fUncommonPeaceFreshLin, 0.2)
         setLFWeight(pond, fRarePeaceFreshKarp, 0.15)
         setLFWeight(pond, fKoiKohaku, 0.01)
