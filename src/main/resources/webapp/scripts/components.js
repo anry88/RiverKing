@@ -1,3 +1,6 @@
+const AssetImage = window.AssetImage;
+const useAssetSrc = window.useAssetSrc;
+
 function StatChip({icon,label,value,active=false,onClick}){
   const iconContent = typeof icon === 'string'
     ? <span className="text-base" aria-hidden="true">{icon}</span>
@@ -52,7 +55,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
         <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar">
           <StatChip icon={'📍'} label={t('location')} value={currentLoc} onClick={onOpenLocations} />
           <StatChip icon={'🎣'} label={t('rod')} value={rodVal} onClick={onOpenRods} />
-          <StatChip icon={lureIconPath ? <img src={lureIconPath} alt="" className="w-5 h-5 object-contain" /> : '🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
+          <StatChip icon={lureIconPath ? <AssetImage src={lureIconPath} alt="" className="w-5 h-5 object-contain" /> : '🪱'} label={t('baits')} value={lureVal} onClick={onOpenBaits} />
           <StatChip icon={'🐟'} label={t('total')} value={`${Number(me.totalWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'📅'} label={t('today')} value={`${Number(me.todayWeight||0).toFixed(1)} ${t('kg')}`} />
           <StatChip icon={'🪙'} label={t('coins')} value={Number(me.coins||0).toLocaleString(lang==='ru'?'ru-RU':'en-US')} />
@@ -83,7 +86,7 @@ function BottomNav({tab,setTab,dailyAvailable}){
             aria-current={tab===item.id ? 'page' : undefined}
           >
             <div className="relative">
-              <img src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+              <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
               {dailyAvailable && item.id==='shop' && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                   !
@@ -335,11 +338,11 @@ function CatchDetailsModal({catchData, me, onClose}){
         <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto relative overflow-hidden">
           {locationBg && (
             <>
-              <img
+              <AssetImage
                 src={locationBg}
                 alt={catchData.location || ''}
                 className="absolute inset-0 w-full h-full object-cover"
-                onError={e=>{ e.currentTarget.style.display='none'; }}
+                onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }}
               />
               <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
             </>
@@ -353,7 +356,7 @@ function CatchDetailsModal({catchData, me, onClose}){
               <div className="flex justify-center">
                 {fishUnlocked ? (
                   fishImg ? (
-                    <img src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain" onError={e=>{e.currentTarget.style.display='none';}} />
+                    <AssetImage src={fishImg} alt={catchData.fish} className="w-32 h-32 object-contain" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
                   ) : (
                     <div className="w-32 h-32 bg-gray-800 rounded-xl flex items-center justify-center text-4xl">🐟</div>
                   )
@@ -420,7 +423,7 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div onClick={onClose} className="absolute inset-0 bg-black/60"></div>
       <div className="relative w-[90%] max-w-sm rounded-xl overflow-hidden">
-        <img src="/app/assets/backgrounds/pond.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
+        <AssetImage src="/app/assets/backgrounds/pond.png" alt="" className="absolute inset-0 w-full h-full object-cover"/>
         <div className="absolute inset-0 bg-black/50"></div>
         <div className="relative p-4">
           <div className="text-lg font-semibold mb-3 text-center">{t('gift')}</div>

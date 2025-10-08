@@ -2,6 +2,181 @@
   const tg = window.Telegram?.WebApp;
   window.BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
+  const assetCache = new Map();
+  let assetRevision = 0;
+  const assetRevisionListeners = new Set();
+
+  function notifyAssetRevision(){
+    assetRevision++;
+    assetRevisionListeners.forEach(listener => {
+      try{ listener(assetRevision); }
+      catch(e){ console.warn('asset revision listener error', e); }
+    });
+  }
+
+  function subscribeAssetRevision(listener){
+    assetRevisionListeners.add(listener);
+    return () => assetRevisionListeners.delete(listener);
+  }
+
+  function parseAssetDescriptor(src){
+    if(!src && src !== '') return null;
+    let value = typeof src === 'string' ? src : String(src || '');
+    value = value.trim();
+    if(!value) return null;
+    if(value.startsWith('blob:')){
+      return { key: value, requestPath: null, resolved: value };
+    }
+    try{
+      if(value.startsWith('http://') || value.startsWith('https://')){
+        const url = new URL(value);
+        value = url.pathname + url.search;
+      }
+    }catch(_){}
+    value = value.replace(/\\\\/g, '/');
+    if(value.startsWith('/')){
+      value = value.replace(/^\/+/, '');
+    }
+    if(value.startsWith('app/assets/')){
+      value = value.slice('app/assets/'.length);
+    } else if(value.startsWith('webapp/assets/')){
+      value = value.slice('webapp/assets/'.length);
+    } else if(value.startsWith('assets/')){
+      value = value.slice('assets/'.length);
+    }
+    if(value.startsWith('app/')){
+      value = value.slice('app/'.length);
+    }
+    if(value.startsWith('assets/')){
+      value = value.slice('assets/'.length);
+    }
+    if(value.includes('..')) return null;
+    if(!value) return null;
+    return {
+      key: value,
+      requestPath: value.split('/').map(encodeURIComponent).join('/'),
+      resolved: null
+    };
+  }
+
+  function getCachedAssetSrc(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return null;
+    const cached = assetCache.get(info.key);
+    return typeof cached === 'string' ? cached : null;
+  }
+
+  function ensureAssetSrc(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return Promise.reject(new Error('invalid asset path'));
+    if(info.resolved){
+      assetCache.set(info.key, info.resolved);
+      return Promise.resolve(info.resolved);
+    }
+    const cached = assetCache.get(info.key);
+    if(typeof cached === 'string') return Promise.resolve(cached);
+    if(cached) return cached;
+    const requestPath = info.requestPath;
+    if(!requestPath) return Promise.reject(new Error('invalid asset path'));
+    const inflight = fetch(`/api/assets/${requestPath}`, {credentials:'include'})
+      .then(resp => {
+        if(!resp.ok){
+          const err = new Error(`asset ${resp.status}`);
+          err.status = resp.status;
+          throw err;
+        }
+        return resp.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        assetCache.set(info.key, url);
+        return url;
+      })
+      .catch(err => {
+        assetCache.delete(info.key);
+        throw err;
+      });
+    assetCache.set(info.key, inflight);
+    return inflight;
+  }
+
+  function preloadAsset(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return Promise.resolve(null);
+    if(info.resolved) return Promise.resolve(info.resolved);
+    return ensureAssetSrc(src).catch(err => {
+      console.warn('asset preload failed', src, err);
+      return null;
+    });
+  }
+
+  function useAssetSrc(src, options={}){
+    const {onError} = options;
+    const [resolved, setResolved] = React.useState(()=>getCachedAssetSrc(src));
+    const [revision, setRevision] = React.useState(assetRevision);
+    React.useEffect(()=> subscribeAssetRevision(setRevision), []);
+    React.useEffect(()=>{
+      let cancelled = false;
+      if(!src){
+        setResolved(null);
+        return;
+      }
+      const info = parseAssetDescriptor(src);
+      if(!info){
+        setResolved(null);
+        return;
+      }
+      if(info.resolved){
+        setResolved(info.resolved);
+        return;
+      }
+      const cached = getCachedAssetSrc(src);
+      if(cached){
+        setResolved(cached);
+        return;
+      }
+      ensureAssetSrc(src)
+        .then(url => { if(!cancelled) setResolved(url); })
+        .catch(err => {
+          if(cancelled) return;
+          setResolved(null);
+          if(typeof onError === 'function'){
+            try{ onError(err); }
+            catch(handlerErr){ console.warn('asset error handler threw', handlerErr); }
+          }
+        });
+      return () => { cancelled = true; };
+    }, [src, onError, revision]);
+    return resolved;
+  }
+
+  const AssetImage = React.forwardRef(({src, onError, ...rest}, ref) => {
+    const innerRef = React.useRef(null);
+    React.useImperativeHandle(ref, () => innerRef.current);
+    const resolved = useAssetSrc(src, {
+      onError: err => {
+        if(typeof onError === 'function'){
+          const target = innerRef.current;
+          const event = target ? {currentTarget: target, target, error: err} : {error: err};
+          try{ onError(event); }
+          catch(handlerErr){ console.warn('asset onError handler threw', handlerErr); }
+        }
+      }
+    });
+    const handleRef = React.useCallback(node => {
+      innerRef.current = node;
+      if(typeof ref === 'function') ref(node);
+      else if(ref) ref.current = node;
+    }, [ref]);
+    return <img {...rest} ref={handleRef} src={resolved || undefined} onError={onError} />;
+  });
+
+  window.useAssetSrc = useAssetSrc;
+  window.preloadAsset = preloadAsset;
+  window.assetAuthReady = notifyAssetRevision;
+  window.ensureAssetSrc = ensureAssetSrc;
+  window.AssetImage = AssetImage;
+
   function applyInsets() {
     const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;
     document.documentElement.style.setProperty('--vh', vh + 'px');
