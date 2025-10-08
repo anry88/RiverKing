@@ -1,3 +1,6 @@
+const AssetImage = window.AssetImage;
+const useAssetSrc = window.useAssetSrc;
+
 function Guide({me}){
   const [section,setSection] = React.useState('locations');
   const [data,setData] = React.useState(null);
@@ -81,7 +84,7 @@ function Guide({me}){
                 {unlocked ? (
                   <>
                     {bgUrl ? (
-                      <img src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                      <AssetImage src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
                     ) : (
                       <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-3xl">?</div>
                     )}
@@ -135,7 +138,7 @@ function Guide({me}){
             return (
               <div key={f.id} className="p-4 glass rounded-xl text-center">
                 {caught ? (
-                  <img src={FISH_IMG[f.name]} alt={f.name} className="w-24 h-24 object-contain mb-2 mx-auto" onError={e=>e.currentTarget.style.display='none'} />
+                  <AssetImage src={FISH_IMG[f.name]} alt={f.name} className="w-24 h-24 object-contain mb-2 mx-auto" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
                 ) : (
                   <div className="w-24 h-24 bg-gray-800 rounded mb-2 mx-auto flex items-center justify-center relative">
                     <span className="text-4xl opacity-20">🐟</span>
@@ -188,7 +191,7 @@ function Guide({me}){
             return (
               <div key={rod.code} className="p-4 glass rounded-xl">
                 <div className="flex items-start gap-3">
-                  <img
+                  <AssetImage
                     src={rodImage}
                     alt={rod.name}
                     className="w-16 h-16 object-contain shrink-0"

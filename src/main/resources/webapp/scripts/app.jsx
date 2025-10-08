@@ -15,6 +15,8 @@ const tgParam = (()=>{
 
 const FAIL_REACTION_SECONDS = 5.1;
 const BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
+const AssetImage = window.AssetImage;
+const preloadAsset = window.preloadAsset;
 
 function App(){
   const [me,setMe] = React.useState(null);
@@ -158,13 +160,6 @@ function App(){
 
   React.useEffect(()=>{
     try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
-    try{
-      const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : [ROD_IMG];
-      Object.values(LOCATION_BG)
-        .concat(rodImages)
-        .concat([BOBBER_ICON])
-        .forEach(src=>{ new Image().src = src; });
-    }catch(e){}
     (async()=>{
       setLoading(true);
       try{
@@ -189,6 +184,13 @@ function App(){
         document.documentElement.lang = d.language;
         try{ localStorage.setItem('lang', d.language); }catch(e){}
         setMe(d);
+        try{ window.assetAuthReady?.(); }catch(e){}
+        try{
+          const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : [ROD_IMG];
+          const backgrounds = window.LOCATION_BG ? Object.values(window.LOCATION_BG) : [];
+          const toPreload = new Set([BOBBER_ICON, ...rodImages, ...backgrounds]);
+          toPreload.forEach(src => { if(src) preloadAsset?.(src); });
+        }catch(e){}
         try{
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){
@@ -824,7 +826,7 @@ function App(){
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
+              <AssetImage src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
               <div className="text-lg font-semibold mb-1">
                 {prize.packageId === 'coins' || typeof prize.coins === 'number'
@@ -848,7 +850,7 @@ function App(){
         {refRewards && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src={BOBBER_ICON} alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
+              <AssetImage src={BOBBER_ICON} alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t(
                 (!refInfo || refInfo.invited.length===0)
                   ? 'welcomeBonus'
