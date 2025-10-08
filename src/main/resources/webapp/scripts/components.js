@@ -1,6 +1,15 @@
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
 
+const BOTTOM_NAV_ITEMS = Object.freeze([
+  {id:'fish', label:() => t('fishing'), icon:'/app/assets/menu/fishing.png'},
+  {id:'tournaments', label:() => t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
+  {id:'ratings', label:() => t('ratings'), icon:'/app/assets/menu/ratings.png'},
+  {id:'guide', label:() => t('guide'), icon:'/app/assets/menu/guide.png'},
+  {id:'shop', label:() => t('shop'), icon:'/app/assets/menu/shop.png'},
+]);
+window.BOTTOM_NAV_ITEMS = BOTTOM_NAV_ITEMS.map(item => ({...item}));
+
 function StatChip({icon,label,value,active=false,onClick}){
   const iconContent = typeof icon === 'string'
     ? <span className="text-base" aria-hidden="true">{icon}</span>
@@ -66,13 +75,10 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
 }
 
 function BottomNav({tab,setTab,dailyAvailable}){
-  const items = [
-    {id:'fish', label:t('fishing'), icon:'/app/assets/menu/fishing.png'},
-    {id:'tournaments', label:t('tournaments'), icon:'/app/assets/menu/tournaments.png'},
-    {id:'ratings', label:t('ratings'), icon:'/app/assets/menu/ratings.png'},
-    {id:'guide', label:t('guide'), icon:'/app/assets/menu/guide.png'},
-    {id:'shop', label:t('shop'), icon:'/app/assets/menu/shop.png'},
-  ];
+  const items = BOTTOM_NAV_ITEMS.map(item => ({
+    ...item,
+    label: typeof item.label === 'function' ? item.label() : item.label,
+  }));
   const isAndroid = (window.Telegram?.WebApp?.platform || '').toLowerCase() === 'android';
   return (
     <div className="-mx-4 sticky bottom-0 z-20">

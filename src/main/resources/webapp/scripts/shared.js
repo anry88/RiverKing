@@ -100,14 +100,43 @@
     return inflight;
   }
 
+  function decodeImage(url){
+    if(typeof Image === 'undefined') return Promise.resolve(url);
+    return new Promise(resolve => {
+      let done = false;
+      const finish = () => {
+        if(done) return;
+        done = true;
+        resolve(url);
+      };
+      const img = new Image();
+      img.onload = finish;
+      img.onerror = finish;
+      try{
+        img.src = url;
+      }catch(e){
+        finish();
+        return;
+      }
+      if(typeof img.decode === 'function'){
+        img.decode().then(finish).catch(finish);
+      } else if(img.complete){
+        finish();
+      }
+      setTimeout(finish, 10000);
+    });
+  }
+
   function preloadAsset(src){
     const info = parseAssetDescriptor(src);
     if(!info) return Promise.resolve(null);
     if(info.resolved) return Promise.resolve(info.resolved);
-    return ensureAssetSrc(src).catch(err => {
-      console.warn('asset preload failed', src, err);
-      return null;
-    });
+    return ensureAssetSrc(src)
+      .then(url => decodeImage(url))
+      .catch(err => {
+        console.warn('asset preload failed', src, err);
+        return null;
+      });
   }
 
   function useAssetSrc(src, options={}){

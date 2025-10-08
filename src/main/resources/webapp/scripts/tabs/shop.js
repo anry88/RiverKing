@@ -5,6 +5,7 @@ const getShopIcon = id => {
   if(String(id).startsWith('autofish')) return '/app/assets/shop/autofish.png';
   return `/app/assets/shop/${id}.png`;
 };
+window.getShopIcon = getShopIcon;
 
 function ShopTab({
   shop,
