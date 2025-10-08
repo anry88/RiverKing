@@ -325,9 +325,14 @@ function App(){
         }
       }finally{
         try{
-          await startEssentialPreload();
+          const maybePromise = startEssentialPreload();
+          if(maybePromise && typeof maybePromise.then === 'function'){
+            maybePromise.catch(err => {
+              console.warn('essential asset preload failed', err);
+            });
+          }
         }catch(err){
-          console.warn('essential asset preload failed', err);
+          console.warn('essential asset preload invocation failed', err);
         }
         if(!cancelled){
           setLoading(false);
