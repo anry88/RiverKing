@@ -577,7 +577,7 @@
     'Сом краснохвостый': { en: 'Redtail Catfish', asset: '/app/assets/fish/krasnohvostiy_som.png' },
     'Пираиба': { en: 'Piraiba', asset: '/app/assets/fish/piraiba.png' },
     'Дискус обыкновенный': { en: 'Common Discus', asset: '/app/assets/fish/diskus.png' },
-    'Скалярия обыкновенная': { en: 'Freshwater Angelfish', asset: '/app/assets/fish/ryba_angel.png' },
+    'Скалярия обыкновенная': { en: 'Freshwater Angelfish', asset: '/app/assets/fish/skalyaria_common.png' },
     'Апистограмма Агассиза': { en: "Agassiz's Cichlid", asset: '/app/assets/fish/apistogramma_agassiza.png' },
     'Тетра кардинальная': { en: 'Cardinal Tetra', asset: '/app/assets/fish/tetra_kardinal.png' },
     'Коридорас панда': { en: 'Panda Cory', asset: '/app/assets/fish/koridorus_panda.png' },

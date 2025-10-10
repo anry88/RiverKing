@@ -110,7 +110,7 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Сом краснохвостый" to "webapp/assets/fish/krasnohvostiy_som.png",
     "Пираиба" to "webapp/assets/fish/piraiba.png",
     "Дискус обыкновенный" to "webapp/assets/fish/diskus.png",
-    "Скалярия обыкновенная" to "webapp/assets/fish/ryba_angel.png",
+    "Скалярия обыкновенная" to "webapp/assets/fish/skalyaria_common.png",
     "Апистограмма Агассиза" to "webapp/assets/fish/apistogramma_agassiza.png",
     "Тетра кардинальная" to "webapp/assets/fish/tetra_kardinal.png",
     "Коридорас панда" to "webapp/assets/fish/koridorus_panda.png",
