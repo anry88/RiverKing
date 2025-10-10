@@ -297,8 +297,8 @@ object DB {
         val mtnRiver    = upsertLocation("Горная река",     300.0, 2.3)
         val delta       = upsertLocation("Дельта реки",     450.0, 2.5)
         val coast       = upsertLocation("Прибрежье моря",  650.0, 2.8)
-        val amazon      = upsertLocation("Русло Амазонки",  500.0,  3.0) //900 1100
-        val igapo       = upsertLocation("Игапо, затопленный лес",  500.0, 3.05)
+        val amazon      = upsertLocation("Русло Амазонки",  900.0,  3.0)
+        val igapo       = upsertLocation("Игапо, затопленный лес",  1100.0, 3.05)
         val mangrove    = upsertLocation("Мангровые заросли",       1500.0, 3.1)
         val coralFlats  = upsertLocation("Коралловые отмели",       2000.0, 3.2)
         val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
