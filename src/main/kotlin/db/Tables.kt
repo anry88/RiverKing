@@ -360,7 +360,7 @@ object DB {
         val fUncommonPredatorFreshGolavl  = upsertFish("Голавль", "uncommon", 0.8, 0.4, true, "fresh")
         val fUncommonPredatorFreshYaz = upsertFish("Язь", "uncommon", 1.20, 0.50, true, "fresh")
         val fUncommonPredatorFreshPiranhaRed = upsertFish("Пиранья краснобрюхая", "uncommon", 0.8, 0.4, true, "fresh")
-        val fUncommonPredatorFreshGymnotus = upsertFish("Гимнотус угревидный" "uncommon", 0.30, 0.15, true, "fresh")
+        val fUncommonPredatorFreshGymnotus = upsertFish("Гимнотус угревидный", "uncommon", 0.30, 0.15, true, "fresh")
         val fUncommonPredatorFreshPimelodus = upsertFish("Пимелодус пятнистый", "uncommon", 0.20, 0.10, true, "fresh")
         val fUncommonPredatorFreshSeverum = upsertFish("Цихлазома северум", "uncommon", 0.60, 0.25, true, "fresh")
 
@@ -854,7 +854,7 @@ object DB {
         setLFWeight(amazon, fCommonPeaceFreshKarnegiellaMermer,0.50)
         setLFWeight(amazon, fCommonPeaceFreshPenguinTetra,0.46)
         setLFWeight(amazon, fCommonPeaceFreshEmberTetra,0.42)
-        setLFWeight(amazon, fCommonPeaceFreshNanoMargin,0.40)
+        setLFWeight(amazon, fCommonPeaceFreshNannostomusMargin,0.40)
         setLFWeight(amazon, fCommonPeaceFreshLemonTetra,0.40)
         setLFWeight(amazon, fUncommonPeaceFreshAncistrus,0.6)
         setLFWeight(amazon, fUncommonPeaceFreshTernecia,0.5)
