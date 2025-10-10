@@ -1565,6 +1565,10 @@ Available commands:
                         val packId = value ?: return true
                         val packInfo = fishing.findPack(packId)
                         if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
+                            Metrics.counter(
+                                "shop_purchase_denied_total",
+                                mapOf("pack" to packId, "currency" to "stars", "reason" to "rod_unlocked"),
+                            )
                             val reply = if (lang == "ru") {
                                 "Эта удочка уже разблокирована."
                             } else {
@@ -1574,6 +1578,10 @@ Available commands:
                             return true
                         }
                         val invoiceChatId = if (chatId < 0) buyerTgId else chatId
+                        Metrics.counter(
+                            "shop_purchase_click_total",
+                            mapOf("pack" to packId, "currency" to "stars"),
+                        )
                         try {
                             stars.sendPackageInvoice(invoiceChatId, buyerTgId, packId, lang)
                             logCommandMetric("buy", mapOf("result" to "sent", "pack" to packId), source)
@@ -1591,6 +1599,10 @@ Available commands:
                                 "buy",
                                 mapOf("result" to "dm_required", "pack" to packId),
                                 source,
+                            )
+                            Metrics.counter(
+                                "shop_purchase_denied_total",
+                                mapOf("pack" to packId, "currency" to "stars", "reason" to "dm_required"),
                             )
                             if (invoiceChatId != chatId) {
                                 val link = "https://t.me/${env.botName}?start=shop"
@@ -1611,6 +1623,10 @@ Available commands:
                         } catch (e: Exception) {
                             log.error("sendInvoice failed chatId={} pack={}", chatId, packId, e)
                             logCommandMetric("buy", mapOf("result" to "error", "pack" to packId), source)
+                            Metrics.counter(
+                                "shop_purchase_failed_total",
+                                mapOf("pack" to packId, "currency" to "stars", "reason" to "invoice_error"),
+                            )
                             val reply = if (invoiceChatId != chatId) {
                                 val link = "https://t.me/${env.botName}?start=start"
                                 if (lang == "ru") {
@@ -2615,10 +2631,16 @@ Available commands:
                     }
                 } else {
                     val uid = fishing.ensureUserByTgId(userId)
-                    try {
+                    val purchaseSucceeded = try {
                         fishing.buyPackage(uid, packId)
+                        true
                     } catch (e: Exception) {
+                        Metrics.counter(
+                            "shop_purchase_failed_total",
+                            mapOf("pack" to packId, "currency" to "stars", "reason" to "buy_error"),
+                        )
                         log.error("buyPackage failed uid={} packId={}", uid, packId, e)
+                        false
                     }
                     try {
                         PayService.recordPayment(
@@ -2640,6 +2662,12 @@ Available commands:
                         }
                     } catch (e: Exception) {
                         log.error("referral reward failed uid={} packId={}", uid, packId, e)
+                    }
+                    if (purchaseSucceeded) {
+                        Metrics.counter(
+                            "shop_purchase_complete_total",
+                            mapOf("pack" to packId, "currency" to "stars"),
+                        )
                     }
                 }
                 return@post call.respond(HttpStatusCode.OK)
