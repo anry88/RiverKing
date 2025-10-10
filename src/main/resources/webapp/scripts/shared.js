@@ -2,6 +2,210 @@
   const tg = window.Telegram?.WebApp;
   window.BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
+  const assetCache = new Map();
+  let assetRevision = 0;
+  const assetRevisionListeners = new Set();
+
+  function notifyAssetRevision(){
+    assetRevision++;
+    assetRevisionListeners.forEach(listener => {
+      try{ listener(assetRevision); }
+      catch(e){ console.warn('asset revision listener error', e); }
+    });
+  }
+
+  function subscribeAssetRevision(listener){
+    assetRevisionListeners.add(listener);
+    return () => assetRevisionListeners.delete(listener);
+  }
+
+  function parseAssetDescriptor(src){
+    if(!src && src !== '') return null;
+    let value = typeof src === 'string' ? src : String(src || '');
+    value = value.trim();
+    if(!value) return null;
+    if(value.startsWith('blob:')){
+      return { key: value, requestPath: null, resolved: value };
+    }
+    try{
+      if(value.startsWith('http://') || value.startsWith('https://')){
+        const url = new URL(value);
+        value = url.pathname + url.search;
+      }
+    }catch(_){}
+    value = value.replace(/\\\\/g, '/');
+    if(value.startsWith('/')){
+      value = value.replace(/^\/+/, '');
+    }
+    if(value.startsWith('app/assets/')){
+      value = value.slice('app/assets/'.length);
+    } else if(value.startsWith('webapp/assets/')){
+      value = value.slice('webapp/assets/'.length);
+    } else if(value.startsWith('assets/')){
+      value = value.slice('assets/'.length);
+    }
+    if(value.startsWith('app/')){
+      value = value.slice('app/'.length);
+    }
+    if(value.startsWith('assets/')){
+      value = value.slice('assets/'.length);
+    }
+    if(value.includes('..')) return null;
+    if(!value) return null;
+    return {
+      key: value,
+      requestPath: value.split('/').map(encodeURIComponent).join('/'),
+      resolved: null
+    };
+  }
+
+  function getCachedAssetSrc(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return null;
+    const cached = assetCache.get(info.key);
+    return typeof cached === 'string' ? cached : null;
+  }
+
+  function ensureAssetSrc(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return Promise.reject(new Error('invalid asset path'));
+    if(info.resolved){
+      assetCache.set(info.key, info.resolved);
+      return Promise.resolve(info.resolved);
+    }
+    const cached = assetCache.get(info.key);
+    if(typeof cached === 'string') return Promise.resolve(cached);
+    if(cached) return cached;
+    const requestPath = info.requestPath;
+    if(!requestPath) return Promise.reject(new Error('invalid asset path'));
+    const inflight = fetch(`/api/assets/${requestPath}`, {credentials:'include'})
+      .then(resp => {
+        if(!resp.ok){
+          const err = new Error(`asset ${resp.status}`);
+          err.status = resp.status;
+          throw err;
+        }
+        return resp.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        assetCache.set(info.key, url);
+        return url;
+      })
+      .catch(err => {
+        assetCache.delete(info.key);
+        throw err;
+      });
+    assetCache.set(info.key, inflight);
+    return inflight;
+  }
+
+  function decodeImage(url){
+    if(typeof Image === 'undefined') return Promise.resolve(url);
+    return new Promise(resolve => {
+      let done = false;
+      const finish = () => {
+        if(done) return;
+        done = true;
+        resolve(url);
+      };
+      const img = new Image();
+      img.onload = finish;
+      img.onerror = finish;
+      try{
+        img.src = url;
+      }catch(e){
+        finish();
+        return;
+      }
+      if(typeof img.decode === 'function'){
+        img.decode().then(finish).catch(finish);
+      } else if(img.complete){
+        finish();
+      }
+      setTimeout(finish, 10000);
+    });
+  }
+
+  function preloadAsset(src){
+    const info = parseAssetDescriptor(src);
+    if(!info) return Promise.resolve(null);
+    if(info.resolved) return Promise.resolve(info.resolved);
+    return ensureAssetSrc(src)
+      .then(url => decodeImage(url))
+      .catch(err => {
+        console.warn('asset preload failed', src, err);
+        return null;
+      });
+  }
+
+  function useAssetSrc(src, options={}){
+    const {onError} = options;
+    const [resolved, setResolved] = React.useState(()=>getCachedAssetSrc(src));
+    const [revision, setRevision] = React.useState(assetRevision);
+    React.useEffect(()=> subscribeAssetRevision(setRevision), []);
+    React.useEffect(()=>{
+      let cancelled = false;
+      if(!src){
+        setResolved(null);
+        return;
+      }
+      const info = parseAssetDescriptor(src);
+      if(!info){
+        setResolved(null);
+        return;
+      }
+      if(info.resolved){
+        setResolved(info.resolved);
+        return;
+      }
+      const cached = getCachedAssetSrc(src);
+      if(cached){
+        setResolved(cached);
+        return;
+      }
+      ensureAssetSrc(src)
+        .then(url => { if(!cancelled) setResolved(url); })
+        .catch(err => {
+          if(cancelled) return;
+          setResolved(null);
+          if(typeof onError === 'function'){
+            try{ onError(err); }
+            catch(handlerErr){ console.warn('asset error handler threw', handlerErr); }
+          }
+        });
+      return () => { cancelled = true; };
+    }, [src, onError, revision]);
+    return resolved;
+  }
+
+  const AssetImage = React.forwardRef(({src, onError, ...rest}, ref) => {
+    const innerRef = React.useRef(null);
+    React.useImperativeHandle(ref, () => innerRef.current);
+    const resolved = useAssetSrc(src, {
+      onError: err => {
+        if(typeof onError === 'function'){
+          const target = innerRef.current;
+          const event = target ? {currentTarget: target, target, error: err} : {error: err};
+          try{ onError(event); }
+          catch(handlerErr){ console.warn('asset onError handler threw', handlerErr); }
+        }
+      }
+    });
+    const handleRef = React.useCallback(node => {
+      innerRef.current = node;
+      if(typeof ref === 'function') ref(node);
+      else if(ref) ref.current = node;
+    }, [ref]);
+    return <img {...rest} ref={handleRef} src={resolved || undefined} onError={onError} />;
+  });
+
+  window.useAssetSrc = useAssetSrc;
+  window.preloadAsset = preloadAsset;
+  window.assetAuthReady = notifyAssetRevision;
+  window.ensureAssetSrc = ensureAssetSrc;
+  window.AssetImage = AssetImage;
+
   function applyInsets() {
     const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;
     document.documentElement.style.setProperty('--vh', vh + 'px');
@@ -356,36 +560,62 @@
     'Рыба-луна': { en: 'Ocean Sunfish', asset: '/app/assets/fish/ryba_luna.png' },
     'Сельдяной король': { en: 'Oarfish', asset: '/app/assets/fish/seldyanoy_korol.png' },
     'Паку бурый': { en: 'Brown Pacu', asset: '/app/assets/fish/tambaki.png' },
+    'Паку краснобрюхий': { en: 'Red-bellied Pacu', asset: '/app/assets/fish/paku_krasnobryuhiy.png' },
     'Паку чёрный': { en: 'Black Pacu', asset: '/app/assets/fish/paku_cherniy.png' },
     'Прохилодус красноштриховый': { en: 'Stripetail Prochilodus', asset: '/app/assets/fish/prohilodus.png' },
+    'Лепоринус полосатый': { en: 'Banded Leporinus', asset: '/app/assets/fish/leporinus_polosatiy.png' },
+    'Метиннис серебристый': { en: 'Silver Dollar', asset: '/app/assets/fish/metinnis_serebristiy.png' },
     'Пелядь': { en: 'Peled Whitefish', asset: '/app/assets/fish/pelyad.png' },
     'Омуль арктический': { en: 'Arctic Omul', asset: '/app/assets/fish/omul_arcticheskiy.png' },
     'Муксун': { en: 'Muksun Whitefish', asset: '/app/assets/fish/muksun.png' },
     'Анциструс обыкновенный': { en: 'Common Bristlenose', asset: '/app/assets/fish/ancistrus.png' },
+    'Птеригоплихт парчовый': { en: 'Sailfin Pleco', asset: '/app/assets/fish/pterigopliht_parchoviy.png' },
     'Отоцинклюс широкополосый': { en: 'Banded Otocinclus', asset: '/app/assets/fish/otocinklyus.png' },
+    'Карнегиелла мраморная': { en: 'Marbled Hatchetfish', asset: '/app/assets/fish/karnegiella_mramornaya.png' },
     'Тетра неоновая': { en: 'Neon Tetra', asset: '/app/assets/fish/tetra_neonovaya.png' },
     'Тернеция чёрная': { en: 'Black Skirt Tetra', asset: '/app/assets/fish/tetra_chernaya.png' },
+    'Рыба-лист амазонская': { en: 'Amazon Leaf Fish', asset: '/app/assets/fish/ryba_list_amazonskaya.png' },
     'Арапайма': { en: 'Arapaima', asset: '/app/assets/fish/arapayma.png' },
     'Ленок': { en: 'Lenok Trout', asset: '/app/assets/fish/lenok.png' },
     'Пиранья краснобрюхая': { en: 'Red-bellied Piranha', asset: '/app/assets/fish/piranya_krasnopuzaya.png' },
     'Бикуда': { en: 'Bicuda', asset: '/app/assets/fish/bikuda.png' },
     'Угорь электрический': { en: 'Electric Eel', asset: '/app/assets/fish/ugor_elektricheskiy.png' },
     'Сом краснохвостый': { en: 'Redtail Catfish', asset: '/app/assets/fish/krasnohvostiy_som.png' },
+    'Пимелодус пятнистый': { en: 'Spotted Pimelodus', asset: '/app/assets/fish/pimelodus_pyatnistiy.png' },
+    'Сом веслоносый': { en: 'Paddlefish', asset: '/app/assets/fish/som_veslonosiy.png' },
     'Пираиба': { en: 'Piraiba', asset: '/app/assets/fish/piraiba.png' },
     'Дискус обыкновенный': { en: 'Common Discus', asset: '/app/assets/fish/diskus.png' },
-    'Скалярия обыкновенная': { en: 'Freshwater Angelfish', asset: '/app/assets/fish/ryba_angel.png' },
+    'Скалярия альтум': { en: 'Altum Angelfish', asset: '/app/assets/fish/skalyaria_altum.png' },
+    'Скалярия обыкновенная': { en: 'Freshwater Angelfish', asset: '/app/assets/fish/skalyaria_common.png' },
     'Апистограмма Агассиза': { en: "Agassiz's Cichlid", asset: '/app/assets/fish/apistogramma_agassiza.png' },
     'Тетра кардинальная': { en: 'Cardinal Tetra', asset: '/app/assets/fish/tetra_kardinal.png' },
+    'Тетра лимонная': { en: 'Lemon Tetra', asset: '/app/assets/fish/tetra_limonnaya.png' },
+    'Тетра огненная': { en: 'Ember Tetra', asset: '/app/assets/fish/tetra_ognennaya.png' },
+    'Тетра пингвин': { en: 'Penguin Tetra', asset: '/app/assets/fish/tetra_pingvin.png' },
+    'Тетра родостомус': { en: 'Rummy-nose Tetra', asset: '/app/assets/fish/tetra_rodostomus.png' },
+    'Тетра чёрный неон': { en: 'Black Neon Tetra', asset: '/app/assets/fish/tetra_black_neon.png' },
     'Коридорас панда': { en: 'Panda Cory', asset: '/app/assets/fish/koridorus_panda.png' },
+    'Коридорас Штерба': { en: "Sterba's Corydoras", asset: '/app/assets/fish/koridoras_shterba.png' },
+    'Татия леопардовая': { en: 'Leopard Tatia', asset: '/app/assets/fish/tatiya_leopardovaya.png' },
+    'Торакатум': { en: 'Hoplo Catfish', asset: '/app/assets/fish/torakatum.png' },
     'Нанностомус трифасциатус': { en: 'Three-Stripe Pencilfish', asset: '/app/assets/fish/nannostomus.png' },
+    'Нанностомус маргинатус': { en: 'Dwarf Pencilfish', asset: '/app/assets/fish/nannostomus_marginatus.png' },
     'Рамирези': { en: 'Ram Cichlid', asset: '/app/assets/fish/ramirezi.png' },
     'Аравана чёрная': { en: 'Black Arowana', asset: '/app/assets/fish/aravana_chernaya.png' },
     'Астронотус глазчатый': { en: 'Oscar Cichlid', asset: '/app/assets/fish/oskar.png' },
     'Аймара': { en: 'Aimara', asset: '/app/assets/fish/aymara.png' },
     'Псевдоплатистома тигровая': { en: 'Tiger Shovelnose', asset: '/app/assets/fish/surubin.png' },
+    'Брахиплатистома тигровая': { en: 'Tiger Catfish', asset: '/app/assets/fish/brahiplatistoma_tigrovaya.png' },
     'Пиранья чёрная': { en: 'Black Piranha', asset: '/app/assets/fish/piranya_chernaya.png' },
+    'Паяра': { en: 'Payara', asset: '/app/assets/fish/payara.png' },
+    'Мечерот обыкновенный': { en: 'Common Freshwater Barracuda', asset: '/app/assets/fish/mecherot_common.png' },
+    'Мечерот пятнистый': { en: 'Spotted Freshwater Barracuda', asset: '/app/assets/fish/mecherot_pyatnistiy.png' },
+    'Гимнотус угревидный': { en: 'Banded Knifefish', asset: '/app/assets/fish/gimnotus_ugrevidniy.png' },
+    'Нож-рыба чёрная': { en: 'Black Ghost Knifefish', asset: '/app/assets/fish/ryba_nozh_chernaya.png' },
     'Щучья цихлида': { en: 'Pike Cichlid', asset: '/app/assets/fish/schuchya_cihlida.png' },
     'Павлиний окунь': { en: 'Peacock Bass', asset: '/app/assets/fish/pavliniy_okun.png' },
+    'Цихлазома мезонаута': { en: 'Flag Cichlid', asset: '/app/assets/fish/cihlazoma_mezonauta.png' },
+    'Цихлазома северум': { en: 'Severum Cichlid', asset: '/app/assets/fish/cihlazoma_severum.png' },
     'Молочная рыба': { en: 'Milkfish', asset: '/app/assets/fish/molochnaya_ryba.png' },
     'Кефаль пятнистая': { en: 'Spotted Mullet', asset: '/app/assets/fish/kefal_pyatnistaya.png' },
     'Тиляпия мозамбикская': { en: 'Mozambique Tilapia', asset: '/app/assets/fish/tilyapiya_mozambikskaya.png' },

@@ -9,6 +9,7 @@ function tournamentFish(name, rarity){
 
 const AGGREGATE_METRICS = new Set(['count', 'total_weight']);
 const isAggregateMetric = metric => AGGREGATE_METRICS.has(metric);
+const AssetImage = window.AssetImage;
 
 function TournamentsTab({
   me,
@@ -72,7 +73,7 @@ function TournamentsTab({
     const src = String(packageId).startsWith('autofish')
       ? '/app/assets/shop/autofish.png'
       : `/app/assets/shop/${packageId}.png`;
-    return <img src={src} alt="" className="w-5 h-5 object-contain" onError={ev=>ev.currentTarget.style.display='none'} />;
+    return <AssetImage src={src} alt="" className="w-5 h-5 object-contain" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />;
   }, []);
 
   const renderPrizeHint = (rank, prize) => {
@@ -167,7 +168,7 @@ function TournamentsTab({
                         <div className="w-8 h-8"></div>
                       ) : e.fish ? (
                         (me.caughtFishIds||[]).includes(e.fishId) ? (
-                          <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
                         ) : (
                           <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
                             <span className="text-lg opacity-20">🐟</span>
@@ -236,7 +237,7 @@ function TournamentsTab({
                         <div className="w-8 h-8"></div>
                       ) : currentTournament.mine.fish ? (
                         (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
-                          <img src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                          <AssetImage src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
                         ) : (
                           <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
                             <span className="text-lg opacity-20">🐟</span>
@@ -343,7 +344,7 @@ function TournamentsTab({
                       <div className="w-8 h-8"></div>
                     ) : e.fish ? (
                       (me.caughtFishIds||[]).includes(e.fishId) ? (
-                        <img src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                        <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
                       ) : (
                         <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
                           <span className="text-lg opacity-20">🐟</span>
@@ -412,7 +413,7 @@ function TournamentsTab({
                       <div className="w-8 h-8"></div>
                     ) : pastResult.mine.fish ? (
                       (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
-                        <img src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>ev.currentTarget.style.display='none'} />
+                        <AssetImage src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
                       ) : (
                         <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
                           <span className="text-lg opacity-20">🐟</span>

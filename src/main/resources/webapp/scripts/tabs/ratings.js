@@ -1,3 +1,5 @@
+const AssetImage = window.AssetImage;
+
 function Ratings({me, setMe, onCatchClick}){
   const [mode,setMode] = React.useState('global');
   const [period,setPeriod] = React.useState('today');
@@ -100,7 +102,7 @@ function Ratings({me, setMe, onCatchClick}){
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 {(me.caughtFishIds||[]).includes(c.fishId) ? (
-                  <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                  <AssetImage src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
                 ) : (
                   <div className="w-10 h-10 bg-gray-800 rounded flex items-center justify-center relative">
                     <span className="text-xl opacity-20">🐟</span>

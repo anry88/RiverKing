@@ -3,6 +3,8 @@ const BOBBER_SIZE = 24;
 const BOBBER_RADIUS = BOBBER_SIZE / 2;
 const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
 const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const AssetImage = window.AssetImage;
+const useAssetSrc = window.useAssetSrc;
 
 function TapChallengeButton({count, goal, timeLeft, onTap, className=''}){
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
@@ -420,19 +422,22 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
     return me.locations.find(loc=> Number(loc.id) === targetId) || null;
   }, [me?.locations, me?.locationId]);
 
-  const bgUrl = React.useMemo(()=>{
+  const bgAsset = React.useMemo(()=>{
     const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
     if(byCurrent) return byCurrent;
     const byIdOnly = resolveLocationBg(me.locationId, null);
     if(byIdOnly) return byIdOnly;
     return LOCATION_BG[1];
   }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
+  const bgUrl = useAssetSrc(bgAsset);
   const [bgLoaded, setBgLoaded] = React.useState(false);
   React.useEffect(() => {
     setBgLoaded(false);
+    if(!bgUrl) return;
     const img = new Image();
     img.src = bgUrl;
     img.onload = () => setBgLoaded(true);
+    return () => { img.onload = null; };
   }, [bgUrl]);
   const showRipple = castLanded && (biting || tapping);
 
@@ -446,8 +451,10 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   let catchStyle = null;
   let catchGlowStyle = null;
   let catchImage = null;
+  const catchAnimAsset = catchAnim ? FISH_IMG[catchAnim.fish] : null;
+  const catchAnimImage = useAssetSrc(catchAnimAsset);
   if(catchAnim){
-    const img = FISH_IMG[catchAnim.fish];
+    const img = catchAnimImage;
     if(img){
       const {start, end, progress} = catchAnim;
       const lift = Math.sin(progress * Math.PI) * (isSmall ? 26 : 38);
@@ -477,11 +484,11 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
          style={{height: stageHeight}}>
       <div
         className="absolute inset-0 transition-opacity duration-200"
-        style={{backgroundImage:`url(${bgUrl})`, backgroundSize:'cover', backgroundPosition:'center bottom', opacity:bgLoaded?1:0}}
+        style={{backgroundImage: bgUrl ? `url(${bgUrl})` : undefined, backgroundSize:'cover', backgroundPosition:'center bottom', opacity:bgLoaded?1:0}}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
-      <img
+      <AssetImage
         src={rodImage}
         alt="rod"
         className="absolute select-none pointer-events-none"
@@ -517,7 +524,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         }}
       >
         <div className="absolute inset-0">
-          <img
+          <AssetImage
             src={bobberIcon}
             alt="bobber"
             className="relative bobber-cast drop-shadow"
@@ -533,7 +540,7 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       {catchImage && catchStyle && (
         <div className="absolute pointer-events-none" style={catchStyle} aria-hidden="true">
           <div className="absolute inset-0 blur-xl" style={catchGlowStyle}></div>
-          <img src={catchImage} alt="" className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,0.45)]" />
+          <AssetImage src={catchImage} alt="" className="absolute inset-0 w-full h-full object-contain drop-shadow-[0_12px_16px_rgba(0,0,0,0.45)]" />
         </div>
       )}
 
@@ -680,7 +687,7 @@ function FishingTab({
           }}
           className="mt-4 w-full text-left p-4 rounded-xl glass flex items-center gap-4"
         >
-          <img src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+          <AssetImage src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
           <div>
             <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
             <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity]||''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} {t('kg')}</div>
@@ -723,7 +730,7 @@ function FishingTab({
                 className="w-full p-3 rounded--xl border border-white/10 flex items-center justify-between text-left"
               >
                 <div className="flex items-center gap-3">
-                  <img src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e=>e.currentTarget.style.display='none'} />
+                  <AssetImage src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
                   <div>
                     <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
                     <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>

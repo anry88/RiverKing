@@ -175,6 +175,30 @@ fun Application.apiRoutes(env: Env) {
     )
 
     routing {
+        get("/api/assets/{path...}") {
+            val session = call.sessions.get<AppSession>()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val segments = call.parameters.getAll("path")?.takeIf { it.isNotEmpty() }
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val sanitized = segments.map { it.trim() }
+            if (sanitized.any { segment ->
+                    segment.isEmpty() || segment == "." || segment == ".." ||
+                        segment.contains("..") || segment.contains('\\')
+                }) {
+                return@get call.respond(HttpStatusCode.BadRequest)
+            }
+            val relativePath = sanitized.joinToString("/")
+            val resourcePath = "webapp/assets/$relativePath"
+            val resourceStream = call.application.environment.classLoader
+                .getResourceAsStream(resourcePath)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val bytes = resourceStream.use { it.readBytes() }
+            val contentType = ContentType.fromFilePath(relativePath).firstOrNull()
+                ?: ContentType.Application.OctetStream
+            call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
+            call.respondBytes(bytes, contentType)
+        }
+
         // Telegram WebApp auth: client sends initData in a header
         post("/api/auth/telegram") {
             val initData = call.request.headers["Telegram-Init-Data"] ?: call.receiveText()

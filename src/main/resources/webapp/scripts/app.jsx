@@ -15,6 +15,8 @@ const tgParam = (()=>{
 
 const FAIL_REACTION_SECONDS = 5.1;
 const BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
+const AssetImage = window.AssetImage;
+const preloadAsset = window.preloadAsset;
 
 function App(){
   const [me,setMe] = React.useState(null);
@@ -77,6 +79,7 @@ function App(){
   const tapFinishingRef = React.useRef(false);
   const catchAnimationIdRef = React.useRef(0);
   const lastCatchAnimationShownRef = React.useRef(null);
+  const essentialAssetsRef = React.useRef(new Set());
   const markCatchAnimationShown = React.useCallback(id => {
     if(id == null) return;
     lastCatchAnimationShownRef.current = id;
@@ -158,13 +161,47 @@ function App(){
 
   React.useEffect(()=>{
     try{ tg?.ready(); tg?.expand(); tg?.MainButton?.hide?.(); tg?.enableClosingConfirmation?.(); }catch(e){}
-    try{
-      const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : [ROD_IMG];
-      Object.values(LOCATION_BG)
-        .concat(rodImages)
-        .concat([BOBBER_ICON])
-        .forEach(src=>{ new Image().src = src; });
-    }catch(e){}
+    const essentialAssets = new Set();
+    const addEssential = src => {
+      if(typeof src === 'string' && src.trim()) essentialAssets.add(src);
+    };
+    addEssential(BOBBER_ICON);
+    if(Array.isArray(window.BOTTOM_NAV_ITEMS)){
+      window.BOTTOM_NAV_ITEMS.forEach(item => {
+        if(item && typeof item.icon === 'string') addEssential(item.icon);
+      });
+    }
+    const rodImages = window.ROD_IMAGES ? Object.values(window.ROD_IMAGES) : (window.ROD_IMG ? [ROD_IMG] : []);
+    rodImages.forEach(addEssential);
+    const backgrounds = window.LOCATION_BG ? Object.values(window.LOCATION_BG) : [];
+    backgrounds.forEach(addEssential);
+    essentialAssetsRef.current = essentialAssets;
+
+    let preloadStarted = false;
+    let preloadPromise = Promise.resolve();
+    const startEssentialPreload = () => {
+      if(preloadStarted) return preloadPromise;
+      preloadStarted = true;
+      if(!preloadAsset || essentialAssets.size===0){
+        preloadPromise = Promise.resolve();
+        return preloadPromise;
+      }
+      const assets = Array.from(essentialAssets);
+      preloadPromise = Promise.all(assets.map(src => {
+        try{
+          return preloadAsset(src);
+        }catch(err){
+          console.warn('asset preload invocation failed', src, err);
+          return Promise.resolve(null);
+        }
+      })).catch(err => {
+        console.warn('essential asset preload batch failed', err);
+        return null;
+      });
+      return preloadPromise;
+    };
+
+    let cancelled = false;
     (async()=>{
       setLoading(true);
       try{
@@ -188,69 +225,77 @@ function App(){
         window.t = t;
         document.documentElement.lang = d.language;
         try{ localStorage.setItem('lang', d.language); }catch(e){}
+        if(cancelled) return;
         setMe(d);
+        try{ window.assetAuthReady?.(); }catch(e){}
+        startEssentialPreload();
         try{
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){
-            setShop(await s.json());
+            const shopData = await s.json();
+            if(!cancelled) setShop(shopData);
           }
         }catch(e){
           if(e.message==='unauthorized'){
-            setError(t('authRequired'));
-            setShop([]);
+            if(!cancelled) setError(t('authRequired'));
+            if(!cancelled) setShop([]);
           }
         }
         try{
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
           if(ct.status===200){
-            setCurrentTournament(await ct.json());
-          } else {
+            const currentData = await ct.json();
+            if(!cancelled) setCurrentTournament(currentData);
+          } else if(!cancelled){
             setCurrentTournament(null);
           }
           const ut = await fetch(`/api/tournaments/upcoming`,{credentials:'include'});
           if(ut.status===200){
-            setUpcomingTournaments(await ut.json());
-          } else {
+            const upcoming = await ut.json();
+            if(!cancelled) setUpcomingTournaments(upcoming);
+          } else if(!cancelled){
             setUpcomingTournaments([]);
           }
           const pt = await fetch(`/api/tournaments/past`,{credentials:'include'});
           if(pt.status===200){
-            setPastTournaments(await pt.json());
-          } else {
+            const past = await pt.json();
+            if(!cancelled) setPastTournaments(past);
+          } else if(!cancelled){
             setPastTournaments([]);
           }
           const pr = await fetch(`/api/prizes`,{credentials:'include'});
           if(pr.ok){
             const list = await pr.json();
-            if(list.length>0) setPrize(list[0]);
+            if(!cancelled && list.length>0) setPrize(list[0]);
           }
           const rr = await fetch(`/api/referrals/rewards`,{credentials:'include'});
           if(rr.ok){
             const rewardsList = await rr.json();
-            if(rewardsList.length>0){
+            if(!cancelled && rewardsList.length>0){
               await loadReferrals();
-              setRefRewards(rewardsList);
+              if(!cancelled) setRefRewards(rewardsList);
             }
           }
         }catch(e){
           if(e.message==='unauthorized'){
-            setError(t('authRequired'));
-            setCurrentTournament(null);
-            setUpcomingTournaments([]);
-            setPastTournaments([]);
+            if(!cancelled) setError(t('authRequired'));
+            if(!cancelled) setCurrentTournament(null);
+            if(!cancelled) setUpcomingTournaments([]);
+            if(!cancelled) setPastTournaments([]);
           }
         }
       }catch(e){
+        startEssentialPreload();
         if(e.message==='unauthorized'){
-          setError(t('authRequired'));
-          setShop([]);
+          if(!cancelled) setError(t('authRequired'));
+          if(!cancelled) setShop([]);
         } else {
-          setError(t('loadProfileFailed'));
+          if(!cancelled) setError(t('loadProfileFailed'));
           t = makeT(initLang);
           window.t = t;
           document.documentElement.lang = initLang;
           try{ localStorage.setItem('lang', initLang); }catch(err){}
-          setMe({
+          if(!cancelled) setMe({
             username:'angler',
             needsNickname:false,
             language:initLang,
@@ -276,11 +321,77 @@ function App(){
             coins:0,
             todayCoins:0,
           });
-          setShop([]);
+          if(!cancelled) setShop([]);
         }
-      }finally{ setLoading(false); }
+      }finally{
+        try{
+          const maybePromise = startEssentialPreload();
+          if(maybePromise && typeof maybePromise.then === 'function'){
+            maybePromise.catch(err => {
+              console.warn('essential asset preload failed', err);
+            });
+          }
+        }catch(err){
+          console.warn('essential asset preload invocation failed', err);
+        }
+        if(!cancelled){
+          setLoading(false);
+        }
+      }
     })();
+    return ()=>{ cancelled = true; };
   },[]);
+
+  const loadAdditionalAssets = React.useCallback(()=>{
+    if(typeof preloadAsset !== 'function') return;
+    const extras = new Set();
+    const addExtra = src => {
+      if(typeof src === 'string' && src.trim()) extras.add(src);
+    };
+    if(window.FISH_IMG){
+      Object.values(window.FISH_IMG).forEach(addExtra);
+    }
+    if(me?.lures && typeof window.getLureIcon === 'function'){
+      me.lures.forEach(lure => {
+        try{ addExtra(window.getLureIcon(lure)); }
+        catch(err){ console.warn('lure icon resolve failed', err); }
+      });
+    }
+    if(Array.isArray(shop)){
+      const shopIconGetter = typeof window.getShopIcon === 'function'
+        ? window.getShopIcon
+        : (id => {
+            if(!id) return '';
+            if(String(id).startsWith('autofish')) return '/app/assets/shop/autofish.png';
+            return `/app/assets/shop/${id}.png`;
+          });
+      shop.forEach(category => {
+        (category?.packs || []).forEach(item => {
+          try{ addExtra(shopIconGetter(item.id)); }
+          catch(err){ console.warn('shop icon resolve failed', err); }
+        });
+      });
+    }
+    const essential = essentialAssetsRef.current || new Set();
+    const run = () => {
+      extras.forEach(src => {
+        if(!src || essential.has(src)) return;
+        try{ preloadAsset(src); }
+        catch(err){ console.warn('background asset preload failed', src, err); }
+      });
+    };
+    if(typeof window.requestIdleCallback === 'function'){
+      window.requestIdleCallback(()=>run(), {timeout:2000});
+    } else {
+      setTimeout(run, 50);
+    }
+  }, [me?.lures, shop]);
+
+  React.useEffect(()=>{
+    if(loading) return;
+    loadAdditionalAssets();
+  }, [loading, loadAdditionalAssets]);
+
 
   async function claimPrize(){
     if(!prize) return;
@@ -824,7 +935,7 @@ function App(){
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
+              <AssetImage src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
               <div className="text-lg font-semibold mb-1">
                 {prize.packageId === 'coins' || typeof prize.coins === 'number'
@@ -848,7 +959,7 @@ function App(){
         {refRewards && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimRefRewards}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
-              <img src={BOBBER_ICON} alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
+              <AssetImage src={BOBBER_ICON} alt="reward" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="mb-2">{t(
                 (!refInfo || refInfo.invited.length===0)
                   ? 'welcomeBonus'
