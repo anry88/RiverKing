@@ -6,8 +6,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
@@ -192,7 +194,9 @@ fun Application.apiRoutes(env: Env) {
             val resourceStream = call.application.environment.classLoader
                 .getResourceAsStream(resourcePath)
                 ?: return@get call.respond(HttpStatusCode.NotFound)
-            val bytes = resourceStream.use { it.readBytes() }
+            val bytes = withContext(Dispatchers.IO) {
+                resourceStream.use { it.readBytes() }
+            }
             val contentType = ContentType.fromFilePath(relativePath).firstOrNull()
                 ?: ContentType.Application.OctetStream
             call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
