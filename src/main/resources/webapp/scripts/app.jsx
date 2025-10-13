@@ -80,6 +80,8 @@ function App(){
   const catchAnimationIdRef = React.useRef(0);
   const lastCatchAnimationShownRef = React.useRef(null);
   const essentialAssetsRef = React.useRef(new Set());
+  const claimingPrizeRef = React.useRef(false);
+  const claimingRefRewardsRef = React.useRef(false);
   const markCatchAnimationShown = React.useCallback(id => {
     if(id == null) return;
     lastCatchAnimationShownRef.current = id;
@@ -394,23 +396,38 @@ function App(){
 
 
   async function claimPrize(){
-    if(!prize) return;
+    if(!prize || claimingPrizeRef.current) return;
+    const currentPrize = prize;
+    setPrize(null);
+    claimingPrizeRef.current = true;
     try{
-      await fetch(`/api/prizes/${prize.id}/claim`,{method:'POST',credentials:'include'});
+      await fetch(`/api/prizes/${currentPrize.id}/claim`,{method:'POST',credentials:'include'});
       const r = await fetch(`/api/me`,{credentials:'include'});
       if(r.ok) setMe(await r.json());
-    }catch(e){}
-    setPrize(null);
+    }catch(e){
+      console.warn('prize claim failed', e);
+      setPrize(currentPrize);
+    }finally{
+      claimingPrizeRef.current = false;
+    }
   }
 
   async function claimRefRewards(){
-    if(!refRewards) return;
+    if(!refRewards || claimingRefRewardsRef.current) return;
+    const pendingRewards = refRewards;
+    setRefRewards(null);
+    claimingRefRewardsRef.current = true;
     try{
       await fetch(`/api/referrals/rewards/claim`,{method:'POST',credentials:'include'});
       const r = await fetch(`/api/me`,{credentials:'include'});
       if(r.ok) setMe(await r.json());
-    }catch(e){}
-    setRefRewards(null);
+      await loadReferrals();
+    }catch(e){
+      console.warn('referral reward claim failed', e);
+      setRefRewards(pendingRewards);
+    }finally{
+      claimingRefRewardsRef.current = false;
+    }
   }
 
   async function openPast(id){
