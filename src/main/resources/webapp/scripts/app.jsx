@@ -52,6 +52,7 @@ function App(){
   const [prizeHint,setPrizeHint] = React.useState(null);
   const [catchDetails,setCatchDetails] = React.useState(null);
   const [dailyOpen,setDailyOpen] = React.useState(false);
+  const dailyPromptDismissedRef = React.useRef(false);
   const [refOpen,setRefOpen] = React.useState(false);
   const [refInfo,setRefInfo] = React.useState(null);
   const [refRewards,setRefRewards] = React.useState(null);
@@ -156,6 +157,20 @@ function App(){
       setNickOpen(true);
     }
   },[me?.needsNickname]);
+
+  React.useEffect(()=>{
+    if(loading) return;
+    if(me?.dailyAvailable){
+      if(!dailyPromptDismissedRef.current && !dailyOpen){
+        setDailyOpen(true);
+      }
+    } else {
+      dailyPromptDismissedRef.current = false;
+      if(dailyOpen){
+        setDailyOpen(false);
+      }
+    }
+  }, [loading, me?.dailyAvailable, dailyOpen]);
 
   React.useEffect(()=>{
     if(tournamentTab!=='past') setPastResult(null);
@@ -456,6 +471,7 @@ function App(){
         dailyAvailable:false,
         dailyStreak:d.dailyStreak
       }));
+      dailyPromptDismissedRef.current = true;
       setDailyOpen(false);
     }catch(e){
       setError(e.message==='unauthorized'
@@ -465,8 +481,14 @@ function App(){
   }
 
   function openDaily(){
+    dailyPromptDismissedRef.current = false;
     setDailyOpen(true);
   }
+
+  const closeDailyModal = React.useCallback(()=>{
+    dailyPromptDismissedRef.current = true;
+    setDailyOpen(false);
+  }, []);
 
   async function loadReferrals(){
     try{
@@ -1007,7 +1029,7 @@ function App(){
           onToggleLanguage={toggleLanguage}
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
-        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
+        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={closeDailyModal} onClaim={claimDaily} />}
         {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
         {coinPurchasePack && (
           <div
