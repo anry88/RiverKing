@@ -160,11 +160,7 @@ function App(){
 
   React.useEffect(()=>{
     if(loading) return;
-    if(me?.dailyAvailable){
-      if(!dailyPromptDismissedRef.current && !dailyOpen){
-        setDailyOpen(true);
-      }
-    } else {
+    if(!me?.dailyAvailable){
       dailyPromptDismissedRef.current = false;
       if(dailyOpen){
         setDailyOpen(false);
