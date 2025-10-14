@@ -455,18 +455,28 @@ function App(){
     setError(null);
     try{
       const r = await fetch(`/api/daily`,{method:'POST',credentials:'include'});
+      if(r.status===409){
+        setMe(p=> (p ? {
+          ...p,
+          dailyAvailable:false,
+        } : p));
+        dailyPromptDismissedRef.current = true;
+        setDailyOpen(false);
+        setError(t('dailyTaken'));
+        return;
+      }
       if(!r.ok){
         if(r.status===401) throw new Error('unauthorized');
         throw 0;
       }
       const d = await r.json();
-      setMe(p=>({
+      setMe(p=> (p ? {
         ...p,
         lures: d.lures,
         currentLureId:d.currentLureId,
         dailyAvailable:false,
         dailyStreak:d.dailyStreak
-      }));
+      } : p));
       dailyPromptDismissedRef.current = true;
       setDailyOpen(false);
     }catch(e){
