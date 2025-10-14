@@ -52,6 +52,7 @@ function App(){
   const [prizeHint,setPrizeHint] = React.useState(null);
   const [catchDetails,setCatchDetails] = React.useState(null);
   const [dailyOpen,setDailyOpen] = React.useState(false);
+  const dailyPromptDismissedRef = React.useRef(false);
   const [refOpen,setRefOpen] = React.useState(false);
   const [refInfo,setRefInfo] = React.useState(null);
   const [refRewards,setRefRewards] = React.useState(null);
@@ -80,6 +81,8 @@ function App(){
   const catchAnimationIdRef = React.useRef(0);
   const lastCatchAnimationShownRef = React.useRef(null);
   const essentialAssetsRef = React.useRef(new Set());
+  const claimingPrizeRef = React.useRef(false);
+  const claimingRefRewardsRef = React.useRef(false);
   const markCatchAnimationShown = React.useCallback(id => {
     if(id == null) return;
     lastCatchAnimationShownRef.current = id;
@@ -154,6 +157,16 @@ function App(){
       setNickOpen(true);
     }
   },[me?.needsNickname]);
+
+  React.useEffect(()=>{
+    if(loading) return;
+    if(!me?.dailyAvailable){
+      dailyPromptDismissedRef.current = false;
+      if(dailyOpen){
+        setDailyOpen(false);
+      }
+    }
+  }, [loading, me?.dailyAvailable, dailyOpen]);
 
   React.useEffect(()=>{
     if(tournamentTab!=='past') setPastResult(null);
@@ -394,23 +407,38 @@ function App(){
 
 
   async function claimPrize(){
-    if(!prize) return;
+    if(!prize || claimingPrizeRef.current) return;
+    const currentPrize = prize;
+    setPrize(null);
+    claimingPrizeRef.current = true;
     try{
-      await fetch(`/api/prizes/${prize.id}/claim`,{method:'POST',credentials:'include'});
+      await fetch(`/api/prizes/${currentPrize.id}/claim`,{method:'POST',credentials:'include'});
       const r = await fetch(`/api/me`,{credentials:'include'});
       if(r.ok) setMe(await r.json());
-    }catch(e){}
-    setPrize(null);
+    }catch(e){
+      console.warn('prize claim failed', e);
+      setPrize(currentPrize);
+    }finally{
+      claimingPrizeRef.current = false;
+    }
   }
 
   async function claimRefRewards(){
-    if(!refRewards) return;
+    if(!refRewards || claimingRefRewardsRef.current) return;
+    const pendingRewards = refRewards;
+    setRefRewards(null);
+    claimingRefRewardsRef.current = true;
     try{
       await fetch(`/api/referrals/rewards/claim`,{method:'POST',credentials:'include'});
       const r = await fetch(`/api/me`,{credentials:'include'});
       if(r.ok) setMe(await r.json());
-    }catch(e){}
-    setRefRewards(null);
+      await loadReferrals();
+    }catch(e){
+      console.warn('referral reward claim failed', e);
+      setRefRewards(pendingRewards);
+    }finally{
+      claimingRefRewardsRef.current = false;
+    }
   }
 
   async function openPast(id){
@@ -439,6 +467,7 @@ function App(){
         dailyAvailable:false,
         dailyStreak:d.dailyStreak
       }));
+      dailyPromptDismissedRef.current = true;
       setDailyOpen(false);
     }catch(e){
       setError(e.message==='unauthorized'
@@ -448,8 +477,14 @@ function App(){
   }
 
   function openDaily(){
+    dailyPromptDismissedRef.current = false;
     setDailyOpen(true);
   }
+
+  const closeDailyModal = React.useCallback(()=>{
+    dailyPromptDismissedRef.current = true;
+    setDailyOpen(false);
+  }, []);
 
   async function loadReferrals(){
     try{
@@ -990,7 +1025,7 @@ function App(){
           onToggleLanguage={toggleLanguage}
         />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
-        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={()=>setDailyOpen(false)} onClaim={claimDaily} />}
+        {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={closeDailyModal} onClaim={claimDaily} />}
         {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
         {coinPurchasePack && (
           <div
