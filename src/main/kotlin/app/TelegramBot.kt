@@ -56,18 +56,77 @@ class TelegramBot(
         }
     }
 
+    private fun sanitizeText(input: String): String {
+        var i = 0
+        val length = input.length
+        var needsSanitizing = false
+        while (i < length) {
+            val ch = input[i]
+            when {
+                Character.isHighSurrogate(ch) -> {
+                    if (i + 1 >= length || !Character.isLowSurrogate(input[i + 1])) {
+                        needsSanitizing = true
+                        break
+                    }
+                    i += 2
+                    continue
+                }
+                Character.isLowSurrogate(ch) -> {
+                    needsSanitizing = true
+                    break
+                }
+            }
+            i++
+        }
+
+        if (!needsSanitizing) return input
+
+        val builder = StringBuilder(length)
+        i = 0
+        while (i < length) {
+            val ch = input[i]
+            when {
+                Character.isHighSurrogate(ch) -> {
+                    if (i + 1 < length) {
+                        val next = input[i + 1]
+                        if (Character.isLowSurrogate(next)) {
+                            builder.append(ch)
+                            builder.append(next)
+                            i += 2
+                            continue
+                        }
+                    }
+                    builder.append('\uFFFD')
+                    i++
+                }
+                Character.isLowSurrogate(ch) -> {
+                    builder.append('\uFFFD')
+                    i++
+                }
+                else -> {
+                    builder.append(ch)
+                    i++
+                }
+            }
+        }
+
+        return builder.toString()
+    }
+
     suspend fun sendMessage(
         chatId: Long,
         text: String,
         replyMarkup: String? = null,
         replyToMessageId: Long? = null,
     ) {
+        val safeText = sanitizeText(text)
+        val safeMarkup = replyMarkup?.let(::sanitizeText)
         val response = client.submitForm(
             url = "$baseUrl/sendMessage",
             formParameters = Parameters.build {
                 append("chat_id", chatId.toString())
-                append("text", text)
-                if (replyMarkup != null) append("reply_markup", replyMarkup)
+                append("text", safeText)
+                if (safeMarkup != null) append("reply_markup", safeMarkup)
                 if (replyToMessageId != null) append("reply_to_message_id", replyToMessageId.toString())
             },
         )
@@ -81,12 +140,14 @@ class TelegramBot(
         replyMarkup: String? = null,
         replyToMessageId: Long? = null,
     ) {
+        val safeCaption = caption?.let(::sanitizeText)
+        val safeMarkup = replyMarkup?.let(::sanitizeText)
         val response = client.submitFormWithBinaryData(
             url = "$baseUrl/sendPhoto",
             formData = formData {
                 append("chat_id", chatId.toString())
-                if (caption != null) append("caption", caption)
-                if (replyMarkup != null) append("reply_markup", replyMarkup)
+                if (safeCaption != null) append("caption", safeCaption)
+                if (safeMarkup != null) append("reply_markup", safeMarkup)
                 if (replyToMessageId != null) {
                     append("reply_to_message_id", replyToMessageId.toString())
                 }
