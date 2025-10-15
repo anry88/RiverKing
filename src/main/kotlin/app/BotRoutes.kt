@@ -369,6 +369,20 @@ fun Application.botRoutes(env: Env) {
                         if (newlineIndex >= index) {
                             end = newlineIndex + 1
                         }
+                        while (
+                            end < text.length &&
+                                end > index &&
+                                text[end - 1].isHighSurrogate() &&
+                                text[end].isLowSurrogate()
+                        ) {
+                            end--
+                        }
+                        if (end == index) {
+                            end = (index + limit).coerceAtMost(text.length)
+                            if (end == index && end < text.length) {
+                                end++
+                            }
+                        }
                     }
                     chunks += text.substring(index, end)
                     index = end
@@ -1262,6 +1276,7 @@ Available commands:
                             val (list, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
                             val metric = t.metric.lowercase()
                             val showFish = metric != "count"
+                            val includeFishName = showFish && metric != "largest"
                             val remaining = Duration.between(Instant.now(), t.endTime)
                             val safeRemaining = if (remaining.isNegative) Duration.ZERO else remaining
                             val totalMinutes = safeRemaining.toMinutes()
@@ -1299,7 +1314,7 @@ Available commands:
                                     } else {
                                         "%.2f".format(Locale.US, e.value)
                                     }
-                                    val info = if (showFish) {
+                                    val info = if (includeFishName) {
                                         val fishName = e.fish?.let { I18n.fish(it, lang) } ?: "-"
                                         "$fishName $valueText"
                                     } else {
@@ -1316,18 +1331,24 @@ Available commands:
                                     "%.2f".format(Locale.US, mine.value)
                                 }
                                 val line = if (lang == "ru") {
-                                    if (showFish) {
-                                        val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
-                                        "Твоя позиция: ${mine.rank}. Рыба: $fishName $valueText"
-                                    } else {
-                                        "Твоя позиция: ${mine.rank}. Поймано: $valueText"
+                                    when {
+                                        includeFishName -> {
+                                            val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                            "Твоя позиция: ${mine.rank}. Рыба: $fishName $valueText"
+                                        }
+                                        metric == "largest" -> "Твоя позиция: ${mine.rank}. Вес: $valueText"
+                                        showFish -> "Твоя позиция: ${mine.rank}. Поймано: $valueText"
+                                        else -> "Твоя позиция: ${mine.rank}. Поймано: $valueText"
                                     }
                                 } else {
-                                    if (showFish) {
-                                        val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
-                                        "Your position: ${mine.rank}. Fish: $fishName $valueText"
-                                    } else {
-                                        "Your position: ${mine.rank}. Caught: $valueText"
+                                    when {
+                                        includeFishName -> {
+                                            val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
+                                            "Your position: ${mine.rank}. Fish: $fishName $valueText"
+                                        }
+                                        metric == "largest" -> "Your position: ${mine.rank}. Weight: $valueText"
+                                        showFish -> "Your position: ${mine.rank}. Caught: $valueText"
+                                        else -> "Your position: ${mine.rank}. Caught: $valueText"
                                     }
                                 }
                                 "\u200E$line"
