@@ -987,9 +987,9 @@ object DB {
         setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
         setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06)
         setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06)
-        setLFWeight(coralFlats, fMythicPredatorSaltMorayGiant,  0.45)
         setLFWeight(coralFlats, fMythicPredatorSaltNapoleonFish, 0.045)
         setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
+        setLFWeight(coralFlats, fMythicPredatorSaltMorayGiant,  0.03)
         setLFWeight(coralFlats, fLegendaryPredatorSaltGiantKaranks, 0.02)
 
         // Фьорд мирные
