@@ -2311,13 +2311,12 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        fishing.setNickname(uid, newName)
+                        val updatedNickname = fishing.setNickname(uid, newName)
                         logCommandMetric("nickname", mapOf("result" to "updated"), source)
-                        val updated = fishing.displayName(uid) ?: newName
                         val reply = if (lang == "ru") {
-                            "Ник изменён на \"$updated\"."
+                            "Ник изменён на \"$updatedNickname\"."
                         } else {
-                            "Nickname changed to \"$updated\"."
+                            "Nickname changed to \"$updatedNickname\"."
                         }
                         trySend(chatId, reply, replyToMessageId = replyTo)
                         return true

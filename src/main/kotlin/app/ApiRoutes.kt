@@ -337,8 +337,8 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             @Serializable data class NickReq(val nickname: String)
             val req = call.receive<NickReq>()
-            fishing.setNickname(uid, req.nickname)
-            call.respond(HttpStatusCode.OK)
+            val sanitized = fishing.setNickname(uid, req.nickname)
+            call.respond(HttpStatusCode.OK, mapOf("nickname" to sanitized))
         }
 
         post("/api/language") {
