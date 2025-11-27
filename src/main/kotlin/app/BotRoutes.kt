@@ -43,6 +43,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
 import org.slf4j.LoggerFactory
 import db.Users
@@ -183,7 +184,11 @@ fun Application.botRoutes(env: Env) {
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
-    data class AutoCastState(var currentCast: Job? = null, var loopJob: Job = Job())
+    data class AutoCastState(
+        var currentCast: Job? = null,
+        var loopJob: Job = Job(),
+        val stopRequested: AtomicBoolean = AtomicBoolean(false),
+    )
     val autoCastJobs = mutableMapOf<Long, AutoCastState>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
@@ -2198,7 +2203,7 @@ Available commands:
                         val loopJob = autoCastScope.launch {
                             val knownFish = fishing.caughtFishIds(uid).toMutableSet()
                             try {
-                                while (isActive) {
+                                while (isActive && !state.stopRequested.get()) {
                                     if (!hasAutoSubscription(uid)) {
                                         val expired = if (lang == "ru") {
                                             "Подписка на автоловлю закончилась. Автозаброс остановлен."
@@ -2249,10 +2254,13 @@ Available commands:
                                     state.currentCast = result.completion
                                     result.completion?.join()
                                     state.currentCast = null
+                                    if (state.stopRequested.get()) break
                                     delay(3000L)
                                 }
                             } finally {
-                                state.currentCast?.cancel()
+                                if (!state.stopRequested.get()) {
+                                    state.currentCast?.cancel()
+                                }
                                 state.currentCast = null
                                 autoCastJobs.remove(uid)
                             }
@@ -2272,7 +2280,7 @@ Available commands:
                     "/stop_autocast" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        val state = autoCastJobs.remove(uid)
+                        val state = autoCastJobs[uid]
                         return if (state == null) {
                             val reply = if (lang == "ru") {
                                 "Автоловля не запущена."
@@ -2282,12 +2290,11 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             true
                         } else {
-                            state.currentCast?.cancel()
-                            state.loopJob.cancel()
+                            state.stopRequested.set(true)
                             val reply = if (lang == "ru") {
-                                "Автоловля остановлена."
+                                "Автоловля остановлена. Текущий заброс завершится."
                             } else {
-                                "Auto casting stopped."
+                                "Auto casting stopped. The current cast will finish."
                             }
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             true
