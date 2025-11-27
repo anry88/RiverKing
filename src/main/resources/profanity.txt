@@ -11,6 +11,7 @@
 хуе
 хую
 хуя
+пизд
 пизда
 пиздец
 пизду
@@ -31,14 +32,23 @@
 пидорас
 чмо
 блят
-xуй
+гавн
+говн
+шлюх
+шлюш
+шмара
 khuy
+huy
+hui
 blyat
 suka
 yob
 yeban
 eban
 pizda
+pizd
+gavn
+govn
 
 # Common English profanity
 fuck
