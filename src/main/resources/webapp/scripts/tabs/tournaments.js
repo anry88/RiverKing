@@ -181,8 +181,8 @@ function TournamentsTab({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap min-w-0">
-                          <bdi className="truncate">{e.user||'-'}</bdi>
+                        <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                          <bdi className="truncate break-words">{e.user||'-'}</bdi>
                         </div>
                         {!isAggregateMetric(currentTournament.tournament.metric) && (
                           e.fish ? (
@@ -250,8 +250,8 @@ function TournamentsTab({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap min-w-0">
-                          <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
+                        <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                          <bdi className="truncate break-words">{currentTournament.mine.user||t('you')}</bdi>
                         </div>
                         {!isAggregateMetric(currentTournament.tournament.metric) && (
                           currentTournament.mine.fish ? (
@@ -357,8 +357,8 @@ function TournamentsTab({
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1 flex-wrap min-w-0">
-                        <bdi className="truncate">{e.user||'-'}</bdi>
+                      <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                        <bdi className="truncate break-words">{e.user||'-'}</bdi>
                       </div>
                       {!isAggregateMetric(pastResult.tournament.metric) && (
                         e.fish ? (
@@ -426,8 +426,8 @@ function TournamentsTab({
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1 flex-wrap min-w-0">
-                        <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
+                      <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                        <bdi className="truncate break-words">{pastResult.mine.user||t('you')}</bdi>
                       </div>
                       {!isAggregateMetric(pastResult.tournament.metric) && (
                         pastResult.mine.fish ? (
