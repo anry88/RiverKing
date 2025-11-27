@@ -37,3 +37,10 @@ Full MVP codebase: Kotlin/Ktor + Exposed + SQLite, Telegram Mini App.
 - Tournament prizes support both lure bundles and in‑game coins. Administrators choose a bundle or coins through inline buttons and set the amount directly from the bot interface.
 - Players receive coins directly on balance when the prize includes them.
 - In addition to “largest”, “smallest”, and “count” metrics, the “total weight” metric is available for leaderboard calculations.
+
+## Auto casting (bot)
+
+- The `/autocast` command starts automatic fishing for users with an auto‑fishing subscription: the bot reuses the player’s current location, rod, and lure, announces every cast, and repeats casts every three seconds until lures run out or the user stops the loop.
+- The bot attempts to message the player privately before starting; when invoked from a group and private messaging is blocked, it asks in the same chat to run `/start` in DMs to grant permission.
+- Catch messages during auto casting include a `/stop_autocast` hint, and the bot halts the loop with a notification when no lures remain.
+- Gear‑changing commands (lure, location, rod) are disabled during auto casting, and each cast is logged as a `/cast` for metrics.
