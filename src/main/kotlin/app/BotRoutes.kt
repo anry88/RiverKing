@@ -9,8 +9,10 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -44,6 +46,8 @@ import java.util.Locale
 import kotlin.random.Random
 import org.slf4j.LoggerFactory
 import db.Users
+import db.Lures
+import db.Locations
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.slice
@@ -125,6 +129,7 @@ private const val TELEGRAM_MESSAGE_LENGTH_LIMIT = 4000
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+private val autoCastScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
@@ -178,6 +183,8 @@ fun Application.botRoutes(env: Env) {
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
+    data class AutoCastState(var currentCast: Job? = null, var loopJob: Job = Job())
+    val autoCastJobs = mutableMapOf<Long, AutoCastState>()
     val log = LoggerFactory.getLogger("Bot")
     routing {
         post("/bot") {
@@ -420,6 +427,326 @@ fun Application.botRoutes(env: Env) {
             }
 
             fun ownedData(ownerUid: Long, payload: Any): String = "$ownerUid:${payload.toString()}"
+
+            data class CastFlowOptions(
+                val startNotification: String? = null,
+                val catchFooter: String? = null,
+            )
+
+            data class CastAttemptResult(
+                val started: Boolean,
+                val failureReason: String? = null,
+                val completion: Job? = null,
+            )
+
+            fun hasAutoSubscription(uid: Long): Boolean = transaction {
+                Users.select { Users.id eq uid }.single()[Users.autoFishUntil]?.isAfter(Instant.now()) == true
+            }
+
+            fun currentSetup(uid: Long): Pair<String?, String?> = transaction {
+                val userRow = Users.select { Users.id eq uid }.single()
+                val lureName = userRow[Users.currentLureId]?.value?.let { id ->
+                    Lures.select { Lures.id eq id }.singleOrNull()?.get(Lures.name)
+                }
+                val locationName = userRow[Users.currentLocationId]?.value?.let { id ->
+                    Locations.select { Locations.id eq id }.singleOrNull()?.get(Locations.name)
+                }
+                lureName to locationName
+            }
+
+            suspend fun performCastSequence(
+                uid: Long,
+                chatId: Long,
+                replyTo: Long?,
+                source: String,
+                lang: String,
+                knownFish: MutableSet<Long>,
+                options: CastFlowOptions = CastFlowOptions(),
+            ): CastAttemptResult {
+                val startRes = try {
+                    fishing.startCast(uid)
+                } catch (e: Exception) {
+                    val reason = e.message ?: "error"
+                    val text = when (reason) {
+                        "casting" -> if (lang == "ru") {
+                            "Заброс уже выполняется. Дождись окончания текущей попытки."
+                        } else {
+                            "You are already casting. Wait for the current attempt to finish."
+                        }
+                        "No lure selected" -> if (lang == "ru") {
+                            "Сначала выбери приманку через /bait и попробуй снова."
+                        } else {
+                            "Select a bait with /bait first and try again."
+                        }
+                        "No baits" -> if (lang == "ru") {
+                            "Приманки закончились. Забери ежедневную награду через /daily или купи новые в /shop."
+                        } else {
+                            "You have no baits left. Claim the daily reward with /daily or buy more in /shop."
+                        }
+                        "No suitable fish" -> if (lang == "ru") {
+                            "На выбранной локации нет подходящей рыбы для этой приманки. Сменить локацию можно через /location, а приманку — через /bait."
+                        } else {
+                            "No suitable fish at this location for the selected bait. Switch location with /location or change bait with /bait."
+                        }
+                        "locked" -> if (lang == "ru") {
+                            "Локация заблокирована. Сменить локацию можно через /location или продолжай ловить, чтобы открыть новую."
+                        } else {
+                            "This location is locked. Change your location with /location or keep fishing to unlock a new one."
+                        }
+                        else -> if (lang == "ru") {
+                            "Не удалось забросить снасть. Попробуй ещё раз позже."
+                        } else {
+                            "Failed to start the cast. Please try again later."
+                        }
+                    }
+                    logCommandMetric("cast", mapOf("result" to "error", "stage" to "start", "reason" to reason), source)
+                    trySend(chatId, text, replyToMessageId = replyTo)
+                    return CastAttemptResult(started = false, failureReason = reason)
+                }
+                if (startRes.lureChanged) {
+                    val lureName = startRes.newLureName?.let { I18n.lure(it, lang) }
+                    val baseLine = if (lang == "ru") {
+                        if (lureName != null) {
+                            "🎣 Приманка закончилась, переключились на «$lureName»."
+                        } else {
+                            "🎣 Приманка закончилась."
+                        }
+                    } else {
+                        if (lureName != null) {
+                            "🎣 Bait ran out, switched to \"$lureName\"."
+                        } else {
+                            "🎣 Bait ran out."
+                        }
+                    }
+                    val (extraLine, button) = when {
+                        startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == true &&
+                            startRes.recommendedRodId != null -> {
+                            val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                            val promptLine = if (lang == "ru") {
+                                "Эта приманка лучше всего работает с удочкой «$rodName». Сменить удочку?"
+                            } else {
+                                "This bait works best with the \"$rodName\" rod. Switch rods?"
+                            }
+                            val buttonLabel = if (lang == "ru") {
+                                "Сменить на «$rodName»"
+                            } else {
+                                "Use \"$rodName\""
+                            }
+                            val btn = InlineKeyboardButton(
+                                buttonLabel,
+                                "/rod ${ownedData(uid, startRes.recommendedRodId)}"
+                            )
+                            Pair(promptLine, btn)
+                        }
+                        startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false &&
+                            startRes.recommendedRodPackId != null && startRes.recommendedRodPriceStars != null -> {
+                            val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                            val priceText = "${startRes.recommendedRodPriceStars}⭐"
+                            val infoLine = if (lang == "ru") {
+                                "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована. Можно открыть за $priceText."
+                            } else {
+                                "The \"$rodName\" rod for this bait is still locked. You can unlock it for $priceText."
+                            }
+                            val buttonLabel = if (lang == "ru") {
+                                "🔓 Разблокировать «$rodName» — $priceText"
+                            } else {
+                                "🔓 Unlock \"$rodName\" — $priceText"
+                            }
+                            val btn = InlineKeyboardButton(
+                                buttonLabel,
+                                "/buy ${ownedData(uid, startRes.recommendedRodPackId)}"
+                            )
+                            Pair(infoLine, btn)
+                        }
+                        startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false -> {
+                            val rodName = I18n.rod(startRes.recommendedRodName, lang)
+                            val infoLine = if (lang == "ru") {
+                                "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована."
+                            } else {
+                                "The \"$rodName\" rod for this bait is still locked."
+                            }
+                            Pair(infoLine, null)
+                        }
+                        else -> Pair(null, null)
+                    }
+                    val message = buildString {
+                        append(baseLine)
+                        if (!extraLine.isNullOrBlank()) {
+                            append('\n')
+                            append(extraLine)
+                        }
+                    }
+                    val markup = button?.let { btn ->
+                        Json.encodeToString(InlineKeyboardMarkup(listOf(listOf(btn))))
+                    }
+                    trySend(chatId, message, markup, replyToMessageId = replyTo)
+                }
+                val waitMessage = buildString {
+                    if (!options.startNotification.isNullOrBlank()) {
+                        append(options.startNotification)
+                        append('\n')
+                    }
+                    append(
+                        if (lang == "ru") {
+                            "Забросили снасть. Ждём поклёвку..."
+                        } else {
+                            "The line is in the water. Waiting for a bite..."
+                        }
+                    )
+                }
+                trySend(chatId, waitMessage, replyToMessageId = replyTo)
+                val job = castScope.launch {
+                    val waitSeconds = 5 + Random.nextInt(26)
+                    delay(waitSeconds * 1000L)
+                    try {
+                        val escapeInfo = fishing.locationEscapeChance(uid)
+                        val extraEscapeChance = if (escapeInfo.rodBonusMultiplier < 1.0) 0.15 else 0.30
+                        val hookRes = fishing.hook(uid, waitSeconds, 0.0, extraEscapeChance)
+                        if (!hookRes.success) {
+                            val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
+                            trySend(chatId, escapedText, replyToMessageId = replyTo)
+                            logCommandMetric(
+                                "cast",
+                                mapOf("result" to "escaped", "location" to escapeInfo.locationId.toString()),
+                                source,
+                            )
+                            return@launch
+                        }
+                        val castRes = fishing.cast(uid, waitSeconds, 0.0, true)
+                        val catch = castRes.catch
+                        if (catch == null) {
+                            val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
+                            trySend(chatId, escapedText, replyToMessageId = replyTo)
+                            logCommandMetric(
+                                "cast",
+                                mapOf(
+                                    "result" to "escaped",
+                                    "location" to escapeInfo.locationId.toString(),
+                                    "stage" to "final",
+                                ),
+                                source,
+                            )
+                            return@launch
+                        }
+                        val fishName = I18n.fish(catch.fish, lang)
+                        val locationName = I18n.location(catch.location, lang)
+                        val isNew = catch.fishId?.let { it !in knownFish } == true
+                        if (isNew && catch.fishId != null) {
+                            knownFish.add(catch.fishId)
+                        }
+                        val newLine = if (isNew) {
+                            if (lang == "ru") "\n✨ Новая рыба!" else "\n✨ New fish!"
+                        } else {
+                            ""
+                        }
+                        val unlockedLine = if (castRes.unlockedLocations.isNotEmpty()) {
+                            val localized = castRes.unlockedLocations.map { I18n.location(it, lang) }
+                            val prefix = if (lang == "ru") {
+                                if (localized.size > 1) "\n📍 Открыы новые локации: " else "\n📍 Открыта новая локация: "
+                            } else {
+                                if (localized.size > 1) "\n📍 New locations unlocked: " else "\n📍 New location unlocked: "
+                            }
+                            prefix + localized.joinToString(", ")
+                        } else {
+                            ""
+                        }
+                        val rodLine = if (castRes.unlockedRods.isNotEmpty()) {
+                            val localized = castRes.unlockedRods.map { I18n.rod(it, lang) }
+                            val prefix = if (lang == "ru") {
+                                if (localized.size > 1) "\n🎣 Открыты новые удочки: " else "\n🎣 Открыта новая удочка: "
+                            } else {
+                                if (localized.size > 1) "\n🎣 New rods unlocked: " else "\n🎣 New rod unlocked: "
+                            }
+                            prefix + localized.joinToString(", ")
+                        } else {
+                            ""
+                        }
+                        val coinsLine = when {
+                            castRes.coins > 0 -> {
+                                val amount = castRes.coins
+                                if (lang == "ru") {
+                                    "\n🪙 +${amount} монет"
+                                } else {
+                                    val suffix = if (amount == 1) "" else "s"
+                                    "\n🪙 +${amount} coin${suffix}"
+                                }
+                            }
+                            castRes.coins == 0 -> {
+                                if (lang == "ru") {
+                                    "\n🪙 Монеты не начислены из-за лимита"
+                                } else {
+                                    "\n🪙 No coins due to daily cap"
+                                }
+                            }
+                            else -> ""
+                        }
+                        val captionBase = buildCatchCaption(
+                            lang = lang,
+                            fishName = fishName,
+                            rarity = catch.rarity,
+                            weightKg = catch.weight,
+                            locationName = locationName,
+                            extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine),
+                        )
+                        var caption = appendCatchTags(captionBase, catch)
+                        if (!options.catchFooter.isNullOrBlank()) {
+                            caption += "\n${options.catchFooter}"
+                        }
+                        val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                        val image = generateCatchImage(
+                            fishInternalName = catch.fish,
+                            locationInternalName = catch.location,
+                            displayFishName = fishName,
+                            displayLocationName = locationName,
+                            weightKg = catch.weight,
+                            rarity = catch.rarity,
+                            lang = lang,
+                            anglerName = catch.user,
+                            caughtAt = caughtAt,
+                        )
+                        if (image != null) {
+                            try {
+                                bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)
+                            } catch (e: Exception) {
+                                log.error("sendPhoto failed chatId={} fish={}", chatId, catch.fish, e)
+                                trySend(chatId, caption, replyToMessageId = replyTo)
+                            }
+                        } else {
+                            trySend(chatId, caption, replyToMessageId = replyTo)
+                        }
+                        logCommandMetric(
+                            "cast",
+                            mapOf(
+                                "result" to "caught",
+                                "rarity" to catch.rarity,
+                                "location" to escapeInfo.locationId.toString(),
+                                "fish" to catch.fish,
+                            ),
+                            source,
+                        )
+                        Metrics.gauge(
+                            "catch_weight_kg",
+                            catch.weight,
+                            mapOf(
+                                "fish" to catch.fish,
+                                "location" to catch.location,
+                                "rarity" to catch.rarity,
+                            ),
+                        )
+                    } catch (e: Exception) {
+                        log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
+                        fishing.resetCasting(uid)
+                        val errorText = if (lang == "ru") "Не удалось завершить заброс." else "Failed to finish the cast."
+                        trySend(chatId, errorText, replyToMessageId = replyTo)
+                        logCommandMetric(
+                            "cast",
+                            mapOf("result" to "error", "stage" to "final"),
+                            source,
+                        )
+                    }
+                }
+                return CastAttemptResult(started = true, completion = job)
+            }
 
             suspend fun sendLanguageMenu(
                 uid: Long,
@@ -1218,6 +1545,8 @@ fun Application.botRoutes(env: Env) {
 
 Доступные команды:
 /cast — забросить снасть
+/autocast — запустить автоловлю
+/stop_autocast — остановить автоловлю
 /bait — сменить приманку
 /rod — выбрать удочку
 /location — сменить локацию
@@ -1235,6 +1564,8 @@ fun Application.botRoutes(env: Env) {
 
 Available commands:
 /cast — cast your line
+/autocast — start auto casting
+/stop_autocast — stop auto casting
 /bait — change your bait
 /rod — change your rod
 /location — change your location
@@ -1804,277 +2135,163 @@ Available commands:
                     "/cast" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
-                        val knownFish = fishing.caughtFishIds(uid)
-                        val startRes = try {
-                            fishing.startCast(uid)
-                        } catch (e: Exception) {
-                            val reason = e.message ?: "error"
-                            val text = when (reason) {
-                                "casting" -> if (lang == "ru") {
-                                    "Заброс уже выполняется. Дождись окончания текущей попытки."
-                                } else {
-                                    "You are already casting. Wait for the current attempt to finish."
-                                }
-                                "No lure selected" -> if (lang == "ru") {
-                                    "Сначала выбери приманку через /bait и попробуй снова."
-                                } else {
-                                    "Select a bait with /bait first and try again."
-                                }
-                                "No baits" -> if (lang == "ru") {
-                                    "Приманки закончились. Забери ежедневную награду через /daily или купи новые в /shop."
-                                } else {
-                                    "You have no baits left. Claim the daily reward with /daily or buy more in /shop."
-                                }
-                                "No suitable fish" -> if (lang == "ru") {
-                                    "На выбранной локации нет подходящей рыбы для этой приманки. Сменить локацию можно через /location, а приманку — через /bait."
-                                } else {
-                                    "No suitable fish at this location for the selected bait. Switch location with /location or change bait with /bait."
-                                }
-                                "locked" -> if (lang == "ru") {
-                                    "Локация заблокирована. Сменить локацию можно через /location или продолжай ловить, чтобы открыть новую."
-                                } else {
-                                    "This location is locked. Change your location with /location or keep fishing to unlock a new one."
-                                }
-                                else -> if (lang == "ru") {
-                                    "Не удалось забросить снасть. Попробуй ещё раз позже."
-                                } else {
-                                    "Failed to start the cast. Please try again later."
-                                }
+                        val knownFish = fishing.caughtFishIds(uid).toMutableSet()
+                        performCastSequence(uid, chatId, replyTo, source, lang, knownFish)
+                        return true
+                    }
+                    "/autocast" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        if (!hasAutoSubscription(uid)) {
+                            val reply = if (lang == "ru") {
+                                "У тебя нет подписки на автоловлю."
+                            } else {
+                                "You don't have an auto-fishing subscription."
                             }
-                            logCommandMetric("cast", mapOf("result" to "error", "stage" to "start", "reason" to reason), source)
-                            trySend(chatId, text, replyToMessageId = replyTo)
+                            trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        if (startRes.lureChanged) {
-                            val lureName = startRes.newLureName?.let { I18n.lure(it, lang) }
-                            val baseLine = if (lang == "ru") {
-                                if (lureName != null) {
-                                    "🎣 Приманка закончилась, переключились на «$lureName»."
-                                } else {
-                                    "🎣 Приманка закончилась."
-                                }
+                        if (autoCastJobs.containsKey(uid)) {
+                            val reply = if (lang == "ru") {
+                                "Автоловля уже запущена."
                             } else {
-                                if (lureName != null) {
-                                    "🎣 Bait ran out, switched to \"$lureName\"."
-                                } else {
-                                    "🎣 Bait ran out."
-                                }
+                                "Auto casting is already running."
                             }
-                            val (extraLine, button) = when {
-                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == true &&
-                                    startRes.recommendedRodId != null -> {
-                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
-                                    val promptLine = if (lang == "ru") {
-                                        "Эта приманка лучше всего работает с удочкой «$rodName». Сменить удочку?"
-                                    } else {
-                                        "This bait works best with the \"$rodName\" rod. Switch rods?"
-                                    }
-                                    val buttonLabel = if (lang == "ru") {
-                                        "Сменить на «$rodName»"
-                                    } else {
-                                        "Use \"$rodName\""
-                                    }
-                                    val btn = InlineKeyboardButton(
-                                        buttonLabel,
-                                        "/rod ${ownedData(uid, startRes.recommendedRodId)}"
-                                    )
-                                    Pair(promptLine, btn)
-                                }
-                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false &&
-                                    startRes.recommendedRodPackId != null && startRes.recommendedRodPriceStars != null -> {
-                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
-                                    val priceText = "${startRes.recommendedRodPriceStars}⭐"
-                                    val infoLine = if (lang == "ru") {
-                                        "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована. Можно открыть за $priceText."
-                                    } else {
-                                        "The \"$rodName\" rod for this bait is still locked. You can unlock it for $priceText."
-                                    }
-                                    val buttonLabel = if (lang == "ru") {
-                                        "🔓 Разблокировать «$rodName» — $priceText"
-                                    } else {
-                                        "🔓 Unlock \"$rodName\" — $priceText"
-                                    }
-                                    val btn = InlineKeyboardButton(
-                                        buttonLabel,
-                                        "/buy ${ownedData(uid, startRes.recommendedRodPackId)}"
-                                    )
-                                    Pair(infoLine, btn)
-                                }
-                                startRes.recommendedRodName != null && startRes.recommendedRodUnlocked == false -> {
-                                    val rodName = I18n.rod(startRes.recommendedRodName, lang)
-                                    val infoLine = if (lang == "ru") {
-                                        "Удочка «$rodName», подходящая для этой приманки, ещё не разблокирована."
-                                    } else {
-                                        "The \"$rodName\" rod for this bait is still locked."
-                                    }
-                                    Pair(infoLine, null)
-                                }
-                                else -> Pair(null, null)
-                            }
-                            val message = buildString {
-                                append(baseLine)
-                                if (!extraLine.isNullOrBlank()) {
-                                    append('\n')
-                                    append(extraLine)
-                                }
-                            }
-                            val markup = button?.let { btn ->
-                                Json.encodeToString(InlineKeyboardMarkup(listOf(listOf(btn))))
-                            }
-                            trySend(chatId, message, markup, replyToMessageId = replyTo)
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
                         }
-                        val waitMessage = if (lang == "ru") {
-                            "Забросили снасть. Ждём поклёвку..."
+                        val (lureNameRaw, locationNameRaw) = currentSetup(uid)
+                        val lureLabel = lureNameRaw?.let { I18n.lure(it, lang) } ?: "—"
+                        val locationLabel = locationNameRaw?.let { I18n.location(it, lang) } ?: "—"
+                        val privateChatId = from?.id ?: chatId
+                        val dmText = if (lang == "ru") {
+                            "Запускаю автоловлю: приманка «$lureLabel», локация «$locationLabel»."
                         } else {
-                            "The line is in the water. Waiting for a bite..."
+                            "Starting auto casting with \"$lureLabel\" at \"$locationLabel\"."
                         }
-                        val anglerName = fishing.displayName(uid)
-                        trySend(chatId, waitMessage, replyToMessageId = replyTo)
-                        castScope.launch {
-                            val waitSeconds = 5 + Random.nextInt(26)
-                            delay(waitSeconds * 1000L)
-                            try {
-                                val escapeInfo = fishing.locationEscapeChance(uid)
-                                val extraEscapeChance = if (escapeInfo.rodBonusMultiplier < 1.0) 0.15 else 0.30
-                                val hookRes = fishing.hook(uid, waitSeconds, 0.0, extraEscapeChance)
-                                if (!hookRes.success) {
-                                    val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
-                                    trySend(chatId, escapedText, replyToMessageId = replyTo)
-                                    logCommandMetric(
-                                        "cast",
-                                        mapOf("result" to "escaped", "location" to escapeInfo.locationId.toString()),
-                                        source,
-                                    )
-                                    return@launch
-                                }
-                                val castRes = fishing.cast(uid, waitSeconds, 0.0, true)
-                                val catch = castRes.catch
-                                if (catch == null) {
-                                    val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"
-                                    trySend(chatId, escapedText, replyToMessageId = replyTo)
-                                    logCommandMetric(
-                                        "cast",
-                                        mapOf(
-                                            "result" to "escaped",
-                                            "location" to escapeInfo.locationId.toString(),
-                                            "stage" to "final",
-                                        ),
-                                        source,
-                                    )
-                                    return@launch
-                                }
-                                val fishName = I18n.fish(catch.fish, lang)
-                                val locationName = I18n.location(catch.location, lang)
-                                val isNew = catch.fishId?.let { it !in knownFish } == true
-                                val newLine = if (isNew) {
-                                    if (lang == "ru") "\n✨ Новая рыба!" else "\n✨ New fish!"
+                        val dmResult = runCatching { bot.sendMessage(privateChatId, dmText) }
+                        if (dmResult.isFailure) {
+                            log.warn("Failed to start auto casting via DM for uid={}", uid, dmResult.exceptionOrNull())
+                            if (chatId != privateChatId) {
+                                val warn = if (lang == "ru") {
+                                    "Не могу отправить сообщение в личку. Разреши боту писать, отправив /start в личные сообщения."
                                 } else {
-                                    ""
+                                    "I couldn't send you a private message. Please allow messages by sending /start to the bot in private."
                                 }
-                                val unlockedLine = if (castRes.unlockedLocations.isNotEmpty()) {
-                                    val localized = castRes.unlockedLocations.map { I18n.location(it, lang) }
-                                    val prefix = if (lang == "ru") {
-                                        if (localized.size > 1) "\n📍 Открыты новые локации: " else "\n📍 Открыта новая локация: "
-                                    } else {
-                                        if (localized.size > 1) "\n📍 New locations unlocked: " else "\n📍 New location unlocked: "
-                                    }
-                                    prefix + localized.joinToString(", ")
+                                trySend(chatId, warn, replyToMessageId = replyTo)
+                            } else {
+                                val warn = if (lang == "ru") {
+                                    "Не удалось отправить сообщение. Попробуй ещё раз позже."
                                 } else {
-                                    ""
+                                    "Failed to send the message. Please try again later."
                                 }
-                                val rodLine = if (castRes.unlockedRods.isNotEmpty()) {
-                                    val localized = castRes.unlockedRods.map { I18n.rod(it, lang) }
-                                    val prefix = if (lang == "ru") {
-                                        if (localized.size > 1) "\n🎣 Открыты новые удочки: " else "\n🎣 Открыта новая удочка: "
-                                    } else {
-                                        if (localized.size > 1) "\n🎣 New rods unlocked: " else "\n🎣 New rod unlocked: "
-                                    }
-                                    prefix + localized.joinToString(", ")
-                                } else {
-                                    ""
-                                }
-                                val coinsLine = when {
-                                    castRes.coins > 0 -> {
-                                        val amount = castRes.coins
-                                        if (lang == "ru") {
-                                            "\n🪙 +${amount} монет"
-                                        } else {
-                                            val suffix = if (amount == 1) "" else "s"
-                                            "\n🪙 +${amount} coin${suffix}"
-                                        }
-                                    }
-                                    castRes.coins == 0 -> {
-                                        if (lang == "ru") {
-                                            "\n🪙 Монеты не начислены из-за лимита"
-                                        } else {
-                                            "\n🪙 No coins due to daily cap"
-                                        }
-                                    }
-                                    else -> ""
-                                }
-                                val captionBase = buildCatchCaption(
-                                    lang = lang,
-                                    fishName = fishName,
-                                    rarity = catch.rarity,
-                                    weightKg = catch.weight,
-                                    locationName = locationName,
-                                    extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine),
-                                )
-                                val caption = appendCatchTags(captionBase, catch)
-                                val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
-                                val image = generateCatchImage(
-                                    fishInternalName = catch.fish,
-                                    locationInternalName = catch.location,
-                                    displayFishName = fishName,
-                                    displayLocationName = locationName,
-                                    weightKg = catch.weight,
-                                    rarity = catch.rarity,
-                                    lang = lang,
-                                    anglerName = catch.user,
-                                    caughtAt = caughtAt,
-                                )
-                                if (image != null) {
-                                    try {
-                                        bot.sendPhoto(chatId, image, caption, replyToMessageId = replyTo)
-                                    } catch (e: Exception) {
-                                        log.error("sendPhoto failed chatId={} fish={}", chatId, catch.fish, e)
-                                        trySend(chatId, caption, replyToMessageId = replyTo)
-                                    }
-                                } else {
-                                    trySend(chatId, caption, replyToMessageId = replyTo)
-                                }
-                                logCommandMetric(
-                                    "cast",
-                                    mapOf(
-                                        "result" to "caught",
-                                        "rarity" to catch.rarity,
-                                        "location" to escapeInfo.locationId.toString(),
-                                        "fish" to catch.fish,
-                                    ),
-                                    source,
-                                )
-                                Metrics.gauge(
-                                    "catch_weight_kg",
-                                    catch.weight,
-                                    mapOf(
-                                        "fish" to catch.fish,
-                                        "location" to catch.location,
-                                        "rarity" to catch.rarity,
-                                    ),
-                                )
-                            } catch (e: Exception) {
-                                log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
-                                fishing.resetCasting(uid)
-                                val errorText = if (lang == "ru") "Не удалось завершить заброс." else "Failed to finish the cast."
-                                trySend(chatId, errorText, replyToMessageId = replyTo)
-                                logCommandMetric(
-                                    "cast",
-                                    mapOf("result" to "error", "stage" to "final"),
-                                    source,
-                                )
+                                trySend(chatId, warn, replyToMessageId = replyTo)
                             }
+                            return true
+                        }
+                        val stopHint = if (lang == "ru") {
+                            "Остановить автоловлю: /stop_autocast"
+                        } else {
+                            "Stop auto casting: /stop_autocast"
+                        }
+                        val state = AutoCastState()
+                        val loopJob = autoCastScope.launch {
+                            val knownFish = fishing.caughtFishIds(uid).toMutableSet()
+                            try {
+                                while (isActive) {
+                                    if (!hasAutoSubscription(uid)) {
+                                        val expired = if (lang == "ru") {
+                                            "Подписка на автоловлю закончилась. Автозаброс остановлен."
+                                        } else {
+                                            "Your auto-fishing subscription has expired. Auto casting stopped."
+                                        }
+                                        trySend(privateChatId, expired)
+                                        break
+                                    }
+                                    val (currentLure, currentLocation) = currentSetup(uid)
+                                    val lureText = currentLure?.let { I18n.lure(it, lang) } ?: "—"
+                                    val locationText = currentLocation?.let { I18n.location(it, lang) } ?: "—"
+                                    val startNote = if (lang == "ru") {
+                                        "🤖 Автоловля: заброс с приманкой «$lureText» на локации «$locationText»."
+                                    } else {
+                                        "🤖 Auto casting: casting with \"$lureText\" at \"$locationText\"."
+                                    }
+                                    val result = performCastSequence(
+                                        uid,
+                                        privateChatId,
+                                        null,
+                                        "auto",
+                                        lang,
+                                        knownFish,
+                                        CastFlowOptions(startNotification = startNote, catchFooter = stopHint),
+                                    )
+                                    if (!result.started) {
+                                        val stopMessage = when (result.failureReason) {
+                                            "No baits" -> if (lang == "ru") {
+                                                "Автоловля остановлена: приманки закончились."
+                                            } else {
+                                                "Auto casting stopped: you are out of baits."
+                                            }
+                                            "casting" -> if (lang == "ru") {
+                                                "Автоловля остановлена: дождись завершения текущего заброса и попробуй снова."
+                                            } else {
+                                                "Auto casting stopped: wait for the current cast to finish and try again."
+                                            }
+                                            else -> if (lang == "ru") {
+                                                "Автоловля остановлена из-за ошибки. Попробуй снова."
+                                            } else {
+                                                "Auto casting stopped because of an error. Please try again."
+                                            }
+                                        }
+                                        trySend(privateChatId, stopMessage)
+                                        break
+                                    }
+                                    state.currentCast = result.completion
+                                    result.completion?.join()
+                                    state.currentCast = null
+                                    delay(3000L)
+                                }
+                            } finally {
+                                state.currentCast?.cancel()
+                                state.currentCast = null
+                                autoCastJobs.remove(uid)
+                            }
+                        }
+                        state.loopJob = loopJob
+                        autoCastJobs[uid] = state
+                        if (chatId != privateChatId) {
+                            val ack = if (lang == "ru") {
+                                "Запустили автоловлю. Сообщения будут приходить в личку."
+                            } else {
+                                "Auto casting started. Updates will be sent in private chat."
+                            }
+                            trySend(chatId, ack, replyToMessageId = replyTo)
                         }
                         return true
+                    }
+                    "/stop_autocast" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val state = autoCastJobs.remove(uid)
+                        return if (state == null) {
+                            val reply = if (lang == "ru") {
+                                "Автоловля не запущена."
+                            } else {
+                                "Auto casting is not running."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        } else {
+                            state.currentCast?.cancel()
+                            state.loopJob.cancel()
+                            val reply = if (lang == "ru") {
+                                "Автоловля остановлена."
+                            } else {
+                                "Auto casting stopped."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            true
+                        }
                     }
                     "/language" -> {
                         val uid = ensureUserId(from) ?: return false
