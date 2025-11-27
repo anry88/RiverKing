@@ -1275,8 +1275,8 @@ Available commands:
                             val tName = if (lang == "ru") t.nameRu else t.nameEn
                             val (list, mine) = tournaments.leaderboard(t, uid, t.prizePlaces)
                             val metric = t.metric.lowercase()
-                            val showFish = metric != "count"
-                            val includeFishName = showFish && metric != "largest"
+                            val isAggregate = metric == "count" || metric == "total_weight"
+                            val includeFishName = metric == "largest" || metric == "smallest"
                             val remaining = Duration.between(Instant.now(), t.endTime)
                             val safeRemaining = if (remaining.isNegative) Duration.ZERO else remaining
                             val totalMinutes = safeRemaining.toMinutes()
@@ -1336,9 +1336,14 @@ Available commands:
                                             val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
                                             "Твоя позиция: ${mine.rank}. Рыба: $fishName $valueText"
                                         }
-                                        metric == "largest" -> "Твоя позиция: ${mine.rank}. Вес: $valueText"
-                                        showFish -> "Твоя позиция: ${mine.rank}. Поймано: $valueText"
-                                        else -> "Твоя позиция: ${mine.rank}. Поймано: $valueText"
+                                        isAggregate -> {
+                                            if (metric == "count") {
+                                                "Твоя позиция: ${mine.rank}. Поймано: $valueText"
+                                            } else {
+                                                "Твоя позиция: ${mine.rank}. Вес: $valueText"
+                                            }
+                                        }
+                                        else -> "Твоя позиция: ${mine.rank}. Вес: $valueText"
                                     }
                                 } else {
                                     when {
@@ -1346,9 +1351,14 @@ Available commands:
                                             val fishName = mine.fish?.let { I18n.fish(it, lang) } ?: "-"
                                             "Your position: ${mine.rank}. Fish: $fishName $valueText"
                                         }
-                                        metric == "largest" -> "Your position: ${mine.rank}. Weight: $valueText"
-                                        showFish -> "Your position: ${mine.rank}. Caught: $valueText"
-                                        else -> "Your position: ${mine.rank}. Caught: $valueText"
+                                        isAggregate -> {
+                                            if (metric == "count") {
+                                                "Your position: ${mine.rank}. Caught: $valueText"
+                                            } else {
+                                                "Your position: ${mine.rank}. Weight: $valueText"
+                                            }
+                                        }
+                                        else -> "Your position: ${mine.rank}. Weight: $valueText"
                                     }
                                 }
                                 "\u200E$line"
