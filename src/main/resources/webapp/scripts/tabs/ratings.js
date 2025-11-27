@@ -130,14 +130,14 @@ function Ratings({me, setMe, onCatchClick}){
                   </div>
                 )}
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                <div className="text-xs opacity-70">
-                  <bdi>{c.user}</bdi>
+                <div className="text-xs opacity-70 leading-tight break-words">
+                  <bdi className="text-[13px] leading-tight break-words">{c.user}</bdi>
                   {usingSpecies || locId==='all' ? (
-                    <> • {c.location}</>
+                    <> {c.location}</>
                   ) : null}
-                  {' '}• {c.at?new Date(c.at).toLocaleString():''}
+                  {c.at ? <> {new Date(c.at).toLocaleString()}</> : null}
                 </div>
               </div>
             </div>
