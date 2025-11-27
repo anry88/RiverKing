@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.javatime.date
 import org.jetbrains.exposed.sql.javatime.timestamp
 import util.CoinCalculator
+import util.sanitizeName
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -45,7 +46,22 @@ object DB {
             seedIfEmpty()
             migrateCoins()
             backfillLastSeenAt()
+            sanitizeExistingNicknames()
         }
+    }
+
+    private fun sanitizeExistingNicknames() {
+        Users
+            .slice(Users.id, Users.nickname)
+            .select { Users.nickname.isNotNull() }
+            .forEach { row ->
+                val userId = row[Users.id].value
+                val nickname = row[Users.nickname] ?: return@forEach
+                val sanitized = sanitizeName(nickname).replace('\n', ' ').trim()
+                if (sanitized != nickname) {
+                    Users.update({ Users.id eq userId }) { it[Users.nickname] = sanitized }
+                }
+            }
     }
 
     private fun backfillLastSeenAt() {

@@ -665,16 +665,23 @@ function App(){
     }
   }
 
-  function saveNickname(nick){
+  async function saveNickname(nick){
     nick = (nick||'').replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g,'').slice(0,30);
     if(!nick || nick===me?.username){
       setNickOpen(false);
       return;
     }
-    fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})})
-      .then(()=> setMe(p=>({...p, username:nick, needsNickname:false})))
-      .catch(()=>{})
-      .finally(()=> setNickOpen(false));
+    try{
+      const r = await fetch('/api/nickname',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nick})});
+      if(r.ok){
+        const body = await r.json().catch(()=>null);
+        const sanitized = body?.nickname || nick;
+        setMe(p=>({...p, username:sanitized, needsNickname:false}));
+      }
+    }catch(e){}
+    finally{
+      setNickOpen(false);
+    }
   }
 
   async function toggleLanguage(){
