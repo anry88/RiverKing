@@ -99,8 +99,8 @@ function Ratings({me, setMe, onCatchClick}){
             }}
             className="w-full p-3 glass rounded-xl flex justify-between text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-1 min-w-0 items-center gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 {(me.caughtFishIds||[]).includes(c.fishId) ? (
                   <AssetImage src={FISH_IMG[c.fish]} alt={c.fish} className="w-10 h-10 object-contain" onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }} />
                 ) : (
@@ -130,18 +130,18 @@ function Ratings({me, setMe, onCatchClick}){
                   </div>
                 )}
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className={`font-medium ${rarityColors[c.rarity]||''}`}>{c.fish}</div>
-                <div className="text-xs opacity-70">
-                  <bdi>{c.user}</bdi>
+                <div className="text-xs opacity-70 leading-tight break-words">
+                  <bdi className="text-[13px] leading-tight break-words">{c.user}</bdi>
                   {usingSpecies || locId==='all' ? (
-                    <> • {c.location}</>
+                    <> {c.location}</>
                   ) : null}
-                  {' '}• {c.at?new Date(c.at).toLocaleString():''}
+                  {c.at ? <> {new Date(c.at).toLocaleString()}</> : null}
                 </div>
               </div>
             </div>
-            <div className="font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
+            <div className="font-semibold shrink-0 text-right">{Number(c.weight).toFixed(2)} {t('kg')}</div>
           </button>
         ))}
         {list.length===0 && <div className="text-center text-sm opacity-70">{t('noData')}</div>}

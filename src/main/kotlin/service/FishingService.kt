@@ -210,8 +210,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
     }
 
-    fun setNickname(userId: Long, nickname: String) = transaction {
-        Users.update({ Users.id eq userId }) { it[Users.nickname] = sanitizeName(nickname) }
+    fun setNickname(userId: Long, nickname: String): String = transaction {
+        val sanitized = sanitizeName(nickname).replace('\n', ' ').trim()
+        Users.update({ Users.id eq userId }) { it[Users.nickname] = sanitized }
+        sanitized
     }
 
     fun setLanguage(userId: Long, language: String) = transaction {

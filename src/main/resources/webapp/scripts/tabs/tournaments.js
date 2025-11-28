@@ -164,25 +164,25 @@ function TournamentsTab({
                           </button>
                         )}
                       </div>
-                      {isAggregateMetric(currentTournament.tournament.metric) ? (
-                        <div className="w-8 h-8"></div>
-                      ) : e.fish ? (
-                        (me.caughtFishIds||[]).includes(e.fishId) ? (
-                          <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                      {!isAggregateMetric(currentTournament.tournament.metric) && (
+                        e.fish ? (
+                          (me.caughtFishIds||[]).includes(e.fishId) ? (
+                            <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                              <span className="text-lg opacity-20">🐟</span>
+                              <span className="absolute">?</span>
+                            </div>
+                          )
                         ) : (
-                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
                             <span className="text-lg opacity-20">🐟</span>
-                            <span className="absolute">?</span>
                           </div>
                         )
-                      ) : (
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
-                          <span className="text-lg opacity-20">🐟</span>
-                        </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap min-w-0">
-                          <bdi className="truncate">{e.user||'-'}</bdi>
+                        <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                          <bdi className="truncate break-words">{e.user||'-'}</bdi>
                         </div>
                         {!isAggregateMetric(currentTournament.tournament.metric) && (
                           e.fish ? (
@@ -233,25 +233,25 @@ function TournamentsTab({
                           </button>
                         )}
                       </div>
-                      {isAggregateMetric(currentTournament.tournament.metric) ? (
-                        <div className="w-8 h-8"></div>
-                      ) : currentTournament.mine.fish ? (
-                        (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
-                          <AssetImage src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                      {!isAggregateMetric(currentTournament.tournament.metric) && (
+                        currentTournament.mine.fish ? (
+                          (me.caughtFishIds||[]).includes(currentTournament.mine.fishId) ? (
+                            <AssetImage src={FISH_IMG[currentTournament.mine.fish]} alt={currentTournament.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                              <span className="text-lg opacity-20">🐟</span>
+                              <span className="absolute">?</span>
+                            </div>
+                          )
                         ) : (
-                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
                             <span className="text-lg opacity-20">🐟</span>
-                            <span className="absolute">?</span>
                           </div>
                         )
-                      ) : (
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
-                          <span className="text-lg opacity-20">🐟</span>
-                        </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap min-w-0">
-                          <bdi className="truncate">{currentTournament.mine.user||t('you')}</bdi>
+                        <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                          <bdi className="truncate break-words">{currentTournament.mine.user||t('you')}</bdi>
                         </div>
                         {!isAggregateMetric(currentTournament.tournament.metric) && (
                           currentTournament.mine.fish ? (
@@ -340,25 +340,25 @@ function TournamentsTab({
                         </button>
                       )}
                     </div>
-                    {isAggregateMetric(pastResult.tournament.metric) ? (
-                      <div className="w-8 h-8"></div>
-                    ) : e.fish ? (
-                      (me.caughtFishIds||[]).includes(e.fishId) ? (
-                        <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                    {!isAggregateMetric(pastResult.tournament.metric) && (
+                      e.fish ? (
+                        (me.caughtFishIds||[]).includes(e.fishId) ? (
+                          <AssetImage src={FISH_IMG[e.fish]} alt={e.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                            <span className="text-lg opacity-20">🐟</span>
+                            <span className="absolute">?</span>
+                          </div>
+                        )
                       ) : (
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
                           <span className="text-lg opacity-20">🐟</span>
-                          <span className="absolute">?</span>
                         </div>
                       )
-                    ) : (
-                      <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
-                        <span className="text-lg opacity-20">🐟</span>
-                      </div>
                     )}
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1 flex-wrap min-w-0">
-                        <bdi className="truncate">{e.user||'-'}</bdi>
+                      <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                        <bdi className="truncate break-words">{e.user||'-'}</bdi>
                       </div>
                       {!isAggregateMetric(pastResult.tournament.metric) && (
                         e.fish ? (
@@ -409,25 +409,25 @@ function TournamentsTab({
                         </button>
                       )}
                     </div>
-                    {isAggregateMetric(pastResult.tournament.metric) ? (
-                      <div className="w-8 h-8"></div>
-                    ) : pastResult.mine.fish ? (
-                      (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
-                        <AssetImage src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                    {!isAggregateMetric(pastResult.tournament.metric) && (
+                      pastResult.mine.fish ? (
+                        (me.caughtFishIds||[]).includes(pastResult.mine.fishId) ? (
+                          <AssetImage src={FISH_IMG[pastResult.mine.fish]} alt={pastResult.mine.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                            <span className="text-lg opacity-20">🐟</span>
+                            <span className="absolute">?</span>
+                          </div>
+                        )
                       ) : (
-                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                        <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
                           <span className="text-lg opacity-20">🐟</span>
-                          <span className="absolute">?</span>
                         </div>
                       )
-                    ) : (
-                      <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center shrink-0">
-                        <span className="text-lg opacity-20">🐟</span>
-                      </div>
                     )}
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1 flex-wrap min-w-0">
-                        <bdi className="truncate">{pastResult.mine.user||t('you')}</bdi>
+                      <div className="flex items-center gap-1 flex-wrap min-w-0 text-sm leading-tight">
+                        <bdi className="truncate break-words">{pastResult.mine.user||t('you')}</bdi>
                       </div>
                       {!isAggregateMetric(pastResult.tournament.metric) && (
                         pastResult.mine.fish ? (
