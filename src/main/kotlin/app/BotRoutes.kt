@@ -2160,6 +2160,7 @@ Available commands:
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
                         if (!hasAutoSubscription(uid)) {
+                            logCommandMetric("autocast", mapOf("result" to "no_subscription"), source)
                             val reply = if (lang == "ru") {
                                 "У тебя нет подписки на автоловлю."
                             } else {
@@ -2169,6 +2170,7 @@ Available commands:
                             return true
                         }
                         if (autoCastJobs.containsKey(uid)) {
+                            logCommandMetric("autocast", mapOf("result" to "already_running"), source)
                             val reply = if (lang == "ru") {
                                 "Автоловля уже запущена."
                             } else {
@@ -2189,6 +2191,7 @@ Available commands:
                         val dmResult = runCatching { bot.sendMessage(privateChatId, dmText) }
                         if (dmResult.isFailure) {
                             log.warn("Failed to start auto casting via DM for uid={}", uid, dmResult.exceptionOrNull())
+                            logCommandMetric("autocast", mapOf("result" to "dm_failed"), source)
                             if (chatId != privateChatId) {
                                 val warn = if (lang == "ru") {
                                     "Не могу отправить сообщение в личку. Разреши боту писать, отправив /start в личные сообщения."
@@ -2223,6 +2226,7 @@ Available commands:
                                             "Your auto-fishing subscription has expired. Auto casting stopped."
                                         }
                                         trySend(privateChatId, expired)
+                                        logCommandMetric("autocast", mapOf("result" to "expired"), source)
                                         break
                                     }
                                     val (currentLure, currentLocation) = currentSetup(uid)
@@ -2279,6 +2283,7 @@ Available commands:
                         }
                         state.loopJob = loopJob
                         autoCastJobs[uid] = state
+                        logCommandMetric("autocast", mapOf("result" to "started"), source)
                         if (chatId != privateChatId) {
                             val ack = if (lang == "ru") {
                                 "Запустили автоловлю. Сообщения будут приходить в личку."
@@ -2294,6 +2299,7 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         val state = autoCastJobs[uid]
                         return if (state == null) {
+                            logCommandMetric("stop_autocast", mapOf("result" to "not_running"), source)
                             val reply = if (lang == "ru") {
                                 "Автоловля не запущена."
                             } else {
@@ -2309,6 +2315,7 @@ Available commands:
                                 "Auto casting stopped. The current cast will finish."
                             }
                             trySend(chatId, reply, replyToMessageId = replyTo)
+                            logCommandMetric("stop_autocast", mapOf("result" to "stopped"), source)
                             true
                         }
                     }
