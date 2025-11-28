@@ -28,6 +28,9 @@ import kotlinx.serialization.json.jsonPrimitive
 class TelegramApiException(val code: Int, message: String) : IOException(message)
 
 @Serializable
+data class BotCommand(val command: String, val description: String)
+
+@Serializable
 private data class AnswerInlineQueryRequest(
     @SerialName("inline_query_id") val inlineQueryId: String,
     val results: List<InlineQueryResultArticle>,
@@ -190,6 +193,21 @@ class TelegramBot(
         val payload = Json { encodeDefaults = true; explicitNulls = false }
             .encodeToString(AnswerInlineQueryRequest(id, results))
         val response = client.post("$baseUrl/answerInlineQuery") {
+            contentType(ContentType.Application.Json)
+            setBody(payload)
+        }
+        response.ensureSuccess()
+    }
+
+    @Serializable
+    private data class SetMyCommandsRequest(
+        val commands: List<BotCommand>,
+        @SerialName("language_code") val languageCode: String? = null,
+    )
+
+    suspend fun setMyCommands(commands: List<BotCommand>, languageCode: String? = null) {
+        val payload = Json.encodeToString(SetMyCommandsRequest(commands, languageCode))
+        val response = client.post("$baseUrl/setMyCommands") {
             contentType(ContentType.Application.Json)
             setBody(payload)
         }

@@ -13,6 +13,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import service.FishingService
@@ -41,6 +42,15 @@ fun main() {
         val bot = TelegramBot(env.botToken)
         val fishing = FishingService()
         val log = LoggerFactory.getLogger("App")
+
+        runBlocking {
+            try {
+                bot.setMyCommands(defaultBotCommands())
+                bot.setMyCommands(russianBotCommands(), languageCode = "ru")
+            } catch (e: Exception) {
+                log.error("Failed to set bot commands", e)
+            }
+        }
 
         val restored = fishing.restoreCastingLuresOnStartup()
         if (restored > 0) {
@@ -84,3 +94,41 @@ fun main() {
         Scheduler.install(this)
     }.start(wait = true)
 }
+
+private fun defaultBotCommands(): List<BotCommand> = listOf(
+    BotCommand("startapp", "Open the game"),
+    BotCommand("cast", "Cast your line"),
+    BotCommand("autocast", "Start auto casting"),
+    BotCommand("stop_autocast", "Stop auto casting"),
+    BotCommand("bait", "Change your bait"),
+    BotCommand("rod", "Choose your rod"),
+    BotCommand("location", "Change your location"),
+    BotCommand("daily", "Claim your daily reward"),
+    BotCommand("prizes", "Claim tournament prizes"),
+    BotCommand("shop", "Buy baits and rods with Stars"),
+    BotCommand("coin_shop", "Buy bundles with coins"),
+    BotCommand("tournament", "View the tournament leaderboard"),
+    BotCommand("daily_rating", "View today's daily rating"),
+    BotCommand("stats", "View your fishing stats"),
+    BotCommand("language", "Choose your language"),
+    BotCommand("nickname", "Change your nickname"),
+)
+
+private fun russianBotCommands(): List<BotCommand> = listOf(
+    BotCommand("startapp", "Открыть игру"),
+    BotCommand("cast", "Сделать заброс"),
+    BotCommand("autocast", "Запустить автоловлю"),
+    BotCommand("stop_autocast", "Остановить автоловлю"),
+    BotCommand("bait", "Сменить приманку"),
+    BotCommand("rod", "Выбрать удочку"),
+    BotCommand("location", "Сменить локацию"),
+    BotCommand("daily", "Получить ежедневную награду"),
+    BotCommand("prizes", "Забрать призы турнира"),
+    BotCommand("shop", "Купить приманки и удочки за звёзды"),
+    BotCommand("coin_shop", "Купить наборы за монеты"),
+    BotCommand("tournament", "Смотреть таблицу турнира"),
+    BotCommand("daily_rating", "Текущий результат в ежедневном рейтинге"),
+    BotCommand("stats", "Статистика уловов"),
+    BotCommand("language", "Выбрать язык"),
+    BotCommand("nickname", "Сменить ник"),
+)
