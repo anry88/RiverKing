@@ -33,6 +33,17 @@ class TelegramApiException(val code: Int, message: String) : IOException(message
 data class BotCommand(val command: String, val description: String)
 
 @Serializable
+sealed class BotCommandScope {
+    @Serializable
+    @SerialName("default")
+    data object Default : BotCommandScope()
+
+    @Serializable
+    @SerialName("all_private_chats")
+    data object AllPrivateChats : BotCommandScope()
+}
+
+@Serializable
 private data class AnswerInlineQueryRequest(
     @SerialName("inline_query_id") val inlineQueryId: String,
     val results: List<InlineQueryResultArticle>,
@@ -214,11 +225,16 @@ class TelegramBot(
     @Serializable
     private data class SetMyCommandsRequest(
         val commands: List<BotCommand>,
+        val scope: BotCommandScope = BotCommandScope.Default,
         @SerialName("language_code") val languageCode: String? = null,
     )
 
-    suspend fun setMyCommands(commands: List<BotCommand>, languageCode: String? = null) {
-        val payload = Json.encodeToString(SetMyCommandsRequest(commands, languageCode))
+    suspend fun setMyCommands(
+        commands: List<BotCommand>,
+        scope: BotCommandScope = BotCommandScope.Default,
+        languageCode: String? = null,
+    ) {
+        val payload = Json.encodeToString(SetMyCommandsRequest(commands, scope, languageCode))
         val response = client.post("$baseUrl/setMyCommands") {
             contentType(ContentType.Application.Json)
             setBody(payload)

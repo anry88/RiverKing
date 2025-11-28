@@ -45,8 +45,18 @@ fun main() {
 
         runBlocking {
             try {
-                bot.setMyCommands(defaultBotCommands())
-                bot.setMyCommands(russianBotCommands(), languageCode = "ru")
+                val englishCommands = defaultBotCommands()
+                val russianCommands = russianBotCommands()
+
+                bot.setMyCommands(englishCommands)
+                bot.setMyCommands(englishCommands, scope = BotCommandScope.AllPrivateChats)
+
+                bot.setMyCommands(russianCommands, languageCode = "ru")
+                bot.setMyCommands(
+                    russianCommands,
+                    languageCode = "ru",
+                    scope = BotCommandScope.AllPrivateChats,
+                )
             } catch (e: Exception) {
                 log.error("Failed to set bot commands", e)
             }
