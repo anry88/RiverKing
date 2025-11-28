@@ -1061,8 +1061,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "autofish",
                     "Автоловля",
                     "Робот ловит за вас целый месяц и не упустит ни одной рыбы",
-//                    499,
-                    1,
+                    499,
                     emptyList()
                 ),
             )
