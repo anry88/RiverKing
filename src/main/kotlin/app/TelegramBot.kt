@@ -22,6 +22,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -56,6 +58,16 @@ class TelegramBot(
                 if (!desc.isNullOrBlank()) append(": ").append(desc)
             }
             throw TelegramApiException(status.value, message)
+        }
+
+        val payload = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
+        if (payload?.get("ok")?.jsonPrimitive?.booleanOrNull == false) {
+            val description = payload["description"]?.jsonPrimitive?.content
+            val errorCode = payload["error_code"]?.jsonPrimitive?.intOrNull
+            val message = description?.let { desc ->
+                if (errorCode != null) "HTTP ${status.value} $errorCode: $desc" else desc
+            } ?: "Telegram returned ok=false"
+            throw TelegramApiException(errorCode ?: status.value, message)
         }
     }
 
