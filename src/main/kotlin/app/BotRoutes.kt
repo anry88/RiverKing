@@ -239,6 +239,18 @@ fun Application.botRoutes(env: Env) {
                         assetName = "cast.png"
                     ) { _, _ -> "/cast" },
                     InlineCommandInfo(
+                        name = "autocast",
+                        ruDescription = "Запустить автоловлю",
+                        enDescription = "Start auto casting",
+                        assetName = "autocast.png"
+                    ) { _, _ -> "/autocast" },
+                    InlineCommandInfo(
+                        name = "stop_autocast",
+                        ruDescription = "Остановить автоловлю",
+                        enDescription = "Stop auto casting",
+                        assetName = "stop_autocast.png"
+                    ) { _, _ -> "/stop_autocast" },
+                    InlineCommandInfo(
                         name = "bait",
                         ruDescription = "Сменить приманку",
                         enDescription = "Change your bait",
