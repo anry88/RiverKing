@@ -72,7 +72,7 @@ object AchievementService {
 
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
 
-    private inline fun <T> inTxn(block: () -> T): T {
+    private inline fun <T> inTxn(crossinline block: () -> T): T {
         val current = TransactionManager.currentOrNull()
         return if (current == null) transaction { block() } else block()
     }
@@ -101,7 +101,7 @@ object AchievementService {
         val existing = AchievementProgress.select {
             (AchievementProgress.userId eq userId) and (AchievementProgress.achievementId eq achievementId)
         }.singleOrNull()
-        if (existing != null) return@transaction existing[AchievementProgress.id].value
+        if (existing != null) return@inTxn existing[AchievementProgress.id]
         AchievementProgress.insertIgnore { row ->
             row[AchievementProgress.userId] = userId
             row[AchievementProgress.achievementId] = achievementId
@@ -185,13 +185,14 @@ object AchievementService {
             .slice(Fish.id)
             .select { Fish.name inList koiFishNames }
             .map { it[Fish.id].value }
-        if (fishIds.isEmpty()) return@transaction 0
+        if (fishIds.isEmpty()) return@inTxn 0
         Catches
             .slice(Catches.fishId)
             .select { (Catches.userId eq userId) and (Catches.fishId inList fishIds) }
             .groupBy(Catches.fishId)
             .orderBy(Catches.fishId, SortOrder.ASC)
             .count()
+            .toInt()
     }
 
     private fun levelLabel(index: Int, ru: Boolean): String = when (index) {
