@@ -74,7 +74,7 @@ function Header({me,lang,onEditNickname,onOpenLocations,onOpenBaits,onOpenRods,o
   );
 }
 
-function BottomNav({tab,setTab,dailyAvailable}){
+function BottomNav({tab,setTab,dailyAvailable,achievementsAvailable}){
   const items = BOTTOM_NAV_ITEMS.map(item => ({
     ...item,
     label: typeof item.label === 'function' ? item.label() : item.label,
@@ -94,6 +94,11 @@ function BottomNav({tab,setTab,dailyAvailable}){
             <div className="relative">
               <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
               {dailyAvailable && item.id==='shop' && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  !
+                </span>
+              )}
+              {achievementsAvailable && item.id==='guide' && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
                   !
                 </span>

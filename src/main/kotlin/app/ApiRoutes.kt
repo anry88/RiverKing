@@ -26,6 +26,8 @@ import service.I18n
 import service.PrizeSpec
 import service.COIN_PRIZE_ID
 import service.ReferralService
+import service.AchievementService
+import service.AchievementRewardDTO
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -413,6 +415,44 @@ fun Application.apiRoutes(env: Env) {
                 },
             )
             call.respond(resp)
+        }
+
+        get("/api/achievements") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = AchievementService.list(uid, language)
+            Metrics.counter("achievements_view_total", mapOf("source" to "app"))
+            call.respond(list)
+        }
+
+        post("/api/achievements/{code}/claim") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val code = call.parameters["code"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val reward = AchievementService.claim(uid, code)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+            when {
+                reward.reward.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
+                    val amount = reward.reward.coins ?: reward.reward.qty
+                    fishing.addCoins(uid, amount)
+                }
+                reward.reward.pack.isNotBlank() -> {
+                    repeat(reward.reward.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, reward.reward.pack) }
+                }
+            }
+            Metrics.counter("achievements_claim_total", mapOf("source" to "app", "code" to code))
+            call.respond(reward)
         }
 
         get("/api/tournament/{id}") {

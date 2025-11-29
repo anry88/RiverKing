@@ -32,6 +32,7 @@ import service.UserPrize
 import service.PrizeSpec
 import service.I18n
 import service.COIN_PRIZE_ID
+import service.AchievementService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -1174,6 +1175,34 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, baseText, markup, replyToMessageId)
             }
 
+            suspend fun sendAchievements(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val achievements = AchievementService.list(uid, lang)
+                val header = if (lang == "ru") "Достижения" else "Achievements"
+                val body = achievements.joinToString("\n\n") {
+                    val progress = "${it.progress}/${it.target}"
+                    "${it.name}:\n${it.level}, $progress"
+                }
+                val claimable = achievements.filter { it.claimable }
+                val markup = if (claimable.isNotEmpty()) {
+                    val buttons = claimable.map { ach ->
+                        val label = if (lang == "ru") {
+                            "🎁 ${ach.name}"
+                        } else {
+                            "🎁 ${ach.name}"
+                        }
+                        listOf(InlineKeyboardButton(label, "/achvclaim ${ownedData(uid, ach.code)}"))
+                    }
+                    Json.encodeToString(InlineKeyboardMarkup(buttons))
+                } else null
+                val text = "$header:\n$body"
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
             fun packNamesRu(): MutableMap<String, String> {
                 val names = fishing.listShop("ru").flatMap { it.packs }.associate { it.id to it.name }.toMutableMap()
                 if (!names.containsKey("autofish_week")) {
@@ -1483,6 +1512,10 @@ fun Application.botRoutes(env: Env) {
                 "призы" to "/prizes",
                 "prize" to "/prizes",
                 "prizes" to "/prizes",
+                "ачивки" to "/achievements",
+                "ачивка" to "/achievements",
+                "achievements" to "/achievements",
+                "achievement" to "/achievements",
                 "рейтинг" to "/daily_rating",
                 "rating" to "/daily_rating",
                 "leaderboard" to "/daily_rating",
@@ -1801,6 +1834,13 @@ Available commands:
                             replyToMessageId = replyTo,
                             showWhenEmpty = true,
                         )
+                        return true
+                    }
+                    "/achievements" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("achievements", source = source)
+                        sendAchievements(uid, chatId, lang, replyToMessageId = replyTo)
                         return true
                     }
                     "/daily" -> {
@@ -2692,6 +2732,38 @@ Available commands:
                             replyToMessageId = replyTo,
                             showWhenEmpty = true,
                         )
+                        return true
+                    }
+                    "/achvclaim" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val code = value ?: return true
+                        val reward = AchievementService.claim(uid, code)
+                        if (reward == null) {
+                            logCommandMetric("achievements_claim", mapOf("result" to "not_found"), source)
+                            val reply = if (lang == "ru") {
+                                "Достижение не найдено или награда уже получена."
+                            } else {
+                                "Achievement not found or already claimed."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        when {
+                            reward.reward.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
+                                val amount = reward.reward.coins ?: reward.reward.qty
+                                fishing.addCoins(uid, amount)
+                            }
+                            reward.reward.pack.isNotBlank() -> {
+                                repeat(reward.reward.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, reward.reward.pack) }
+                            }
+                        }
+                        logCommandMetric("achievements_claim", mapOf("result" to "ok", "code" to code), source)
+                        val reply = if (lang == "ru") "Награда за достижение получена!" else "Achievement reward claimed!"
+                        sendAchievements(uid, chatId, lang, replyToMessageId = replyTo)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
                 }
