@@ -41,9 +41,12 @@ object DB {
                 ReferralLinks,
                 ReferralRewards,
                 ShopDiscounts,
+                Achievements,
+                AchievementProgress,
             )
             migrateFishNames()
             seedIfEmpty()
+            seedAchievements()
             migrateCoins()
             backfillLastSeenAt()
             sanitizeExistingNicknames()
@@ -1256,6 +1259,10 @@ object DB {
             }
         }
     }
+
+    private fun seedAchievements() {
+        service.AchievementService.seed()
+    }
 }
 
 // Table definitions
@@ -1430,4 +1437,20 @@ object ShopDiscounts : LongIdTable() {
     val price = integer("price")
     val startDate = date("start_date")
     val endDate = date("end_date")
+}
+
+object Achievements : LongIdTable() {
+    val code = varchar("code", 100).uniqueIndex()
+    val nameRu = varchar("name_ru", 200)
+    val nameEn = varchar("name_en", 200)
+    val descRu = varchar("desc_ru", 300)
+    val descEn = varchar("desc_en", 300)
+}
+
+object AchievementProgress : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val achievementId = reference("achievement_id", Achievements)
+    val level = integer("level").default(0)
+    val claimedLevel = integer("claimed_level").default(0)
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
 }

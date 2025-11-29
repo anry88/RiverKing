@@ -724,6 +724,25 @@
     return lang === 'en' ? info.enDescription : info.ruDescription;
   };
 
+  const ACHIEVEMENT_LEVEL_LABELS = {
+    ru: ['Нет уровня', 'Бронза', 'Серебро', 'Золото', 'Платина'],
+    en: ['No tier', 'Bronze', 'Silver', 'Gold', 'Platinum'],
+  };
+  const achievementLevelLabel = (index, lang = document.documentElement.lang) => {
+    const labels = ACHIEVEMENT_LEVEL_LABELS[lang] || ACHIEVEMENT_LEVEL_LABELS.ru;
+    return labels[index] || labels[0];
+  };
+  const ACHIEVEMENT_IMAGES = {
+    0: '/app/assets/achievements/achievement_none.svg',
+    1: '/app/assets/achievements/achievement_bronze.svg',
+    2: '/app/assets/achievements/achievement_silver.svg',
+    3: '/app/assets/achievements/achievement_gold.svg',
+    4: '/app/assets/achievements/achievement_platinum.svg',
+  };
+  window.ACHIEVEMENT_LEVEL_LABELS = ACHIEVEMENT_LEVEL_LABELS;
+  window.achievementLevelLabel = achievementLevelLabel;
+  window.ACHIEVEMENT_IMAGES = ACHIEVEMENT_IMAGES;
+
   const STRINGS = {
     ru: {
       location: 'Локация',
@@ -832,8 +851,11 @@
       prizes: 'Призы',
       ratings: 'Рейтинги',
       guide: 'Справочник',
+      achievements: 'Достижения',
+      achievementsTab: 'Ачивки',
       shop: 'Магазин',
       menu: 'Меню',
+      achievementRewardsAvailable: 'Доступна награда',
       invite: 'Пригласить друзей',
       refBonusInfo: name => `Пригласите друзей — вы оба получите ${name}. За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.`,
       referralBonus: 'Ваш друг присоединился по вашей ссылке и вы получили набор:',
@@ -870,6 +892,19 @@
       hintTapPrize: 'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
       hintAutoCatch: 'С подпиской робот позаботится о вашем улове, если вы не успеете вовремя выловить рыбу',
       hintNoCloseRod: 'Не закрывай игру с заброшенной удочкой чтобы не потерять приманку',
+      achievementsEmpty: 'Пока нет достижений — продолжайте ловить рыбу!',
+      achievementProgress: ({ progress, target }) => `${progress}/${target}`,
+      achievementLevel: level => `Уровень: ${level}`,
+      achievementLocked: 'Собирайте прогресс, чтобы открыть первый уровень.',
+      achievementNextLevel: level => `Следующий уровень: ${level}`,
+      achievementClaim: 'Забрать награду',
+      achievementClaimed: 'Награда за достижение получена!',
+      achievementsUnavailable: 'Не удалось загрузить достижения',
+      achievementsRefresh: 'Обновить',
+      achievementUnlockedLine: ({ name, level }) => `Открыта ачивка «${name}»: ${level}`,
+      achievementRewardTitle: 'Награда за достижение',
+      achievementRewardCoins: coins => `🪙 +${coins} монет`,
+      achievementRewardPack: ({ name, qty }) => `${name}${qty > 1 ? ` x${qty}` : ''}`,
     },
     en: {
       location: 'Location',
@@ -978,8 +1013,11 @@
       prizes: 'Prizes',
       ratings: 'Ratings',
       guide: 'Guide',
+      achievements: 'Achievements',
+      achievementsTab: 'Achievements',
       shop: 'Shop',
       menu: 'Menu',
+      achievementRewardsAvailable: 'Reward available',
       invite: 'Invite friends',
       refBonusInfo: name => `Invite friends — you both get ${name}. When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.`,
       referralBonus: 'Your friend joined via your link and you received a pack:',
@@ -1016,6 +1054,19 @@
       hintTapPrize: 'Tap a leaderboard card to see its potential prize',
       hintAutoCatch: 'With a subscription, the robot will secure your catch if you fail to reel in the fish in time',
       hintNoCloseRod: "Don't close the game with your rod cast or you'll lose the bait",
+      achievementsEmpty: 'No achievements yet — keep fishing!',
+      achievementProgress: ({ progress, target }) => `${progress}/${target}`,
+      achievementLevel: level => `Tier: ${level}`,
+      achievementLocked: 'Earn progress to unlock the first tier.',
+      achievementNextLevel: level => `Next tier: ${level}`,
+      achievementClaim: 'Claim reward',
+      achievementClaimed: 'Achievement reward claimed!',
+      achievementsUnavailable: 'Failed to load achievements',
+      achievementsRefresh: 'Refresh',
+      achievementUnlockedLine: ({ name, level }) => `Achievement unlocked: ${name} — ${level}`,
+      achievementRewardTitle: 'Achievement reward',
+      achievementRewardCoins: coins => `🪙 +${coins} coins`,
+      achievementRewardPack: ({ name, qty }) => `${name}${qty > 1 ? ` x${qty}` : ''}`,
     }
   };
   function makeT(lang) {

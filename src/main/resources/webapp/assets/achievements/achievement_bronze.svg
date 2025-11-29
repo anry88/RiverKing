@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="bronze" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#c08457" />
+      <stop offset="100%" stop-color="#8b5a2b" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="16" fill="#0f172a"/>
+  <circle cx="60" cy="60" r="44" fill="url(#bronze)" stroke="#f1d0b5" stroke-width="4"/>
+  <path d="M60 32l9.5 19.3 21.3 3.1-15.4 14.8 3.6 21.2L60 79.8l-19 10 3.6-21.2L29 54.4l21.3-3.1z" fill="#fef3c7" opacity="0.75"/>
+  <path d="M60 40l7 14.2 15.7 2.3-11.3 11 2.6 15.8L60 73.6l-14.4 7.5 2.6-15.8-11.3-11 15.7-2.3z" fill="#7c3b18" opacity="0.9"/>
+</svg>

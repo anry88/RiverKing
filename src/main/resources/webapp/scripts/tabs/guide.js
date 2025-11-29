@@ -1,7 +1,16 @@
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
 
-function Guide({me}){
+function Guide({
+  me,
+  achievements = [],
+  onReloadAchievements,
+  achievementsLoading,
+  achievementsError,
+  onClaimAchievement,
+  claimInProgress,
+  achievementsClaimable,
+}){
   const [section,setSection] = React.useState('locations');
   const [data,setData] = React.useState(null);
   const [error,setError] = React.useState(null);
@@ -24,6 +33,13 @@ function Guide({me}){
   React.useEffect(()=>{
     setFishRarityFilter('all');
   },[data?.fish, me.language]);
+  React.useEffect(()=>{
+    if(section!=='achievements') return;
+    if(achievementsLoading) return;
+    if((achievements||[]).length===0 && typeof onReloadAchievements === 'function'){
+      onReloadAchievements();
+    }
+  }, [section, achievementsLoading, achievements?.length, onReloadAchievements]);
   const rarityDisplayName = React.useCallback((rarity)=>{
     const names = (window.rarityNames && window.rarityNames[me.language])
       || (window.rarityNames && window.rarityNames.en)
@@ -58,6 +74,12 @@ function Guide({me}){
         <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
         <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
         <button onClick={()=>setSection('rods')} className={`flex-1 py-2 rounded-xl ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
+        <button onClick={()=>setSection('achievements')} className={`flex-1 py-2 rounded-xl relative ${section==='achievements'?'bg-emerald-600':'glass'}`}>
+          {t('achievementsTab')}
+          {achievementsClaimable && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">!</span>
+          )}
+        </button>
       </div>
       {section==='locations' && (
         <div className="space-y-4">
@@ -209,6 +231,69 @@ function Guide({me}){
           })}
         </div>
       )}
+      {section==='achievements' && (
+        <AchievementsSection
+          achievements={achievements}
+          loading={achievementsLoading}
+          error={achievementsError}
+          onReload={onReloadAchievements}
+          onClaim={onClaimAchievement}
+          claimInProgress={claimInProgress}
+        />
+      )}
+    </div>
+  );
+}
+
+function AchievementsSection({achievements, loading, error, onReload, onClaim, claimInProgress}){
+  const imageForLevel = level => {
+    if(window.ACHIEVEMENT_IMAGES && window.ACHIEVEMENT_IMAGES[level]) return window.ACHIEVEMENT_IMAGES[level];
+    return window.ACHIEVEMENT_IMAGES ? window.ACHIEVEMENT_IMAGES[0] : '';
+  };
+  const levelLabel = (idx) => {
+    return typeof window.achievementLevelLabel === 'function'
+      ? window.achievementLevelLabel(idx, document.documentElement.lang)
+      : idx;
+  };
+  if(loading) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
+  if(error) return (
+    <div className="mt-6 text-center opacity-80">
+      <div className="mb-2">{t('achievementsUnavailable')}</div>
+      {onReload && <button className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500" onClick={onReload}>{t('achievementsRefresh')}</button>}
+    </div>
+  );
+  if(!achievements || achievements.length===0) return <div className="mt-6 text-center opacity-80">{t('achievementsEmpty')}</div>;
+  return (
+    <div className="space-y-4">
+      {achievements.map(a=>{
+        const nextLevel = levelLabel(Math.min((a.levelIndex||0)+1, 4));
+        return (
+          <div key={a.code} className="p-4 glass rounded-xl flex gap-3 items-start">
+            <AssetImage src={imageForLevel(a.levelIndex)} alt={a.name} className="w-16 h-16 object-contain" />
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-semibold leading-tight">{a.name}</div>
+                <div className="text-xs opacity-80 whitespace-nowrap">{t('achievementLevel', levelLabel(a.levelIndex))}</div>
+              </div>
+              <div className="text-xs opacity-70 mt-1 mb-2">{a.description}</div>
+              <div className="text-sm font-semibold">{t('achievementProgress', { progress: a.progress, target: a.target })}</div>
+              <div className="text-xs opacity-70 mb-2">{a.levelIndex < 4 ? t('achievementNextLevel', nextLevel) : t('achievementLevel', levelLabel(a.levelIndex))}</div>
+              {a.claimable ? (
+                <button
+                  type="button"
+                  className="mt-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                  disabled={claimInProgress === a.code}
+                  onClick={()=> onClaim && onClaim(a.code)}
+                >
+                  {claimInProgress === a.code ? t('loading') : t('achievementClaim')}
+                </button>
+              ) : (
+                <div className="text-xs opacity-60">{a.levelIndex > 0 ? t('achievementLevel', levelLabel(a.levelIndex)) : t('achievementLocked')}</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

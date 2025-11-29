@@ -13,4 +13,8 @@ The server starts from `main()` in `Application.kt`: it loads the configuration,
 
 Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, tournaments, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the client or the bot.
 
+Achievements are tracked through `AchievementService` and exposed via `/api/achievements` plus the `/achievements` bot command. The first goal, **Коллекционер Кои / Koi Collector**, advances as players catch different koi fish, notifies on new tiers, and allows reward claiming (lure bundles or auto‑fishing time) from the mini‑app and the bot.
+
+In the mini‑app client (`resources/webapp`), the Guide tab now contains an Achievements sub‑tab that shows tier art, localized descriptions, progress (e.g., `3/16`), and claim buttons for unlocked rewards. A red badge on the Guide navigation item highlights unclaimed achievement prizes.
+
 To understand how a specific function works, open the README for the relevant package and follow the links to the detailed files.
