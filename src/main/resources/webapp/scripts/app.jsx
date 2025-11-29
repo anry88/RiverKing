@@ -982,8 +982,8 @@ function App(){
   }
 
   return (
-    <div className="app-content w-full px-4" onClick={()=>setPrizeHint(null)}>
-      <div className="flex flex-col min-h-full">
+    <div className="app-content w-full px-4 flex justify-center" onClick={()=>setPrizeHint(null)}>
+      <div className="w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full">
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
