@@ -393,11 +393,13 @@ object AchievementService {
     }
 
     private fun heaviestCatchKg(userId: Long): Int = inTxn {
-        val maxWeight = Catches
-            .slice(Catches.weight.max())
+        val row = Catches
+            .slice(Catches.weight)
             .select { Catches.userId eq userId }
+            .orderBy(Catches.weight, SortOrder.DESC)
+            .limit(1)
             .singleOrNull()
-            ?.get(Catches.weight.max()) ?: 0.0
+        val maxWeight = row?.get(Catches.weight) ?: 0.0
         floor(maxWeight).toInt()
     }
 
