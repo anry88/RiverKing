@@ -69,11 +69,8 @@ fun main() {
 
         // Static Mini App (served from resources/webapp)
         routing {
-            route("/app/assets") {
-                get("{...}") { call.respond(HttpStatusCode.NotFound) }
-                head("{...}") { call.respond(HttpStatusCode.NotFound) }
-            }
-            staticResources("/app", "webapp")
+            staticResources("/app/assets", "webapp/assets")
+            staticResources("/app", "webapp", "index.html")
             get("/") {
                 val params = call.request.rawQueryParameters
                 params["tgId"]?.toLongOrNull()?.let { tgId ->
