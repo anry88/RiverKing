@@ -92,7 +92,6 @@ object AchievementService {
         PrizeSpec(pack = "autofish", qty = 1),
     )
 
-    private val koiThresholds = listOf(0, 1, 3, 8, 16)
     private val simpleFisherThresholds = listOf(0, 10, 100, 500, 1000)
     private val uncommonFisherThresholds = listOf(0, 5, 50, 250, 500)
     private val rareFisherThresholds = listOf(0, 3, 30, 150, 300)
@@ -101,6 +100,7 @@ object AchievementService {
     private val legendaryFisherThresholds = listOf(0, 1, 5, 25, 50)
     private val travelerThresholds = listOf(1, 3, 6, 10, 14)
     private val trophyHunterThresholds = listOf(0, 1, 10, 100, 1000)
+    private val koiThresholds = listOf(0, 1, 3, 8, 16)
     private val simpleFisherRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
         PrizeSpec(pack = "fresh_topup_s", qty = 1),
@@ -117,16 +117,6 @@ object AchievementService {
     )
 
     private val definitions = listOf(
-        AchievementDefinition(
-            code = KOI_COLLECTOR_CODE,
-            nameRu = "Коллекционер Кои",
-            nameEn = "Koi Collector",
-            descRu = "Поймайте все 16 видов карпов кои",
-            descEn = "Catch all 16 koi varieties",
-            thresholds = koiThresholds,
-            rewards = koiRewards,
-            progress = ::koiCatchCount,
-        ),
         AchievementDefinition(
             code = SIMPLE_FISHER_CODE,
             nameRu = "Простой рыбак",
@@ -206,6 +196,16 @@ object AchievementService {
             thresholds = trophyHunterThresholds,
             rewards = simpleFisherRewards,
             progress = ::heaviestCatchKg,
+        ),
+        AchievementDefinition(
+            code = KOI_COLLECTOR_CODE,
+            nameRu = "Коллекционер Кои",
+            nameEn = "Koi Collector",
+            descRu = "Поймайте все 16 видов карпов кои",
+            descEn = "Catch all 16 koi varieties",
+            thresholds = koiThresholds,
+            rewards = koiRewards,
+            progress = ::koiCatchCount,
         ),
     )
 
