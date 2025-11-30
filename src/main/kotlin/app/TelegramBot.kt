@@ -39,6 +39,10 @@ sealed class BotCommandScope {
     data object Default : BotCommandScope()
 
     @Serializable
+    @SerialName("all_group_chats")
+    data object AllGroupChats : BotCommandScope()
+
+    @Serializable
     @SerialName("all_private_chats")
     data object AllPrivateChats : BotCommandScope()
 }
