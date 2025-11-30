@@ -1750,8 +1750,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.coins] = coinsAwarded
         }
 
-        val achievementUnlock = AchievementService.updateOnCatch(userId, fishId)
-        val achievements = achievementUnlock?.let { listOf(it) } ?: emptyList()
+        val achievements = AchievementService.updateOnCatch(userId, fishId)
 
         if (coinsAwarded != 0) {
             Users.update({ Users.id eq userId }) {

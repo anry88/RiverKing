@@ -162,7 +162,8 @@ function App(){
         throw new Error('claim_failed');
       }
       const data = await r.json();
-      setAchievementReward({ ...data, name: achievementNameByCode(code) });
+      const rewards = Array.isArray(data?.rewards) ? data.rewards : [];
+      setAchievementReward({ code, rewards, name: achievementNameByCode(code) });
       await loadAchievements();
       await reloadProfile();
     }catch(e){
@@ -1117,8 +1118,15 @@ function App(){
             <div className="glass p-6 rounded-xl text-center animate-pop">
               <AssetImage src={BOBBER_ICON} alt="achievement" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
               <div className="text-lg font-semibold mb-1">{t('achievementRewardTitle')}</div>
-              <div className="text-sm opacity-80 mb-1">{achievementReward.name || achievementReward.code}</div>
-              <div className="text-xl font-bold mb-1">{achievementRewardLabel(achievementReward.reward)}</div>
+              <div className="text-sm opacity-80 mb-2">{achievementReward.name || achievementReward.code}</div>
+              <div className="text-left inline-block text-sm font-semibold space-y-1">
+                {(achievementReward.rewards||[]).map((reward, idx)=>(
+                  <div key={`${achievementReward.code}-${idx}`} className="flex items-center gap-2">
+                    <span>•</span>
+                    <span>{achievementRewardLabel(reward)}</span>
+                  </div>
+                ))}
+              </div>
               <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
             </div>
           </div>

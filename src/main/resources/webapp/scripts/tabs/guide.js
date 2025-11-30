@@ -69,12 +69,12 @@ function Guide({
   if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
   return (
     <div className="mt-4">
-      <div className="flex gap-2 mb-4">
-        <button onClick={()=>setSection('locations')} className={`flex-1 py-2 rounded-xl ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
-        <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
-        <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
-        <button onClick={()=>setSection('rods')} className={`flex-1 py-2 rounded-xl ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
-        <button onClick={()=>setSection('achievements')} className={`flex-1 py-2 rounded-xl relative ${section==='achievements'?'bg-emerald-600':'glass'}`}>
+      <div className="flex flex-wrap justify-center gap-2 mb-4">
+        <button onClick={()=>setSection('locations')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
+        <button onClick={()=>setSection('fish')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
+        <button onClick={()=>setSection('lures')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
+        <button onClick={()=>setSection('rods')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
+        <button onClick={()=>setSection('achievements')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center relative ${section==='achievements'?'bg-emerald-600':'glass'}`}>
           {t('achievementsTab')}
           {achievementsClaimable && (
             <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">!</span>
