@@ -179,6 +179,9 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const rodTipAnchor = (window.ROD_TIP_ANCHORS && currentRod?.code && window.ROD_TIP_ANCHORS[currentRod.code])
     || (window.ROD_TIP_ANCHORS && window.ROD_TIP_ANCHORS.default)
     || ROD_TIP_ANCHOR;
+  const rodLineGuides = (window.ROD_LINE_GUIDES && currentRod?.code && window.ROD_LINE_GUIDES[currentRod.code])
+    || (window.ROD_LINE_GUIDES && window.ROD_LINE_GUIDES.default)
+    || [];
   const rodBaseWidth = (ROD_IMG_SIZE && ROD_IMG_SIZE.width) || 1200;
   const rodBaseHeight = (ROD_IMG_SIZE && ROD_IMG_SIZE.height) || 1200;
   const rodScaleBase = Math.min((w * targetWFrac) / rodBaseWidth, (h * targetHFrac) / rodBaseHeight);
@@ -197,31 +200,52 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
   const shouldShowSlack = !casting && !biting && !tapping;
+  const linePoints = React.useMemo(()=>{
+    const guides = Array.isArray(rodLineGuides) ? rodLineGuides : [];
+    const guidePoints = guides.map(g=>({
+      x: rodLeft + rodW * g.x,
+      y: rodTop + rodH * g.y,
+    }));
+    return [
+      { x: tipX, y: tipY },
+      ...guidePoints,
+      { x: lineAttach.x, y: lineAttach.y },
+    ];
+  }, [rodLineGuides, rodLeft, rodTop, rodW, rodH, tipX, tipY, lineAttach.x, lineAttach.y]);
   const linePath = React.useMemo(() => {
-    if(!Number.isFinite(tipX) || !Number.isFinite(tipY) || !Number.isFinite(lineAttach.x) || !Number.isFinite(lineAttach.y)){
+    const pts = linePoints.map(p=>({...p}));
+    if(!pts.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) {
       return `M ${tipX},${tipY} L ${lineAttach.x},${lineAttach.y}`;
     }
-    const dx = lineAttach.x - tipX;
-    const dy = lineAttach.y - tipY;
-    const dist = Math.hypot(dx, dy);
-    if(shouldShowSlack){
-      const sag = Math.min(h * 0.22, Math.max(16, dist * 0.55));
-      const baseMidY = tipY + dy * 0.5;
-      const control1 = {
-        x: tipX + dx * 0.35,
-        y: baseMidY + sag * 0.45
-      };
-      const control2 = {
-        x: tipX + dx * 0.75,
-        y: baseMidY + sag
-      };
-      return `M ${tipX},${tipY} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
+    if(pts.length >= 3 && shouldShowSlack){
+      const mid = Math.floor((pts.length - 1) / 2);
+      const end = pts[pts.length - 1];
+      const dist = Math.hypot(end.x - pts[0].x, end.y - pts[0].y);
+      const sag = Math.min(h * 0.22, Math.max(14, dist * 0.38));
+      pts[mid].y += sag;
+      if(pts.length > 3){
+        pts[pts.length - 2].y += sag * 0.6;
+      }
     }
-    const gentleSag = Math.min(h * 0.08, dist * 0.12);
-    const controlX = tipX + dx * 0.5;
-    const controlY = tipY + dy * 0.5 + gentleSag;
-    return `M ${tipX},${tipY} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h]);
+    const catmullToPath = (points) => {
+      if(points.length < 2) return '';
+      const p = points;
+      const d = [`M ${p[0].x},${p[0].y}`];
+      for(let i=0; i<p.length-1; i++){
+        const p0 = p[i-1] || p[i];
+        const p1 = p[i];
+        const p2 = p[i+1];
+        const p3 = p[i+2] || p2;
+        const c1x = p1.x + (p2.x - p0.x) / 6;
+        const c1y = p1.y + (p2.y - p0.y) / 6;
+        const c2x = p2.x - (p3.x - p1.x) / 6;
+        const c2y = p2.y - (p3.y - p1.y) / 6;
+        d.push(`C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`);
+      }
+      return d.join(' ');
+    };
+    return catmullToPath(pts);
+  }, [linePoints, tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h]);
 
   const catchTargetPx = React.useMemo(()=>{
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -488,14 +512,6 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
-      <AssetImage
-        src={rodImage}
-        alt="rod"
-        className="absolute select-none pointer-events-none"
-        style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
-        loading="eager"
-        decoding="async"
-      />
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         {shouldClipLine && (
           <defs>
@@ -507,12 +523,20 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
         <path
           d={linePath}
           stroke="rgba(255,255,255,0.45)"
-          strokeWidth="1.2"
+          strokeWidth="0.8"
           strokeLinecap="round"
           fill="none"
           clipPath={shouldClipLine ? `url(#${lineClipId})` : undefined}
         />
       </svg>
+      <AssetImage
+        src={rodImage}
+        alt="rod"
+        className="absolute select-none pointer-events-none"
+        style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
+        loading="eager"
+        decoding="async"
+      />
 
       <div
         className="absolute"
