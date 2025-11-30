@@ -96,7 +96,7 @@ object AchievementService {
             code = KOI_COLLECTOR_CODE,
             nameRu = "Коллекционер Кои",
             nameEn = "Koi Collector",
-            descRu = "Поймайте всех 16 видов карпов кои",
+            descRu = "Поймайте все 16 видов карпов кои",
             descEn = "Catch all 16 koi varieties",
             thresholds = koiThresholds,
             rewards = koiRewards,
