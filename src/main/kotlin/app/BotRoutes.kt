@@ -2044,7 +2044,7 @@ Available commands:
                                 }
                                 trySend(chatId, info, replyToMessageId = replyTo)
                             }
-                        } catch (e: StarsPaymentService.MissingPrivateChatAccessException) {
+                        } catch (_: StarsPaymentService.MissingPrivateChatAccessException) {
                             log.warn("sendInvoice missing private chat access chatId={} pack={}", chatId, packId)
                             logCommandMetric(
                                 "buy",
@@ -2759,7 +2759,7 @@ Available commands:
                                     "$header\n$lines"
                                 }
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             logCommandMetric(
                                 "prizes_claim",
                                 mapOf("result" to "error", "pack" to (if (isCoins) COIN_PRIZE_ID else prize.packageId)),
@@ -3427,7 +3427,7 @@ Available commands:
                     logCommandMetric("answer", mapOf("result" to "invalid_args"), source)
                     trySend(chatId, reply)
                 } else {
-                    val reqId = id!!
+                    val reqId = id
                     val req = PayService.findSupportRequest(reqId)
                     if (req != null && req.userId == uid) {
                         PayService.updateSupportRequest(reqId, "pending", answer)
