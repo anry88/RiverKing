@@ -152,6 +152,12 @@ function App(){
     }
   }, [t]);
 
+  React.useEffect(()=>{
+    if(tab === 'guide'){
+      loadAchievements();
+    }
+  }, [tab, loadAchievements]);
+
   const claimAchievement = React.useCallback(async code => {
     if(!code) return;
     setClaimingAchievement(code);
