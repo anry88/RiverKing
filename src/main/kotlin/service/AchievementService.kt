@@ -88,11 +88,11 @@ object AchievementService {
 
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
     private val simpleFisherThresholds = listOf(0, 10, 100, 500, 1000)
-    private val uncommonFisherThresholds = listOf(0, 5, 50, 500)
-    private val rareFisherThresholds = listOf(0, 3, 30, 300)
-    private val epicFisherThresholds = listOf(0, 1, 20, 200)
-    private val mythicFisherThresholds = listOf(0, 1, 10, 100)
-    private val legendaryFisherThresholds = listOf(0, 1, 5, 50)
+    private val uncommonFisherThresholds = listOf(0, 5, 50, 250, 500)
+    private val rareFisherThresholds = listOf(0, 3, 30, 150, 300)
+    private val epicFisherThresholds = listOf(0, 1, 20, 100, 200)
+    private val mythicFisherThresholds = listOf(0, 1, 10, 50, 100)
+    private val legendaryFisherThresholds = listOf(0, 1, 5, 25, 50)
     private val simpleFisherRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
         PrizeSpec(pack = "fresh_topup_s", qty = 1),
