@@ -250,11 +250,6 @@ function AchievementsSection({achievements, loading, error, onReload, onClaim, c
     if(window.ACHIEVEMENT_IMAGES && window.ACHIEVEMENT_IMAGES[level]) return window.ACHIEVEMENT_IMAGES[level];
     return window.ACHIEVEMENT_IMAGES ? window.ACHIEVEMENT_IMAGES[0] : '';
   };
-  const levelLabel = (idx) => {
-    return typeof window.achievementLevelLabel === 'function'
-      ? window.achievementLevelLabel(idx, document.documentElement.lang)
-      : idx;
-  };
   if(loading) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
   if(error) return (
     <div className="mt-6 text-center opacity-80">
@@ -266,18 +261,14 @@ function AchievementsSection({achievements, loading, error, onReload, onClaim, c
   return (
     <div className="space-y-4">
       {achievements.map(a=>{
-        const nextLevel = levelLabel(Math.min((a.levelIndex||0)+1, 4));
+        const statusText = a.levelIndex > 0 ? t('achievementInProgress') : t('achievementLocked');
         return (
           <div key={a.code} className="p-4 glass rounded-xl flex gap-3 items-start">
             <AssetImage src={imageForLevel(a.levelIndex)} alt={a.name} className="w-16 h-16 object-contain" />
             <div className="flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="font-semibold leading-tight">{a.name}</div>
-                <div className="text-xs opacity-80 whitespace-nowrap">{t('achievementLevel', levelLabel(a.levelIndex))}</div>
-              </div>
+              <div className="font-semibold leading-tight">{a.name}</div>
               <div className="text-xs opacity-70 mt-1 mb-2">{a.description}</div>
-              <div className="text-sm font-semibold">{t('achievementProgress', { progress: a.progress, target: a.target })}</div>
-              <div className="text-xs opacity-70 mb-2">{a.levelIndex < 4 ? t('achievementNextLevel', nextLevel) : t('achievementLevel', levelLabel(a.levelIndex))}</div>
+              <div className="text-sm font-semibold">{t('achievementProgressLabel', { progress: a.progress, target: a.target })}</div>
               {a.claimable ? (
                 <button
                   type="button"
@@ -288,7 +279,7 @@ function AchievementsSection({achievements, loading, error, onReload, onClaim, c
                   {claimInProgress === a.code ? t('loading') : t('achievementClaim')}
                 </button>
               ) : (
-                <div className="text-xs opacity-60">{a.levelIndex > 0 ? t('achievementLevel', levelLabel(a.levelIndex)) : t('achievementLocked')}</div>
+                <div className="text-xs opacity-60">{statusText}</div>
               )}
             </div>
           </div>
