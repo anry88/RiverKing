@@ -730,7 +730,8 @@
   };
   const achievementLevelLabel = (index, lang = document.documentElement.lang) => {
     const labels = ACHIEVEMENT_LEVEL_LABELS[lang] || ACHIEVEMENT_LEVEL_LABELS.ru;
-    return labels[index] || labels[0];
+    const safeIndex = Math.min(index, labels.length - 1);
+    return labels[safeIndex] || labels[0];
   };
   const ACHIEVEMENT_IMAGES = {
     0: '/app/assets/achievements/achievement_none.svg',

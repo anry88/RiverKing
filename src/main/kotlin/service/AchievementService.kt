@@ -4,6 +4,7 @@ import db.AchievementProgress
 import db.Achievements
 import db.Catches
 import db.Fish
+import db.Locations
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
@@ -14,6 +15,9 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import util.Metrics
 import java.time.Instant
+import kotlin.math.floor
+import org.jetbrains.exposed.sql.max
+import org.jetbrains.exposed.sql.sum
 
 @Serializable
 data class AchievementDTO(
@@ -58,6 +62,8 @@ object AchievementService {
     private const val EPIC_FISHER_CODE = "epic_fisher"
     private const val MYTHIC_FISHER_CODE = "mythic_fisher"
     private const val LEGENDARY_FISHER_CODE = "legendary_fisher"
+    private const val TRAVELER_CODE = "traveler"
+    private const val TROPHY_HUNTER_CODE = "trophy_hunter"
 
     private val koiFishNames = listOf(
         "Карп кои (Кохаку)",
@@ -93,7 +99,16 @@ object AchievementService {
     private val epicFisherThresholds = listOf(0, 1, 20, 100, 200)
     private val mythicFisherThresholds = listOf(0, 1, 10, 50, 100)
     private val legendaryFisherThresholds = listOf(0, 1, 5, 25, 50)
+    private val travelerThresholds = listOf(1, 3, 6, 10, 14)
+    private val trophyHunterThresholds = listOf(0, 1, 10, 100, 1000)
     private val simpleFisherRewards = listOf(
+        PrizeSpec(pack = "", qty = 0),
+        PrizeSpec(pack = "fresh_topup_s", qty = 1),
+        PrizeSpec(pack = "fresh_stock_m", qty = 1),
+        PrizeSpec(pack = "fresh_crate_l", qty = 1),
+        PrizeSpec(pack = "salt_crate_l", qty = 1),
+    )
+    private val travelerRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
         PrizeSpec(pack = "fresh_topup_s", qty = 1),
         PrizeSpec(pack = "fresh_stock_m", qty = 1),
@@ -172,6 +187,26 @@ object AchievementService {
             rewards = simpleFisherRewards,
             progress = ::legendaryCatchCount,
         ),
+        AchievementDefinition(
+            code = TRAVELER_CODE,
+            nameRu = "Путешественник",
+            nameEn = "Traveler",
+            descRu = "Откройте все локации",
+            descEn = "Unlock every location",
+            thresholds = travelerThresholds,
+            rewards = travelerRewards,
+            progress = ::unlockedLocationsCount,
+        ),
+        AchievementDefinition(
+            code = TROPHY_HUNTER_CODE,
+            nameRu = "Охотник за трофеями",
+            nameEn = "Trophy Hunter",
+            descRu = "Поймайте самую крупную рыбу",
+            descEn = "Land your heaviest fish yet",
+            thresholds = trophyHunterThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::heaviestCatchKg,
+        ),
     )
 
     private inline fun <T> inTxn(crossinline block: () -> T): T {
@@ -229,6 +264,7 @@ object AchievementService {
         val langIsRu = language.lowercase().startsWith("ru")
         val progressValue = definition.progress(userId)
         val level = levelIndex(definition.thresholds, progressValue)
+        val uiLevel = minOf(level, 4)
         val target = definition.thresholds.getOrNull(level + 1) ?: definition.thresholds.last()
         val rowId = ensureProgressRow(userId, definition)
         val progressRow = inTxn {
@@ -248,8 +284,8 @@ object AchievementService {
             code = definition.code,
             name = if (langIsRu) definition.nameRu else definition.nameEn,
             description = if (langIsRu) definition.descRu else definition.descEn,
-            level = levelLabel(level, langIsRu),
-            levelIndex = level,
+            level = levelLabel(uiLevel, langIsRu),
+            levelIndex = uiLevel,
             progress = progressValue,
             target = target,
             claimable = level > claimed,
@@ -261,23 +297,25 @@ object AchievementService {
     fun claim(userId: Long, code: String): AchievementRewardDTO? {
         val definition = definitionFor(code) ?: return null
         val progressValue = definition.progress(userId)
-        val levelIndex = levelIndex(definition.thresholds, progressValue)
+        val currentLevel = levelIndex(definition.thresholds, progressValue)
         val rowId = ensureProgressRow(userId, definition)
         val (claimed, storedLevel) = inTxn {
             AchievementProgress.select { AchievementProgress.id eq rowId }.single().let { row ->
                 row[AchievementProgress.claimedLevel] to row[AchievementProgress.level]
             }
         }
-        if (levelIndex <= claimed) return null
+        if (currentLevel <= claimed) return null
         inTxn {
             AchievementProgress.update({ AchievementProgress.id eq rowId }) {
-                it[AchievementProgress.claimedLevel] = levelIndex
-                it[AchievementProgress.level] = maxOf(storedLevel, levelIndex)
+                it[AchievementProgress.claimedLevel] = currentLevel
+                it[AchievementProgress.level] = maxOf(storedLevel, currentLevel)
                 it[AchievementProgress.updatedAt] = Instant.now()
             }
         }
         Metrics.counter("achievement_claim_total", mapOf("code" to code))
-        val rewards = ((claimed + 1)..levelIndex).mapNotNull { definition.rewards.getOrNull(it) }
+        val rewards = ((claimed + 1)..currentLevel).mapNotNull { level ->
+            definition.rewards.getOrNull(level)
+        }
         return AchievementRewardDTO(code, rewards)
     }
 
@@ -297,6 +335,8 @@ object AchievementService {
                 EPIC_FISHER_CODE -> fishDetails?.second == "epic"
                 MYTHIC_FISHER_CODE -> fishDetails?.second == "mythic"
                 LEGENDARY_FISHER_CODE -> fishDetails?.second == "legendary"
+                TRAVELER_CODE -> true
+                TROPHY_HUNTER_CODE -> true
                 else -> true
             }
             if (!relevant) return@forEach
@@ -306,16 +346,17 @@ object AchievementService {
                     .single()[AchievementProgress.level]
             }
             val progressValue = definition.progress(userId)
-            val levelIndex = levelIndex(definition.thresholds, progressValue)
-            if (levelIndex > previous) {
+            val newLevel = levelIndex(definition.thresholds, progressValue)
+            val uiLevel = minOf(newLevel, 4)
+            if (newLevel > previous) {
                 inTxn {
                     AchievementProgress.update({ AchievementProgress.id eq rowId }) {
-                        it[AchievementProgress.level] = levelIndex
+                        it[AchievementProgress.level] = newLevel
                         it[AchievementProgress.updatedAt] = Instant.now()
                     }
                 }
                 Metrics.counter("achievement_unlock_total", mapOf("code" to definition.code))
-                unlocks.add(AchievementUnlock(definition.code, levelIndex))
+                unlocks.add(AchievementUnlock(definition.code, uiLevel))
             }
         }
         return unlocks
@@ -344,6 +385,22 @@ object AchievementService {
             .toInt()
     }
 
+    private fun unlockedLocationsCount(userId: Long): Int = inTxn {
+        val totalKg = Catches.slice(Catches.weight.sum())
+            .select { Catches.userId eq userId }
+            .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
+        Locations.select { Locations.unlockKg lessEq totalKg }.count().toInt()
+    }
+
+    private fun heaviestCatchKg(userId: Long): Int = inTxn {
+        val maxWeight = Catches
+            .slice(Catches.weight.max())
+            .select { Catches.userId eq userId }
+            .singleOrNull()
+            ?.get(Catches.weight.max()) ?: 0.0
+        floor(maxWeight).toInt()
+    }
+
     private fun commonCatchCount(userId: Long): Int = rarityCatchCount(userId, "common")
     private fun uncommonCatchCount(userId: Long): Int = rarityCatchCount(userId, "uncommon")
     private fun rareCatchCount(userId: Long): Int = rarityCatchCount(userId, "rare")
@@ -351,11 +408,12 @@ object AchievementService {
     private fun mythicCatchCount(userId: Long): Int = rarityCatchCount(userId, "mythic")
     private fun legendaryCatchCount(userId: Long): Int = rarityCatchCount(userId, "legendary")
 
-    private fun levelLabel(index: Int, ru: Boolean): String = when (index) {
-        1 -> if (ru) "Бронза" else "Bronze"
-        2 -> if (ru) "Серебро" else "Silver"
-        3 -> if (ru) "Золото" else "Gold"
-        4 -> if (ru) "Платина" else "Platinum"
-        else -> if (ru) "Нет уровня" else "No tier"
-    }
+    private fun levelLabel(index: Int, ru: Boolean): String =
+        when {
+            index >= 4 -> if (ru) "Платина" else "Platinum"
+            index == 3 -> if (ru) "Золото" else "Gold"
+            index == 2 -> if (ru) "Серебро" else "Silver"
+            index == 1 -> if (ru) "Бронза" else "Bronze"
+            else -> if (ru) "Нет уровня" else "No tier"
+        }
 }
