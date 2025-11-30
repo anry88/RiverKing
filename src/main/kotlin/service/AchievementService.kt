@@ -53,6 +53,11 @@ object AchievementService {
 
     private const val KOI_COLLECTOR_CODE = "koi_collector"
     private const val SIMPLE_FISHER_CODE = "simple_fisher"
+    private const val UNCOMMON_FISHER_CODE = "uncommon_fisher"
+    private const val RARE_FISHER_CODE = "rare_fisher"
+    private const val EPIC_FISHER_CODE = "epic_fisher"
+    private const val MYTHIC_FISHER_CODE = "mythic_fisher"
+    private const val LEGENDARY_FISHER_CODE = "legendary_fisher"
 
     private val koiFishNames = listOf(
         "Карп кои (Кохаку)",
@@ -83,6 +88,11 @@ object AchievementService {
 
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
     private val simpleFisherThresholds = listOf(0, 10, 100, 500, 1000)
+    private val uncommonFisherThresholds = listOf(0, 5, 50, 500)
+    private val rareFisherThresholds = listOf(0, 3, 30, 300)
+    private val epicFisherThresholds = listOf(0, 1, 20, 200)
+    private val mythicFisherThresholds = listOf(0, 1, 10, 100)
+    private val legendaryFisherThresholds = listOf(0, 1, 5, 50)
     private val simpleFisherRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
         PrizeSpec(pack = "fresh_topup_s", qty = 1),
@@ -106,11 +116,61 @@ object AchievementService {
             code = SIMPLE_FISHER_CODE,
             nameRu = "Простой рыбак",
             nameEn = "Simple Fisher",
-            descRu = "Ловите рыбу простой редкости",
+            descRu = "Наловите рыб простой редкости",
             descEn = "Catch common rarity fish",
             thresholds = simpleFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::commonCatchCount,
+        ),
+        AchievementDefinition(
+            code = UNCOMMON_FISHER_CODE,
+            nameRu = "Непростой рыбак",
+            nameEn = "Uncommon Fisher",
+            descRu = "Наловите рыб необычной редкости",
+            descEn = "Catch uncommon rarity fish",
+            thresholds = uncommonFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::uncommonCatchCount,
+        ),
+        AchievementDefinition(
+            code = RARE_FISHER_CODE,
+            nameRu = "Редкий рыбак",
+            nameEn = "Rare Fisher",
+            descRu = "Наловите редких рыб",
+            descEn = "Catch rare fish",
+            thresholds = rareFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::rareCatchCount,
+        ),
+        AchievementDefinition(
+            code = EPIC_FISHER_CODE,
+            nameRu = "Эпичный рыбак",
+            nameEn = "Epic Fisher",
+            descRu = "Наловите рыб эпической редкости",
+            descEn = "Catch epic rarity fish",
+            thresholds = epicFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::epicCatchCount,
+        ),
+        AchievementDefinition(
+            code = MYTHIC_FISHER_CODE,
+            nameRu = "Мифический рыбак",
+            nameEn = "Mythic Fisher",
+            descRu = "Наловите рыб мифической редкости",
+            descEn = "Catch mythic rarity fish",
+            thresholds = mythicFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::mythicCatchCount,
+        ),
+        AchievementDefinition(
+            code = LEGENDARY_FISHER_CODE,
+            nameRu = "Легендарный рыбак",
+            nameEn = "Legendary Fisher",
+            descRu = "Наловите рыб легендарной редкости",
+            descEn = "Catch legendary rarity fish",
+            thresholds = legendaryFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::legendaryCatchCount,
         ),
     )
 
@@ -232,6 +292,11 @@ object AchievementService {
             val relevant = when (definition.code) {
                 KOI_COLLECTOR_CODE -> fishDetails?.first?.let { koiFishNames.contains(it) } == true
                 SIMPLE_FISHER_CODE -> fishDetails?.second == "common"
+                UNCOMMON_FISHER_CODE -> fishDetails?.second == "uncommon"
+                RARE_FISHER_CODE -> fishDetails?.second == "rare"
+                EPIC_FISHER_CODE -> fishDetails?.second == "epic"
+                MYTHIC_FISHER_CODE -> fishDetails?.second == "mythic"
+                LEGENDARY_FISHER_CODE -> fishDetails?.second == "legendary"
                 else -> true
             }
             if (!relevant) return@forEach
@@ -271,13 +336,20 @@ object AchievementService {
             .toInt()
     }
 
-    private fun commonCatchCount(userId: Long): Int = inTxn {
+    private fun rarityCatchCount(userId: Long, rarity: String): Int = inTxn {
         (Catches innerJoin Fish)
             .slice(Catches.id)
-            .select { (Catches.userId eq userId) and (Fish.rarity eq "common") }
+            .select { (Catches.userId eq userId) and (Fish.rarity eq rarity) }
             .count()
             .toInt()
     }
+
+    private fun commonCatchCount(userId: Long): Int = rarityCatchCount(userId, "common")
+    private fun uncommonCatchCount(userId: Long): Int = rarityCatchCount(userId, "uncommon")
+    private fun rareCatchCount(userId: Long): Int = rarityCatchCount(userId, "rare")
+    private fun epicCatchCount(userId: Long): Int = rarityCatchCount(userId, "epic")
+    private fun mythicCatchCount(userId: Long): Int = rarityCatchCount(userId, "mythic")
+    private fun legendaryCatchCount(userId: Long): Int = rarityCatchCount(userId, "legendary")
 
     private fun levelLabel(index: Int, ru: Boolean): String = when (index) {
         1 -> if (ru) "Бронза" else "Bronze"
