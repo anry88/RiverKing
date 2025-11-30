@@ -444,48 +444,56 @@
     return null;
   };
   const ROD_TIP_ANCHOR_DEFAULT = { x: 0.0802, y: 0.0568 };
+  const ROD_LINE_ANCHOR_DEFAULT = { x: 0.44, y: 0.82 };
   const ROD_LINE_GUIDES_DEFAULT = [
-    { x: 0.091, y: 0.077 },
-    { x: 0.148, y: 0.122 },
-    { x: 0.237, y: 0.192 },
-    { x: 0.360, y: 0.281 },
-    { x: 0.515, y: 0.395 },
     { x: 0.712, y: 0.560 },
+    { x: 0.515, y: 0.395 },
+    { x: 0.360, y: 0.281 },
+    { x: 0.237, y: 0.192 },
+    { x: 0.148, y: 0.122 },
+    { x: 0.091, y: 0.077 },
   ];
   const ROD_CONFIG = {
     spark: {
       image: '/app/assets/rods/yellow_rod.png',
       tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
     dew: {
       image: '/app/assets/rods/green_rod.png',
       tipAnchor: { x: 0.13607, y: 0.06641 },
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
       tipAnchor: { x: 0.16276, y: 0.07422 },
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
     abyss: {
       image: '/app/assets/rods/black_rod.png',
       tipAnchor: { x: 0.14844, y: 0.04688 },
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
       tipAnchor: { x: 0.13411, y: 0.07520 },
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
     default: {
       image: '/app/assets/rods/yellow_rod.png',
       tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+      lineAnchor: ROD_LINE_ANCHOR_DEFAULT,
       lineGuides: ROD_LINE_GUIDES_DEFAULT,
     },
   };
   const ROD_IMAGES = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.image]));
   const ROD_TIP_ANCHORS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.tipAnchor]));
+  const ROD_LINE_ANCHORS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.lineAnchor || ROD_LINE_ANCHOR_DEFAULT]));
   const ROD_LINE_GUIDES = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.lineGuides || ROD_LINE_GUIDES_DEFAULT]));
   const ROD_IMG = ROD_IMAGES.default;
   const ROD_IMG_SIZE = { width: 1536, height: 1024 };
@@ -1135,6 +1143,7 @@
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;
   window.ROD_TIP_ANCHOR = ROD_TIP_ANCHOR;
   window.ROD_TIP_ANCHORS = ROD_TIP_ANCHORS;
+  window.ROD_LINE_ANCHORS = ROD_LINE_ANCHORS;
   window.ROD_LINE_GUIDES = ROD_LINE_GUIDES;
   window.ROD_BASE_ANCHOR = ROD_BASE_ANCHOR;
   window.ROD_SIZE_MULT = ROD_SIZE_MULT;

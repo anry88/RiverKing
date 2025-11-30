@@ -179,6 +179,9 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const rodTipAnchor = (window.ROD_TIP_ANCHORS && currentRod?.code && window.ROD_TIP_ANCHORS[currentRod.code])
     || (window.ROD_TIP_ANCHORS && window.ROD_TIP_ANCHORS.default)
     || ROD_TIP_ANCHOR;
+  const rodLineAnchor = (window.ROD_LINE_ANCHORS && currentRod?.code && window.ROD_LINE_ANCHORS[currentRod.code])
+    || (window.ROD_LINE_ANCHORS && window.ROD_LINE_ANCHORS.default)
+    || { x: ROD_BASE_ANCHOR.x, y: ROD_BASE_ANCHOR.y * 0.9 };
   const rodLineGuides = (window.ROD_LINE_GUIDES && currentRod?.code && window.ROD_LINE_GUIDES[currentRod.code])
     || (window.ROD_LINE_GUIDES && window.ROD_LINE_GUIDES.default)
     || [];
@@ -200,52 +203,52 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
   const tipY = rodTop  + rodH * rodTipAnchor.y;
 
   const shouldShowSlack = !casting && !biting && !tapping;
-  const linePoints = React.useMemo(()=>{
+  const rodLinePoints = React.useMemo(()=>{
     const guides = Array.isArray(rodLineGuides) ? rodLineGuides : [];
     const guidePoints = guides.map(g=>({
       x: rodLeft + rodW * g.x,
       y: rodTop + rodH * g.y,
     }));
     return [
-      { x: tipX, y: tipY },
+      { x: rodLeft + rodW * rodLineAnchor.x, y: rodTop + rodH * rodLineAnchor.y },
       ...guidePoints,
-      { x: lineAttach.x, y: lineAttach.y },
+      { x: tipX, y: tipY },
     ];
-  }, [rodLineGuides, rodLeft, rodTop, rodW, rodH, tipX, tipY, lineAttach.x, lineAttach.y]);
-  const linePath = React.useMemo(() => {
-    const pts = linePoints.map(p=>({...p}));
-    if(!pts.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) {
+  }, [rodLineGuides, rodLeft, rodTop, rodW, rodH, rodLineAnchor.x, rodLineAnchor.y, tipX, tipY]);
+  const castLinePath = React.useMemo(() => {
+    if(!Number.isFinite(tipX) || !Number.isFinite(tipY) || !Number.isFinite(lineAttach.x) || !Number.isFinite(lineAttach.y)){
       return `M ${tipX},${tipY} L ${lineAttach.x},${lineAttach.y}`;
     }
-    if(pts.length >= 3 && shouldShowSlack){
-      const mid = Math.floor((pts.length - 1) / 2);
-      const end = pts[pts.length - 1];
-      const dist = Math.hypot(end.x - pts[0].x, end.y - pts[0].y);
-      const sag = Math.min(h * 0.22, Math.max(14, dist * 0.38));
-      pts[mid].y += sag;
-      if(pts.length > 3){
-        pts[pts.length - 2].y += sag * 0.6;
-      }
+    const dx = lineAttach.x - tipX;
+    const dy = lineAttach.y - tipY;
+    const dist = Math.hypot(dx, dy);
+    if(shouldShowSlack){
+      const sag = Math.min(h * 0.2, Math.max(18, dist * 0.4));
+      const control1 = { x: tipX + dx * 0.32, y: tipY + dy * 0.32 + sag * 0.6 };
+      const control2 = { x: tipX + dx * 0.68, y: tipY + dy * 0.68 + sag };
+      return `M ${tipX},${tipY} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
     }
-    const catmullToPath = (points) => {
-      if(points.length < 2) return '';
-      const p = points;
-      const d = [`M ${p[0].x},${p[0].y}`];
-      for(let i=0; i<p.length-1; i++){
-        const p0 = p[i-1] || p[i];
-        const p1 = p[i];
-        const p2 = p[i+1];
-        const p3 = p[i+2] || p2;
-        const c1x = p1.x + (p2.x - p0.x) / 6;
-        const c1y = p1.y + (p2.y - p0.y) / 6;
-        const c2x = p2.x - (p3.x - p1.x) / 6;
-        const c2y = p2.y - (p3.y - p1.y) / 6;
-        d.push(`C ${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`);
-      }
-      return d.join(' ');
-    };
-    return catmullToPath(pts);
-  }, [linePoints, tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h]);
+    const gentleSag = Math.min(h * 0.08, dist * 0.12);
+    const controlX = tipX + dx * 0.5;
+    const controlY = tipY + dy * 0.5 + gentleSag;
+    return `M ${tipX},${tipY} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h]);
+
+  const rodLinePath = React.useMemo(()=>{
+    const pts = rodLinePoints.map(p=>({...p}));
+    if(!pts.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) return '';
+    const d = [`M ${pts[0].x},${pts[0].y}`];
+    for(let i=0; i<pts.length-1; i++){
+      const p0 = pts[i];
+      const p1 = pts[i+1];
+      const midX = (p0.x + p1.x) / 2;
+      const midY = (p0.y + p1.y) / 2;
+      const ctrlX = midX;
+      const ctrlY = midY + (p1.x - p0.x) * 0.04;
+      d.push(`Q ${ctrlX},${ctrlY} ${p1.x},${p1.y}`);
+    }
+    return d.join(' ');
+  }, [rodLinePoints]);
 
   const catchTargetPx = React.useMemo(()=>{
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -520,8 +523,17 @@ function FishingStage({me, setMe, casting, biting, tapping, tapCount, tapGoal, t
             </clipPath>
           </defs>
         )}
+        {rodLinePath && (
+          <path
+            d={rodLinePath}
+            stroke="rgba(255,255,255,0.45)"
+            strokeWidth="0.8"
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
         <path
-          d={linePath}
+          d={castLinePath}
           stroke="rgba(255,255,255,0.45)"
           strokeWidth="0.8"
           strokeLinecap="round"
