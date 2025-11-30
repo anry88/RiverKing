@@ -442,13 +442,15 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val reward = AchievementService.claim(uid, code)
                 ?: return@post call.respond(HttpStatusCode.NotFound)
-            when {
-                reward.reward.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
-                    val amount = reward.reward.coins ?: reward.reward.qty
-                    fishing.addCoins(uid, amount)
-                }
-                reward.reward.pack.isNotBlank() -> {
-                    repeat(reward.reward.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, reward.reward.pack) }
+            reward.rewards.forEach { prize ->
+                when {
+                    prize.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
+                        val amount = prize.coins ?: prize.qty
+                        fishing.addCoins(uid, amount)
+                    }
+                    prize.pack.isNotBlank() -> {
+                        repeat(prize.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, prize.pack) }
+                    }
                 }
             }
             Metrics.counter("achievements_claim_total", mapOf("source" to "app", "code" to code))

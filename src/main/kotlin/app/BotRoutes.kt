@@ -6,7 +6,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
@@ -276,6 +278,12 @@ fun Application.botRoutes(env: Env) {
                         assetName = "daily.png"
                     ) { _, _ -> "/daily" },
                     InlineCommandInfo(
+                        name = "achievements",
+                        ruDescription = "Посмотреть достижения",
+                        enDescription = "View your achievements",
+                        assetName = "achievements.png"
+                    ) { _, _ -> "/achievements" },
+                    InlineCommandInfo(
                         name = "prizes",
                         ruDescription = "Забрать призы турнира",
                         enDescription = "Claim tournament prizes",
@@ -455,6 +463,7 @@ fun Application.botRoutes(env: Env) {
                 val started: Boolean,
                 val failureReason: String? = null,
                 val completion: Job? = null,
+                val completionResult: Deferred<Boolean>? = null,
             )
 
             fun hasAutoSubscription(uid: Long): Boolean = transaction {
@@ -613,7 +622,9 @@ fun Application.botRoutes(env: Env) {
                     )
                 }
                 trySend(chatId, waitMessage, replyToMessageId = replyTo)
+                val completionResult = CompletableDeferred<Boolean>()
                 val job = castScope.launch {
+                    var success = true
                     val waitSeconds = 5 + Random.nextInt(26)
                     delay(waitSeconds * 1000L)
                     try {
@@ -752,18 +763,27 @@ fun Application.botRoutes(env: Env) {
                             ),
                         )
                     } catch (e: Exception) {
+                        success = false
                         log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
                         fishing.resetCasting(uid)
-                        val errorText = if (lang == "ru") "Не удалось завершить заброс." else "Failed to finish the cast."
+                        val errorText = if (lang == "ru") {
+                            "Произошла ошибка во время заброса. Попробуй снова."
+                        } else {
+                            "An error occurred during the cast. Please try again."
+                        }
                         trySend(chatId, errorText, replyToMessageId = replyTo)
                         logCommandMetric(
                             "cast",
                             mapOf("result" to "error", "stage" to "final"),
                             source,
                         )
+                    } finally {
+                        if (!completionResult.isCompleted) {
+                            completionResult.complete(success)
+                        }
                     }
                 }
-                return CastAttemptResult(started = true, completion = job)
+                return CastAttemptResult(started = true, completion = job, completionResult = completionResult)
             }
 
             suspend fun sendLanguageMenu(
@@ -1175,6 +1195,14 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, baseText, markup, replyToMessageId)
             }
 
+            fun levelLabel(index: Int, ru: Boolean): String? = when (index) {
+                1 -> if (ru) "Бронза" else "Bronze"
+                2 -> if (ru) "Серебро" else "Silver"
+                3 -> if (ru) "Золото" else "Gold"
+                4 -> if (ru) "Платина" else "Platinum"
+                else -> null
+            }
+
             suspend fun sendAchievements(
                 uid: Long,
                 chatId: Long,
@@ -1183,9 +1211,28 @@ fun Application.botRoutes(env: Env) {
             ) {
                 val achievements = AchievementService.list(uid, lang)
                 val header = if (lang == "ru") "Достижения" else "Achievements"
+                val langIsRu = lang.lowercase().startsWith("ru")
                 val body = achievements.joinToString("\n\n") {
-                    val progress = "${it.progress}/${it.target}"
-                    "${it.name}:\n${it.level}, $progress"
+                    val currentLabel = if (it.levelIndex == 0) {
+                        if (langIsRu) "не открыта" else "Locked"
+                    } else {
+                        it.level
+                    }
+                    val nextLabel = levelLabel(it.levelIndex + 1, langIsRu)
+                    val progress = if (nextLabel == null) {
+                        if (langIsRu) {
+                            "${it.progress}/${it.target} (максимальный статус)"
+                        } else {
+                            "${it.progress}/${it.target} (max status)"
+                        }
+                    } else {
+                        if (langIsRu) {
+                            "${it.progress}/${it.target} до статуса $nextLabel"
+                        } else {
+                            "${it.progress}/${it.target} toward $nextLabel"
+                        }
+                    }
+                    "${it.name}:\n$currentLabel, $progress"
                 }
                 val claimable = achievements.filter { it.claimable }
                 val markup = if (claimable.isNotEmpty()) {
@@ -1512,8 +1559,8 @@ fun Application.botRoutes(env: Env) {
                 "призы" to "/prizes",
                 "prize" to "/prizes",
                 "prizes" to "/prizes",
-                "ачивки" to "/achievements",
-                "ачивка" to "/achievements",
+                "достижения" to "/achievements",
+                "достижение" to "/achievements",
                 "achievements" to "/achievements",
                 "achievement" to "/achievements",
                 "рейтинг" to "/daily_rating",
@@ -1601,6 +1648,7 @@ fun Application.botRoutes(env: Env) {
 /rod — выбрать удочку
 /location — сменить локацию
 /daily — получить ежедневную награду
+/achievements — посмотреть достижения
 /prizes — забрать призы турнира
 /shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
@@ -1620,6 +1668,7 @@ Available commands:
 /rod — change your rod
 /location — change your location
 /daily — claim your daily reward
+/achievements — view your achievements
 /prizes — claim tournament prizes
 /shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
@@ -2308,8 +2357,23 @@ Available commands:
                                         break
                                     }
                                     state.currentCast = result.completion
-                                    result.completion?.join()
+                                    val completedSuccessfully = try {
+                                        result.completion?.join()
+                                        result.completionResult?.await() != false
+                                    } catch (e: Exception) {
+                                        log.error("autocast completion failed uid={}", uid, e)
+                                        false
+                                    }
                                     state.currentCast = null
+                                    if (!completedSuccessfully) {
+                                        val stopMessage = if (lang == "ru") {
+                                            "Автоловля остановлена из-за ошибки."
+                                        } else {
+                                            "Auto casting stopped because of an error."
+                                        }
+                                        trySend(privateChatId, stopMessage)
+                                        break
+                                    }
                                     if (state.stopRequested.get()) break
                                     delay(3000L)
                                 }
@@ -2751,13 +2815,15 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        when {
-                            reward.reward.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
-                                val amount = reward.reward.coins ?: reward.reward.qty
-                                fishing.addCoins(uid, amount)
-                            }
-                            reward.reward.pack.isNotBlank() -> {
-                                repeat(reward.reward.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, reward.reward.pack) }
+                        reward.rewards.forEach { prize ->
+                            when {
+                                prize.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
+                                    val amount = prize.coins ?: prize.qty
+                                    fishing.addCoins(uid, amount)
+                                }
+                                prize.pack.isNotBlank() -> {
+                                    repeat(prize.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, prize.pack) }
+                                }
                             }
                         }
                         logCommandMetric("achievements_claim", mapOf("result" to "ok", "code" to code), source)

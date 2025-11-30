@@ -4,13 +4,11 @@ import db.AchievementProgress
 import db.Achievements
 import db.Catches
 import db.Fish
-import db.Users
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -32,7 +30,7 @@ data class AchievementDTO(
 @Serializable
 data class AchievementRewardDTO(
     val code: String,
-    val reward: PrizeSpec,
+    val rewards: List<PrizeSpec>,
 )
 
 @Serializable
@@ -42,7 +40,20 @@ data class AchievementUnlock(
 )
 
 object AchievementService {
+    private data class AchievementDefinition(
+        val code: String,
+        val nameRu: String,
+        val nameEn: String,
+        val descRu: String,
+        val descEn: String,
+        val thresholds: List<Int>,
+        val rewards: List<PrizeSpec>,
+        val progress: (Long) -> Int,
+    )
+
     private const val KOI_COLLECTOR_CODE = "koi_collector"
+    private const val SIMPLE_FISHER_CODE = "simple_fisher"
+
     private val koiFishNames = listOf(
         "Карп кои (Кохаку)",
         "Карп кои (Тайсё Сансёку)",
@@ -71,6 +82,37 @@ object AchievementService {
     )
 
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
+    private val simpleFisherThresholds = listOf(0, 10, 100, 500, 1000)
+    private val simpleFisherRewards = listOf(
+        PrizeSpec(pack = "", qty = 0),
+        PrizeSpec(pack = "fresh_topup_s", qty = 1),
+        PrizeSpec(pack = "fresh_stock_m", qty = 1),
+        PrizeSpec(pack = "fresh_crate_l", qty = 1),
+        PrizeSpec(pack = "salt_crate_l", qty = 1),
+    )
+
+    private val definitions = listOf(
+        AchievementDefinition(
+            code = KOI_COLLECTOR_CODE,
+            nameRu = "Коллекционер Кои",
+            nameEn = "Koi Collector",
+            descRu = "Поймайте всех 16 видов карпов кои",
+            descEn = "Catch all 16 koi varieties",
+            thresholds = koiThresholds,
+            rewards = koiRewards,
+            progress = ::koiCatchCount,
+        ),
+        AchievementDefinition(
+            code = SIMPLE_FISHER_CODE,
+            nameRu = "Простой рыбак",
+            nameEn = "Simple Fisher",
+            descRu = "Ловите рыбу простой редкости",
+            descEn = "Catch common rarity fish",
+            thresholds = simpleFisherThresholds,
+            rewards = simpleFisherRewards,
+            progress = ::commonCatchCount,
+        ),
+    )
 
     private inline fun <T> inTxn(crossinline block: () -> T): T {
         val current = TransactionManager.currentOrNull()
@@ -78,26 +120,34 @@ object AchievementService {
     }
 
     fun seed() = inTxn {
-        Achievements.insertIgnore { row ->
-            row[code] = KOI_COLLECTOR_CODE
-            row[nameRu] = "Коллекционер Кои"
-            row[nameEn] = "Koi Collector"
-            row[descRu] = "Поймайте всех 16 видов карпов кои"
-            row[descEn] = "Catch all 16 koi varieties"
+        definitions.forEach { def ->
+            Achievements.insertIgnore { row ->
+                row[code] = def.code
+                row[nameRu] = def.nameRu
+                row[nameEn] = def.nameEn
+                row[descRu] = def.descRu
+                row[descEn] = def.descEn
+            }
         }
     }
 
-    private fun levelIndex(progress: Int): Int {
+    private fun definitionFor(code: String): AchievementDefinition? = definitions.find { it.code == code }
+
+    private fun achievementId(definition: AchievementDefinition): Long = inTxn {
+        Achievements.select { Achievements.code eq definition.code }
+            .single()[Achievements.id].value
+    }
+
+    private fun levelIndex(thresholds: List<Int>, progress: Int): Int {
         var level = 0
-        koiThresholds.forEachIndexed { index, threshold ->
+        thresholds.forEachIndexed { index, threshold ->
             if (progress >= threshold) level = index
         }
         return level
     }
 
-    private fun ensureProgressRow(userId: Long): Long = inTxn {
-        val achievementId = Achievements.select { Achievements.code eq KOI_COLLECTOR_CODE }
-            .single()[Achievements.id].value
+    private fun ensureProgressRow(userId: Long, definition: AchievementDefinition): Long = inTxn {
+        val achievementId = achievementId(definition)
         val existing = AchievementProgress.select {
             (AchievementProgress.userId eq userId) and (AchievementProgress.achievementId eq achievementId)
         }.singleOrNull()
@@ -111,73 +161,99 @@ object AchievementService {
         } get AchievementProgress.id
     }.value
 
-    fun progress(userId: Long, language: String): AchievementDTO = inTxn {
-        val achievement = Achievements.select { Achievements.code eq KOI_COLLECTOR_CODE }.single()
+    private fun progress(
+        userId: Long,
+        language: String,
+        definition: AchievementDefinition,
+    ): AchievementDTO {
         val langIsRu = language.lowercase().startsWith("ru")
-        val progress = koiCatchCount(userId)
-        val level = levelIndex(progress)
-        val target = koiThresholds.getOrNull(level + 1) ?: koiThresholds.last()
-        val progressRow = AchievementProgress.select {
-            (AchievementProgress.userId eq userId) and (AchievementProgress.achievementId eq achievement[Achievements.id].value)
-        }.singleOrNull()
+        val progressValue = definition.progress(userId)
+        val level = levelIndex(definition.thresholds, progressValue)
+        val target = definition.thresholds.getOrNull(level + 1) ?: definition.thresholds.last()
+        val rowId = ensureProgressRow(userId, definition)
+        val progressRow = inTxn {
+            AchievementProgress.select { AchievementProgress.id eq rowId }.singleOrNull()
+        }
         val claimed = progressRow?.get(AchievementProgress.claimedLevel) ?: 0
-        AchievementDTO(
-            code = KOI_COLLECTOR_CODE,
-            name = if (langIsRu) achievement[Achievements.nameRu] else achievement[Achievements.nameEn],
-            description = if (langIsRu) achievement[Achievements.descRu] else achievement[Achievements.descEn],
+        val storedLevel = progressRow?.get(AchievementProgress.level) ?: 0
+        if (level > storedLevel) {
+            inTxn {
+                AchievementProgress.update({ AchievementProgress.id eq rowId }) {
+                    it[AchievementProgress.level] = level
+                    it[AchievementProgress.updatedAt] = Instant.now()
+                }
+            }
+        }
+        return AchievementDTO(
+            code = definition.code,
+            name = if (langIsRu) definition.nameRu else definition.nameEn,
+            description = if (langIsRu) definition.descRu else definition.descEn,
             level = levelLabel(level, langIsRu),
             levelIndex = level,
-            progress = progress,
+            progress = progressValue,
             target = target,
             claimable = level > claimed,
         )
     }
 
-    fun list(userId: Long, language: String): List<AchievementDTO> = listOf(progress(userId, language))
+    fun list(userId: Long, language: String): List<AchievementDTO> = definitions.map { progress(userId, language, it) }
 
     fun claim(userId: Long, code: String): AchievementRewardDTO? {
-        if (code != KOI_COLLECTOR_CODE) return null
-        val progress = progress(userId, "ru")
-        val achievementId = inTxn {
-            Achievements.select { Achievements.code eq KOI_COLLECTOR_CODE }
-                .single()[Achievements.id].value
+        val definition = definitionFor(code) ?: return null
+        val progressValue = definition.progress(userId)
+        val levelIndex = levelIndex(definition.thresholds, progressValue)
+        val rowId = ensureProgressRow(userId, definition)
+        val (claimed, storedLevel) = inTxn {
+            AchievementProgress.select { AchievementProgress.id eq rowId }.single().let { row ->
+                row[AchievementProgress.claimedLevel] to row[AchievementProgress.level]
+            }
         }
-        val rowId = ensureProgressRow(userId)
-        val claimed = inTxn {
-            AchievementProgress.select { AchievementProgress.id eq rowId }
-                .single()[AchievementProgress.claimedLevel]
-        }
-        if (progress.levelIndex <= claimed) return null
+        if (levelIndex <= claimed) return null
         inTxn {
             AchievementProgress.update({ AchievementProgress.id eq rowId }) {
-                it[claimedLevel] = progress.levelIndex
-                it[updatedAt] = Instant.now()
+                it[AchievementProgress.claimedLevel] = levelIndex
+                it[AchievementProgress.level] = maxOf(storedLevel, levelIndex)
+                it[AchievementProgress.updatedAt] = Instant.now()
             }
         }
         Metrics.counter("achievement_claim_total", mapOf("code" to code))
-        return AchievementRewardDTO(code, koiRewards[progress.levelIndex])
+        val rewards = ((claimed + 1)..levelIndex).mapNotNull { definition.rewards.getOrNull(it) }
+        return AchievementRewardDTO(code, rewards)
     }
 
-    fun updateOnCatch(userId: Long, fishId: Long): AchievementUnlock? {
-        val isKoi = inTxn {
-            Fish.select { Fish.id eq fishId }.singleOrNull()?.get(Fish.name)
-        }?.let { koiFishNames.contains(it) } ?: false
-        if (!isKoi) return null
-        val progress = progress(userId, "ru")
-        val rowId = ensureProgressRow(userId)
-        val previous = inTxn {
-            AchievementProgress.select { AchievementProgress.id eq rowId }
-                .single()[AchievementProgress.level]
-        }
-        if (progress.levelIndex <= previous) return null
-        inTxn {
-            AchievementProgress.update({ AchievementProgress.id eq rowId }) {
-                it[level] = progress.levelIndex
-                it[updatedAt] = Instant.now()
+    fun updateOnCatch(userId: Long, fishId: Long): List<AchievementUnlock> {
+        val fishDetails = inTxn {
+            Fish.select { Fish.id eq fishId }.singleOrNull()?.let { row ->
+                row[Fish.name] to row[Fish.rarity]
             }
         }
-        Metrics.counter("achievement_unlock_total", mapOf("code" to KOI_COLLECTOR_CODE))
-        return AchievementUnlock(KOI_COLLECTOR_CODE, progress.levelIndex)
+        val unlocks = mutableListOf<AchievementUnlock>()
+        definitions.forEach { definition ->
+            val relevant = when (definition.code) {
+                KOI_COLLECTOR_CODE -> fishDetails?.first?.let { koiFishNames.contains(it) } == true
+                SIMPLE_FISHER_CODE -> fishDetails?.second == "common"
+                else -> true
+            }
+            if (!relevant) return@forEach
+            val rowId = ensureProgressRow(userId, definition)
+            val previous = inTxn {
+                AchievementProgress.select { AchievementProgress.id eq rowId }
+                    .single()[AchievementProgress.level]
+            }
+            val progressValue = definition.progress(userId)
+            val levelIndex = levelIndex(definition.thresholds, progressValue)
+            if (levelIndex > previous) {
+                inTxn {
+                    AchievementProgress.update({ AchievementProgress.id eq rowId }) {
+                        it[AchievementProgress.level] = levelIndex
+                        it[AchievementProgress.updatedAt] = Instant.now()
+                    }
+                }
+                Metrics.counter("achievement_unlock_total", mapOf("code" to definition.code))
+                unlocks.add(AchievementUnlock(definition.code, levelIndex))
+            }
+        }
+        return unlocks
     }
 
     private fun koiCatchCount(userId: Long): Int = inTxn {
@@ -191,6 +267,14 @@ object AchievementService {
             .select { (Catches.userId eq userId) and (Catches.fishId inList fishIds) }
             .groupBy(Catches.fishId)
             .orderBy(Catches.fishId, SortOrder.ASC)
+            .count()
+            .toInt()
+    }
+
+    private fun commonCatchCount(userId: Long): Int = inTxn {
+        (Catches innerJoin Fish)
+            .slice(Catches.id)
+            .select { (Catches.userId eq userId) and (Fish.rarity eq "common") }
             .count()
             .toInt()
     }
