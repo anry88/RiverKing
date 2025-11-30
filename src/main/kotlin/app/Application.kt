@@ -50,6 +50,12 @@ fun main() {
 
                 bot.setMyCommands(englishCommands)
                 bot.setMyCommands(englishCommands, scope = BotCommandScope.AllPrivateChats)
+                bot.setMyCommands(englishCommands, languageCode = "en")
+                bot.setMyCommands(
+                    englishCommands,
+                    languageCode = "en",
+                    scope = BotCommandScope.AllPrivateChats,
+                )
 
                 bot.setMyCommands(russianCommands, languageCode = "ru")
                 bot.setMyCommands(
