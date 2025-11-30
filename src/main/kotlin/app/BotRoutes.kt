@@ -1195,14 +1195,6 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, baseText, markup, replyToMessageId)
             }
 
-            fun levelLabel(index: Int, ru: Boolean): String? = when (index) {
-                1 -> if (ru) "Бронза" else "Bronze"
-                2 -> if (ru) "Серебро" else "Silver"
-                3 -> if (ru) "Золото" else "Gold"
-                4 -> if (ru) "Платина" else "Platinum"
-                else -> null
-            }
-
             suspend fun sendAchievements(
                 uid: Long,
                 chatId: Long,
@@ -1213,26 +1205,20 @@ fun Application.botRoutes(env: Env) {
                 val header = if (lang == "ru") "Достижения" else "Achievements"
                 val langIsRu = lang.lowercase().startsWith("ru")
                 val body = achievements.joinToString("\n\n") {
-                    val currentLabel = if (it.levelIndex == 0) {
-                        if (langIsRu) "не открыта" else "Locked"
-                    } else {
-                        it.level
-                    }
-                    val nextLabel = levelLabel(it.levelIndex + 1, langIsRu)
-                    val progress = if (nextLabel == null) {
+                    val progressLabel = if (it.levelIndex >= 4) {
                         if (langIsRu) {
-                            "${it.progress}/${it.target} (максимальный статус)"
+                            "Прогресс ${it.progress}/${it.target} (максимум)"
                         } else {
-                            "${it.progress}/${it.target} (max status)"
+                            "Progress ${it.progress}/${it.target} (max)"
                         }
                     } else {
                         if (langIsRu) {
-                            "${it.progress}/${it.target} до статуса $nextLabel"
+                            "Прогресс ${it.progress}/${it.target}"
                         } else {
-                            "${it.progress}/${it.target} toward $nextLabel"
+                            "Progress ${it.progress}/${it.target}"
                         }
                     }
-                    "${it.name}:\n$currentLabel, $progress"
+                    "${it.name}:\n$progressLabel"
                 }
                 val claimable = achievements.filter { it.claimable }
                 val markup = if (claimable.isNotEmpty()) {
