@@ -1,6 +1,5 @@
 package app
 
-import app.RARITY_LABELS
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -54,9 +53,6 @@ import db.Lures
 import db.Locations
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.slice
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, userId: Long): String? {
@@ -1205,6 +1201,7 @@ fun Application.botRoutes(env: Env) {
                 val header = if (lang == "ru") "Достижения" else "Achievements"
                 val langIsRu = lang.lowercase().startsWith("ru")
                 val body = achievements.joinToString("\n\n") {
+                    val description = it.description
                     val progressLabel = if (it.levelIndex >= 4) {
                         if (langIsRu) {
                             "Прогресс ${it.progress}/${it.target} (максимум)"
@@ -1218,7 +1215,7 @@ fun Application.botRoutes(env: Env) {
                             "Progress ${it.progress}/${it.target}"
                         }
                     }
-                    "${it.name}:\n$progressLabel"
+                    "${it.name}:\n$description\n$progressLabel"
                 }
                 val claimable = achievements.filter { it.claimable }
                 val markup = if (claimable.isNotEmpty()) {
