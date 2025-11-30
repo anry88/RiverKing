@@ -5,6 +5,19 @@ const params = new URLSearchParams(window.location.search);
 const refToken = tg?.initDataUnsafe?.start_param
   || params.get('tgWebAppStartParam')
   || params.get('ref');
+const makeT = window.makeT || ((lang) => (key) => key);
+let t = window.t || ((key) => key);
+const TAP_CHALLENGE_DURATION_MS = window.TAP_CHALLENGE_DURATION_MS || 5000;
+const TAP_CHALLENGE_GOAL = window.TAP_CHALLENGE_GOAL || 10;
+const CAST_READY_DELAY_MS = window.CAST_READY_DELAY_MS || 3000;
+const initLang = window.initLang || 'en';
+const translateLure = (name, lang) => {
+  const fn = window.translateLure;
+  if (typeof fn === 'function' && fn !== translateLure) return fn(name, lang);
+  return name;
+};
+const useResizeObserver = window.useResizeObserver || (() => ({ w: 0, h: 0 }));
+const ROD_IMG = window.ROD_IMG || '/app/assets/rods/yellow_rod.png';
 const tgParam = (()=>{
   try{
     const raw = window.location.search + window.location.hash;
@@ -848,7 +861,7 @@ function App(){
                 todayCoins: todayCoins,
                 locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
                 rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
-                recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},..,(p.recent||[])].slice(0,5),
+                recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
               };
             });
