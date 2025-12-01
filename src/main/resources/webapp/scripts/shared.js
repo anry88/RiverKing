@@ -443,7 +443,7 @@
     }
     return null;
   };
-  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.0478 };
+  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.0479 };
 //  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
   const ROD_CONFIG = {
     spark: {
