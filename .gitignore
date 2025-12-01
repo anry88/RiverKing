@@ -37,3 +37,4 @@ build/
 # Конфиг файл
 *.properties
 
+/.gradle-home/wrapper/

@@ -50,12 +50,29 @@ fun main() {
 
                 bot.setMyCommands(englishCommands)
                 bot.setMyCommands(englishCommands, scope = BotCommandScope.AllPrivateChats)
+                bot.setMyCommands(englishCommands, scope = BotCommandScope.AllGroupChats)
+                bot.setMyCommands(englishCommands, languageCode = "en")
+                bot.setMyCommands(
+                    englishCommands,
+                    languageCode = "en",
+                    scope = BotCommandScope.AllPrivateChats,
+                )
+                bot.setMyCommands(
+                    englishCommands,
+                    languageCode = "en",
+                    scope = BotCommandScope.AllGroupChats,
+                )
 
                 bot.setMyCommands(russianCommands, languageCode = "ru")
                 bot.setMyCommands(
                     russianCommands,
                     languageCode = "ru",
                     scope = BotCommandScope.AllPrivateChats,
+                )
+                bot.setMyCommands(
+                    russianCommands,
+                    languageCode = "ru",
+                    scope = BotCommandScope.AllGroupChats,
                 )
             } catch (e: Exception) {
                 log.error("Failed to set bot commands", e)
@@ -69,11 +86,8 @@ fun main() {
 
         // Static Mini App (served from resources/webapp)
         routing {
-            route("/app/assets") {
-                get("{...}") { call.respond(HttpStatusCode.NotFound) }
-                head("{...}") { call.respond(HttpStatusCode.NotFound) }
-            }
-            staticResources("/app", "webapp")
+            staticResources("/app/assets", "webapp/assets")
+            staticResources("/app", "webapp", "index.html")
             get("/") {
                 val params = call.request.rawQueryParameters
                 params["tgId"]?.toLongOrNull()?.let { tgId ->
@@ -114,6 +128,7 @@ private fun defaultBotCommands(): List<BotCommand> = listOf(
     BotCommand("rod", "Choose your rod"),
     BotCommand("location", "Change your location"),
     BotCommand("daily", "Claim your daily reward"),
+    BotCommand("achievements", "View your achievements"),
     BotCommand("prizes", "Claim tournament prizes"),
     BotCommand("shop", "Buy baits and rods with Stars"),
     BotCommand("coin_shop", "Buy bundles with coins"),
@@ -133,6 +148,7 @@ private fun russianBotCommands(): List<BotCommand> = listOf(
     BotCommand("rod", "Выбрать удочку"),
     BotCommand("location", "Сменить локацию"),
     BotCommand("daily", "Получить ежедневную награду"),
+    BotCommand("achievements", "Посмотреть достижения"),
     BotCommand("prizes", "Забрать призы турнира"),
     BotCommand("shop", "Купить приманки и удочки за звёзды"),
     BotCommand("coin_shop", "Купить наборы за монеты"),

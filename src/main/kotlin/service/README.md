@@ -25,3 +25,4 @@ Manages the player lifecycle and fishing process.
 - **I18n** — catalog of localized names for fish, locations, rods, and lures; functions like `fish(code, lang)` and `location(code, lang)` are used by the API for readable responses.
 - **ReferralService** — creates and applies referral tokens: `generateLink`, `currentLink`, `invited`, `applyToken`; `onPurchase` awards the referrer after purchases.
 - **PrizeService** (supporting types) — `UserPrize` and `PrizeSpec` DTOs are reused by `/api/tournament*` routes.
+- **AchievementService** — tracks achievement definitions and player progress. The initial entry, **Коллекционер Кои / Koi Collector**, counts unique koi catches, unlocks bronze/silver/gold/platinum tiers, records claim status in `AchievementProgress`, and grants lure bundles or auto‑fishing time through the API and bot.

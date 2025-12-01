@@ -1507,6 +1507,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val coins: Int = 0,
         val totalCoins: Long? = null,
         val todayCoins: Long? = null,
+        val achievements: List<AchievementUnlock> = emptyList(),
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1676,6 +1677,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             coinsAwarded: Int = 0,
             totalCoins: Long? = null,
             todayCoins: Long? = null,
+            achievements: List<AchievementUnlock> = emptyList(),
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1692,6 +1694,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 coinsAwarded,
                 totalCoins,
                 todayCoins,
+                achievements,
             )
         }
 
@@ -1747,6 +1750,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.coins] = coinsAwarded
         }
 
+        val achievements = AchievementService.updateOnCatch(userId, fishId)
+
         if (coinsAwarded != 0) {
             Users.update({ Users.id eq userId }) {
                 it[Users.coins] = totalCoinsAfter
@@ -1771,6 +1776,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             coinsAwarded = coinsAwarded,
             totalCoins = totalCoinsAfter,
             todayCoins = todayCoinsAfter,
+            achievements = achievements,
         )
     }
 

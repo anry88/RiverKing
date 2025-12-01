@@ -703,6 +703,11 @@ function FishingTab({
             {result.newRods && result.newRods.length>0 && (
               <div className="text-xs text-emerald-400">{(result.newRods.length>1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
             )}
+            {Array.isArray(result.achievements) && result.achievements.map((a,i)=>(
+              <div key={`ach-${i}`} className="text-xs text-amber-300">
+                {t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex })}
+              </div>
+            ))}
           </div>
         </button>
       )}

@@ -1,12 +1,13 @@
 package app
 
-import app.RARITY_LABELS
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
@@ -32,6 +33,7 @@ import service.UserPrize
 import service.PrizeSpec
 import service.I18n
 import service.COIN_PRIZE_ID
+import service.AchievementService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -51,9 +53,6 @@ import db.Lures
 import db.Locations
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.slice
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, userId: Long): String? {
@@ -275,6 +274,12 @@ fun Application.botRoutes(env: Env) {
                         assetName = "daily.png"
                     ) { _, _ -> "/daily" },
                     InlineCommandInfo(
+                        name = "achievements",
+                        ruDescription = "Посмотреть достижения",
+                        enDescription = "View your achievements",
+                        assetName = "achievements.png"
+                    ) { _, _ -> "/achievements" },
+                    InlineCommandInfo(
                         name = "prizes",
                         ruDescription = "Забрать призы турнира",
                         enDescription = "Claim tournament prizes",
@@ -454,6 +459,7 @@ fun Application.botRoutes(env: Env) {
                 val started: Boolean,
                 val failureReason: String? = null,
                 val completion: Job? = null,
+                val completionResult: Deferred<Boolean>? = null,
             )
 
             fun hasAutoSubscription(uid: Long): Boolean = transaction {
@@ -612,7 +618,9 @@ fun Application.botRoutes(env: Env) {
                     )
                 }
                 trySend(chatId, waitMessage, replyToMessageId = replyTo)
+                val completionResult = CompletableDeferred<Boolean>()
                 val job = castScope.launch {
+                    var success = true
                     val waitSeconds = 5 + Random.nextInt(26)
                     delay(waitSeconds * 1000L)
                     try {
@@ -751,18 +759,27 @@ fun Application.botRoutes(env: Env) {
                             ),
                         )
                     } catch (e: Exception) {
+                        success = false
                         log.error("cast command failed uid={} chatId={} source={}", uid, chatId, source, e)
                         fishing.resetCasting(uid)
-                        val errorText = if (lang == "ru") "Не удалось завершить заброс." else "Failed to finish the cast."
+                        val errorText = if (lang == "ru") {
+                            "Произошла ошибка во время заброса. Попробуй снова."
+                        } else {
+                            "An error occurred during the cast. Please try again."
+                        }
                         trySend(chatId, errorText, replyToMessageId = replyTo)
                         logCommandMetric(
                             "cast",
                             mapOf("result" to "error", "stage" to "final"),
                             source,
                         )
+                    } finally {
+                        if (!completionResult.isCompleted) {
+                            completionResult.complete(success)
+                        }
                     }
                 }
-                return CastAttemptResult(started = true, completion = job)
+                return CastAttemptResult(started = true, completion = job, completionResult = completionResult)
             }
 
             suspend fun sendLanguageMenu(
@@ -1174,6 +1191,48 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, baseText, markup, replyToMessageId)
             }
 
+            suspend fun sendAchievements(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val achievements = AchievementService.list(uid, lang)
+                val header = if (lang == "ru") "Достижения" else "Achievements"
+                val langIsRu = lang.lowercase().startsWith("ru")
+                val body = achievements.joinToString("\n\n") {
+                    val description = it.description
+                    val progressText = if (it.levelIndex >= 4) {
+                        if (langIsRu) {
+                            "Прогресс ${it.progressLabel}/${it.targetLabel} (максимум)"
+                        } else {
+                            "Progress ${it.progressLabel}/${it.targetLabel} (max)"
+                        }
+                    } else {
+                        if (langIsRu) {
+                            "Прогресс ${it.progressLabel}/${it.targetLabel}"
+                        } else {
+                            "Progress ${it.progressLabel}/${it.targetLabel}"
+                        }
+                    }
+                    "${it.name}:\n$description\n$progressText"
+                }
+                val claimable = achievements.filter { it.claimable }
+                val markup = if (claimable.isNotEmpty()) {
+                    val buttons = claimable.map { ach ->
+                        val label = if (lang == "ru") {
+                            "🎁 ${ach.name}"
+                        } else {
+                            "🎁 ${ach.name}"
+                        }
+                        listOf(InlineKeyboardButton(label, "/achvclaim ${ownedData(uid, ach.code)}"))
+                    }
+                    Json.encodeToString(InlineKeyboardMarkup(buttons))
+                } else null
+                val text = "$header:\n$body"
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
             fun packNamesRu(): MutableMap<String, String> {
                 val names = fishing.listShop("ru").flatMap { it.packs }.associate { it.id to it.name }.toMutableMap()
                 if (!names.containsKey("autofish_week")) {
@@ -1483,6 +1542,10 @@ fun Application.botRoutes(env: Env) {
                 "призы" to "/prizes",
                 "prize" to "/prizes",
                 "prizes" to "/prizes",
+                "достижения" to "/achievements",
+                "достижение" to "/achievements",
+                "achievements" to "/achievements",
+                "achievement" to "/achievements",
                 "рейтинг" to "/daily_rating",
                 "rating" to "/daily_rating",
                 "leaderboard" to "/daily_rating",
@@ -1568,6 +1631,7 @@ fun Application.botRoutes(env: Env) {
 /rod — выбрать удочку
 /location — сменить локацию
 /daily — получить ежедневную награду
+/achievements — посмотреть достижения
 /prizes — забрать призы турнира
 /shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
@@ -1587,6 +1651,7 @@ Available commands:
 /rod — change your rod
 /location — change your location
 /daily — claim your daily reward
+/achievements — view your achievements
 /prizes — claim tournament prizes
 /shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
@@ -1803,6 +1868,13 @@ Available commands:
                         )
                         return true
                     }
+                    "/achievements" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("achievements", source = source)
+                        sendAchievements(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
                     "/daily" -> {
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
@@ -1972,7 +2044,7 @@ Available commands:
                                 }
                                 trySend(chatId, info, replyToMessageId = replyTo)
                             }
-                        } catch (e: StarsPaymentService.MissingPrivateChatAccessException) {
+                        } catch (_: StarsPaymentService.MissingPrivateChatAccessException) {
                             log.warn("sendInvoice missing private chat access chatId={} pack={}", chatId, packId)
                             logCommandMetric(
                                 "buy",
@@ -2268,8 +2340,23 @@ Available commands:
                                         break
                                     }
                                     state.currentCast = result.completion
-                                    result.completion?.join()
+                                    val completedSuccessfully = try {
+                                        result.completion?.join()
+                                        result.completionResult?.await() != false
+                                    } catch (e: Exception) {
+                                        log.error("autocast completion failed uid={}", uid, e)
+                                        false
+                                    }
                                     state.currentCast = null
+                                    if (!completedSuccessfully) {
+                                        val stopMessage = if (lang == "ru") {
+                                            "Автоловля остановлена из-за ошибки."
+                                        } else {
+                                            "Auto casting stopped because of an error."
+                                        }
+                                        trySend(privateChatId, stopMessage)
+                                        break
+                                    }
                                     if (state.stopRequested.get()) break
                                     delay(3000L)
                                 }
@@ -2672,7 +2759,7 @@ Available commands:
                                     "$header\n$lines"
                                 }
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             logCommandMetric(
                                 "prizes_claim",
                                 mapOf("result" to "error", "pack" to (if (isCoins) COIN_PRIZE_ID else prize.packageId)),
@@ -2692,6 +2779,40 @@ Available commands:
                             replyToMessageId = replyTo,
                             showWhenEmpty = true,
                         )
+                        return true
+                    }
+                    "/achvclaim" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val code = value ?: return true
+                        val reward = AchievementService.claim(uid, code)
+                        if (reward == null) {
+                            logCommandMetric("achievements_claim", mapOf("result" to "not_found"), source)
+                            val reply = if (lang == "ru") {
+                                "Достижение не найдено или награда уже получена."
+                            } else {
+                                "Achievement not found or already claimed."
+                            }
+                            trySend(chatId, reply, replyToMessageId = replyTo)
+                            return true
+                        }
+                        reward.rewards.forEach { prize ->
+                            when {
+                                prize.pack.equals(COIN_PRIZE_ID, ignoreCase = true) -> {
+                                    val amount = prize.coins ?: prize.qty
+                                    fishing.addCoins(uid, amount)
+                                }
+                                prize.pack.isNotBlank() -> {
+                                    repeat(prize.qty.coerceAtLeast(1)) { fishing.buyPackage(uid, prize.pack) }
+                                }
+                            }
+                        }
+                        logCommandMetric("achievements_claim", mapOf("result" to "ok", "code" to code), source)
+                        val reply = if (lang == "ru") "Награда за достижение получена!" else "Achievement reward claimed!"
+                        sendAchievements(uid, chatId, lang, replyToMessageId = replyTo)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
                 }
@@ -3306,7 +3427,7 @@ Available commands:
                     logCommandMetric("answer", mapOf("result" to "invalid_args"), source)
                     trySend(chatId, reply)
                 } else {
-                    val reqId = id!!
+                    val reqId = id
                     val req = PayService.findSupportRequest(reqId)
                     if (req != null && req.userId == uid) {
                         PayService.updateSupportRequest(reqId, "pending", answer)

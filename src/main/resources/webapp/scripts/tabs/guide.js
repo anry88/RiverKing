@@ -1,7 +1,16 @@
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
 
-function Guide({me}){
+function Guide({
+  me,
+  achievements = [],
+  onReloadAchievements,
+  achievementsLoading,
+  achievementsError,
+  onClaimAchievement,
+  claimInProgress,
+  achievementsClaimable,
+}){
   const [section,setSection] = React.useState('locations');
   const [data,setData] = React.useState(null);
   const [error,setError] = React.useState(null);
@@ -24,6 +33,13 @@ function Guide({me}){
   React.useEffect(()=>{
     setFishRarityFilter('all');
   },[data?.fish, me.language]);
+  React.useEffect(()=>{
+    if(section!=='achievements') return;
+    if(achievementsLoading) return;
+    if((achievements||[]).length===0 && typeof onReloadAchievements === 'function'){
+      onReloadAchievements();
+    }
+  }, [section, achievementsLoading, achievements?.length, onReloadAchievements]);
   const rarityDisplayName = React.useCallback((rarity)=>{
     const names = (window.rarityNames && window.rarityNames[me.language])
       || (window.rarityNames && window.rarityNames.en)
@@ -53,11 +69,19 @@ function Guide({me}){
   if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
   return (
     <div className="mt-4">
-      <div className="flex gap-2 mb-4">
-        <button onClick={()=>setSection('locations')} className={`flex-1 py-2 rounded-xl ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
-        <button onClick={()=>setSection('fish')} className={`flex-1 py-2 rounded-xl ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
-        <button onClick={()=>setSection('lures')} className={`flex-1 py-2 rounded-xl ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
-        <button onClick={()=>setSection('rods')} className={`flex-1 py-2 rounded-xl ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
+      <div className="glass rounded-2xl p-3 shadow-lg mb-4">
+        <div className="flex flex-wrap justify-center gap-2">
+          <button onClick={()=>setSection('locations')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>
+          <button onClick={()=>setSection('fish')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='fish'?'bg-emerald-600':'glass'}`}>{t('fish')}</button>
+          <button onClick={()=>setSection('lures')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='lures'?'bg-emerald-600':'glass'}`}>{t('lures')}</button>
+          <button onClick={()=>setSection('rods')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='rods'?'bg-emerald-600':'glass'}`}>{t('rods')}</button>
+          <button onClick={()=>setSection('achievements')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center relative ${section==='achievements'?'bg-emerald-600':'glass'}`}>
+            {t('achievementsTab')}
+            {achievementsClaimable && (
+              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">!</span>
+            )}
+          </button>
+        </div>
       </div>
       {section==='locations' && (
         <div className="space-y-4">
@@ -209,6 +233,66 @@ function Guide({me}){
           })}
         </div>
       )}
+      {section==='achievements' && (
+        <AchievementsSection
+          achievements={achievements}
+          loading={achievementsLoading}
+          error={achievementsError}
+          onReload={onReloadAchievements}
+          onClaim={onClaimAchievement}
+          claimInProgress={claimInProgress}
+        />
+      )}
+    </div>
+  );
+}
+
+function AchievementsSection({achievements, loading, error, onReload, onClaim, claimInProgress}){
+  const imageForAchievement = (code, level) => {
+    if(typeof window.achievementImage === 'function') return window.achievementImage(code, level);
+    if(window.ACHIEVEMENT_IMAGES && window.ACHIEVEMENT_IMAGES[level]) return window.ACHIEVEMENT_IMAGES[level];
+    return window.ACHIEVEMENT_IMAGES ? window.ACHIEVEMENT_IMAGES[0] : '';
+  };
+  if(loading) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
+  if(error) return (
+    <div className="mt-6 text-center opacity-80">
+      <div className="mb-2">{t('achievementsUnavailable')}</div>
+      {onReload && <button className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500" onClick={onReload}>{t('achievementsRefresh')}</button>}
+    </div>
+  );
+  if(!achievements || achievements.length===0) return <div className="mt-6 text-center opacity-80">{t('achievementsEmpty')}</div>;
+  return (
+    <div className="space-y-4">
+      {achievements.map(a=>{
+        const statusText = a.levelIndex > 0 ? t('achievementInProgress') : t('achievementLocked');
+        return (
+          <div key={a.code} className="p-4 glass rounded-xl flex gap-3 items-start">
+            <AssetImage src={imageForAchievement(a.code, a.levelIndex)} alt={a.name} className="w-16 h-16 object-contain" />
+            <div className="flex-1">
+              <div className="font-semibold leading-tight">{a.name}</div>
+              <div className="text-xs opacity-70 mt-1 mb-2">{a.description}</div>
+              <div className="text-sm font-semibold">
+                {t('achievementProgressLabel', {
+                  progress: a.progressLabel ?? a.progress,
+                  target: a.targetLabel ?? a.target
+                })}
+              </div>
+              {a.claimable ? (
+                <button
+                  type="button"
+                  className="mt-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                  disabled={claimInProgress === a.code}
+                  onClick={()=> onClaim && onClaim(a.code)}
+                >
+                  {claimInProgress === a.code ? t('loading') : t('achievementClaim')}
+                </button>
+              ) : (
+                <div className="text-xs opacity-60">{statusText}</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

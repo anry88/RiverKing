@@ -5,6 +5,19 @@ const params = new URLSearchParams(window.location.search);
 const refToken = tg?.initDataUnsafe?.start_param
   || params.get('tgWebAppStartParam')
   || params.get('ref');
+const makeT = window.makeT || ((lang) => (key) => key);
+let t = window.t || ((key) => key);
+const TAP_CHALLENGE_DURATION_MS = window.TAP_CHALLENGE_DURATION_MS || 5000;
+const TAP_CHALLENGE_GOAL = window.TAP_CHALLENGE_GOAL || 10;
+const CAST_READY_DELAY_MS = window.CAST_READY_DELAY_MS || 3000;
+const initLang = window.initLang || 'en';
+const translateLure = (name, lang) => {
+  const fn = window.translateLure;
+  if (typeof fn === 'function' && fn !== translateLure) return fn(name, lang);
+  return name;
+};
+const useResizeObserver = window.useResizeObserver || (() => ({ w: 0, h: 0 }));
+const ROD_IMG = window.ROD_IMG || '/app/assets/rods/yellow_rod.png';
 const tgParam = (()=>{
   try{
     const raw = window.location.search + window.location.hash;
@@ -59,6 +72,13 @@ function App(){
   const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
   const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
   const [coinInsufficientOpen, setCoinInsufficientOpen] = React.useState(false);
+  const [achievements, setAchievements] = React.useState([]);
+  const [achievementsLoading, setAchievementsLoading] = React.useState(false);
+  const [achievementsError, setAchievementsError] = React.useState(null);
+  const [achievementsClaimable, setAchievementsClaimable] = React.useState(false);
+  const achievementsRef = React.useRef([]);
+  const [claimingAchievement, setClaimingAchievement] = React.useState(null);
+  const [achievementReward, setAchievementReward] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
   const coinPurchasePriceLabel = coinPurchasePack
     ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
@@ -96,6 +116,79 @@ function App(){
     if(!data) return;
     setCatchDetails({...data});
   }, []);
+
+  const achievementNameByCode = React.useCallback(code => {
+    if(!code) return '';
+    return achievementsRef.current.find(a => a.code === code)?.name || code;
+  }, []);
+
+  const reloadProfile = React.useCallback(async ()=>{
+    try{
+      const meResp = await fetch(`/api/me`,{credentials:'include'});
+      if(meResp.ok){
+        setMe(await meResp.json());
+      }
+    }catch(e){}
+  }, []);
+
+  const loadAchievements = React.useCallback(async ()=>{
+    setAchievementsLoading(true);
+    setAchievementsError(null);
+    try{
+      const r = await fetch(`/api/achievements`,{credentials:'include'});
+      if(!r.ok){
+        if(r.status===401) throw new Error('unauthorized');
+        throw new Error('load_failed');
+      }
+      const list = await r.json();
+      achievementsRef.current = list;
+      setAchievements(list);
+      setAchievementsClaimable(list.some(a=>a.claimable));
+    }catch(e){
+      setAchievementsError(e.message);
+      if(e.message==='unauthorized') setError(t('authRequired'));
+    }finally{
+      setAchievementsLoading(false);
+    }
+  }, [t]);
+
+  React.useEffect(()=>{
+    if(tab === 'guide'){
+      loadAchievements();
+    }
+  }, [tab, loadAchievements]);
+
+  const claimAchievement = React.useCallback(async code => {
+    if(!code) return;
+    setClaimingAchievement(code);
+    try{
+      const r = await fetch(`/api/achievements/${code}/claim`,{method:'POST',credentials:'include'});
+      if(!r.ok){
+        if(r.status===401) throw new Error('unauthorized');
+        throw new Error('claim_failed');
+      }
+      const data = await r.json();
+      const rewards = Array.isArray(data?.rewards) ? data.rewards : [];
+      setAchievementReward({ code, rewards, name: achievementNameByCode(code) });
+      await loadAchievements();
+      await reloadProfile();
+    }catch(e){
+      setError(e.message==='unauthorized' ? t('authRequired') : t('achievementsUnavailable'));
+    }finally{
+      setClaimingAchievement(null);
+    }
+  }, [achievementNameByCode, loadAchievements, reloadProfile, t]);
+
+  const achievementRewardLabel = React.useCallback((reward)=>{
+    if(!reward) return '';
+    if(reward.pack === 'coins'){
+      const coins = reward.coins ?? reward.qty ?? 0;
+      return t('achievementRewardCoins', coins);
+    }
+    const pack = (shop.reduce((acc,c)=>acc.concat(c.packs||[]),[]).find(p=>p.id===reward.pack));
+    const label = pack?.name || (reward.pack === 'autofish' ? t('autoFishExtend') : reward.pack || t('achievementRewardTitle'));
+    return t('achievementRewardPack', { name: label, qty: reward.qty || 1 });
+  }, [shop, t]);
 
   React.useEffect(()=>{
     autoCastRef.current = autoCast;
@@ -159,6 +252,11 @@ function App(){
   },[me?.needsNickname]);
 
   React.useEffect(()=>{
+    if(!me) return;
+    loadAchievements();
+  }, [me?.language, loadAchievements]);
+
+  React.useEffect(()=>{
     if(loading) return;
     if(!me?.dailyAvailable){
       dailyPromptDismissedRef.current = false;
@@ -188,6 +286,16 @@ function App(){
     rodImages.forEach(addEssential);
     const backgrounds = window.LOCATION_BG ? Object.values(window.LOCATION_BG) : [];
     backgrounds.forEach(addEssential);
+    if(window.ACHIEVEMENT_ART){
+      Object.values(window.ACHIEVEMENT_ART).forEach(levelMap => {
+        if(levelMap && typeof levelMap === 'object'){
+          Object.values(levelMap).forEach(addEssential);
+        }
+      });
+    }
+    if(window.ACHIEVEMENT_IMAGES){
+      Object.values(window.ACHIEVEMENT_IMAGES).forEach(addEssential);
+    }
     essentialAssetsRef.current = essentialAssets;
 
     let preloadStarted = false;
@@ -242,6 +350,7 @@ function App(){
         setMe(d);
         try{ window.assetAuthReady?.(); }catch(e){}
         startEssentialPreload();
+        loadAchievements();
         try{
           const s = await fetch(`/api/shop`,{credentials:'include'});
           if(s.ok){
@@ -740,13 +849,22 @@ function App(){
         const newTotal = (me.totalWeight||0)+c.weight;
         const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
+        const achievementUnlocks = Array.isArray(d.achievements)
+          ? d.achievements.map(a => ({
+              ...a,
+              name: achievementNameByCode(a.code),
+              levelLabel: typeof window.achievementLevelLabel === 'function'
+                ? window.achievementLevelLabel(a.newLevelIndex, me.language)
+                : a.newLevelIndex,
+            }))
+          : [];
         const animationId = ++catchAnimationIdRef.current;
         setResult({
           ...c,
           coins: typeof d.coins === 'number' ? d.coins : 0,
           todayCoins: typeof d.todayCoins === 'number' ? d.todayCoins : undefined,
           totalCoins: typeof d.totalCoins === 'number' ? d.totalCoins : undefined,
-          newFish:isNewFish,newLocations:newLocs,newRods,animationId
+          newFish:isNewFish,newLocations:newLocs,newRods,animationId,achievements: achievementUnlocks
         });
             setMe(p=>{
               const tot = (p.totalWeight||0)+c.weight;
@@ -764,6 +882,9 @@ function App(){
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
               };
             });
+        if(achievementUnlocks.length>0){
+          loadAchievements();
+        }
         try{
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
           if(ct.status===200){
@@ -982,8 +1103,8 @@ function App(){
   }
 
   return (
-    <div className="app-content w-full px-4" onClick={()=>setPrizeHint(null)}>
-      <div className="flex flex-col min-h-full">
+    <div className="app-content w-full px-4 flex justify-center" onClick={()=>setPrizeHint(null)}>
+      <div className="w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full">
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1003,6 +1124,24 @@ function App(){
                     {prize.qty > 1 ? ` x${prize.qty}` : ''}
                   </>)
                 }
+              </div>
+              <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
+            </div>
+          </div>
+        )}
+        {achievementReward && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={()=>setAchievementReward(null)}>
+            <div className="glass p-6 rounded-xl text-center animate-pop">
+              <AssetImage src={BOBBER_ICON} alt="achievement" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
+              <div className="text-lg font-semibold mb-1">{t('achievementRewardTitle')}</div>
+              <div className="text-sm opacity-80 mb-2">{achievementReward.name || achievementReward.code}</div>
+              <div className="text-left inline-block text-sm font-semibold space-y-1">
+                {(achievementReward.rewards||[]).map((reward, idx)=>(
+                  <div key={`${achievementReward.code}-${idx}`} className="flex items-center gap-2">
+                    <span>•</span>
+                    <span>{achievementRewardLabel(reward)}</span>
+                  </div>
+                ))}
               </div>
               <div className="text-sm opacity-80 mt-2">{t('tapToClaim')}</div>
             </div>
@@ -1160,11 +1299,25 @@ function App(){
             />
           )}
           {tab === 'guide' && (
-            <Guide me={me} />
+            <Guide
+              me={me}
+              achievements={achievements}
+              achievementsLoading={achievementsLoading}
+              achievementsError={achievementsError}
+              onReloadAchievements={loadAchievements}
+              onClaimAchievement={claimAchievement}
+              claimInProgress={claimingAchievement}
+              achievementsClaimable={achievementsClaimable}
+            />
           )}
         </div>
 
-        <BottomNav tab={tab} setTab={setTab} dailyAvailable={me.dailyAvailable} />
+        <BottomNav
+          tab={tab}
+          setTab={setTab}
+          dailyAvailable={me.dailyAvailable}
+          achievementsAvailable={achievementsClaimable}
+        />
 
         <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
         <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{

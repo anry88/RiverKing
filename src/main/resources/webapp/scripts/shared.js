@@ -678,6 +678,31 @@
     'Тунец желтоперый': { en: 'Yellowfin Tuna', asset: '/app/assets/fish/tunec_zeltoperiy.png' },
     'Снук чёрный': { en: 'Black Snook', asset: '/app/assets/fish/chyorniy_snuk.png' },
     'Рыба-наполеон': { en: 'Napoleon Wrasse', asset: '/app/assets/fish/ryba_napoleon.png' },
+    'Рыба-клоун': { en: 'Clownfish', asset: '/app/assets/fish/ryba_kloun.png' },
+    'Кефаль мангровая': { en: 'Mangrove Mullet', asset: '/app/assets/fish/kefal_mangrovaya.png' },
+    'Сельдь тихоокеанская': { en: 'Pacific Herring', asset: '/app/assets/fish/seld_tihookeanskaya.png' },
+    'Хромис рифовый': { en: 'Reef Chromis', asset: '/app/assets/fish/hromis_rifoviy.png' },
+    'Дамсел жёлтохвостый': { en: 'Yellowtail Damselfish', asset: '/app/assets/fish/damsel_zheltohvostiy.png' },
+    'Морской конёк': { en: 'Seahorse', asset: '/app/assets/fish/morskoy_konek.png' },
+    'Идол мавританский': { en: 'Moorish Idol', asset: '/app/assets/fish/idol_mavritanskiy.png' },
+    'Рыба-бабочка полосатая': { en: 'Striped Butterflyfish', asset: '/app/assets/fish/ryba_babochka_polosataya.png' },
+    'Гобиодон голубопятнистый': { en: 'Bluespotted Goby', asset: '/app/assets/fish/gobiodon_golubopyatnistiy.png' },
+    'Сиган коричневопятнистый': { en: 'Brown-spotted Rabbitfish', asset: '/app/assets/fish/sigan_korichnevopyatnistiy.png' },
+    'Хирург полосатый': { en: 'Striped Surgeonfish', asset: '/app/assets/fish/hirurg_polosatiy.png' },
+    'Луциан серебристо-пятнистый': { en: 'Silverspot Snapper', asset: '/app/assets/fish/lucian_serebristo-pyatnistiy.png' },
+    'Скорпена бородатая': { en: 'Bearded Scorpionfish', asset: '/app/assets/fish/skorpena_borodataya.png' },
+    'Барракуда полосатая': { en: 'Striped Barracuda', asset: '/app/assets/fish/barrakuda_polosataya.png' },
+    'Каранкс шестиполосый': { en: 'Sixband Trevally', asset: '/app/assets/fish/karanks_polosatiy.png' },
+    'Группер леопардовый коралловый': { en: 'Leopard Coral Grouper', asset: '/app/assets/fish/grupper_leopardoviy_koralloviy.png' },
+    'Иглорыл-агухон': { en: 'Agujon Needlefish', asset: '/app/assets/fish/igloryl-aguhon.png' },
+    'Акула рифовая чёрнопёрая': { en: 'Blacktip Reef Shark', asset: '/app/assets/fish/akula_rifovaya_chernoperaya.png' },
+    'Губан-чистильщик': { en: 'Cleaner Wrasse', asset: '/app/assets/fish/guban-chistilschik.png' },
+    'Сержант-майор атлантический': { en: 'Atlantic Sergeant Major', asset: '/app/assets/fish/sergant-major_atlanticheskiy.png' },
+    'Грамма королевская': { en: 'Royal Gramma', asset: '/app/assets/fish/gramma_korolevskaya.png' },
+    'Ангел королевский': { en: 'Queen Angelfish', asset: '/app/assets/fish/angel_korolevskiy.png' },
+    'Мандариновая рыба': { en: 'Mandarin Dragonet', asset: '/app/assets/fish/mandarinivaya_ryba.png' },
+    'Крылатка зебровая': { en: 'Zebra Lionfish', asset: '/app/assets/fish/krylaka_zebrovaya.png' },
+    'Рыба-флейта': { en: 'Trumpetfish', asset: '/app/assets/fish/ryba-fleita.png' },
   };
   const FISH_TRANSLATIONS = {};
   const FISH_IMG = {};
@@ -698,6 +723,100 @@
     if (!info) return '';
     return lang === 'en' ? info.enDescription : info.ruDescription;
   };
+
+  const ACHIEVEMENT_LEVEL_LABELS = {
+    ru: ['Нет уровня', 'Бронза', 'Серебро', 'Золото', 'Платина'],
+    en: ['No tier', 'Bronze', 'Silver', 'Gold', 'Platinum'],
+  };
+  const achievementLevelLabel = (index, lang = document.documentElement.lang) => {
+    const labels = ACHIEVEMENT_LEVEL_LABELS[lang] || ACHIEVEMENT_LEVEL_LABELS.ru;
+    const safeIndex = Math.min(index, labels.length - 1);
+    return labels[safeIndex] || labels[0];
+  };
+  const ACHIEVEMENT_IMAGES = {
+    0: '/app/assets/achievements/achievement_none.svg',
+    1: '/app/assets/achievements/achievement_bronze.svg',
+    2: '/app/assets/achievements/achievement_silver.svg',
+    3: '/app/assets/achievements/achievement_gold.svg',
+    4: '/app/assets/achievements/achievement_platinum.svg',
+  };
+  const ACHIEVEMENT_ART = {
+    simple_fisher: {
+      0: '/app/assets/achievements/simple_fisher_grey.png',
+      1: '/app/assets/achievements/simple_fisher_bronze.png',
+      2: '/app/assets/achievements/simple_fisher_silver.png',
+      3: '/app/assets/achievements/simple_fisher_gold.png',
+      4: '/app/assets/achievements/simple_fisher_platinum.png',
+    },
+    uncommon_fisher: {
+      0: '/app/assets/achievements/uncommon_fisher_grey.png',
+      1: '/app/assets/achievements/uncommon_fisher_bronze.png',
+      2: '/app/assets/achievements/uncommon_fisher_silver.png',
+      3: '/app/assets/achievements/uncommon_fisher_gold.png',
+      4: '/app/assets/achievements/uncommon_fisher_platinum.png',
+    },
+    rare_fisher: {
+      0: '/app/assets/achievements/rare_fisher_grey.png',
+      1: '/app/assets/achievements/rare_fisher_bronze.png',
+      2: '/app/assets/achievements/rare_fisher_silver.png',
+      3: '/app/assets/achievements/rare_fisher_gold.png',
+      4: '/app/assets/achievements/rare_fisher_platinum.png',
+    },
+    epic_fisher: {
+      0: '/app/assets/achievements/epic_fisher_grey.png',
+      1: '/app/assets/achievements/epic_fisher_bronze.png',
+      2: '/app/assets/achievements/epic_fisher_silver.png',
+      3: '/app/assets/achievements/epic_fisher_gold.png',
+      4: '/app/assets/achievements/epic_fisher_platinum.png',
+    },
+    mythic_fisher: {
+      0: '/app/assets/achievements/mythic_fisher_grey.png',
+      1: '/app/assets/achievements/mythic_fisher_bronze.png',
+      2: '/app/assets/achievements/mythic_fisher_silver.png',
+      3: '/app/assets/achievements/mythic_fisher_gold.png',
+      4: '/app/assets/achievements/mythic_fisher_platinum.png',
+    },
+    legendary_fisher: {
+      0: '/app/assets/achievements/legendary_fisher_grey.png',
+      1: '/app/assets/achievements/legendary_fisher_bronze.png',
+      2: '/app/assets/achievements/legendary_fisher_silver.png',
+      3: '/app/assets/achievements/legendary_fisher_gold.png',
+      4: '/app/assets/achievements/legendary_fisher_platinum.png',
+    },
+    traveler: {
+      0: '/app/assets/achievements/traveler_grey.png',
+      1: '/app/assets/achievements/traveler_bronze.png',
+      2: '/app/assets/achievements/traveler_silver.png',
+      3: '/app/assets/achievements/traveler_gold.png',
+      4: '/app/assets/achievements/traveler_platinum.png',
+    },
+    trophy_hunter: {
+      0: '/app/assets/achievements/trophy_hunter_grey.png',
+      1: '/app/assets/achievements/trophy_hunter_bronze.png',
+      2: '/app/assets/achievements/trophy_hunter_silver.png',
+      3: '/app/assets/achievements/trophy_hunter_gold.png',
+      4: '/app/assets/achievements/trophy_hunter_platinum.png',
+    },
+    koi_collector: {
+      0: '/app/assets/achievements/koi_collector_grey.png',
+      1: '/app/assets/achievements/koi_collector_bronze.png',
+      2: '/app/assets/achievements/koi_collector_silver.png',
+      3: '/app/assets/achievements/koi_collector_gold.png',
+      4: '/app/assets/achievements/koi_collector_platinum.png',
+    },
+  };
+  const achievementImage = (code, level = 0) => {
+    const safeLevel = Math.max(0, Math.min(4, Number(level) || 0));
+    const key = typeof code === 'string' ? code.toLowerCase() : '';
+    const art = ACHIEVEMENT_ART[key];
+    if (art && art[safeLevel]) return art[safeLevel];
+    return ACHIEVEMENT_IMAGES[safeLevel] || ACHIEVEMENT_IMAGES[0];
+  };
+  window.ACHIEVEMENT_LEVEL_LABELS = ACHIEVEMENT_LEVEL_LABELS;
+  window.achievementLevelLabel = achievementLevelLabel;
+  window.ACHIEVEMENT_IMAGES = ACHIEVEMENT_IMAGES;
+  window.ACHIEVEMENT_ART = ACHIEVEMENT_ART;
+  window.achievementImage = achievementImage;
 
   const STRINGS = {
     ru: {
@@ -807,8 +926,11 @@
       prizes: 'Призы',
       ratings: 'Рейтинги',
       guide: 'Справочник',
+      achievements: 'Достижения',
+      achievementsTab: 'Достижения',
       shop: 'Магазин',
       menu: 'Меню',
+      achievementRewardsAvailable: 'Доступна награда',
       invite: 'Пригласить друзей',
       refBonusInfo: name => `Пригласите друзей — вы оба получите ${name}. За покупки приглашённых друзей вы получаете 25% приманок и неделю авто-рыбалки за их подписку.`,
       referralBonus: 'Ваш друг присоединился по вашей ссылке и вы получили набор:',
@@ -845,6 +967,19 @@
       hintTapPrize: 'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
       hintAutoCatch: 'С подпиской робот позаботится о вашем улове, если вы не успеете вовремя выловить рыбу',
       hintNoCloseRod: 'Не закрывай игру с заброшенной удочкой чтобы не потерять приманку',
+      achievementsEmpty: 'Пока нет достижений — продолжайте ловить рыбу!',
+      achievementProgress: ({ progress, target }) => `${progress}/${target}`,
+      achievementProgressLabel: ({ progress, target }) => `Прогресс ${progress}/${target}`,
+      achievementLocked: 'Ловите рыбу, чтобы получить награду.',
+      achievementInProgress: 'Продолжайте ловить рыбу.',
+      achievementClaim: 'Забрать награду',
+      achievementClaimed: 'Награда за достижение получена!',
+      achievementsUnavailable: 'Не удалось загрузить достижения',
+      achievementsRefresh: 'Обновить',
+      achievementUnlockedLine: ({ name, level }) => `Открыто достижение «${name}»: ${level}`,
+      achievementRewardTitle: 'Награды за достижение',
+      achievementRewardCoins: coins => `🪙 +${coins} монет`,
+      achievementRewardPack: ({ name, qty }) => `${name}${qty > 1 ? ` x${qty}` : ''}`,
     },
     en: {
       location: 'Location',
@@ -953,8 +1088,11 @@
       prizes: 'Prizes',
       ratings: 'Ratings',
       guide: 'Guide',
+      achievements: 'Achievements',
+      achievementsTab: 'Achievements',
       shop: 'Shop',
       menu: 'Menu',
+      achievementRewardsAvailable: 'Reward available',
       invite: 'Invite friends',
       refBonusInfo: name => `Invite friends — you both get ${name}. When invited friends make purchases, you get 25% of their baits and a week of auto-fish for each auto-fish pack.`,
       referralBonus: 'Your friend joined via your link and you received a pack:',
@@ -991,6 +1129,19 @@
       hintTapPrize: 'Tap a leaderboard card to see its potential prize',
       hintAutoCatch: 'With a subscription, the robot will secure your catch if you fail to reel in the fish in time',
       hintNoCloseRod: "Don't close the game with your rod cast or you'll lose the bait",
+      achievementsEmpty: 'No achievements yet — keep fishing!',
+      achievementProgress: ({ progress, target }) => `${progress}/${target}`,
+      achievementProgressLabel: ({ progress, target }) => `Progress ${progress}/${target}`,
+      achievementLocked: 'Keep fishing to unlock rewards.',
+      achievementInProgress: 'Keep fishing for the next reward.',
+      achievementClaim: 'Claim reward',
+      achievementClaimed: 'Achievement reward claimed!',
+      achievementsUnavailable: 'Failed to load achievements',
+      achievementsRefresh: 'Refresh',
+      achievementUnlockedLine: ({ name, level }) => `Achievement unlocked: ${name} — ${level}`,
+      achievementRewardTitle: 'Achievement rewards',
+      achievementRewardCoins: coins => `🪙 +${coins} coins`,
+      achievementRewardPack: ({ name, qty }) => `${name}${qty > 1 ? ` x${qty}` : ''}`,
     }
   };
   function makeT(lang) {
