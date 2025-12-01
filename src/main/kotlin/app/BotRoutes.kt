@@ -1202,20 +1202,20 @@ fun Application.botRoutes(env: Env) {
                 val langIsRu = lang.lowercase().startsWith("ru")
                 val body = achievements.joinToString("\n\n") {
                     val description = it.description
-                    val progressLabel = if (it.levelIndex >= 4) {
+                    val progressText = if (it.levelIndex >= 4) {
                         if (langIsRu) {
-                            "Прогресс ${it.progress}/${it.target} (максимум)"
+                            "Прогресс ${it.progressLabel}/${it.targetLabel} (максимум)"
                         } else {
-                            "Progress ${it.progress}/${it.target} (max)"
+                            "Progress ${it.progressLabel}/${it.targetLabel} (max)"
                         }
                     } else {
                         if (langIsRu) {
-                            "Прогресс ${it.progress}/${it.target}"
+                            "Прогресс ${it.progressLabel}/${it.targetLabel}"
                         } else {
-                            "Progress ${it.progress}/${it.target}"
+                            "Progress ${it.progressLabel}/${it.targetLabel}"
                         }
                     }
-                    "${it.name}:\n$description\n$progressLabel"
+                    "${it.name}:\n$description\n$progressText"
                 }
                 val claimable = achievements.filter { it.claimable }
                 val markup = if (claimable.isNotEmpty()) {

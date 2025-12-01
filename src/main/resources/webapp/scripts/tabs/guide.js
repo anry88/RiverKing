@@ -270,7 +270,12 @@ function AchievementsSection({achievements, loading, error, onReload, onClaim, c
             <div className="flex-1">
               <div className="font-semibold leading-tight">{a.name}</div>
               <div className="text-xs opacity-70 mt-1 mb-2">{a.description}</div>
-              <div className="text-sm font-semibold">{t('achievementProgressLabel', { progress: a.progress, target: a.target })}</div>
+              <div className="text-sm font-semibold">
+                {t('achievementProgressLabel', {
+                  progress: a.progressLabel ?? a.progress,
+                  target: a.targetLabel ?? a.target
+                })}
+              </div>
               {a.claimable ? (
                 <button
                   type="button"

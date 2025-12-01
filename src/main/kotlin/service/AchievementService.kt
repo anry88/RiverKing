@@ -15,8 +15,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import util.Metrics
 import java.time.Instant
-import kotlin.math.floor
-import org.jetbrains.exposed.sql.max
+import java.util.Locale
+import kotlin.math.roundToInt
 import org.jetbrains.exposed.sql.sum
 
 @Serializable
@@ -26,8 +26,10 @@ data class AchievementDTO(
     val description: String,
     val level: String,
     val levelIndex: Int,
-    val progress: Int,
+    val progress: Double,
     val target: Int,
+    val progressLabel: String,
+    val targetLabel: String,
     val claimable: Boolean,
 )
 
@@ -52,7 +54,7 @@ object AchievementService {
         val descEn: String,
         val thresholds: List<Int>,
         val rewards: List<PrizeSpec>,
-        val progress: (Long) -> Int,
+        val progress: (Long) -> Double,
     )
 
     private const val KOI_COLLECTOR_CODE = "koi_collector"
@@ -233,7 +235,7 @@ object AchievementService {
             .single()[Achievements.id].value
     }
 
-    private fun levelIndex(thresholds: List<Int>, progress: Int): Int {
+    private fun levelIndex(thresholds: List<Int>, progress: Double): Int {
         var level = 0
         thresholds.forEachIndexed { index, threshold ->
             if (progress >= threshold) level = index
@@ -263,6 +265,7 @@ object AchievementService {
     ): AchievementDTO {
         val langIsRu = language.lowercase().startsWith("ru")
         val progressValue = definition.progress(userId)
+        val roundedProgress = roundForDisplay(definition.code, progressValue)
         val level = levelIndex(definition.thresholds, progressValue)
         val uiLevel = minOf(level, 4)
         val target = definition.thresholds.getOrNull(level + 1) ?: definition.thresholds.last()
@@ -286,8 +289,10 @@ object AchievementService {
             description = if (langIsRu) definition.descRu else definition.descEn,
             level = levelLabel(uiLevel, langIsRu),
             levelIndex = uiLevel,
-            progress = progressValue,
+            progress = roundedProgress,
             target = target,
+            progressLabel = formatAchievementValue(definition.code, roundedProgress, langIsRu),
+            targetLabel = formatAchievementValue(definition.code, target.toDouble(), langIsRu),
             claimable = level > claimed,
         )
     }
@@ -362,53 +367,69 @@ object AchievementService {
         return unlocks
     }
 
-    private fun koiCatchCount(userId: Long): Int = inTxn {
+    private fun roundForDisplay(code: String, value: Double): Double =
+        if (code == TROPHY_HUNTER_CODE) {
+            (value * 100).roundToInt() / 100.0
+        } else {
+            value
+        }
+
+    private fun formatAchievementValue(code: String, value: Double, langIsRu: Boolean): String {
+        return if (code == TROPHY_HUNTER_CODE) {
+            val rounded = roundForDisplay(code, value)
+            val formatted = String.format(Locale.US, "%.2f", rounded)
+            if (langIsRu) "$formatted кг" else "$formatted kg"
+        } else {
+            value.toInt().toString()
+        }
+    }
+
+    private fun koiCatchCount(userId: Long): Double = inTxn {
         val fishIds = Fish
             .slice(Fish.id)
             .select { Fish.name inList koiFishNames }
             .map { it[Fish.id].value }
-        if (fishIds.isEmpty()) return@inTxn 0
+        if (fishIds.isEmpty()) return@inTxn 0.0
         Catches
             .slice(Catches.fishId)
             .select { (Catches.userId eq userId) and (Catches.fishId inList fishIds) }
             .groupBy(Catches.fishId)
             .orderBy(Catches.fishId, SortOrder.ASC)
             .count()
-            .toInt()
+            .toDouble()
     }
 
-    private fun rarityCatchCount(userId: Long, rarity: String): Int = inTxn {
+    private fun rarityCatchCount(userId: Long, rarity: String): Double = inTxn {
         (Catches innerJoin Fish)
             .slice(Catches.id)
             .select { (Catches.userId eq userId) and (Fish.rarity eq rarity) }
             .count()
-            .toInt()
+            .toDouble()
     }
 
-    private fun unlockedLocationsCount(userId: Long): Int = inTxn {
+    private fun unlockedLocationsCount(userId: Long): Double = inTxn {
         val totalKg = Catches.slice(Catches.weight.sum())
             .select { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
-        Locations.select { Locations.unlockKg lessEq totalKg }.count().toInt()
+        Locations.select { Locations.unlockKg lessEq totalKg }.count().toDouble()
     }
 
-    private fun heaviestCatchKg(userId: Long): Int = inTxn {
+    private fun heaviestCatchKg(userId: Long): Double = inTxn {
         val row = Catches
             .slice(Catches.weight)
             .select { Catches.userId eq userId }
             .orderBy(Catches.weight, SortOrder.DESC)
             .limit(1)
             .singleOrNull()
-        val maxWeight = row?.get(Catches.weight) ?: 0.0
-        floor(maxWeight).toInt()
+        row?.get(Catches.weight) ?: 0.0
     }
 
-    private fun commonCatchCount(userId: Long): Int = rarityCatchCount(userId, "common")
-    private fun uncommonCatchCount(userId: Long): Int = rarityCatchCount(userId, "uncommon")
-    private fun rareCatchCount(userId: Long): Int = rarityCatchCount(userId, "rare")
-    private fun epicCatchCount(userId: Long): Int = rarityCatchCount(userId, "epic")
-    private fun mythicCatchCount(userId: Long): Int = rarityCatchCount(userId, "mythic")
-    private fun legendaryCatchCount(userId: Long): Int = rarityCatchCount(userId, "legendary")
+    private fun commonCatchCount(userId: Long): Double = rarityCatchCount(userId, "common")
+    private fun uncommonCatchCount(userId: Long): Double = rarityCatchCount(userId, "uncommon")
+    private fun rareCatchCount(userId: Long): Double = rarityCatchCount(userId, "rare")
+    private fun epicCatchCount(userId: Long): Double = rarityCatchCount(userId, "epic")
+    private fun mythicCatchCount(userId: Long): Double = rarityCatchCount(userId, "mythic")
+    private fun legendaryCatchCount(userId: Long): Double = rarityCatchCount(userId, "legendary")
 
     private fun levelLabel(index: Int, ru: Boolean): String =
         when {
