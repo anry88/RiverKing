@@ -286,6 +286,16 @@ function App(){
     rodImages.forEach(addEssential);
     const backgrounds = window.LOCATION_BG ? Object.values(window.LOCATION_BG) : [];
     backgrounds.forEach(addEssential);
+    if(window.ACHIEVEMENT_ART){
+      Object.values(window.ACHIEVEMENT_ART).forEach(levelMap => {
+        if(levelMap && typeof levelMap === 'object'){
+          Object.values(levelMap).forEach(addEssential);
+        }
+      });
+    }
+    if(window.ACHIEVEMENT_IMAGES){
+      Object.values(window.ACHIEVEMENT_IMAGES).forEach(addEssential);
+    }
     essentialAssetsRef.current = essentialAssets;
 
     let preloadStarted = false;

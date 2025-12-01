@@ -248,7 +248,8 @@ function Guide({
 }
 
 function AchievementsSection({achievements, loading, error, onReload, onClaim, claimInProgress}){
-  const imageForLevel = level => {
+  const imageForAchievement = (code, level) => {
+    if(typeof window.achievementImage === 'function') return window.achievementImage(code, level);
     if(window.ACHIEVEMENT_IMAGES && window.ACHIEVEMENT_IMAGES[level]) return window.ACHIEVEMENT_IMAGES[level];
     return window.ACHIEVEMENT_IMAGES ? window.ACHIEVEMENT_IMAGES[0] : '';
   };
@@ -266,7 +267,7 @@ function AchievementsSection({achievements, loading, error, onReload, onClaim, c
         const statusText = a.levelIndex > 0 ? t('achievementInProgress') : t('achievementLocked');
         return (
           <div key={a.code} className="p-4 glass rounded-xl flex gap-3 items-start">
-            <AssetImage src={imageForLevel(a.levelIndex)} alt={a.name} className="w-16 h-16 object-contain" />
+            <AssetImage src={imageForAchievement(a.code, a.levelIndex)} alt={a.name} className="w-16 h-16 object-contain" />
             <div className="flex-1">
               <div className="font-semibold leading-tight">{a.name}</div>
               <div className="text-xs opacity-70 mt-1 mb-2">{a.description}</div>

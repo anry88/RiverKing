@@ -740,9 +740,83 @@
     3: '/app/assets/achievements/achievement_gold.svg',
     4: '/app/assets/achievements/achievement_platinum.svg',
   };
+  const ACHIEVEMENT_ART = {
+    simple_fisher: {
+      0: '/app/assets/achievements/simple_fisher_grey.png',
+      1: '/app/assets/achievements/simple_fisher_bronze.png',
+      2: '/app/assets/achievements/simple_fisher_silver.png',
+      3: '/app/assets/achievements/simple_fisher_gold.png',
+      4: '/app/assets/achievements/simple_fisher_platinum.png',
+    },
+    uncommon_fisher: {
+      0: '/app/assets/achievements/uncommon_fisher_grey.png',
+      1: '/app/assets/achievements/uncommon_fisher_bronze.png',
+      2: '/app/assets/achievements/uncommon_fisher_silver.png',
+      3: '/app/assets/achievements/uncommon_fisher_gold.png',
+      4: '/app/assets/achievements/uncommon_fisher_platinum.png',
+    },
+    rare_fisher: {
+      0: '/app/assets/achievements/rare_fisher_grey.png',
+      1: '/app/assets/achievements/rare_fisher_bronze.png',
+      2: '/app/assets/achievements/rare_fisher_silver.png',
+      3: '/app/assets/achievements/rare_fisher_gold.png',
+      4: '/app/assets/achievements/rare_fisher_platinum.png',
+    },
+    epic_fisher: {
+      0: '/app/assets/achievements/epic_fisher_grey.png',
+      1: '/app/assets/achievements/epic_fisher_bronze.png',
+      2: '/app/assets/achievements/epic_fisher_silver.png',
+      3: '/app/assets/achievements/epic_fisher_gold.png',
+      4: '/app/assets/achievements/epic_fisher_platinum.png',
+    },
+    mythic_fisher: {
+      0: '/app/assets/achievements/mythic_fisher_grey.png',
+      1: '/app/assets/achievements/mythic_fisher_bronze.png',
+      2: '/app/assets/achievements/mythic_fisher_silver.png',
+      3: '/app/assets/achievements/mythic_fisher_gold.png',
+      4: '/app/assets/achievements/mythic_fisher_platinum.png',
+    },
+    legendary_fisher: {
+      0: '/app/assets/achievements/legendary_fisher_grey.png',
+      1: '/app/assets/achievements/legendary_fisher_bronze.png',
+      2: '/app/assets/achievements/legendary_fisher_silver.png',
+      3: '/app/assets/achievements/legendary_fisher_gold.png',
+      4: '/app/assets/achievements/legendary_fisher_platinum.png',
+    },
+    traveler: {
+      0: '/app/assets/achievements/traveler_grey.png',
+      1: '/app/assets/achievements/traveler_bronze.png',
+      2: '/app/assets/achievements/traveler_silver.png',
+      3: '/app/assets/achievements/traveler_gold.png',
+      4: '/app/assets/achievements/traveler_platinum.png',
+    },
+    trophy_hunter: {
+      0: '/app/assets/achievements/trophy_hunter_grey.png',
+      1: '/app/assets/achievements/trophy_hunter_bronze.png',
+      2: '/app/assets/achievements/trophy_hunter_silver.png',
+      3: '/app/assets/achievements/trophy_hunter_gold.png',
+      4: '/app/assets/achievements/trophy_hunter_platinum.png',
+    },
+    koi_collector: {
+      0: '/app/assets/achievements/koi_collector_grey.png',
+      1: '/app/assets/achievements/koi_collector_bronze.png',
+      2: '/app/assets/achievements/koi_collector_silver.png',
+      3: '/app/assets/achievements/koi_collector_gold.png',
+      4: '/app/assets/achievements/koi_collector_platinum.png',
+    },
+  };
+  const achievementImage = (code, level = 0) => {
+    const safeLevel = Math.max(0, Math.min(4, Number(level) || 0));
+    const key = typeof code === 'string' ? code.toLowerCase() : '';
+    const art = ACHIEVEMENT_ART[key];
+    if (art && art[safeLevel]) return art[safeLevel];
+    return ACHIEVEMENT_IMAGES[safeLevel] || ACHIEVEMENT_IMAGES[0];
+  };
   window.ACHIEVEMENT_LEVEL_LABELS = ACHIEVEMENT_LEVEL_LABELS;
   window.achievementLevelLabel = achievementLevelLabel;
   window.ACHIEVEMENT_IMAGES = ACHIEVEMENT_IMAGES;
+  window.ACHIEVEMENT_ART = ACHIEVEMENT_ART;
+  window.achievementImage = achievementImage;
 
   const STRINGS = {
     ru: {
