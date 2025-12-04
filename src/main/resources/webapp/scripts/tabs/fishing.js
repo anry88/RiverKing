@@ -200,31 +200,36 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const tipY = rodTop + rodH * rodTipAnchor.y;
 
   const shouldShowSlack = !casting && !biting && !tapping;
-  const linePath = React.useMemo(() => {
+  const { rodLinePath, waterLinePath } = React.useMemo(() => {
     const rodPointsPx = rodLinePoints.map(p => ({
       x: rodLeft + rodW * p.x,
       y: rodTop + rodH * p.y
     }));
 
-    let pathStart = '';
+    let rPath = '';
     let lastPoint = { x: tipX, y: tipY };
 
     if (rodPointsPx.length > 0) {
-      pathStart = `M ${rodPointsPx[0].x},${rodPointsPx[0].y}`;
+      rPath = `M ${rodPointsPx[0].x},${rodPointsPx[0].y}`;
       for (let i = 1; i < rodPointsPx.length; i++) {
-        pathStart += ` L ${rodPointsPx[i].x},${rodPointsPx[i].y}`;
+        rPath += ` L ${rodPointsPx[i].x},${rodPointsPx[i].y}`;
       }
       lastPoint = rodPointsPx[rodPointsPx.length - 1];
     } else {
-      pathStart = `M ${tipX},${tipY}`;
+      // If no points, we don't draw a rod line, just start water line from tip
+      lastPoint = { x: tipX, y: tipY };
     }
 
+    let wPath = '';
     if (!Number.isFinite(lastPoint.x) || !Number.isFinite(lastPoint.y) || !Number.isFinite(lineAttach.x) || !Number.isFinite(lineAttach.y)) {
-      return `${pathStart} L ${lineAttach.x},${lineAttach.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} L ${lineAttach.x},${lineAttach.y}`;
+      return { rodLinePath: rPath, waterLinePath: wPath };
     }
+
     const dx = lineAttach.x - lastPoint.x;
     const dy = lineAttach.y - lastPoint.y;
     const dist = Math.hypot(dx, dy);
+
     if (shouldShowSlack) {
       const sag = Math.min(h * 0.22, Math.max(16, dist * 0.55));
       const baseMidY = lastPoint.y + dy * 0.5;
@@ -236,12 +241,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         x: lastPoint.x + dx * 0.75,
         y: baseMidY + sag
       };
-      return `${pathStart} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
+    } else {
+      const gentleSag = Math.min(h * 0.08, dist * 0.12);
+      const controlX = lastPoint.x + dx * 0.5;
+      const controlY = lastPoint.y + dy * 0.5 + gentleSag;
+      wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
     }
-    const gentleSag = Math.min(h * 0.08, dist * 0.12);
-    const controlX = lastPoint.x + dx * 0.5;
-    const controlY = lastPoint.y + dy * 0.5 + gentleSag;
-    return `${pathStart} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
+    return { rodLinePath: rPath, waterLinePath: wPath };
   }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH]);
 
   const catchTargetPx = React.useMemo(() => {
@@ -526,7 +533,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
           </defs>
         )}
         <path
-          d={linePath}
+          d={rodLinePath}
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d={waterLinePath}
           stroke="rgba(255,255,255,0.45)"
           strokeWidth="1.2"
           strokeLinecap="round"
