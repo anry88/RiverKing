@@ -471,14 +471,14 @@
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.158, y: 0.07422 },
+      tipAnchor: { x: 0.155, y: 0.07422 },
       linePoints: [
         { x: 0.72, y: 1.1 },
         { x: 0.609, y: 0.895 },
         { x: 0.497, y: 0.690 },
         { x: 0.386, y: 0.485 },
         { x: 0.274, y: 0.279 },
-        { x: 0.158, y: 0.07422 }
+        { x: 0.155, y: 0.07422 }
       ]
     },
     abyss: {
@@ -495,14 +495,14 @@
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
-      tipAnchor: { x: 0.133, y: 0.07520 },
+      tipAnchor: { x: 0.125, y: 0.07520 },
       linePoints: [
         { x: 0.72, y: 1.1 },
         { x: 0.603, y: 0.895 },
         { x: 0.486, y: 0.690 },
         { x: 0.369, y: 0.485 },
         { x: 0.251, y: 0.280 },
-        { x: 0.133, y: 0.07520 }
+        { x: 0.125, y: 0.07520 }
       ]
     },
     default: {
