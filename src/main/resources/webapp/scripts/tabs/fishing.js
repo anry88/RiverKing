@@ -534,14 +534,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         )}
         <path
           d={rodLinePath}
-          stroke="rgba(255,255,255,0.45)"
+          stroke="rgba(255,255,255,0.3)"
           strokeWidth="1.2"
           strokeLinecap="round"
           fill="none"
         />
         <path
           d={waterLinePath}
-          stroke="rgba(255,255,255,0.45)"
+          stroke="rgba(255,255,255,0.3)"
           strokeWidth="1.2"
           strokeLinecap="round"
           fill="none"
