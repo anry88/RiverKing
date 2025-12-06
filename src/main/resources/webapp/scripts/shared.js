@@ -449,7 +449,7 @@
       image: '/app/assets/rods/yellow_rod.png',
       tipAnchor: { x: 0.078, y: 0.048 },
       linePoints: [
-        { x: 0.77, y: 0.98 },
+        { x: 0.765, y: 0.98 },
         { x: 0.63, y: 0.80 },
         { x: 0.49, y: 0.61 },
         { x: 0.35, y: 0.42 },
