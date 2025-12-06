@@ -6,52 +6,52 @@
   let assetRevision = 0;
   const assetRevisionListeners = new Set();
 
-  function notifyAssetRevision(){
+  function notifyAssetRevision() {
     assetRevision++;
     assetRevisionListeners.forEach(listener => {
-      try{ listener(assetRevision); }
-      catch(e){ console.warn('asset revision listener error', e); }
+      try { listener(assetRevision); }
+      catch (e) { console.warn('asset revision listener error', e); }
     });
   }
 
-  function subscribeAssetRevision(listener){
+  function subscribeAssetRevision(listener) {
     assetRevisionListeners.add(listener);
     return () => assetRevisionListeners.delete(listener);
   }
 
-  function parseAssetDescriptor(src){
-    if(!src && src !== '') return null;
+  function parseAssetDescriptor(src) {
+    if (!src && src !== '') return null;
     let value = typeof src === 'string' ? src : String(src || '');
     value = value.trim();
-    if(!value) return null;
-    if(value.startsWith('blob:')){
+    if (!value) return null;
+    if (value.startsWith('blob:')) {
       return { key: value, requestPath: null, resolved: value };
     }
-    try{
-      if(value.startsWith('http://') || value.startsWith('https://')){
+    try {
+      if (value.startsWith('http://') || value.startsWith('https://')) {
         const url = new URL(value);
         value = url.pathname + url.search;
       }
-    }catch(_){}
+    } catch (_) { }
     value = value.replace(/\\\\/g, '/');
-    if(value.startsWith('/')){
+    if (value.startsWith('/')) {
       value = value.replace(/^\/+/, '');
     }
-    if(value.startsWith('app/assets/')){
+    if (value.startsWith('app/assets/')) {
       value = value.slice('app/assets/'.length);
-    } else if(value.startsWith('webapp/assets/')){
+    } else if (value.startsWith('webapp/assets/')) {
       value = value.slice('webapp/assets/'.length);
-    } else if(value.startsWith('assets/')){
+    } else if (value.startsWith('assets/')) {
       value = value.slice('assets/'.length);
     }
-    if(value.startsWith('app/')){
+    if (value.startsWith('app/')) {
       value = value.slice('app/'.length);
     }
-    if(value.startsWith('assets/')){
+    if (value.startsWith('assets/')) {
       value = value.slice('assets/'.length);
     }
-    if(value.includes('..')) return null;
-    if(!value) return null;
+    if (value.includes('..')) return null;
+    if (!value) return null;
     return {
       key: value,
       requestPath: value.split('/').map(encodeURIComponent).join('/'),
@@ -59,28 +59,28 @@
     };
   }
 
-  function getCachedAssetSrc(src){
+  function getCachedAssetSrc(src) {
     const info = parseAssetDescriptor(src);
-    if(!info) return null;
+    if (!info) return null;
     const cached = assetCache.get(info.key);
     return typeof cached === 'string' ? cached : null;
   }
 
-  function ensureAssetSrc(src){
+  function ensureAssetSrc(src) {
     const info = parseAssetDescriptor(src);
-    if(!info) return Promise.reject(new Error('invalid asset path'));
-    if(info.resolved){
+    if (!info) return Promise.reject(new Error('invalid asset path'));
+    if (info.resolved) {
       assetCache.set(info.key, info.resolved);
       return Promise.resolve(info.resolved);
     }
     const cached = assetCache.get(info.key);
-    if(typeof cached === 'string') return Promise.resolve(cached);
-    if(cached) return cached;
+    if (typeof cached === 'string') return Promise.resolve(cached);
+    if (cached) return cached;
     const requestPath = info.requestPath;
-    if(!requestPath) return Promise.reject(new Error('invalid asset path'));
-    const inflight = fetch(`/api/assets/${requestPath}`, {credentials:'include'})
+    if (!requestPath) return Promise.reject(new Error('invalid asset path'));
+    const inflight = fetch(`/api/assets/${requestPath}`, { credentials: 'include' })
       .then(resp => {
-        if(!resp.ok){
+        if (!resp.ok) {
           const err = new Error(`asset ${resp.status}`);
           err.status = resp.status;
           throw err;
@@ -100,37 +100,37 @@
     return inflight;
   }
 
-  function decodeImage(url){
-    if(typeof Image === 'undefined') return Promise.resolve(url);
+  function decodeImage(url) {
+    if (typeof Image === 'undefined') return Promise.resolve(url);
     return new Promise(resolve => {
       let done = false;
       const finish = () => {
-        if(done) return;
+        if (done) return;
         done = true;
         resolve(url);
       };
       const img = new Image();
       img.onload = finish;
       img.onerror = finish;
-      try{
+      try {
         img.src = url;
-      }catch(e){
+      } catch (e) {
         finish();
         return;
       }
-      if(typeof img.decode === 'function'){
+      if (typeof img.decode === 'function') {
         img.decode().then(finish).catch(finish);
-      } else if(img.complete){
+      } else if (img.complete) {
         finish();
       }
       setTimeout(finish, 10000);
     });
   }
 
-  function preloadAsset(src){
+  function preloadAsset(src) {
     const info = parseAssetDescriptor(src);
-    if(!info) return Promise.resolve(null);
-    if(info.resolved) return Promise.resolve(info.resolved);
+    if (!info) return Promise.resolve(null);
+    if (info.resolved) return Promise.resolve(info.resolved);
     return ensureAssetSrc(src)
       .then(url => decodeImage(url))
       .catch(err => {
@@ -139,39 +139,39 @@
       });
   }
 
-  function useAssetSrc(src, options={}){
-    const {onError} = options;
-    const [resolved, setResolved] = React.useState(()=>getCachedAssetSrc(src));
+  function useAssetSrc(src, options = {}) {
+    const { onError } = options;
+    const [resolved, setResolved] = React.useState(() => getCachedAssetSrc(src));
     const [revision, setRevision] = React.useState(assetRevision);
-    React.useEffect(()=> subscribeAssetRevision(setRevision), []);
-    React.useEffect(()=>{
+    React.useEffect(() => subscribeAssetRevision(setRevision), []);
+    React.useEffect(() => {
       let cancelled = false;
-      if(!src){
+      if (!src) {
         setResolved(null);
         return;
       }
       const info = parseAssetDescriptor(src);
-      if(!info){
+      if (!info) {
         setResolved(null);
         return;
       }
-      if(info.resolved){
+      if (info.resolved) {
         setResolved(info.resolved);
         return;
       }
       const cached = getCachedAssetSrc(src);
-      if(cached){
+      if (cached) {
         setResolved(cached);
         return;
       }
       ensureAssetSrc(src)
-        .then(url => { if(!cancelled) setResolved(url); })
+        .then(url => { if (!cancelled) setResolved(url); })
         .catch(err => {
-          if(cancelled) return;
+          if (cancelled) return;
           setResolved(null);
-          if(typeof onError === 'function'){
-            try{ onError(err); }
-            catch(handlerErr){ console.warn('asset error handler threw', handlerErr); }
+          if (typeof onError === 'function') {
+            try { onError(err); }
+            catch (handlerErr) { console.warn('asset error handler threw', handlerErr); }
           }
         });
       return () => { cancelled = true; };
@@ -179,23 +179,23 @@
     return resolved;
   }
 
-  const AssetImage = React.forwardRef(({src, onError, ...rest}, ref) => {
+  const AssetImage = React.forwardRef(({ src, onError, ...rest }, ref) => {
     const innerRef = React.useRef(null);
     React.useImperativeHandle(ref, () => innerRef.current);
     const resolved = useAssetSrc(src, {
       onError: err => {
-        if(typeof onError === 'function'){
+        if (typeof onError === 'function') {
           const target = innerRef.current;
-          const event = target ? {currentTarget: target, target, error: err} : {error: err};
-          try{ onError(event); }
-          catch(handlerErr){ console.warn('asset onError handler threw', handlerErr); }
+          const event = target ? { currentTarget: target, target, error: err } : { error: err };
+          try { onError(event); }
+          catch (handlerErr) { console.warn('asset onError handler threw', handlerErr); }
         }
       }
     });
     const handleRef = React.useCallback(node => {
       innerRef.current = node;
-      if(typeof ref === 'function') ref(node);
-      else if(ref) ref.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
     }, [ref]);
     return <img {...rest} ref={handleRef} src={resolved || undefined} onError={onError} />;
   });
@@ -354,7 +354,7 @@
   const getLureIcon = lure => {
     const info = getLureInfo(lure);
     if (info?.icon) return info.icon;
-    if (typeof lure === 'object'){
+    if (typeof lure === 'object') {
       if (typeof lure?.icon === 'string') return lure.icon;
       if (typeof lure?.image === 'string') return lure.image;
     }
@@ -447,31 +447,80 @@
   const ROD_CONFIG = {
     spark: {
       image: '/app/assets/rods/yellow_rod.png',
-      tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+      tipAnchor: { x: 0.078, y: 0.048 },
+      linePoints: [
+        { x: 0.765, y: 0.98 },
+        { x: 0.635, y: 0.80 },
+        { x: 0.495, y: 0.61 },
+        { x: 0.355, y: 0.42 },
+        { x: 0.215, y: 0.23 },
+        { x: 0.078, y: 0.048 }
+      ]
     },
     dew: {
       image: '/app/assets/rods/green_rod.png',
       tipAnchor: { x: 0.13607, y: 0.06641 },
+      linePoints: [
+        { x: 0.765, y: 0.98 },
+        { x: 0.639, y: 0.797 },
+        { x: 0.513, y: 0.614 },
+        { x: 0.388, y: 0.432 },
+        { x: 0.262, y: 0.249 },
+        { x: 0.13607, y: 0.06641 }
+      ]
     },
     stream: {
       image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.16276, y: 0.07422 },
+      tipAnchor: { x: 0.155, y: 0.07422 },
+      linePoints: [
+        { x: 0.72, y: 1.1 },
+        { x: 0.609, y: 0.895 },
+        { x: 0.497, y: 0.690 },
+        { x: 0.386, y: 0.485 },
+        { x: 0.274, y: 0.279 },
+        { x: 0.155, y: 0.07422 }
+      ]
     },
     abyss: {
       image: '/app/assets/rods/black_rod.png',
       tipAnchor: { x: 0.14844, y: 0.04688 },
+      linePoints: [
+        { x: 0.765, y: 0.98 },
+        { x: 0.642, y: 0.793 },
+        { x: 0.518, y: 0.607 },
+        { x: 0.395, y: 0.420 },
+        { x: 0.272, y: 0.234 },
+        { x: 0.14844, y: 0.04688 }
+      ]
     },
     storm: {
       image: '/app/assets/rods/silver_rod.png',
-      tipAnchor: { x: 0.13411, y: 0.07520 },
+      tipAnchor: { x: 0.125, y: 0.07520 },
+      linePoints: [
+        { x: 0.72, y: 1.1 },
+        { x: 0.603, y: 0.895 },
+        { x: 0.486, y: 0.690 },
+        { x: 0.369, y: 0.485 },
+        { x: 0.251, y: 0.280 },
+        { x: 0.125, y: 0.07520 }
+      ]
     },
     default: {
       image: '/app/assets/rods/yellow_rod.png',
       tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
+      linePoints: [
+        { x: 0.765, y: 0.98 },
+        { x: 0.635, y: 0.80 },
+        { x: 0.495, y: 0.61 },
+        { x: 0.355, y: 0.42 },
+        { x: 0.215, y: 0.23 },
+        { x: 0.078, y: 0.048 }
+      ]
     },
   };
   const ROD_IMAGES = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.image]));
   const ROD_TIP_ANCHORS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.tipAnchor]));
+  const ROD_LINE_POINTS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.linePoints]));
   const ROD_IMG = ROD_IMAGES.default;
   const ROD_IMG_SIZE = { width: 1536, height: 1024 };
   const ROD_TIP_ANCHOR = ROD_TIP_ANCHORS.default || ROD_TIP_ANCHOR_DEFAULT;
@@ -837,7 +886,7 @@
       allLocations: 'Все локации',
       unlocked: 'Открыто',
       requiresKg: kg => `Требуется ${kg} кг`,
-      rodLockedStars: ({kg, stars}) => `Требуется ${kg} кг или ${stars}`,
+      rodLockedStars: ({ kg, stars }) => `Требуется ${kg} кг или ${stars}`,
       current: 'Текущий',
       rodBonusFreshPeaceful: '−50% шанс побега пресноводных мирных рыб',
       rodBonusFreshPredator: '−50% шанс побега пресноводных хищных рыб',
@@ -999,7 +1048,7 @@
       allLocations: 'All locations',
       unlocked: 'Unlocked',
       requiresKg: kg => `${kg} kg required`,
-      rodLockedStars: ({kg, stars}) => `${kg} kg required or ${stars}`,
+      rodLockedStars: ({ kg, stars }) => `${kg} kg required or ${stars}`,
       current: 'Current',
       rodBonusFreshPeaceful: '50% less escape chance for freshwater peaceful fish',
       rodBonusFreshPredator: '50% less escape chance for freshwater predator fish',
@@ -1070,7 +1119,7 @@
       catch: 'Catch!',
       new: 'New!',
       locationLabel: 'Location:',
-      coinsEarned: coins => `+${coins} coin${coins===1?'':'s'}`,
+      coinsEarned: coins => `+${coins} coin${coins === 1 ? '' : 's'}`,
       coinsCapReached: 'No coins due to daily cap',
       newLocation: 'New location unlocked:',
       newRod: 'New rod unlocked:',
@@ -1195,6 +1244,7 @@
   window.ROD_IMG_SIZE = ROD_IMG_SIZE;
   window.ROD_TIP_ANCHOR = ROD_TIP_ANCHOR;
   window.ROD_TIP_ANCHORS = ROD_TIP_ANCHORS;
+  window.ROD_LINE_POINTS = ROD_LINE_POINTS;
   window.ROD_BASE_ANCHOR = ROD_BASE_ANCHOR;
   window.ROD_SIZE_MULT = ROD_SIZE_MULT;
   window.ROD_BASE_X_FRACTION = ROD_BASE_X_FRACTION;
