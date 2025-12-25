@@ -284,14 +284,25 @@ object AchievementService {
             .selectAll()
             .associate { row -> row[Locations.name] to row[Locations.id].value }
 
+        val fishCounts = mutableMapOf<Long, MutableSet<Long>>()
+        val watersByLocation = mutableMapOf<Long, MutableSet<String>>()
+        (LocationFishWeights innerJoin Fish)
+            .slice(LocationFishWeights.locationId, LocationFishWeights.fishId, Fish.water)
+            .selectAll()
+            .forEach { row ->
+                val locId = row[LocationFishWeights.locationId].value
+                fishCounts.getOrPut(locId) { mutableSetOf() }.add(row[LocationFishWeights.fishId].value)
+                watersByLocation.getOrPut(locId) { mutableSetOf() }.add(row[Fish.water])
+            }
+
         locationAchievementConfigs.mapNotNull { (code, name, stats) ->
             val id = idsByName[name] ?: return@mapNotNull null
             LocationAchievementData(
                 code = code,
                 locationId = id,
                 locationName = name,
-                fishCount = stats.fishCount,
-                waters = stats.waters,
+                fishCount = fishCounts[id]?.size ?: stats.fishCount,
+                waters = watersByLocation[id] ?: stats.waters,
             )
         }
     }
@@ -364,6 +375,11 @@ object AchievementService {
         val level = levelIndex(definition.thresholds, progressValue)
         val uiLevel = minOf(level, 4)
         val target = definition.thresholds.getOrNull(level + 1) ?: definition.thresholds.last()
+        val displayTarget = if (definition.code.endsWith("_all_fish")) {
+            definition.thresholds.last()
+        } else {
+            target
+        }
         val rowId = ensureProgressRow(userId, definition)
         val progressRow = inTxn {
             AchievementProgress.select { AchievementProgress.id eq rowId }.singleOrNull()
@@ -385,9 +401,9 @@ object AchievementService {
             level = levelLabel(uiLevel, langIsRu),
             levelIndex = uiLevel,
             progress = roundedProgress,
-            target = target,
+            target = displayTarget,
             progressLabel = formatAchievementValue(definition.code, roundedProgress, langIsRu),
-            targetLabel = formatAchievementValue(definition.code, target.toDouble(), langIsRu),
+            targetLabel = formatAchievementValue(definition.code, displayTarget.toDouble(), langIsRu),
             claimable = level > claimed,
         )
     }
