@@ -467,6 +467,21 @@ object AchievementService {
         return unlocks
     }
 
+    fun unlockMessages(unlocks: List<AchievementUnlock>, language: String): List<String> {
+        if (unlocks.isEmpty()) return emptyList()
+        val langIsRu = language.lowercase().startsWith("ru")
+        return unlocks.mapNotNull { unlock ->
+            val definition = definitionFor(unlock.code) ?: return@mapNotNull null
+            val name = if (langIsRu) definition.nameRu else definition.nameEn
+            val level = levelLabel(unlock.newLevelIndex, langIsRu)
+            if (langIsRu) {
+                "Открыто достижение «$name»: $level"
+            } else {
+                "Achievement unlocked: \"$name\" — $level"
+            }
+        }
+    }
+
     private fun uniqueFishCaughtAtLocation(userId: Long, locationId: Long): Double = inTxn {
         Catches
             .slice(Catches.fishId)

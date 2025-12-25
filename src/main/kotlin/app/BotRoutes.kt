@@ -705,13 +705,16 @@ fun Application.botRoutes(env: Env) {
                             }
                             else -> ""
                         }
+                        val achievementLines = AchievementService
+                            .unlockMessages(castRes.achievements, lang)
+                            .map { line -> "\n🏆 $line" }
                         val captionBase = buildCatchCaption(
                             lang = lang,
                             fishName = fishName,
                             rarity = catch.rarity,
                             weightKg = catch.weight,
                             locationName = locationName,
-                            extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine),
+                            extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine) + achievementLines,
                         )
                         var caption = appendCatchTags(captionBase, catch)
                         if (!options.catchFooter.isNullOrBlank()) {
