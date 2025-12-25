@@ -1,42 +1,310 @@
-Базовый шаблон промпта
+0) Общий “Series Spec” (вставляй в каждый промпт без изменений)
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, минимум деталей, мягкая винтажная стилизация как в старых значках. Плоские заливки, лёгкий объём за счёт 1–2 больших теней, без текстур, без текста.
-Везде аккуратный тёмный контур. Никаких бликов, неона, градиентов, ореолов, виньеток, надписей.
-Для этого варианта используй цветовую гамму уровня: [ОПИСАНИЕ ЦВЕТА УРОВНЯ]. Всё остальное — та же композиция и стиль, чтобы значки выглядели как одна серия.
+OUTPUT: PNG 1024×1024, transparent background.
 
-1. Без достижения (серый / заблокировано)
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, винтажный плоский значок, лёгкий объём, тёмный контур, без текста, без неона, без градиентов и ореолов.
-Для этого варианта используй серую, тусклую палитру “без достижения”: тёмно-серые и светло-серые оттенки, немного приглушённого тёплого серо-бежевого, без ярких акцентных цветов. Всё остальное — та же композиция и стиль.
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
 
-2. Бронза
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, винтажный плоский значок, лёгкий объём, тёмный контур, без текста, без неона, без градиентов и ореолов.
-Для этого варианта используй бронзовую палитру: тёплые коричнево-оранжевые и медные тона, светлая бежево-бронзовая середина, тёмно-коричневый контур. Всё остальное — та же композиция и стиль.
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
 
-3. Серебро
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, винтажный плоский значок, лёгкий объём, тёмный контур, без текста, без неона, без градиентов и ореолов.
-Для этого варианта используй серебристую палитру: холодные светло-серые и стальные оттенки, чуть более тёмный серый для внешнего кольца, мягкие бело-серые блики, тёмный графитовый контур. Всё остальное — та же композиция и стиль.
+1) Тир: “Без достижения / Locked” (самый простой, «тусклый»)
 
-4. Золото
+OUTPUT: PNG 1024×1024, transparent background.
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, винтажный плоский значок, лёгкий объём, тёмный контур, без текста, без неона, без градиентов и ореолов.
-Для этого варианта используй золотую палитру: насыщённые жёлто-золотые и тёплые охристые оттенки, светлый золотистый для фона, тёмно-коричневый контур и детали. Всё остальное — та же композиция и стиль.
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
 
-5. Платина
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
 
-Нарисуй PNG 1024×1024, RGBA, прозрачный фон. Круглый значок-бейдж достижения в одном и том же стиле для всех уровней.
-Композиция: толстое внешнее кольцо, внутри узкое светлое кольцо-ободок, затем круглый фон и по центру простой плоский символ достижения: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ].
-Стиль: ровные векторные формы, винтажный плоский значок, лёгкий объём, тёмный контур, без текста, без неона, без градиентов и ореолов.
-Для этого варианта используй платиновую палитру: очень светлые холодные серо-белые оттенки с лёгким голубоватым нюансом, более тёмный холодный серый для внешних колец, тёмный графитовый контур. Всё остальное — та же композиция и стиль.
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
+
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
+
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ] (same outline, simplified, fits 560×560).
+
+TIER ORNAMENTS (locked): NONE. No rivets, no stars, no laurel, no crown.
+
+LOCKED LOOK:
+- overall muted, low-contrast, matte
+- central symbol slightly less contrast than other tiers (but still readable)
+
+COLOR PALETTE (use ONLY these hex):
+Outline: #2E2E2E
+Outer ring dark: #5B5B5B
+Outer ring mid:  #7A7A7A
+Outer ring shadow: #4A4A4A
+Thin inner rim (light): #D6D6D6
+Inner field: #9B9B9B
+Inner field shadow: #7F7F7F
+Small warm neutral accent (optional, very subtle): #B8AFA0
+Total colors ≤ 8.
+
+
+2) Тир: “Бронза” (первый «престиж»)
+
+OUTPUT: PNG 1024×1024, transparent background.
+
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
+
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
+
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
+
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
+
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ]
+
+TIER ORNAMENTS (bronze):
+- Add 8 round rivets on the outer ring, evenly spaced at 45° steps.
+- Each rivet diameter: 34px.
+- Rivets center radius: 413px from center (512,512) (so they sit nicely inside the outer ring).
+- Rivets use same outline and have a small flat shadow shape.
+
+COLOR PALETTE (use ONLY these hex):
+Outline: #2B1D14
+Outer ring dark: #7A4E2F
+Outer ring mid:  #A36A3F
+Outer ring highlight: #D9B48A
+Outer ring shadow: #5B3821
+Thin inner rim (light): #E6D3B5
+Inner field: #C5905A
+Inner field shadow: #9B6B3D
+Total colors ≤ 8.
+
+
+3) Тир: “Серебро” (заметно круче бронзы)
+
+OUTPUT: PNG 1024×1024, transparent background.
+
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
+
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
+
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
+
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
+
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ]
+
+TIER ORNAMENTS (silver):
+- Add 12 round rivets on the outer ring, evenly spaced every 30°.
+- Rivet diameter: 32px. Rivets center radius: 413px.
+- Add a single 5-point star at 12 o’clock, centered on the outer ring:
+  - Star bounding box: 120×120px
+  - Star center: (512, 160)
+  - Star sits on top of the outer ring (still within the 472px outer radius).
+- Star has outline + one flat shadow shape.
+
+COLOR PALETTE (use ONLY these hex):
+Outline: #1F242B
+Outer ring dark: #6C7682
+Outer ring mid:  #A5AFB9
+Outer ring highlight: #E3E8EE
+Outer ring shadow: #56606A
+Thin inner rim (light): #EFF3F7
+Inner field: #C9D1D8
+Inner field shadow: #9AA3AD
+Total colors ≤ 8.
+
+
+4) Тир: “Золото” (явно топовее серебра)
+
+OUTPUT: PNG 1024×1024, transparent background.
+
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
+
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
+
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
+
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
+
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ]
+
+TIER ORNAMENTS (gold):
+- Keep 12 rivets (same as silver): diameter 32px, radius 413px.
+- Keep top 5-point star (same position/size): 120×120, center (512,160).
+- Add two laurel branches OUTSIDE the badge ring (left and right), hugging the outer circle:
+  - Each branch bounding box: 220×420px
+  - Left branch center: (300, 560), right branch center: (724, 560)
+  - Leaves are simple flat shapes (no texture), consistent outline.
+  - Branches must stay within the outer radius 472px (no cut-off, no going outside).
+
+COLOR PALETTE (use ONLY these hex):
+Outline: #2B1D14
+Outer ring dark: #8A6A1C
+Outer ring mid:  #D1A64A
+Outer ring highlight: #F6E7BA
+Outer ring shadow: #6E5314
+Thin inner rim (light): #F2E1B1
+Inner field: #E0B95D
+Inner field shadow: #B1842D
+Total colors ≤ 8.
+
+
+5) Тир: “Платина” (самый крутой, «элитный»)
+
+OUTPUT: PNG 1024×1024, transparent background.
+
+STYLE (fixed for the whole series):
+- clean vector shapes, vintage flat badge, minimal details
+- solid fills only (NO gradients, NO glow, NO vignette, NO textures, NO noise, NO text)
+- 1–2 large flat shadow shapes (as separate solid shapes), consistent direction: shadow goes 12px down and 8px right
+- consistent dark outline everywhere: stroke thickness 12px, rounded joins/caps
+
+GEOMETRY (fixed):
+- Badge center: (512, 512)
+- Outer circle radius: 472px (outer diameter 944px). Everything must fit inside this circle; outside is fully transparent.
+- Outer ring thickness: 118px (so inner radius of outer ring = 354px)
+- Inner light rim (thin ring) thickness: 22px (so inner radius after rim = 332px)
+- Inner field (main circle background) radius: 332px
+- Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
+- Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
+- Outside the outer radius (472px) is transparent only.
+
+LAYER ORDER (fixed):
+1) Outer ring
+2) Thin inner light rim
+3) Inner field circle
+4) Ornaments for tier (rivets / star / laurel / crown) — only where specified
+5) Central symbol (the only thing that changes per badge)
+All elements use the same outline rules above.
+
+NEGATIVE CONSTRAINTS:
+no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
+
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ]
+
+TIER ORNAMENTS (platinum):
+- Rivets: 16 rivets, evenly spaced every 22.5°. Diameter 30px, radius 413px.
+- Replace side branches with a FULL laurel wreath around the badge (still within outer radius 472px):
+  - Wreath thickness band: ~70px around the outer ring perimeter, leaving the outer ring still visible.
+  - Leaves are simple flat shapes, consistent outline, no texture.
+- Add a small crown at 12 o’clock (above the outer ring but inside outer radius):
+  - Crown bounding box: 180×140px
+  - Crown center: (512, 140)
+  - Crown uses same outline + one flat shadow shape.
+- No sparkles, no glow.
+
+COLOR PALETTE (use ONLY these hex):
+Outline: #20262E
+Outer ring dark: #7C8896
+Outer ring mid:  #C9D2DA
+Outer ring highlight: #FFFFFF
+Outer ring shadow: #6B7682
+Thin inner rim (light): #F7FBFF
+Inner field: #E7EEF4
+Cool accent (optional, subtle): #D7E6F2
+Total colors ≤ 8.
+
+
+Как вставлять символ достижения (важно для консистентности)
+
+Вместо [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ] используй формулировку такого типа:
+
+a simple flat icon of [X], centered, left-to-right balanced, 2–5 solid shapes, no micro-details, no texture, same 12px outline, fits 560×560 box
+
+
+Примеры:
+
+a simple flat icon of a fish hanging vertically above water (no hook), minimal fins, centered
+
+a simple flat icon of a trophy cup, centered, minimal details
