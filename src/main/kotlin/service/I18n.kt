@@ -162,7 +162,7 @@ object I18n {
         "Пермит" to "Permit",
         "Альбула" to "Bonefish",
         "Скумбрия испанская" to "Spanish Mackerel",
-        "Форель коралловая" to "Coral Trout",
+        "Группер коралловый" to "Coral Grouper",
         "Спинорог-титан" to "Titan Triggerfish",
         "Карп кои (Кохаку)" to "Koi (Kohaku)",
         "Карп кои (Тайсё Сансёку)" to "Koi (Taisho Sanshoku)",
