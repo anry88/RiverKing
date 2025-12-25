@@ -176,7 +176,8 @@ object DB {
             "Большая барракуда" to "Барракуда большая",
             "Гигантский каранкс" to "Каранкс гигантский",
             "Испанская скумбрия" to "Скумбрия испанская",
-            "Коралловая форель" to "Форель коралловая",
+            "Коралловая форель" to "Группер коралловый",
+            "Форель коралловая" to "Группер коралловый",
             "Электрический угорь" to "Угорь электрический",
             "Краснохвостый сом" to "Сом краснохвостый",
             "Цихлида щучья" to "Щучья цихлида",
@@ -563,7 +564,7 @@ object DB {
         val fEpicPredatorSaltBlueKaranks  = upsertFish("Каранкс голубой", "epic", 5.0, 2.0, true, "salt")
         val fEpicPredatorSaltBigBarracuda = upsertFish("Барракуда большая", "epic", 12.0, 6.0, true, "salt")
         val fEpicPredatorSaltPermit   = upsertFish("Пермит", "epic", 6.0, 3.0, true, "salt")
-        val fEpicPredatorSaltCoralForel = upsertFish("Форель коралловая", "epic", 5.0, 2.0, true, "salt")
+        val fEpicPredatorSaltCoralGrouper = upsertFish("Группер коралловый", "epic", 5.0, 2.0, true, "salt")
         val fEpicPredatorSaltKatran= upsertFish("Катран обыкновенный","epic",     7.0,  3.0,  true, "salt")
         val fEpicPredatorSaltMorayEuropean = upsertFish("Мурена европейская", "epic", 3.0, 1.2, true, "salt")
 
@@ -1077,7 +1078,7 @@ object DB {
         setLFWeight(coralFlats, fRarePredatorSaltMangrovesLucian, 0.17)
         setLFWeight(coralFlats, fEpicPredatorSaltPermit, 0.08)
         setLFWeight(coralFlats, fEpicPredatorSaltBigBarracuda, 0.06)
-        setLFWeight(coralFlats, fEpicPredatorSaltCoralForel, 0.06)
+        setLFWeight(coralFlats, fEpicPredatorSaltCoralGrouper, 0.06)
         setLFWeight(coralFlats, fMythicPredatorSaltNapoleonFish, 0.045)
         setLFWeight(coralFlats, fMythicPredatorSaltCubera, 0.04)
         setLFWeight(coralFlats, fMythicPredatorSaltMorayGiant,  0.03)
