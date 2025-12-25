@@ -18,6 +18,16 @@ GEOMETRY (fixed):
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
 
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
+
 LAYER ORDER (fixed):
 1) Outer ring
 2) Thin inner light rim
@@ -49,6 +59,16 @@ GEOMETRY (fixed):
 - Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
+
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
 
 LAYER ORDER (fixed):
 1) Outer ring
@@ -101,6 +121,16 @@ GEOMETRY (fixed):
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
 
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
+
 LAYER ORDER (fixed):
 1) Outer ring
 2) Thin inner light rim
@@ -151,6 +181,16 @@ GEOMETRY (fixed):
 - Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
+
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
 
 LAYER ORDER (fixed):
 1) Outer ring
@@ -206,6 +246,16 @@ GEOMETRY (fixed):
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
 
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
+
 LAYER ORDER (fixed):
 1) Outer ring
 2) Thin inner light rim
@@ -259,6 +309,16 @@ GEOMETRY (fixed):
 - Central achievement symbol must fit inside a 560×560px box centered at (512,512). Keep at least 36px padding from the inner light rim.
 - Edge constraint: all 4 corners (0,0), (1023,0), (0,1023), (1023,1023) must be fully transparent.
 - Outside the outer radius (472px) is transparent only.
+
+OUTER RING (two-halves split, like the reference):
+- The outer ring fill is made of EXACTLY 2 solid shapes (no third shading shape):
+  1) TOP semi-annulus (upper half) — uniform flat fill, lighter tone
+  2) BOTTOM semi-annulus (lower half) — uniform flat fill, darker tone
+- The split is a perfectly straight horizontal line through the center (y = 512).
+- The split line has NO stroke/outline of its own (only the ring’s normal outlines).
+- No gradients, no patches, no mottling, no texture, no extra highlights/shadows on the ring.
+- Only anti-aliasing on the curved edges is allowed.
+- Use ONLY two colors on the ring fill: OuterRingTop and OuterRingBottom.
 
 LAYER ORDER (fixed):
 1) Outer ring
