@@ -4,18 +4,22 @@ import db.AchievementProgress
 import db.Achievements
 import db.Catches
 import db.Fish
+import db.LocationFishWeights
 import db.Locations
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import util.Metrics
 import java.time.Instant
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import org.jetbrains.exposed.sql.sum
 
@@ -55,6 +59,22 @@ object AchievementService {
         val thresholds: List<Int>,
         val rewards: List<PrizeSpec>,
         val progress: (Long) -> Double,
+        val isRelevantCatch: (CatchContext) -> Boolean = { true },
+    )
+
+    private data class CatchContext(
+        val fishName: String?,
+        val rarity: String?,
+        val locationId: Long?,
+    )
+
+    private data class LocationAchievementConfig(val code: String, val locationName: String)
+    private data class LocationAchievementData(
+        val id: Long,
+        val name: String,
+        val fishCount: Int,
+        val waters: Set<String>,
+        val config: LocationAchievementConfig,
     )
 
     private const val KOI_COLLECTOR_CODE = "koi_collector"
@@ -66,6 +86,24 @@ object AchievementService {
     private const val LEGENDARY_FISHER_CODE = "legendary_fisher"
     private const val TRAVELER_CODE = "traveler"
     private const val TROPHY_HUNTER_CODE = "trophy_hunter"
+    private const val LOCATION_MANY_SPECIES_THRESHOLD = 35
+
+    private val locationAchievementConfigs = listOf(
+        LocationAchievementConfig("pond_all_fish", "Пруд"),
+        LocationAchievementConfig("swamp_all_fish", "Болото"),
+        LocationAchievementConfig("river_all_fish", "Река"),
+        LocationAchievementConfig("lake_all_fish", "Озеро"),
+        LocationAchievementConfig("reservoir_all_fish", "Водохранилище"),
+        LocationAchievementConfig("mountain_river_all_fish", "Горная река"),
+        LocationAchievementConfig("river_delta_all_fish", "Дельта реки"),
+        LocationAchievementConfig("sea_coast_all_fish", "Прибрежье моря"),
+        LocationAchievementConfig("amazon_riverbed_all_fish", "Русло Амазонки"),
+        LocationAchievementConfig("igapo_all_fish", "Игапо, затопленный лес"),
+        LocationAchievementConfig("mangroves_all_fish", "Мангровые заросли"),
+        LocationAchievementConfig("coral_flats_all_fish", "Коралловые отмели"),
+        LocationAchievementConfig("fjord_all_fish", "Фьорд"),
+        LocationAchievementConfig("open_ocean_all_fish", "Открытый океан"),
+    )
 
     private val koiFishNames = listOf(
         "Карп кои (Кохаку)",
@@ -118,7 +156,7 @@ object AchievementService {
         PrizeSpec(pack = "salt_crate_l", qty = 1),
     )
 
-    private val definitions = listOf(
+    private val baseDefinitions = listOf(
         AchievementDefinition(
             code = SIMPLE_FISHER_CODE,
             nameRu = "Простой рыбак",
@@ -128,6 +166,7 @@ object AchievementService {
             thresholds = simpleFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::commonCatchCount,
+            isRelevantCatch = { it.rarity == "common" },
         ),
         AchievementDefinition(
             code = UNCOMMON_FISHER_CODE,
@@ -138,6 +177,7 @@ object AchievementService {
             thresholds = uncommonFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::uncommonCatchCount,
+            isRelevantCatch = { it.rarity == "uncommon" },
         ),
         AchievementDefinition(
             code = RARE_FISHER_CODE,
@@ -148,6 +188,7 @@ object AchievementService {
             thresholds = rareFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::rareCatchCount,
+            isRelevantCatch = { it.rarity == "rare" },
         ),
         AchievementDefinition(
             code = EPIC_FISHER_CODE,
@@ -158,6 +199,7 @@ object AchievementService {
             thresholds = epicFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::epicCatchCount,
+            isRelevantCatch = { it.rarity == "epic" },
         ),
         AchievementDefinition(
             code = MYTHIC_FISHER_CODE,
@@ -168,6 +210,7 @@ object AchievementService {
             thresholds = mythicFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::mythicCatchCount,
+            isRelevantCatch = { it.rarity == "mythic" },
         ),
         AchievementDefinition(
             code = LEGENDARY_FISHER_CODE,
@@ -178,6 +221,7 @@ object AchievementService {
             thresholds = legendaryFisherThresholds,
             rewards = simpleFisherRewards,
             progress = ::legendaryCatchCount,
+            isRelevantCatch = { it.rarity == "legendary" },
         ),
         AchievementDefinition(
             code = TRAVELER_CODE,
@@ -208,8 +252,13 @@ object AchievementService {
             thresholds = koiThresholds,
             rewards = koiRewards,
             progress = ::koiCatchCount,
+            isRelevantCatch = { koiFishNames.contains(it.fishName) },
         ),
     )
+
+    private val definitions: List<AchievementDefinition> by lazy {
+        baseDefinitions + buildLocationAchievements()
+    }
 
     private inline fun <T> inTxn(crossinline block: () -> T): T {
         val current = TransactionManager.currentOrNull()
@@ -229,6 +278,62 @@ object AchievementService {
     }
 
     private fun definitionFor(code: String): AchievementDefinition? = definitions.find { it.code == code }
+
+    private fun locationAchievementData(): List<LocationAchievementData> = inTxn {
+        val configByName = locationAchievementConfigs.associateBy { it.locationName }
+        val perLocation = mutableMapOf<Long, Triple<String, MutableSet<Long>, MutableSet<String>>>()
+        val rows = (LocationFishWeights innerJoin Fish innerJoin Locations)
+            .slice(LocationFishWeights.locationId, Locations.name, LocationFishWeights.fishId, Fish.water)
+            .selectAll()
+        rows.forEach { row ->
+            val locId = row[LocationFishWeights.locationId].value
+            val locName = row[Locations.name]
+            val fishId = row[LocationFishWeights.fishId].value
+            val water = row[Fish.water]
+            val entry = perLocation.getOrPut(locId) { Triple(locName, mutableSetOf(), mutableSetOf()) }
+            entry.second += fishId
+            entry.third += water
+        }
+        perLocation.mapNotNull { (id, triple) ->
+            val config = configByName[triple.first] ?: return@mapNotNull null
+            LocationAchievementData(
+                id = id,
+                name = triple.first,
+                fishCount = triple.second.size,
+                waters = triple.third,
+                config = config,
+            )
+        }
+    }
+
+    private fun locationThresholds(fishCount: Int): List<Int> {
+        val midBase = if (fishCount >= LOCATION_MANY_SPECIES_THRESHOLD) 5 else 3
+        val mid = midBase.coerceAtMost(fishCount)
+        val half = maxOf(mid + 1, ceil(fishCount / 2.0).toInt()).coerceAtMost(fishCount)
+        return listOf(0, 1, mid, half, fishCount)
+    }
+
+    private fun locationRewards(waters: Set<String>): List<PrizeSpec> {
+        val boosterPack = if (waters.all { it == "fresh" }) "fresh_boost_l" else "salt_boost_l"
+        return simpleFisherRewards.dropLast(1) + listOf(PrizeSpec(pack = boosterPack, qty = 1))
+    }
+
+    private fun buildLocationAchievements(): List<AchievementDefinition> = locationAchievementData().map { loc ->
+        val locNameEn = I18n.location(loc.name, "en")
+        val thresholds = locationThresholds(loc.fishCount)
+        val rewards = locationRewards(loc.waters)
+        AchievementDefinition(
+            code = loc.config.code,
+            nameRu = "Исследователь: ${loc.name}",
+            nameEn = "Explorer: $locNameEn",
+            descRu = "Откройте всех рыб в локации «${loc.name}»",
+            descEn = "Discover every fish in $locNameEn",
+            thresholds = thresholds,
+            rewards = rewards,
+            progress = { userId -> uniqueFishCaughtAtLocation(userId, loc.id) },
+            isRelevantCatch = { ctx -> ctx.locationId == loc.id },
+        )
+    }
 
     private fun achievementId(definition: AchievementDefinition): Long = inTxn {
         Achievements.select { Achievements.code eq definition.code }
@@ -324,27 +429,16 @@ object AchievementService {
         return AchievementRewardDTO(code, rewards)
     }
 
-    fun updateOnCatch(userId: Long, fishId: Long): List<AchievementUnlock> {
+    fun updateOnCatch(userId: Long, fishId: Long, locationId: Long): List<AchievementUnlock> {
         val fishDetails = inTxn {
             Fish.select { Fish.id eq fishId }.singleOrNull()?.let { row ->
                 row[Fish.name] to row[Fish.rarity]
             }
         }
+        val context = CatchContext(fishDetails?.first, fishDetails?.second, locationId)
         val unlocks = mutableListOf<AchievementUnlock>()
         definitions.forEach { definition ->
-            val relevant = when (definition.code) {
-                KOI_COLLECTOR_CODE -> fishDetails?.first?.let { koiFishNames.contains(it) } == true
-                SIMPLE_FISHER_CODE -> fishDetails?.second == "common"
-                UNCOMMON_FISHER_CODE -> fishDetails?.second == "uncommon"
-                RARE_FISHER_CODE -> fishDetails?.second == "rare"
-                EPIC_FISHER_CODE -> fishDetails?.second == "epic"
-                MYTHIC_FISHER_CODE -> fishDetails?.second == "mythic"
-                LEGENDARY_FISHER_CODE -> fishDetails?.second == "legendary"
-                TRAVELER_CODE -> true
-                TROPHY_HUNTER_CODE -> true
-                else -> true
-            }
-            if (!relevant) return@forEach
+            if (!definition.isRelevantCatch(context)) return@forEach
             val rowId = ensureProgressRow(userId, definition)
             val previous = inTxn {
                 AchievementProgress.select { AchievementProgress.id eq rowId }
@@ -365,6 +459,15 @@ object AchievementService {
             }
         }
         return unlocks
+    }
+
+    private fun uniqueFishCaughtAtLocation(userId: Long, locationId: Long): Double = inTxn {
+        Catches
+            .slice(Catches.fishId)
+            .select { (Catches.userId eq userId) and (Catches.locationId eq locationId) }
+            .groupBy(Catches.fishId)
+            .count()
+            .toDouble()
     }
 
     private fun roundForDisplay(code: String, value: Double): Double =
