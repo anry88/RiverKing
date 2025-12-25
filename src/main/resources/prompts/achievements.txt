@@ -81,7 +81,7 @@ All elements use the same outline rules above.
 NEGATIVE CONSTRAINTS:
 no typography, no labels, no numbers, no watermark, no photo/3D render, no metallic reflections, no sparkles/glitter, no gradients.
 
-CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ] (same outline, simplified, fits 560×560).
+CENTER SYMBOL: [КРАТКО ОПИШИ СИМВОЛ ДОСТИЖЕНИЯ] (same outline, simplified, fits 512×512).
 
 TIER ORNAMENTS (locked): NONE. No rivets, no stars, no laurel, no crown.
 
@@ -278,6 +278,17 @@ TIER ORNAMENTS (gold):
 - Branches must stay within the outer radius 472px (no cut-off, no going outside).
 - The very lowest visible point of each branch (leaf or stem tip) MUST reach y≈980–984 (6 o’clock), visibly touching the outer circle edge (no gap).
 - Laurel branches must be continuous from about y≈260 down to y≈984, with a visible stem tip near the bottom.
+
+Laurel branches (outside ring look, like the reference)
+- Two symmetric laurel branches hugging the outer circle (left & right), drawn as ornaments (not part of the ring fill)
+- Each branch bounding box: 240×680px
+- Left branch center (300,644)
+- Right branch center (724,644)
+- Leaves: simple flat almond shapes, consistent outline; minimal count (примерно 14–18 листьев на ветку)
+- Branches must stay fully inside outer radius 472px (no cut-off, nothing outside)
+- The very lowest visible point of each branch must reach y = 980–984, visibly touching the outer circle edge (no gap)
+- Branch must be continuous from about y ≈ 260 down to y ≈ 984, with a visible stem tip near the bottom
+- Add at most one flat shadow shape per branch (direction 12↓ 8→), shadow stays inside outer circle
 
 COLOR PALETTE (use ONLY these hex):
 Outline: #2B1D14
