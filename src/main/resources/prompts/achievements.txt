@@ -42,6 +42,8 @@ no typography, no labels, no numbers, no watermark, no photo/3D render, no metal
 
 1) Тир: “Без достижения / Locked” (самый простой, «тусклый»)
 
+Make the badge picture for the game.
+
 OUTPUT: PNG 1024×1024, transparent background.
 
 STYLE (fixed for the whole series):
@@ -103,6 +105,8 @@ Total colors ≤ 8.
 
 2) Тир: “Бронза” (первый «престиж»)
 
+Make the badge picture for the game.
+
 OUTPUT: PNG 1024×1024, transparent background.
 
 STYLE (fixed for the whole series):
@@ -163,6 +167,8 @@ Total colors ≤ 8.
 
 
 3) Тир: “Серебро” (заметно круче бронзы)
+
+Make the badge picture for the game.
 
 OUTPUT: PNG 1024×1024, transparent background.
 
@@ -227,6 +233,8 @@ Total colors ≤ 8.
 
 
 4) Тир: “Золото” (явно топовее серебра)
+
+Make the badge picture for the game.
 
 OUTPUT: PNG 1024×1024, transparent background.
 
@@ -303,6 +311,8 @@ Total colors ≤ 8.
 
 
 5) Тир: “Платина” (самый крутой, «элитный»)
+
+Make the badge picture for the game.
 
 OUTPUT: PNG 1024×1024, transparent background.
 
