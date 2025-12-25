@@ -692,7 +692,7 @@
     'Пермит': { en: 'Permit', asset: '/app/assets/fish/permit.png' },
     'Альбула': { en: 'Bonefish', asset: '/app/assets/fish/kostlyavaya_ryba.png' },
     'Скумбрия испанская': { en: 'Spanish Mackerel', asset: '/app/assets/fish/ispanskaya_makrel.png' },
-    'Форель коралловая': { en: 'Coral Trout', asset: '/app/assets/fish/koralloviy_grupper.png' },
+    'Группер коралловый': { en: 'Coral Grouper', asset: '/app/assets/fish/koralloviy_grupper.png' },
     'Спинорог-титан': { en: 'Titan Triggerfish', asset: '/app/assets/fish/spinorog_titan.png' },
     'Карп кои (Кохаку)': { en: 'Koi (Kohaku)', asset: '/app/assets/fish/koi_kohaku.png' },
     'Карп кои (Тайсё Сансёку)': { en: 'Koi (Taisho Sanshoku)', asset: '/app/assets/fish/koi_taisho_sanke.png' },
