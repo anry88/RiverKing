@@ -87,6 +87,17 @@ fun main() {
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app/assets", "webapp/assets")
+            get("/app/config.js") {
+                val js = """
+                    window.APP_CONFIG = {
+                        telemetree: {
+                            projectId: "${env.telemetreeProjectId}",
+                            apiKey: "${env.telemetreeApiKey}"
+                        }
+                    };
+                """.trimIndent()
+                call.respondText(js, ContentType.Application.JavaScript)
+            }
             staticResources("/app", "webapp", "index.html")
             get("/") {
                 val params = call.request.rawQueryParameters

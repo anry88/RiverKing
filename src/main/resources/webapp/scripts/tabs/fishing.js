@@ -654,6 +654,27 @@ function FishingTab({
   markCatchAnimationShown,
   onCatchClick
 }) {
+  const handleCast = () => {
+    window.Analytics?.track('cast_attempt');
+    if (onCast) onCast();
+  };
+
+  const handleHook = () => {
+    window.Analytics?.track('hook_attempt');
+    if (onHook) onHook();
+  };
+
+  React.useEffect(() => {
+    if (result) {
+      window.Analytics?.track('fish_caught', {
+        fish: result.fish,
+        weight: result.weight,
+        rarity: result.rarity,
+        location: result.location
+      });
+    }
+  }, [result]);
+
   return (
     <>
       <div className="mt-3 md:mt-4">
@@ -667,8 +688,8 @@ function FishingTab({
           tapGoal={TAP_CHALLENGE_GOAL}
           tapTimeLeft={tapTimeLeft}
           castReady={castReady}
-          onCast={onCast}
-          onHook={onHook}
+          onCast={handleCast}
+          onHook={handleHook}
           onTap={onTap}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
@@ -683,7 +704,7 @@ function FishingTab({
       <div className="md:hidden mt-3">
         {!casting ? (
           castReady ? (
-            <button onClick={onCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
+            <button onClick={handleCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
             <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
               <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
@@ -699,7 +720,7 @@ function FishingTab({
             className="w-full"
           />
         ) : biting ? (
-          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
+          <button onClick={handleHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
         ) : (
           <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
             <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
