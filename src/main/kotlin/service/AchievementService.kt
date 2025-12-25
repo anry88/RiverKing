@@ -6,6 +6,8 @@ import db.Catches
 import db.Fish
 import db.LocationFishWeights
 import db.Locations
+import db.RatingPrizes
+import db.UserPrizes
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
@@ -85,6 +87,8 @@ object AchievementService {
     private const val LEGENDARY_FISHER_CODE = "legendary_fisher"
     private const val TRAVELER_CODE = "traveler"
     private const val TROPHY_HUNTER_CODE = "trophy_hunter"
+    private const val TOURNAMENT_WINNER_CODE = "tournament_winner"
+    private const val DAILY_RATING_STAR_CODE = "daily_rating_star"
     private data class LocationStats(val fishCount: Int, val waters: Set<String>)
     private data class LocationAchievementConfig(val code: String, val name: String, val stats: LocationStats)
 
@@ -141,6 +145,8 @@ object AchievementService {
     private val travelerThresholds = listOf(1, 3, 6, 10, 14)
     private val trophyHunterThresholds = listOf(0, 1, 10, 100, 1000)
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
+    private val tournamentWinnerThresholds = listOf(0, 1, 5, 25, 50)
+    private val dailyRatingStarThresholds = listOf(0, 1, 10, 50, 100)
     private val simpleFisherRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
         PrizeSpec(pack = "fresh_topup_s", qty = 1),
@@ -253,6 +259,28 @@ object AchievementService {
             rewards = koiRewards,
             progress = ::koiCatchCount,
             isRelevantCatch = { koiFishNames.contains(it.fishName) },
+        ),
+        AchievementDefinition(
+            code = TOURNAMENT_WINNER_CODE,
+            nameRu = "Призёр турниров",
+            nameEn = "Tournament Laureate",
+            descRu = "Попадите в призовые места в турнирах",
+            descEn = "Place in the prize slots of tournaments",
+            thresholds = tournamentWinnerThresholds,
+            rewards = koiRewards,
+            progress = ::tournamentPrizeCount,
+            isRelevantCatch = { false },
+        ),
+        AchievementDefinition(
+            code = DAILY_RATING_STAR_CODE,
+            nameRu = "Звезда ежедневных рейтингов",
+            nameEn = "Daily Ranking Star",
+            descRu = "Получайте награды в ежедневных рейтингах",
+            descEn = "Earn rewards in daily rankings",
+            thresholds = dailyRatingStarThresholds,
+            rewards = koiRewards,
+            progress = ::dailyRatingPrizeCount,
+            isRelevantCatch = { false },
         ),
     )
 
@@ -554,6 +582,13 @@ object AchievementService {
     private fun epicCatchCount(userId: Long): Double = rarityCatchCount(userId, "epic")
     private fun mythicCatchCount(userId: Long): Double = rarityCatchCount(userId, "mythic")
     private fun legendaryCatchCount(userId: Long): Double = rarityCatchCount(userId, "legendary")
+    private fun tournamentPrizeCount(userId: Long): Double = inTxn {
+        UserPrizes.select { UserPrizes.userId eq userId }.count().toDouble()
+    }
+
+    private fun dailyRatingPrizeCount(userId: Long): Double = inTxn {
+        RatingPrizes.select { RatingPrizes.userId eq userId }.count().toDouble()
+    }
 
     private fun levelLabel(index: Int, ru: Boolean): String =
         when {
