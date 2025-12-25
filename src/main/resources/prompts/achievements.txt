@@ -273,10 +273,11 @@ TIER ORNAMENTS (gold):
 - Keep 12 rivets (same as silver): diameter 32px, radius 413px.
 - Keep top 5-point star (same position/size): 120×120, center (512,160).
 - Add two laurel branches OUTSIDE the badge ring (left and right), hugging the outer circle:
-  - Each branch bounding box: 220×420px
-  - Left branch center: (300, 560), right branch center: (724, 560)
-  - Leaves are simple flat shapes (no texture), consistent outline.
-  - Branches must stay within the outer radius 472px (no cut-off, no going outside).
+- Each branch bounding box: 240×680px - Left branch center: (300, 644), right branch center: (724, 644)
+- Leaves are simple flat shapes (no texture), consistent outline.
+- Branches must stay within the outer radius 472px (no cut-off, no going outside).
+- The very lowest visible point of each branch (leaf or stem tip) MUST reach y≈980–984 (6 o’clock), visibly touching the outer circle edge (no gap).
+- Laurel branches must be continuous from about y≈260 down to y≈984, with a visible stem tip near the bottom.
 
 COLOR PALETTE (use ONLY these hex):
 Outline: #2B1D14
