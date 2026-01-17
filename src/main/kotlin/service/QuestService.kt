@@ -130,8 +130,8 @@ object QuestService {
         val rule: QuestRule,
         val availability: (AvailabilityContext) -> Boolean = { true },
     ) {
-        fun name(lang: String) = if (lang == "en") nameEn else nameRu
-        fun description(lang: String) = if (lang == "en") descEn else descRu
+        fun name(lang: String) = if (lang.startsWith("en", ignoreCase = true)) nameEn else nameRu
+        fun description(lang: String) = if (lang.startsWith("en", ignoreCase = true)) descEn else descRu
         fun initialProgress(userId: Long, periodStart: LocalDate): Int =
             min(target, rule.initialProgress(userId, periodStart))
 
