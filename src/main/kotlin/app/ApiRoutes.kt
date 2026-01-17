@@ -28,6 +28,7 @@ import service.COIN_PRIZE_ID
 import service.ReferralService
 import service.AchievementService
 import service.AchievementRewardDTO
+import service.QuestService
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -428,6 +429,20 @@ fun Application.apiRoutes(env: Env) {
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = AchievementService.list(uid, language)
             Metrics.counter("achievements_view_total", mapOf("source" to "app"))
+            call.respond(list)
+        }
+
+        get("/api/quests") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val list = QuestService.list(uid, language)
+            Metrics.counter("quests_view_total", mapOf("source" to "app"))
             call.respond(list)
         }
 
@@ -1060,11 +1075,17 @@ fun Application.apiRoutes(env: Env) {
             } else {
                 res.unlockedRods.map { I18n.rod(it, language) }
             }
+            val localizedQuestUpdates = if (res.questUpdates.isEmpty()) {
+                emptyList()
+            } else {
+                QuestService.localizeUpdates(res.questUpdates, language)
+            }
             call.respond(
                 res.copy(
                     catch = localizedCatch,
                     unlockedLocations = localizedUnlocked,
                     unlockedRods = localizedRods,
+                    questUpdates = localizedQuestUpdates,
                 )
             )
         }

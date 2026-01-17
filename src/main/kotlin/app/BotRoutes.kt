@@ -34,6 +34,7 @@ import service.PrizeSpec
 import service.I18n
 import service.COIN_PRIZE_ID
 import service.AchievementService
+import service.QuestService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -279,6 +280,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "View your achievements",
                         assetName = "achievements.png"
                     ) { _, _ -> "/achievements" },
+                    InlineCommandInfo(
+                        name = "quests",
+                        ruDescription = "Посмотреть задания",
+                        enDescription = "View your quests",
+                        assetName = "quests.png"
+                    ) { _, _ -> "/quests" },
                     InlineCommandInfo(
                         name = "prizes",
                         ruDescription = "Забрать призы турнира",
@@ -708,13 +715,16 @@ fun Application.botRoutes(env: Env) {
                         val achievementLines = AchievementService
                             .unlockMessages(castRes.achievements, lang)
                             .map { line -> "\n🏆 $line" }
+                        val questLines = QuestService
+                            .unlockMessages(castRes.questUpdates, lang)
+                            .map { line -> "\n🎯 $line" }
                         val captionBase = buildCatchCaption(
                             lang = lang,
                             fishName = fishName,
                             rarity = catch.rarity,
                             weightKg = catch.weight,
                             locationName = locationName,
-                            extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine) + achievementLines,
+                            extraLines = listOf(coinsLine, newLine, unlockedLine, rodLine) + achievementLines + questLines,
                         )
                         var caption = appendCatchTags(captionBase, catch)
                         if (!options.catchFooter.isNullOrBlank()) {
@@ -1236,6 +1246,48 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
+            suspend fun sendQuests(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val quests = QuestService.list(uid, lang)
+                val header = if (lang == "ru") "Задания" else "Quests"
+                fun formatSection(title: String, items: List<QuestService.QuestDTO>): String {
+                    if (items.isEmpty()) {
+                        val emptyText = if (lang == "ru") "Нет активных заданий." else "No active quests."
+                        return "$title\n$emptyText"
+                    }
+                    val lines = items.joinToString("\n\n") { quest ->
+                        val status = if (quest.completed) "✅" else "•"
+                        val progress = if (lang == "ru") {
+                            "Прогресс ${quest.progress}/${quest.target}"
+                        } else {
+                            "Progress ${quest.progress}/${quest.target}"
+                        }
+                        val reward = if (lang == "ru") {
+                            "Награда: ${quest.rewardCoins} монет"
+                        } else {
+                            val suffix = if (quest.rewardCoins == 1) "" else "s"
+                            "Reward: ${quest.rewardCoins} coin$suffix"
+                        }
+                        "$status ${quest.name}\n${quest.description}\n$progress\n$reward"
+                    }
+                    return "$title\n$lines"
+                }
+                val dailyTitle = if (lang == "ru") "Ежедневные задания" else "Daily quests"
+                val weeklyTitle = if (lang == "ru") "Еженедельные задания" else "Weekly quests"
+                val text = buildString {
+                    append(header)
+                    append(":\n\n")
+                    append(formatSection(dailyTitle, quests.daily))
+                    append("\n\n")
+                    append(formatSection(weeklyTitle, quests.weekly))
+                }
+                trySend(chatId, text, replyToMessageId = replyToMessageId)
+            }
+
             fun packNamesRu(): MutableMap<String, String> {
                 val names = fishing.listShop("ru").flatMap { it.packs }.associate { it.id to it.name }.toMutableMap()
                 if (!names.containsKey("autofish_week")) {
@@ -1549,6 +1601,10 @@ fun Application.botRoutes(env: Env) {
                 "достижение" to "/achievements",
                 "achievements" to "/achievements",
                 "achievement" to "/achievements",
+                "задания" to "/quests",
+                "задание" to "/quests",
+                "quests" to "/quests",
+                "quest" to "/quests",
                 "рейтинг" to "/daily_rating",
                 "rating" to "/daily_rating",
                 "leaderboard" to "/daily_rating",
@@ -1635,6 +1691,7 @@ fun Application.botRoutes(env: Env) {
 /location — сменить локацию
 /daily — получить ежедневную награду
 /achievements — посмотреть достижения
+/quests — посмотреть задания
 /prizes — забрать призы турнира
 /shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
@@ -1655,6 +1712,7 @@ Available commands:
 /location — change your location
 /daily — claim your daily reward
 /achievements — view your achievements
+/quests — view your quests
 /prizes — claim tournament prizes
 /shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
@@ -1876,6 +1934,13 @@ Available commands:
                         val lang = fishing.userLanguage(uid)
                         logCommandMetric("achievements", source = source)
                         sendAchievements(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/quests" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        logCommandMetric("quests", source = source)
+                        sendQuests(uid, chatId, lang, replyToMessageId = replyTo)
                         return true
                     }
                     "/daily" -> {

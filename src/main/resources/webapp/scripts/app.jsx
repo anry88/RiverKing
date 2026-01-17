@@ -79,6 +79,10 @@ function App(){
   const achievementsRef = React.useRef([]);
   const [claimingAchievement, setClaimingAchievement] = React.useState(null);
   const [achievementReward, setAchievementReward] = React.useState(null);
+  const [questsOpen, setQuestsOpen] = React.useState(false);
+  const [quests, setQuests] = React.useState({ daily: [], weekly: [] });
+  const [questsLoading, setQuestsLoading] = React.useState(false);
+  const [questsError, setQuestsError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
   const coinPurchasePriceLabel = coinPurchasePack
     ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
@@ -152,6 +156,24 @@ function App(){
     }
   }, [t]);
 
+  const loadQuests = React.useCallback(async ()=>{
+    setQuestsLoading(true);
+    setQuestsError(null);
+    try{
+      const r = await fetch(`/api/quests`,{credentials:'include'});
+      if(!r.ok){
+        if(r.status===401) throw new Error('unauthorized');
+        throw new Error('load_failed');
+      }
+      setQuests(await r.json());
+    }catch(e){
+      setQuestsError(e.message);
+      if(e.message==='unauthorized') setError(t('authRequired'));
+    }finally{
+      setQuestsLoading(false);
+    }
+  }, [t]);
+
   React.useEffect(()=>{
     if(tab === 'guide'){
       loadAchievements();
@@ -178,6 +200,11 @@ function App(){
       setClaimingAchievement(null);
     }
   }, [achievementNameByCode, loadAchievements, reloadProfile, t]);
+
+  const openQuests = React.useCallback(() => {
+    setQuestsOpen(true);
+    loadQuests();
+  }, [loadQuests]);
 
   const achievementRewardLabel = React.useCallback((reward)=>{
     if(!reward) return '';
@@ -858,13 +885,14 @@ function App(){
                 : a.newLevelIndex,
             }))
           : [];
+        const questUpdates = Array.isArray(d.questUpdates) ? d.questUpdates : [];
         const animationId = ++catchAnimationIdRef.current;
         setResult({
           ...c,
           coins: typeof d.coins === 'number' ? d.coins : 0,
           todayCoins: typeof d.todayCoins === 'number' ? d.todayCoins : undefined,
           totalCoins: typeof d.totalCoins === 'number' ? d.totalCoins : undefined,
-          newFish:isNewFish,newLocations:newLocs,newRods,animationId,achievements: achievementUnlocks
+          newFish:isNewFish,newLocations:newLocs,newRods,animationId,achievements: achievementUnlocks,questUpdates
         });
             setMe(p=>{
               const tot = (p.totalWeight||0)+c.weight;
@@ -884,6 +912,9 @@ function App(){
             });
         if(achievementUnlocks.length>0){
           loadAchievements();
+        }
+        if(questUpdates.length>0){
+          loadQuests();
         }
         try{
           const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
@@ -1260,6 +1291,7 @@ function App(){
               hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
               markCatchAnimationShown={markCatchAnimationShown}
               onCatchClick={handleCatchClick}
+              onOpenQuests={openQuests}
             />
           )}
 
@@ -1319,6 +1351,14 @@ function App(){
           achievementsAvailable={achievementsClaimable}
         />
 
+        <QuestsDrawer
+          open={questsOpen}
+          onClose={()=>setQuestsOpen(false)}
+          quests={quests}
+          loading={questsLoading}
+          error={questsError}
+          onReload={loadQuests}
+        />
         <LocationsDrawer open={drawerOpen} onClose={()=>setDrawerOpen(false)} me={me} onSelect={selectLocation} />
         <BaitsDrawer open={baitsOpen} onClose={()=>setBaitsOpen(false)} me={me} onSelect={async id=>{
           try{

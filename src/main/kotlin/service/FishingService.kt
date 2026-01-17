@@ -1424,6 +1424,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 }
             }
         }
+        QuestService.ensureCurrentQuests(userId)
         StartCastResult(
             currentLureId = newLure,
             lureChanged = lureChanged,
@@ -1508,6 +1509,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val totalCoins: Long? = null,
         val todayCoins: Long? = null,
         val achievements: List<AchievementUnlock> = emptyList(),
+        val questUpdates: List<QuestService.QuestUpdate> = emptyList(),
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1678,6 +1680,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             totalCoins: Long? = null,
             todayCoins: Long? = null,
             achievements: List<AchievementUnlock> = emptyList(),
+            questUpdates: List<QuestService.QuestUpdate> = emptyList(),
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1695,6 +1698,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 totalCoins,
                 todayCoins,
                 achievements,
+                questUpdates,
             )
         }
 
@@ -1751,10 +1755,18 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
         val achievements = AchievementService.updateOnCatch(userId, fishId, locId)
+        val questUpdates = QuestService.updateOnCatch(
+            userId = userId,
+            fishName = fishName,
+            rarity = rarity,
+            locationId = locId,
+            weight = weight,
+        )
+        val questRewardCoins = questUpdates.sumOf { it.rewardCoins }
 
-        if (coinsAwarded != 0) {
+        if (coinsAwarded != 0 || questRewardCoins != 0) {
             Users.update({ Users.id eq userId }) {
-                it[Users.coins] = totalCoinsAfter
+                it[Users.coins] = totalCoinsAfter + questRewardCoins
             }
         }
 
@@ -1774,9 +1786,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
             coinsAwarded = coinsAwarded,
-            totalCoins = totalCoinsAfter,
+            totalCoins = totalCoinsAfter + questRewardCoins,
             todayCoins = todayCoinsAfter,
             achievements = achievements,
+            questUpdates = questUpdates,
         )
     }
 
