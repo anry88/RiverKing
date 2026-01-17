@@ -144,6 +144,85 @@ function LocationsDrawer({open, onClose, me, onSelect}){
   );
 }
 
+function QuestCard({quest}){
+  if(!quest) return null;
+  const progress = Math.max(0, Number(quest.progress) || 0);
+  const target = Math.max(1, Number(quest.target) || 1);
+  const ratio = Math.min(1, progress / target);
+  const completed = !!quest.completed;
+  return (
+    <div className={`p-3 rounded-xl border ${completed ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-white/10'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-semibold">{quest.name}</div>
+          <div className="text-xs opacity-70 mt-1">{quest.description}</div>
+        </div>
+        {completed && <div className="text-emerald-300 text-xs font-semibold uppercase">{t('questCompleted')}</div>}
+      </div>
+      <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className={`h-2 rounded-full ${completed ? 'bg-emerald-400' : 'bg-emerald-600'}`}
+          style={{width:`${Math.round(ratio*100)}%`}}
+        ></div>
+      </div>
+      <div className="text-xs mt-2 text-yellow-300">{t('questRewardCoins', quest.rewardCoins)}</div>
+    </div>
+  );
+}
+
+function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
+  const daily = quests?.daily || [];
+  const weekly = quests?.weekly || [];
+  return (
+    <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
+      <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
+      <div
+          className={`absolute right-0 inset-y-0 w-[88%] sm:w-[420px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-lg font-semibold">{t('quests')}</div>
+          <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+        </div>
+        {loading ? (
+          <div className="text-sm opacity-70">{t('loading')}</div>
+        ) : error ? (
+          <div className="text-sm opacity-70">
+            <div>{t('questsUnavailable')}</div>
+            {onReload && (
+              <button className="mt-3 px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500" onClick={onReload}>
+                {t('questsRefresh')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4 overflow-y-auto pr-1">
+            <div>
+              <div className="text-sm font-semibold mb-2">{t('dailyQuests')}</div>
+              {daily.length === 0 ? (
+                <div className="text-sm opacity-60">{t('questsEmpty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {daily.map(q => <QuestCard key={q.code} quest={q} />)}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-2">{t('weeklyQuests')}</div>
+              {weekly.length === 0 ? (
+                <div className="text-sm opacity-60">{t('questsEmpty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {weekly.map(q => <QuestCard key={q.code} quest={q} />)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BaitsDrawer({open,onClose,me,onSelect}){
   return (
     <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>

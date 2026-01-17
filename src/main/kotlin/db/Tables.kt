@@ -43,6 +43,7 @@ object DB {
                 ShopDiscounts,
                 Achievements,
                 AchievementProgress,
+                QuestProgress,
             )
             migrateFishNames()
             seedIfEmpty()
@@ -1454,4 +1455,21 @@ object AchievementProgress : LongIdTable() {
     val level = integer("level").default(0)
     val claimedLevel = integer("claimed_level").default(0)
     val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+}
+
+object QuestProgress : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val code = varchar("code", 100)
+    val period = varchar("period", 20)
+    val periodStart = date("period_start")
+    val progress = integer("progress").default(0)
+    val target = integer("target")
+    val rewardCoins = integer("reward_coins")
+    val completedAt = timestamp("completed_at").nullable()
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+
+    init {
+        uniqueIndex(userId, code, period, periodStart)
+    }
 }

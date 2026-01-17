@@ -652,7 +652,8 @@ function FishingTab({
   autoCastTimeoutRef,
   hasCatchAnimationBeenShown,
   markCatchAnimationShown,
-  onCatchClick
+  onCatchClick,
+  onOpenQuests
 }) {
   const handleCast = () => {
     window.Analytics?.track('cast_attempt');
@@ -699,6 +700,16 @@ function FishingTab({
           hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
           markCatchAnimationShown={markCatchAnimationShown}
         />
+      </div>
+
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={onOpenQuests}
+          className="px-4 py-2 rounded-xl glass border border-white/10 text-sm"
+        >
+          {t('quests')}
+        </button>
       </div>
 
       <div className="md:hidden mt-3">
@@ -762,6 +773,11 @@ function FishingTab({
             {Array.isArray(result.achievements) && result.achievements.map((a, i) => (
               <div key={`ach-${i}`} className="text-xs text-amber-300">
                 {t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex })}
+              </div>
+            ))}
+            {Array.isArray(result.questUpdates) && result.questUpdates.map((q, i) => (
+              <div key={`quest-${i}`} className="text-xs text-emerald-300">
+                {t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 })}
               </div>
             ))}
           </div>
