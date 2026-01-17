@@ -37,7 +37,7 @@ function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown }) {
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -516,6 +516,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
+      <button
+        type="button"
+        onClick={onOpenQuests}
+        className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+      >
+        {t('quests')}
+      </button>
+
       <AssetImage
         src={rodImage}
         alt="rod"
@@ -699,17 +707,8 @@ function FishingTab({
           result={result}
           hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
           markCatchAnimationShown={markCatchAnimationShown}
+          onOpenQuests={onOpenQuests}
         />
-      </div>
-
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={onOpenQuests}
-          className="px-4 py-2 rounded-xl glass border border-white/10 text-sm"
-        >
-          {t('quests')}
-        </button>
       </div>
 
       <div className="md:hidden mt-3">
