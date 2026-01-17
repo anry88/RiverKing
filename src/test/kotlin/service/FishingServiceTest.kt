@@ -207,7 +207,7 @@ class FishingServiceTest {
 
         val rods = svc.listRods(userId).associateBy { it.code }
         assertEquals(7, rods["dew"]?.priceStars)
-        assertEquals(75, rods["stream"]?.priceStars)
+        assertEquals(40, rods["stream"]?.priceStars)
     }
 
     @Test
