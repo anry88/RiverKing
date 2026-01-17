@@ -595,10 +595,10 @@ object DB {
 
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)
-        upsertRod("dew",   "Роса",  15.0, "fresh", false, priceStars = 15)
-        upsertRod("stream","Поток", 150.0, "fresh", true, priceStars = 75)
-        upsertRod("abyss", "Глубь", 450.0, "salt",  false, priceStars = 145)
-        upsertRod("storm", "Шторм", 1000.0, "salt", true, priceStars = 235)
+        upsertRod("dew",   "Роса",  15.0, "fresh", false, priceStars = 10)
+        upsertRod("stream","Поток", 150.0, "fresh", true, priceStars = 40)
+        upsertRod("abyss", "Глубь", 450.0, "salt",  false, priceStars = 70)
+        upsertRod("storm", "Шторм", 1000.0, "salt", true, priceStars = 100)
 
         // --- Weights per location ---
 
