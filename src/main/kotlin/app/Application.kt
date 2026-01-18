@@ -87,6 +87,17 @@ fun main() {
         // Static Mini App (served from resources/webapp)
         routing {
             staticResources("/app/assets", "webapp/assets")
+            get("/app/config.js") {
+                val js = """
+                    window.APP_CONFIG = {
+                        telemetree: {
+                            projectId: "${env.telemetreeProjectId}",
+                            apiKey: "${env.telemetreeApiKey}"
+                        }
+                    };
+                """.trimIndent()
+                call.respondText(js, ContentType.Application.JavaScript)
+            }
             staticResources("/app", "webapp", "index.html")
             get("/") {
                 val params = call.request.rawQueryParameters
@@ -129,6 +140,7 @@ private fun defaultBotCommands(): List<BotCommand> = listOf(
     BotCommand("location", "Change your location"),
     BotCommand("daily", "Claim your daily reward"),
     BotCommand("achievements", "View your achievements"),
+    BotCommand("quests", "View your quests"),
     BotCommand("prizes", "Claim tournament prizes"),
     BotCommand("shop", "Buy baits and rods with Stars"),
     BotCommand("coin_shop", "Buy bundles with coins"),
@@ -149,6 +161,7 @@ private fun russianBotCommands(): List<BotCommand> = listOf(
     BotCommand("location", "Сменить локацию"),
     BotCommand("daily", "Получить ежедневную награду"),
     BotCommand("achievements", "Посмотреть достижения"),
+    BotCommand("quests", "Посмотреть задания"),
     BotCommand("prizes", "Забрать призы турнира"),
     BotCommand("shop", "Купить приманки и удочки за звёзды"),
     BotCommand("coin_shop", "Купить наборы за монеты"),

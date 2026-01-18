@@ -649,6 +649,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val id: Long,
         val name: String,
         val rarity: String,
+        val locationIds: List<Long>,
         val locations: List<String>,
         val lures: List<String>,
     )
@@ -779,6 +780,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     fishData.id,
                     fishData.name,
                     fishData.rarity,
+                    fishLocations[fishData.id]
+                        .orEmpty()
+                        .distinct()
+                        .sortedBy { locationOrder[it] ?: Int.MAX_VALUE },
                     locationsForFish,
                     luresForFish,
                 )
@@ -842,11 +847,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "fresh_basic",
             "Пресные простые",
             listOf(
-                ShopPackage("fresh_topup_s","Пресное пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",39,
+                ShopPackage("fresh_topup_s","Пресное пополнение S","20 пресных простых: 10 «Зерновая крошка» и 10 «Ручейный малек»",20,
                     listOf("Пресная мирная" to 10, "Пресная хищная" to 10), coinPrice = 360),
-                ShopPackage("fresh_stock_m","Пресный запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",89,
+                ShopPackage("fresh_stock_m","Пресный запас M","50 пресных простых: 25 «Зерновая крошка» и 25 «Ручейный малек»",45,
                     listOf("Пресная мирная" to 25, "Пресная хищная" to 25), coinPrice = 825),
-                ShopPackage("fresh_crate_l","Пресный ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",199,
+                ShopPackage("fresh_crate_l","Пресный ящик L","120 пресных простых: 60 «Зерновая крошка» и 60 «Ручейный малек»",100,
                     listOf("Пресная мирная" to 60, "Пресная хищная" to 60), coinPrice = 1875),
             )
         ),
@@ -860,7 +865,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "salt_topup_s",
                     "Морское пополнение S",
                     "20 морских простых: 6 «Морская водоросль» и 14 «Кольца кальмара»",
-                    55,
+                    25,
                     listOf("Морская мирная" to 6, "Морская хищная" to 14),
                     coinPrice = 675
                 ),
@@ -868,7 +873,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "salt_stock_m",
                     "Морской запас M",
                     "50 морских простых: 15 «Морская водоросль» и 35 «Кольца кальмара»",
-                    129,
+                    65,
                     listOf("Морская мирная" to 15, "Морская хищная" to 35),
                     coinPrice = 1500
                 ),
@@ -876,7 +881,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "salt_crate_l",
                     "Морской ящик L",
                     "120 морских простых: 40 «Морская водоросль» и 80 «Кольца кальмара»",
-                    299,
+                    125,
                     listOf("Морская мирная" to 40, "Морская хищная" to 80),
                     coinPrice = 3300
                 ),
@@ -888,11 +893,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             "fresh_boost",
             "Пресные улучшенные",
             listOf(
-                ShopPackage("fresh_boost_s","Пресный буст S","10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»",69,
+                ShopPackage("fresh_boost_s","Пресный буст S","10 пресных улучшенных: 5 «Луговой червь» и 5 «Серебряный живец»",35,
                     listOf("Пресная мирная+" to 5, "Пресная хищная+" to 5)),
-                ShopPackage("fresh_boost_m","Пресный буст M","25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»",159,
+                ShopPackage("fresh_boost_m","Пресный буст M","25 пресных улучшенных: 12 «Луговой червь» и 13 «Серебряный живец»",70,
                     listOf("Пресная мирная+" to 12, "Пресная хищная+" to 13)),
-                ShopPackage("fresh_boost_l","Пресный буст L","60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»",349,
+                ShopPackage("fresh_boost_l","Пресный буст L","60 пресных улучшенных: 30 «Луговой червь» и 30 «Серебряный живец»",140,
                     listOf("Пресная мирная+" to 30, "Пресная хищная+" to 30)),
             )
         ),
@@ -906,21 +911,21 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "salt_boost_s",
                     "Морской буст S",
                     "10 морских улучшенных: 4 «Неоновый планктон» и 6 «Королевская креветка»",
-                    99,
+                    40,
                     listOf("Морская мирная+" to 4, "Морская хищная+" to 6)
                 ),
                 ShopPackage(
                     "salt_boost_m",
                     "Морской буст M",
                     "25 морских улучшенных: 9 «Неоновый планктон» и 16 «Королевская креветка»",
-                    239,
+                    90,
                     listOf("Морская мирная+" to 9, "Морская хищная+" to 16)
                 ),
                 ShopPackage(
                     "salt_boost_l",
                     "Морской буст L",
                     "60 морских улучшенных: 20 «Неоновый планктон» и 40 «Королевская креветка»",
-                    549,
+                    180,
                     listOf("Морская мирная+" to 20, "Морская хищная+" to 40)
                 ),
             )
@@ -935,7 +940,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "bundle_starter",
                     "Стартовый набор",
                     "40 пресных простых (20 «Зерновая крошка» и 20 «Ручейный малек»), 20 морских простых (6 «Морская водоросль» и 14 «Кольца кальмара») и 5 пресных улучшенных (3 «Луговой червь» и 2 «Серебряный живец»)",
-                    129,
+                    60,
                     listOf(
                         "Пресная мирная" to 20,
                         "Пресная хищная" to 20,
@@ -949,7 +954,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "bundle_pro",
                     "Профи рыболов",
                     "80 пресных простых (40 «Зерновая крошка» и 40 «Ручейный малек»), 40 морских простых (12 «Морская водоросль» и 28 «Кольца кальмара»), 15 пресных улучшенных (8 «Луговой червь» и 7 «Серебряный живец») и 5 морских улучшенных (1 «Неоновый планктон» и 4 «Королевская креветка»)",
-                    319,
+                    150,
                     listOf(
                         "Пресная мирная" to 40,
                         "Пресная хищная" to 40,
@@ -965,7 +970,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "bundle_whale",
                     "Китовый ящик",
                     "200 пресных простых (100 «Зерновая крошка» и 100 «Ручейный малек»), 120 морских простых (40 «Морская водоросль» и 80 «Кольца кальмара»), 40 пресных улучшенных (20 «Луговой червь» и 20 «Серебряный живец») и 20 морских улучшенных (6 «Неоновый планктон» и 14 «Королевская креветка»)",
-                    869,
+                    400,
                     listOf(
                         "Пресная мирная" to 100,
                         "Пресная хищная" to 100,
@@ -989,7 +994,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "micro_pred_fresh",
                     "Пополнение пресных хищных",
                     "15 «Ручейный малек»",
-                    29,
+                    15,
                     listOf("Пресная хищная" to 15),
                     coinPrice = 315
                 ),
@@ -997,7 +1002,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "micro_salt_starter",
                     "Морской старт",
                     "10 морских простых: 3 «Морская водоросль» и 7 «Кольца кальмара»",
-                    25,
+                    15,
                     listOf("Морская мирная" to 3, "Морская хищная" to 7),
                     coinPrice = 360
                 ),
@@ -1005,7 +1010,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "micro_salt_pred_refill",
                     "Морской хищный запас",
                     "20 «Кольца кальмара»",
-                    49,
+                    25,
                     listOf("Морская хищная" to 20),
                     coinPrice = 750
                 ),
@@ -1021,7 +1026,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     id = "rod_dew",
                     name = "Удочка «Роса»",
                     desc = "Разблокирует удочку «Роса».\nБонус: −50% шанс побега пресноводных мирных рыб.",
-                    price = 15,
+                    price = 10,
                     items = emptyList(),
                     rodCode = "dew",
                 ),
@@ -1029,7 +1034,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     id = "rod_stream",
                     name = "Удочка «Поток»",
                     desc = "Разблокирует удочку «Поток».\nБонус: −50% шанс побега пресноводных хищных рыб.",
-                    price = 75,
+                    price = 40,
                     items = emptyList(),
                     rodCode = "stream",
                 ),
@@ -1037,7 +1042,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     id = "rod_abyss",
                     name = "Удочка «Глубь»",
                     desc = "Разблокирует удочку «Глубь».\nБонус: −50% шанс побега морских мирных рыб.",
-                    price = 145,
+                    price = 70,
                     items = emptyList(),
                     rodCode = "abyss",
                 ),
@@ -1045,7 +1050,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     id = "rod_storm",
                     name = "Удочка «Шторм»",
                     desc = "Разблокирует удочку «Шторм».\nБонус: −50% шанс побега морских хищных рыб.",
-                    price = 235,
+                    price = 100,
                     items = emptyList(),
                     rodCode = "storm",
                 ),
@@ -1061,7 +1066,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     "autofish",
                     "Автоловля",
                     "Робот ловит за вас целый месяц и не упустит ни одной рыбы",
-                    499,
+                    250,
                     emptyList()
                 ),
             )
@@ -1424,6 +1429,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 }
             }
         }
+        QuestService.ensureCurrentQuests(userId)
         StartCastResult(
             currentLureId = newLure,
             lureChanged = lureChanged,
@@ -1508,6 +1514,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val totalCoins: Long? = null,
         val todayCoins: Long? = null,
         val achievements: List<AchievementUnlock> = emptyList(),
+        val questUpdates: List<QuestService.QuestUpdate> = emptyList(),
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1678,6 +1685,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             totalCoins: Long? = null,
             todayCoins: Long? = null,
             achievements: List<AchievementUnlock> = emptyList(),
+            questUpdates: List<QuestService.QuestUpdate> = emptyList(),
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1695,6 +1703,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 totalCoins,
                 todayCoins,
                 achievements,
+                questUpdates,
             )
         }
 
@@ -1750,11 +1759,19 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.coins] = coinsAwarded
         }
 
-        val achievements = AchievementService.updateOnCatch(userId, fishId)
+        val achievements = AchievementService.updateOnCatch(userId, fishId, locId)
+        val questUpdates = QuestService.updateOnCatch(
+            userId = userId,
+            fishName = fishName,
+            rarity = rarity,
+            locationId = locId,
+            weight = weight,
+        )
+        val questRewardCoins = questUpdates.sumOf { it.rewardCoins }
 
-        if (coinsAwarded != 0) {
+        if (coinsAwarded != 0 || questRewardCoins != 0) {
             Users.update({ Users.id eq userId }) {
-                it[Users.coins] = totalCoinsAfter
+                it[Users.coins] = totalCoinsAfter + questRewardCoins
             }
         }
 
@@ -1774,9 +1791,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
             coinsAwarded = coinsAwarded,
-            totalCoins = totalCoinsAfter,
+            totalCoins = totalCoinsAfter + questRewardCoins,
             todayCoins = todayCoinsAfter,
             achievements = achievements,
+            questUpdates = questUpdates,
         )
     }
 

@@ -17,4 +17,6 @@ Achievements are tracked through `AchievementService` and exposed via `/api/achi
 
 In the mini‑app client (`resources/webapp`), the Guide tab now contains an Achievements sub‑tab that shows tier art, localized descriptions, progress (e.g., `3/16`), and claim buttons for unlocked rewards. A red badge on the Guide navigation item highlights unclaimed achievement prizes.
 
+Daily and weekly quests are handled by `QuestService`, surfaced in the mini‑app through the Fishing tab quest drawer, and exposed via `/api/quests` plus the `/quests` bot command. Quest progress is updated after each catch and notifications are appended alongside achievement unlocks in the client and bot responses.
+
 To understand how a specific function works, open the README for the relevant package and follow the links to the detailed files.

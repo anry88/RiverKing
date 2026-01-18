@@ -176,7 +176,7 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Пермит" to "webapp/assets/fish/permit.png",
     "Альбула" to "webapp/assets/fish/kostlyavaya_ryba.png",
     "Скумбрия испанская" to "webapp/assets/fish/ispanskaya_makrel.png",
-    "Форель коралловая" to "webapp/assets/fish/koralloviy_grupper.png",
+    "Группер коралловый" to "webapp/assets/fish/koralloviy_grupper.png",
     "Спинорог-титан" to "webapp/assets/fish/spinorog_titan.png",
     "Карп кои (Кохаку)" to "webapp/assets/fish/koi_kohaku.png",
     "Карп кои (Тайсё Сансёку)" to "webapp/assets/fish/koi_taisho_sanke.png",

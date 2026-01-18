@@ -37,7 +37,7 @@ function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown }) {
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -516,6 +516,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
+      <button
+        type="button"
+        onClick={onOpenQuests}
+        className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+      >
+        {t('quests')}
+      </button>
+
       <AssetImage
         src={rodImage}
         alt="rod"
@@ -652,8 +660,30 @@ function FishingTab({
   autoCastTimeoutRef,
   hasCatchAnimationBeenShown,
   markCatchAnimationShown,
-  onCatchClick
+  onCatchClick,
+  onOpenQuests
 }) {
+  const handleCast = () => {
+    window.Analytics?.track('cast_attempt');
+    if (onCast) onCast();
+  };
+
+  const handleHook = () => {
+    window.Analytics?.track('hook_attempt');
+    if (onHook) onHook();
+  };
+
+  React.useEffect(() => {
+    if (result) {
+      window.Analytics?.track('fish_caught', {
+        fish: result.fish,
+        weight: result.weight,
+        rarity: result.rarity,
+        location: result.location
+      });
+    }
+  }, [result]);
+
   return (
     <>
       <div className="mt-3 md:mt-4">
@@ -667,8 +697,8 @@ function FishingTab({
           tapGoal={TAP_CHALLENGE_GOAL}
           tapTimeLeft={tapTimeLeft}
           castReady={castReady}
-          onCast={onCast}
-          onHook={onHook}
+          onCast={handleCast}
+          onHook={handleHook}
           onTap={onTap}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
@@ -677,13 +707,14 @@ function FishingTab({
           result={result}
           hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
           markCatchAnimationShown={markCatchAnimationShown}
+          onOpenQuests={onOpenQuests}
         />
       </div>
 
       <div className="md:hidden mt-3">
         {!casting ? (
           castReady ? (
-            <button onClick={onCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
+            <button onClick={handleCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
             <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
               <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
@@ -699,7 +730,7 @@ function FishingTab({
             className="w-full"
           />
         ) : biting ? (
-          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
+          <button onClick={handleHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
         ) : (
           <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
             <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
@@ -741,6 +772,11 @@ function FishingTab({
             {Array.isArray(result.achievements) && result.achievements.map((a, i) => (
               <div key={`ach-${i}`} className="text-xs text-amber-300">
                 {t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex })}
+              </div>
+            ))}
+            {Array.isArray(result.questUpdates) && result.questUpdates.map((q, i) => (
+              <div key={`quest-${i}`} className="text-xs text-emerald-300">
+                {t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 })}
               </div>
             ))}
           </div>
