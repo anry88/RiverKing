@@ -769,6 +769,118 @@ fun Application.apiRoutes(env: Env) {
             call.respond(details.toDto())
         }
 
+        post("/api/club/leave") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            try {
+                clubs.leaveClub(uid)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(HttpStatusCode.OK)
+        }
+
+        post("/api/club/members/{id}/promote") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val details = try {
+                clubs.promoteMember(uid, targetId)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "not_in_club", "member_not_found" -> HttpStatusCode.NotFound
+                    "invalid_role", "invalid_target" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/members/{id}/demote") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val details = try {
+                clubs.demoteMember(uid, targetId)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "not_in_club", "member_not_found" -> HttpStatusCode.NotFound
+                    "invalid_role", "invalid_target" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/members/{id}/kick") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val details = try {
+                clubs.kickMember(uid, targetId)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "not_in_club", "member_not_found" -> HttpStatusCode.NotFound
+                    "invalid_target" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/members/{id}/appoint-president") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val details = try {
+                clubs.appointPresident(uid, targetId)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "not_in_club", "member_not_found" -> HttpStatusCode.NotFound
+                    "invalid_role", "invalid_target" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
         // Daily baits
         post("/api/daily") {
             val session = call.sessions.get<AppSession>()
