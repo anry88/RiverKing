@@ -649,6 +649,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val id: Long,
         val name: String,
         val rarity: String,
+        val locationIds: List<Long>,
         val locations: List<String>,
         val lures: List<String>,
     )
@@ -779,6 +780,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     fishData.id,
                     fishData.name,
                     fishData.rarity,
+                    fishLocations[fishData.id]
+                        .orEmpty()
+                        .distinct()
+                        .sortedBy { locationOrder[it] ?: Int.MAX_VALUE },
                     locationsForFish,
                     luresForFish,
                 )
