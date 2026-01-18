@@ -7,6 +7,8 @@ import db.ClubWeeklyContributions
 import db.ClubWeeklyRewards
 import db.Users
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.sanitizeName
 import java.time.DayOfWeek
