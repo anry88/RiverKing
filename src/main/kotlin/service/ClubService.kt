@@ -190,12 +190,14 @@ class ClubService {
                 if (total <= 0) return@forEach
                 val members = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (members.isEmpty()) return@forEach
+                val perMember = total / members.size
+                if (perMember <= 0) return@forEach
                 members.forEach { member ->
                     ClubWeeklyRewards.insert {
                         it[ClubWeeklyRewards.clubId] = clubId
                         it[ClubWeeklyRewards.userId] = member[ClubMembers.userId].value
                         it[ClubWeeklyRewards.weekStart] = weekStart
-                        it[ClubWeeklyRewards.coins] = total
+                        it[ClubWeeklyRewards.coins] = perMember
                         it[ClubWeeklyRewards.claimed] = false
                         it[ClubWeeklyRewards.createdAt] = now
                     }
