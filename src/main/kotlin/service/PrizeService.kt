@@ -5,33 +5,46 @@ import java.time.Instant
 class PrizeService(
     private val tournaments: TournamentService,
     private val ratingPrizes: RatingPrizeService,
+    private val clubs: ClubService,
 ) {
     fun distributePrizes(now: Instant = Instant.now()) {
         tournaments.distributePrizes(now)
         ratingPrizes.distributeDailyPrizes(now)
+        clubs.distributeWeeklyRewards(now)
     }
 
     fun pendingPrizes(userId: Long): List<UserPrize> {
         val tournamentPrizes = tournaments.pendingPrizes(userId)
         val rating = ratingPrizes.pendingPrizes(userId)
-        return (tournamentPrizes + rating)
+        val clubRewards = clubs.pendingRewards(userId)
+        return (tournamentPrizes + rating + clubRewards)
             .sortedWith(compareByDescending<UserPrize> { it.coins ?: 0 }.thenBy { it.rank })
     }
 
     fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService): Pair<List<FishingService.LureDTO>, Long?> {
         return when {
-            prizeId >= 0 -> tournaments.claimPrize(userId, prizeId, fishing)
             prizeId == RATING_AGGREGATE_PRIZE_ID -> {
                 val coins = ratingPrizes.claimAll(userId)
                 if (coins > 0) {
                     fishing.addCoins(userId, coins)
+                    clubs.addContribution(userId, coins)
                 }
                 Pair(emptyList(), null)
             }
-            else -> {
-                ratingPrizes.claimPrize(userId, -prizeId, fishing)
+            prizeId < 0 -> {
+                val coins = ratingPrizes.claimPrize(userId, -prizeId)
+                if (coins > 0) {
+                    fishing.addCoins(userId, coins)
+                    clubs.addContribution(userId, coins)
+                }
                 Pair(emptyList(), null)
             }
+            clubs.hasPendingReward(userId, prizeId) -> {
+                val coins = clubs.claimReward(userId, prizeId)
+                if (coins > 0) fishing.addCoins(userId, coins)
+                Pair(emptyList(), null)
+            }
+            else -> tournaments.claimPrize(userId, prizeId, fishing)
         }
     }
 }

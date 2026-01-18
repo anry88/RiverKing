@@ -44,6 +44,10 @@ object DB {
                 Achievements,
                 AchievementProgress,
                 QuestProgress,
+                Clubs,
+                ClubMembers,
+                ClubWeeklyContributions,
+                ClubWeeklyRewards,
             )
             migrateFishNames()
             seedIfEmpty()
@@ -1472,4 +1476,38 @@ object QuestProgress : LongIdTable() {
     init {
         uniqueIndex(userId, code, period, periodStart)
     }
+}
+
+object Clubs : LongIdTable() {
+    val name = varchar("name", 50)
+    val presidentId = reference("president_id", Users)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object ClubMembers : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users).uniqueIndex()
+    val role = varchar("role", 20)
+    val joinedAt = timestamp("joined_at").clientDefault { Instant.now() }
+
+    init {
+        uniqueIndex(clubId, userId)
+    }
+}
+
+object ClubWeeklyContributions : Table() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users)
+    val weekStart = date("week_start")
+    val coins = integer("coins").default(0)
+    override val primaryKey = PrimaryKey(clubId, userId, weekStart)
+}
+
+object ClubWeeklyRewards : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users)
+    val weekStart = date("week_start")
+    val coins = integer("coins").default(0)
+    val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
