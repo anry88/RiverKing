@@ -47,6 +47,30 @@ function Ratings({me, setMe, onCatchClick}){
     setPrizeHint(null);
   },[mode,locId,fishId,period,order,list]);
 
+  const fishLocale = me.language === 'ru' ? 'ru-RU' : 'en-US';
+  const locationName = (me.locations||[]).find(l=>String(l.id)===String(locId))?.name;
+  const locationId = Number(locId);
+  const filteredFishList = React.useMemo(()=>{
+    const byLocation = locId === 'all'
+      ? fishList
+      : fishList.filter(f=>{
+          if(Array.isArray(f.locationIds) && Number.isFinite(locationId)){
+            return f.locationIds.includes(locationId);
+          }
+          if(locationName){
+            return (f.locations||[]).includes(locationName);
+          }
+          return false;
+        });
+    return [...byLocation].sort((a,b)=>a.name.localeCompare(b.name, fishLocale));
+  },[fishList, locId, locationName, fishLocale, locationId]);
+
+  React.useEffect(()=>{
+    if(fishId !== 'all' && !filteredFishList.some(f=>String(f.id)===String(fishId))){
+      setFishId('all');
+    }
+  },[fishId, filteredFishList]);
+
   const usingSpecies = fishId !== 'all';
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='ru') ? 'ru-RU' : 'en-US';
   const showPrizePreview = mode==='global' && fishId==='all' && locId!=='all' && order==='desc';
@@ -79,7 +103,7 @@ function Ratings({me, setMe, onCatchClick}){
         </select>
         <select value={fishId} onChange={e=>setFishId(e.target.value)} className="flex-1 min-w-[150px] p-2 rounded-lg bg-black/20 border border-white/10">
           <option value="all">{t('allFish')}</option>
-          {fishList.map(f=> <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+          {filteredFishList.map(f=> <option key={f.id} value={String(f.id)}>{f.name}</option>)}
         </select>
       </div>
 
@@ -149,4 +173,3 @@ function Ratings({me, setMe, onCatchClick}){
     </div>
   );
 }
-
