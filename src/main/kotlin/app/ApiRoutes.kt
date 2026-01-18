@@ -29,6 +29,8 @@ import service.ReferralService
 import service.AchievementService
 import service.AchievementRewardDTO
 import service.QuestService
+import service.ClubService
+import service.PrizeSource
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -41,7 +43,8 @@ fun Application.apiRoutes(env: Env) {
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
-    val prizeService = PrizeService(tournaments, ratingPrizes)
+    val clubs = ClubService()
+    val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val bot = TelegramBot(env.botToken)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
 
@@ -125,13 +128,77 @@ fun Application.apiRoutes(env: Env) {
     data class InvoiceResp(val invoice_url: String)
 
     @Serializable
-    data class PrizeDTO(val id: Long, val packageId: String, val qty: Int, val rank: Int, val coins: Int? = null)
+    data class PrizeDTO(
+        val id: Long,
+        val packageId: String,
+        val qty: Int,
+        val rank: Int,
+        val coins: Int? = null,
+        val source: String = PrizeSource.TOURNAMENT.name.lowercase(),
+    )
 
     @Serializable
     data class PrizeSpecDTO(val packageId: String, val qty: Int, val coins: Int? = null)
 
     @Serializable
     data class ReferralRewardDTO(val packageId: String, val qty: Int, val name: String)
+
+    @Serializable
+    data class ClubMemberDTO(
+        val userId: Long,
+        val name: String?,
+        val role: String,
+        val coins: Int,
+    )
+
+    @Serializable
+    data class ClubWeekDTO(
+        val weekStart: String,
+        val totalCoins: Int,
+        val members: List<ClubMemberDTO>,
+    )
+
+    @Serializable
+    data class ClubDetailsDTO(
+        val id: Long,
+        val name: String,
+        val role: String,
+        val memberCount: Int,
+        val capacity: Int,
+        val currentWeek: ClubWeekDTO,
+        val previousWeek: ClubWeekDTO,
+    )
+
+    @Serializable
+    data class ClubSummaryDTO(
+        val id: Long,
+        val name: String,
+        val memberCount: Int,
+        val capacity: Int,
+    )
+
+    fun ClubService.ClubWeekView.toDto(): ClubWeekDTO = ClubWeekDTO(
+        weekStart = weekStart.toString(),
+        totalCoins = totalCoins,
+        members = members.map {
+            ClubMemberDTO(
+                userId = it.userId,
+                name = it.name,
+                role = it.role,
+                coins = it.coins,
+            )
+        },
+    )
+
+    fun ClubService.ClubDetails.toDto(): ClubDetailsDTO = ClubDetailsDTO(
+        id = id,
+        name = name,
+        role = role,
+        memberCount = memberCount,
+        capacity = capacity,
+        currentWeek = currentWeek.toDto(),
+        previousWeek = previousWeek.toDto(),
+    )
 
     @Serializable
     data class TournamentDTO(
@@ -594,7 +661,16 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val pending = prizeService.pendingPrizes(uid).map { PrizeDTO(it.id, it.packageId, it.qty, it.rank, it.coins) }
+            val pending = prizeService.pendingPrizes(uid).map {
+                PrizeDTO(
+                    it.id,
+                    it.packageId,
+                    it.qty,
+                    it.rank,
+                    it.coins,
+                    it.source.name.lowercase(),
+                )
+            }
             call.respond(pending)
         }
 
@@ -618,6 +694,79 @@ fun Application.apiRoutes(env: Env) {
                 )
             }
             call.respond(ShopBuyResp(lures2, current))
+        }
+
+        get("/api/club") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val details = clubs.clubDetails(uid) ?: return@get call.respond(HttpStatusCode.NoContent)
+            call.respond(details.toDto())
+        }
+
+        get("/api/club/search") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            fishing.ensureUserByTgId(tgId)
+            val list = clubs.searchClubs().map {
+                ClubSummaryDTO(it.id, it.name, it.memberCount, it.capacity)
+            }
+            call.respond(list)
+        }
+
+        post("/api/club/create") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            @Serializable data class ClubCreateReq(val name: String)
+            val req = try { call.receive<ClubCreateReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val details = try {
+                clubs.createClub(uid, req.name)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "already_in_club", "weight_required", "not_enough_coins" -> HttpStatusCode.Conflict
+                    "name_empty", "name_too_long", "name_profanity" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/{id}/join") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val clubId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val details = try {
+                clubs.joinClub(uid, clubId)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "already_in_club", "club_full" -> HttpStatusCode.Conflict
+                    "not_found" -> HttpStatusCode.NotFound
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
         }
 
         // Daily baits

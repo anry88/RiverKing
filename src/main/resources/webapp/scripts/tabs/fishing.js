@@ -37,7 +37,7 @@ function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests }) {
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -523,6 +523,13 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       >
         {t('quests')}
       </button>
+      <button
+        type="button"
+        onClick={onOpenClub}
+        className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+      >
+        {t('club')}
+      </button>
 
       <AssetImage
         src={rodImage}
@@ -661,7 +668,8 @@ function FishingTab({
   hasCatchAnimationBeenShown,
   markCatchAnimationShown,
   onCatchClick,
-  onOpenQuests
+  onOpenQuests,
+  onOpenClub
 }) {
   const handleCast = () => {
     window.Analytics?.track('cast_attempt');
@@ -708,6 +716,7 @@ function FishingTab({
           hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
           markCatchAnimationShown={markCatchAnimationShown}
           onOpenQuests={onOpenQuests}
+          onOpenClub={onOpenClub}
         />
       </div>
 

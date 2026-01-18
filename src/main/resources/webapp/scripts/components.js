@@ -536,3 +536,367 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
     </div>
   );
 }
+
+function ClubModal({open,onClose,me,onReloadProfile}){
+  const CLUB_CREATE_COST = 1000;
+  const CLUB_MIN_WEIGHT = 1000;
+  const [mode, setMode] = React.useState('hub');
+  const [club, setClub] = React.useState(null);
+  const [clubTab, setClubTab] = React.useState('current');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [search, setSearch] = React.useState([]);
+  const [searchLoading, setSearchLoading] = React.useState(false);
+  const [searchError, setSearchError] = React.useState(null);
+  const [selectedClubId, setSelectedClubId] = React.useState(null);
+  const [name, setName] = React.useState('');
+  const [confirming, setConfirming] = React.useState(false);
+  const [createLoading, setCreateLoading] = React.useState(false);
+  const [createError, setCreateError] = React.useState(null);
+  const [joinLoading, setJoinLoading] = React.useState(false);
+  const [joinError, setJoinError] = React.useState(null);
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+
+  const roleLabel = React.useCallback(role => {
+    if(role === 'president') return t('clubRolePresident');
+    if(role === 'heir') return t('clubRoleHeir');
+    if(role === 'veteran') return t('clubRoleVeteran');
+    if(role === 'novice') return t('clubRoleNovice');
+    return role;
+  }, []);
+
+  const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
+
+  const resetState = React.useCallback(() => {
+    setMode('hub');
+    setClub(null);
+    setClubTab('current');
+    setLoading(false);
+    setError(null);
+    setSearch([]);
+    setSearchLoading(false);
+    setSearchError(null);
+    setSelectedClubId(null);
+    setName('');
+    setConfirming(false);
+    setCreateLoading(false);
+    setCreateError(null);
+    setJoinLoading(false);
+    setJoinError(null);
+  }, []);
+
+  const loadClub = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try{
+      const resp = await fetch(`/api/club`, {credentials:'include'});
+      if(resp.status === 204){
+        setClub(null);
+        setMode('hub');
+        return;
+      }
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('load_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setClubTab('current');
+      setMode('club');
+    }catch(e){
+      setError(e.message==='unauthorized' ? t('authRequired') : t('clubLoadFailed'));
+    }finally{
+      setLoading(false);
+    }
+  }, []);
+
+  const loadSearch = React.useCallback(async () => {
+    setSearchLoading(true);
+    setSearchError(null);
+    try{
+      const resp = await fetch(`/api/club/search`, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('search_failed');
+      }
+      const data = await resp.json();
+      setSearch(Array.isArray(data) ? data : []);
+      if(!selectedClubId && data.length > 0){
+        setSelectedClubId(data[0]?.id || null);
+      }
+    }catch(e){
+      setSearchError(e.message==='unauthorized' ? t('authRequired') : t('clubSearchFailed'));
+    }finally{
+      setSearchLoading(false);
+    }
+  }, [selectedClubId]);
+
+  const parseClubError = React.useCallback((code, fallbackKey) => {
+    if(code === 'already_in_club') return t('clubAlreadyIn');
+    if(code === 'club_full') return t('clubFull');
+    if(code === 'weight_required') return t('clubNeedWeightError', CLUB_MIN_WEIGHT);
+    if(code === 'not_enough_coins') return t('clubNotEnoughCoins');
+    if(code === 'name_empty') return t('clubNameEmpty');
+    if(code === 'name_too_long') return t('clubNameTooLong');
+    if(code === 'name_profanity') return t('clubNameProfanity');
+    if(code === 'not_found') return t('clubNotFound');
+    return t(fallbackKey);
+  }, []);
+
+  const handleCreate = React.useCallback(async () => {
+    const trimmed = name.trim();
+    setCreateError(null);
+    if(!trimmed){
+      setCreateError(t('clubNameEmpty'));
+      return;
+    }
+    if(trimmed.length > 20){
+      setCreateError(t('clubNameTooLong'));
+      return;
+    }
+    setCreateLoading(true);
+    try{
+      const resp = await fetch(`/api/club/create`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: trimmed})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'create_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setMode('club');
+      setClubTab('current');
+      setName('');
+      setConfirming(false);
+      onReloadProfile?.();
+    }catch(e){
+      setCreateError(parseClubError(e.message, 'clubCreateFailed'));
+    }finally{
+      setCreateLoading(false);
+    }
+  }, [name, onReloadProfile, parseClubError]);
+
+  const handleJoin = React.useCallback(async () => {
+    if(!selectedClubId) return;
+    setJoinError(null);
+    setJoinLoading(true);
+    try{
+      const resp = await fetch(`/api/club/${selectedClubId}/join`, {method:'POST', credentials:'include'});
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'join_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setMode('club');
+      setClubTab('current');
+      setSelectedClubId(null);
+      onReloadProfile?.();
+    }catch(e){
+      setJoinError(parseClubError(e.message, 'clubJoinFailed'));
+    }finally{
+      setJoinLoading(false);
+    }
+  }, [selectedClubId, onReloadProfile, parseClubError]);
+
+  React.useEffect(() => {
+    if(!open) return;
+    resetState();
+    loadClub();
+  }, [open, resetState, loadClub]);
+
+  if(!open) return null;
+
+  const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div onClick={onClose} className="absolute inset-0 bg-black/70"></div>
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="glass max-w-md w-full p-5 rounded-xl relative animate-pop" onClick={e=>e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold">{t('club')}</div>
+            <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
+          </div>
+
+          {loading ? (
+            <div className="text-sm opacity-70">{t('loading')}</div>
+          ) : error ? (
+            <div className="text-sm opacity-70">{error}</div>
+          ) : mode === 'club' && club ? (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-semibold">{club.name}</div>
+                  <div className="text-xs opacity-70">{roleLabel(club.role)}</div>
+                </div>
+                <div className="text-xs opacity-70">{club.memberCount}/{club.capacity}</div>
+              </div>
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={()=>setClubTab('current')}
+                  className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
+                >{t('clubCurrentWeek')}</button>
+                <button
+                  type="button"
+                  onClick={()=>setClubTab('previous')}
+                  className={`flex-1 py-2 rounded-xl ${clubTab==='previous' ? 'bg-emerald-600' : 'glass'}`}
+                >{t('clubPreviousWeek')}</button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {(weekData?.members || []).length === 0 ? (
+                  <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
+                ) : (
+                  weekData.members.map(member => (
+                    <div key={member.userId} className="flex items-center justify-between gap-3 p-2 rounded-xl border border-white/10">
+                      <div>
+                        <div className="font-semibold text-sm">
+                          <bdi>{member.name || '—'}</bdi>
+                        </div>
+                        <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                      </div>
+                      <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="text-sm opacity-80 text-right">
+                {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
+              </div>
+            </div>
+          ) : mode === 'create' ? (
+            <div className="space-y-3">
+              {!canCreate && (
+                <div className="text-sm opacity-70">{t('clubNeedWeightError', CLUB_MIN_WEIGHT)}</div>
+              )}
+              {canCreate && (
+                <>
+                  <div className="text-sm opacity-70">{t('clubNameHint')}</div>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={name}
+                    onChange={e=>{ setName(e.target.value); setCreateError(null); }}
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10"
+                    placeholder={t('clubNamePlaceholder')}
+                  />
+                  {createError && <div className="text-sm text-red-400">{createError}</div>}
+                  {confirming ? (
+                    <div className="space-y-3">
+                      <div className="text-sm opacity-80">{t('clubCreateConfirm', { name: name.trim(), coins: CLUB_CREATE_COST })}</div>
+                      <div className="flex gap-2 text-sm">
+                        <button
+                          type="button"
+                          className="flex-1 px-3 py-2 rounded-xl glass"
+                          onClick={()=>setConfirming(false)}
+                          disabled={createLoading}
+                        >{t('cancel')}</button>
+                        <button
+                          type="button"
+                          className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                          onClick={handleCreate}
+                          disabled={createLoading}
+                        >{t('clubConfirmCreate')}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60"
+                      onClick={()=>{
+                        const trimmed = name.trim();
+                        if(!trimmed){
+                          setCreateError(t('clubNameEmpty'));
+                          return;
+                        }
+                        if(trimmed.length > 20){
+                          setCreateError(t('clubNameTooLong'));
+                          return;
+                        }
+                        setConfirming(true);
+                        setCreateError(null);
+                      }}
+                      disabled={createLoading}
+                    >{t('clubCreateCost', CLUB_CREATE_COST)}</button>
+                  )}
+                </>
+              )}
+              <button
+                type="button"
+                className="w-full px-3 py-2 rounded-xl glass"
+                onClick={()=>{ setMode('hub'); setConfirming(false); setCreateError(null); }}
+              >{t('back')}</button>
+            </div>
+          ) : mode === 'search' ? (
+            <div className="space-y-3">
+              {searchLoading ? (
+                <div className="text-sm opacity-70">{t('loading')}</div>
+              ) : searchError ? (
+                <div className="text-sm opacity-70">{searchError}</div>
+              ) : search.length === 0 ? (
+                <div className="text-sm opacity-70">{t('clubSearchEmpty')}</div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {search.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={()=>setSelectedClubId(item.id)}
+                      className={`w-full text-left p-3 rounded-xl border ${selectedClubId===item.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:bg-white/5'}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-semibold text-sm">
+                          <bdi>{item.name}</bdi>
+                        </div>
+                        <div className="text-xs opacity-70">{item.memberCount}/{item.capacity}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {joinError && <div className="text-sm text-red-400">{joinError}</div>}
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-xl glass"
+                  onClick={()=>{ loadSearch(); }}
+                  disabled={searchLoading}
+                >{t('clubSearchRefresh')}</button>
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                  onClick={handleJoin}
+                  disabled={joinLoading || !selectedClubId || searchLoading || searchError}
+                >{t('clubJoin')}</button>
+              </div>
+              <button
+                type="button"
+                className="w-full px-3 py-2 rounded-xl glass"
+                onClick={()=>{ setMode('hub'); setJoinError(null); }}
+              >{t('back')}</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <button
+                type="button"
+                className="w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+                onClick={()=>{ setMode('create'); setCreateError(null); setConfirming(false); }}
+              >{t('clubCreate')}</button>
+              <button
+                type="button"
+                className="w-full px-3 py-2 rounded-xl glass"
+                onClick={()=>{ setMode('search'); loadSearch(); }}
+              >{t('clubSearch')}</button>
+              {createError && <div className="text-sm text-red-400">{createError}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -14,6 +14,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
   - Fishing: `POST /api/cast`, `POST /api/hook`, `POST /api/catch` drive the cast→hook→catch lifecycle using `FishingService.startCast`, `hook`, and `catch`.
   - Daily rewards and shop: `POST /api/daily`, `GET/POST /api/shop` call `FishingService.dailyReward`, `buyPackage`, and related payments (`StarsPaymentService`, `PayService`).
   - Tournaments: `/api/tournament*` endpoints rely on `TournamentService` and `RatingPrizeService` to serve leaderboards and process rewards.
+  - Clubs: `/api/club`, `/api/club/create`, `/api/club/search`, `/api/club/{id}/join` expose fishing club membership, creation, and discovery.
   - Referrals: `GET/POST /api/referrals` and `POST /api/referrals/apply` handle links via `ReferralService`.
   - Utility calls: `GET /api/assets/{path...}` serves webapp assets with manual path checks; `GET /api/metrics` updates `UserMetrics`.
 - **`BotRoutes.kt`** — registers the Telegram bot webhook. Processes updates, sends responses through `TelegramBot`, and calls game services to handle bot commands.
@@ -22,7 +23,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
 - **`TgWebAppAuth.kt`** — verifies `initData` signatures and extracts `TelegramUser` for WebApp authentication.
 
 ## Background jobs and presentation
-- **`Scheduler.kt`** — configures the Ktor scheduler with periodic tasks: auto‑fishing (`FishingService.autoFishUsers`), clearing stuck casts, issuing tournament rewards via `PrizeService`.
+- **`Scheduler.kt`** — configures the Ktor scheduler with periodic tasks: auto‑fishing (`FishingService.autoFishUsers`), clearing stuck casts, issuing tournament/daily rating/club weekly rewards via `PrizeService`.
 - **`CatchPresentation.kt`** — builds human‑readable texts and DTOs for catch results so a single source serves both the API and the bot.
 
 ### Function navigation

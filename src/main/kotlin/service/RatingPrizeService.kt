@@ -122,6 +122,7 @@ class RatingPrizeService {
                         qty = 1,
                         rank = 0,
                         coins = totalCoins,
+                        source = PrizeSource.RATING,
                     )
                 )
             }
@@ -142,16 +143,13 @@ class RatingPrizeService {
         }
     }
 
-    fun claimPrize(userId: Long, prizeId: Long, fishing: FishingService) {
-        val coins = transaction {
+    fun claimPrize(userId: Long, prizeId: Long): Int {
+        return transaction {
             val row = RatingPrizes.select {
                 (RatingPrizes.id eq prizeId) and (RatingPrizes.userId eq userId) and (RatingPrizes.claimed eq false)
             }.singleOrNull() ?: error("not found")
             RatingPrizes.update({ RatingPrizes.id eq prizeId }) { it[claimed] = true }
             row[RatingPrizes.coins]
-        }
-        if (coins > 0) {
-            fishing.addCoins(userId, coins)
         }
     }
 }
