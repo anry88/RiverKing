@@ -1526,9 +1526,9 @@ fun Application.botRoutes(env: Env) {
                     "🪙 Coin shop. Balance: $balanceText coins."
                 }
                 val footer = if (lang == "ru") {
-                    "Нажми на кнопку, чтобы купить за монеты. Или открой мини-приложение: https://t.me/${env.botName}?startapp"
+                    "Нажми на кнопку, чтобы купить за монеты."
                 } else {
-                    "Tap a button to buy with coins. Or open the mini app: https://t.me/${env.botName}?startapp"
+                    "Tap a button to buy with coins."
                 }
                 val text = buildString {
                     append(header)
@@ -1558,7 +1558,7 @@ fun Application.botRoutes(env: Env) {
                         val label = "${pack.name} — 🪙 $priceText"
                         InlineKeyboardButton(label, "/coinbuy ${ownedData(uid, pack.id)}")
                     }.filterNotNull()
-                }.chunked(2)
+                }.chunked(1)
                 val markup = if (buttons.isEmpty()) null else Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, text, markup, replyToMessageId)
             }
