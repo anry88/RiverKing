@@ -140,6 +140,68 @@ class ClubService {
         return clubDetails(userId) ?: throw ClubException("join_failed")
     }
 
+    fun leaveClub(userId: Long) {
+        transaction {
+            val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
+                ?: throw ClubException("not_in_club")
+            val clubId = membership[ClubMembers.clubId].value
+            val role = membership[ClubMembers.role]
+            ClubMembers.deleteWhere { ClubMembers.userId eq userId }
+            if (role == ROLE_PRESIDENT) {
+                val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
+                if (remaining.isEmpty()) {
+                    ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
+                    ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
+                    Clubs.deleteWhere { Clubs.id eq clubId }
+                    return@transaction
+                }
+                val heirs = remaining.filter { it[ClubMembers.role] == ROLE_HEIR }
+                val nextPresident = (heirs.ifEmpty { remaining }).random()
+                val newPresidentId = nextPresident[ClubMembers.userId].value
+                Clubs.update({ Clubs.id eq clubId }) { it[presidentId] = newPresidentId }
+                ClubMembers.update({
+                    (ClubMembers.clubId eq clubId) and (ClubMembers.userId eq newPresidentId)
+                }) { it[ClubMembers.role] = ROLE_PRESIDENT }
+            }
+        }
+    }
+
+    fun promoteMember(actorId: Long, targetId: Long): ClubDetails {
+        return updateMemberRole(actorId, targetId, RoleAction.PROMOTE)
+    }
+
+    fun demoteMember(actorId: Long, targetId: Long): ClubDetails {
+        return updateMemberRole(actorId, targetId, RoleAction.DEMOTE)
+    }
+
+    fun kickMember(actorId: Long, targetId: Long): ClubDetails {
+        val clubId = transaction {
+            val (actor, target) = loadActorAndTarget(actorId, targetId)
+            ensureCanManage(actor.role, target.role)
+            ClubMembers.deleteWhere {
+                (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
+            }
+            actor.clubId
+        }
+        return clubDetails(actorId) ?: throw ClubException("update_failed")
+    }
+
+    fun appointPresident(actorId: Long, targetId: Long): ClubDetails {
+        transaction {
+            val (actor, target) = loadActorAndTarget(actorId, targetId)
+            if (actor.role != ROLE_PRESIDENT) throw ClubException("forbidden")
+            if (target.role != ROLE_HEIR) throw ClubException("invalid_role")
+            Clubs.update({ Clubs.id eq actor.clubId }) { it[presidentId] = target.userId }
+            ClubMembers.update({
+                (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq actor.userId)
+            }) { it[ClubMembers.role] = ROLE_HEIR }
+            ClubMembers.update({
+                (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
+            }) { it[ClubMembers.role] = ROLE_PRESIDENT }
+        }
+        return clubDetails(actorId) ?: throw ClubException("update_failed")
+    }
+
     fun addContribution(userId: Long, coins: Int, at: Instant = Instant.now()) {
         if (coins <= 0) return
         transaction {
@@ -258,11 +320,17 @@ class ClubService {
         val list = members.map { member ->
             member.copy(coins = byUser[member.userId] ?: 0)
         }
+        val sorted = list.sortedWith(
+            compareByDescending<ClubMemberContribution> { it.coins }
+                .thenBy { roleRank(it.role) }
+                .thenBy { it.name ?: "" }
+                .thenBy { it.userId }
+        )
         val total = byUser.values.sum()
         return ClubWeekView(
             weekStart = weekStart,
             totalCoins = total,
-            members = list,
+            members = sorted,
         )
     }
 
@@ -277,17 +345,74 @@ class ClubService {
                     coins = 0,
                 )
             }
-        val roleOrder = mapOf(
-            ROLE_PRESIDENT to 0,
-            ROLE_HEIR to 1,
-            ROLE_VETERAN to 2,
-            ROLE_NOVICE to 3,
-        )
         return rows.sortedWith(
-            compareBy<ClubMemberContribution> { roleOrder[it.role] ?: 9 }
+            compareBy<ClubMemberContribution> { roleRank(it.role) }
                 .thenBy { it.name ?: "" }
                 .thenBy { it.userId }
         )
+    }
+
+    private fun updateMemberRole(actorId: Long, targetId: Long, action: RoleAction): ClubDetails {
+        transaction {
+            val (actor, target) = loadActorAndTarget(actorId, targetId)
+            ensureCanManage(actor.role, target.role)
+            val nextRole = when (action) {
+                RoleAction.PROMOTE -> nextRole(target.role)
+                RoleAction.DEMOTE -> previousRole(target.role)
+            }
+            ClubMembers.update({
+                (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
+            }) { it[role] = nextRole }
+        }
+        return clubDetails(actorId) ?: throw ClubException("update_failed")
+    }
+
+    private fun ensureCanManage(actorRole: String, targetRole: String) {
+        val allowed = when (actorRole) {
+            ROLE_PRESIDENT -> targetRole != ROLE_PRESIDENT
+            ROLE_HEIR -> targetRole == ROLE_VETERAN || targetRole == ROLE_NOVICE
+            else -> false
+        }
+        if (!allowed) throw ClubException("forbidden")
+    }
+
+    private fun nextRole(role: String): String = when (role) {
+        ROLE_NOVICE -> ROLE_VETERAN
+        ROLE_VETERAN -> ROLE_HEIR
+        else -> throw ClubException("invalid_role")
+    }
+
+    private fun previousRole(role: String): String = when (role) {
+        ROLE_HEIR -> ROLE_VETERAN
+        ROLE_VETERAN -> ROLE_NOVICE
+        else -> throw ClubException("invalid_role")
+    }
+
+    private fun roleRank(role: String): Int = when (role) {
+        ROLE_PRESIDENT -> 0
+        ROLE_HEIR -> 1
+        ROLE_VETERAN -> 2
+        ROLE_NOVICE -> 3
+        else -> 9
+    }
+
+    private data class MemberEntry(
+        val clubId: Long,
+        val userId: Long,
+        val role: String,
+    )
+
+    private fun loadActorAndTarget(actorId: Long, targetId: Long): Pair<MemberEntry, MemberEntry> {
+        if (actorId == targetId) throw ClubException("invalid_target")
+        val actor = ClubMembers.select { ClubMembers.userId eq actorId }.singleOrNull()
+            ?: throw ClubException("not_in_club")
+        val target = ClubMembers.select { ClubMembers.userId eq targetId }.singleOrNull()
+            ?: throw ClubException("member_not_found")
+        val actorClubId = actor[ClubMembers.clubId].value
+        val targetClubId = target[ClubMembers.clubId].value
+        if (actorClubId != targetClubId) throw ClubException("member_not_found")
+        return MemberEntry(actorClubId, actorId, actor[ClubMembers.role]) to
+            MemberEntry(targetClubId, targetId, target[ClubMembers.role])
     }
 
     private fun totalCaughtKg(userId: Long): Double {
@@ -335,5 +460,10 @@ class ClubService {
         const val ROLE_VETERAN = "veteran"
         const val ROLE_NOVICE = "novice"
         private val CLUB_ZONE: ZoneId = ZoneId.of("Europe/Belgrade")
+    }
+
+    private enum class RoleAction {
+        PROMOTE,
+        DEMOTE,
     }
 }

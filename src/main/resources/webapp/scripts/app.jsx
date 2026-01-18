@@ -72,7 +72,7 @@ function App(){
   const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
   const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
   const [coinInsufficientOpen, setCoinInsufficientOpen] = React.useState(false);
-  const [clubOpen, setClubOpen] = React.useState(false);
+  const prevTabRef = React.useRef('fish');
   const [achievements, setAchievements] = React.useState([]);
   const [achievementsLoading, setAchievementsLoading] = React.useState(false);
   const [achievementsError, setAchievementsError] = React.useState(null);
@@ -1276,13 +1276,6 @@ function App(){
           </div>
         )}
 
-        <ClubModal
-          open={clubOpen}
-          onClose={()=>setClubOpen(false)}
-          me={me}
-          onReloadProfile={reloadProfile}
-        />
-
         <div className="flex-1 flex flex-col">
           {tab === 'fish' && (
             <FishingTab
@@ -1307,7 +1300,18 @@ function App(){
               markCatchAnimationShown={markCatchAnimationShown}
               onCatchClick={handleCatchClick}
               onOpenQuests={openQuests}
-              onOpenClub={()=>setClubOpen(true)}
+              onOpenClub={()=>{
+                prevTabRef.current = tab;
+                setTab('club');
+              }}
+            />
+          )}
+          {tab === 'club' && (
+            <ClubScreen
+              active={tab === 'club'}
+              onClose={()=>setTab(prevTabRef.current || 'fish')}
+              me={me}
+              onReloadProfile={reloadProfile}
             />
           )}
 
@@ -1360,12 +1364,14 @@ function App(){
           )}
         </div>
 
-        <BottomNav
-          tab={tab}
-          setTab={setTab}
-          dailyAvailable={me.dailyAvailable}
-          achievementsAvailable={achievementsClaimable}
-        />
+        {tab !== 'club' && (
+          <BottomNav
+            tab={tab}
+            setTab={setTab}
+            dailyAvailable={me.dailyAvailable}
+            achievementsAvailable={achievementsClaimable}
+          />
+        )}
 
         <QuestsDrawer
           open={questsOpen}
