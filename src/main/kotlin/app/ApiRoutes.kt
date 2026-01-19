@@ -170,6 +170,13 @@ fun Application.apiRoutes(env: Env) {
     )
 
     @Serializable
+    data class ClubChatMessageDTO(
+        val id: Long,
+        val message: String,
+        val createdAt: String,
+    )
+
+    @Serializable
     data class ClubSummaryDTO(
         val id: Long,
         val name: String,
@@ -198,6 +205,12 @@ fun Application.apiRoutes(env: Env) {
         capacity = capacity,
         currentWeek = currentWeek.toDto(),
         previousWeek = previousWeek.toDto(),
+    )
+
+    fun ClubService.ClubChatMessage.toDto(): ClubChatMessageDTO = ClubChatMessageDTO(
+        id = id,
+        message = message,
+        createdAt = createdAt.toString(),
     )
 
     @Serializable
@@ -706,6 +719,26 @@ fun Application.apiRoutes(env: Env) {
             val uid = fishing.ensureUserByTgId(tgId)
             val details = clubs.clubDetails(uid) ?: return@get call.respond(HttpStatusCode.NoContent)
             call.respond(details.toDto())
+        }
+
+        get("/api/club/chat") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            val messages = try {
+                clubs.clubChat(uid)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@get call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(messages.map { it.toDto() })
         }
 
         get("/api/club/search") {

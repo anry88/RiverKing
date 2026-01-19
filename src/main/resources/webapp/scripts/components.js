@@ -555,6 +555,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [createError, setCreateError] = React.useState(null);
   const [joinLoading, setJoinLoading] = React.useState(false);
   const [joinError, setJoinError] = React.useState(null);
+  const [chatOpen, setChatOpen] = React.useState(false);
+  const [chatMessages, setChatMessages] = React.useState([]);
+  const [chatLoading, setChatLoading] = React.useState(false);
+  const [chatError, setChatError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
 
   const roleLabel = React.useCallback(role => {
@@ -583,6 +587,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setCreateError(null);
     setJoinLoading(false);
     setJoinError(null);
+    setChatOpen(false);
+    setChatMessages([]);
+    setChatLoading(false);
+    setChatError(null);
   }, []);
 
   const loadClub = React.useCallback(async () => {
@@ -630,6 +638,24 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       setSearchLoading(false);
     }
   }, [selectedClubId]);
+
+  const loadChat = React.useCallback(async () => {
+    setChatLoading(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat`, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('chat_failed');
+      }
+      const data = await resp.json();
+      setChatMessages(Array.isArray(data) ? data : []);
+    }catch(e){
+      setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
+    }finally{
+      setChatLoading(false);
+    }
+  }, []);
 
   const parseClubError = React.useCallback((code, fallbackKey) => {
     if(code === 'already_in_club') return t('clubAlreadyIn');
@@ -758,8 +784,57 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     <div className="flex-1 flex flex-col">
       <div className="flex items-center gap-2 mb-3">
         <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
-        <div className="text-lg font-semibold">{t('club')}</div>
+        <div className="flex-1 text-lg font-semibold">{t('club')}</div>
+        {mode === 'club' && club && (
+          <button
+            type="button"
+            className="px-3 py-1 rounded-xl glass text-sm"
+            onClick={()=>{
+              setChatOpen(true);
+              loadChat();
+            }}
+          >{t('clubChat')}</button>
+        )}
       </div>
+
+      {chatOpen && (
+        <div className="fixed inset-0 z-50">
+          <div onClick={()=>setChatOpen(false)} className="absolute inset-0 bg-black/60"></div>
+          <div className="absolute inset-x-4 top-16 bottom-16 glass rounded-2xl p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-semibold">{t('clubChatTitle')}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1 rounded-xl glass text-sm"
+                  onClick={loadChat}
+                  disabled={chatLoading}
+                >{t('clubChatRefresh')}</button>
+                <button onClick={()=>setChatOpen(false)} className="px-3 py-1 rounded-xl glass">✕</button>
+              </div>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+              {chatLoading ? (
+                <div className="text-sm opacity-70">{t('loading')}</div>
+              ) : chatError ? (
+                <div className="text-sm opacity-70">{chatError}</div>
+              ) : chatMessages.length === 0 ? (
+                <div className="text-sm opacity-70">{t('clubChatEmpty')}</div>
+              ) : (
+                chatMessages.map(item => {
+                  const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
+                  return (
+                    <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
+                      <div className="text-xs opacity-70">{ts}</div>
+                      <div className="mt-1">{item.message}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-sm opacity-70">{t('loading')}</div>

@@ -48,6 +48,7 @@ object DB {
                 ClubMembers,
                 ClubWeeklyContributions,
                 ClubWeeklyRewards,
+                ClubChatMessages,
             )
             migrateFishNames()
             seedIfEmpty()
@@ -1509,5 +1510,11 @@ object ClubWeeklyRewards : LongIdTable() {
     val weekStart = date("week_start")
     val coins = integer("coins").default(0)
     val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object ClubChatMessages : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val message = varchar("message", 500)
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
