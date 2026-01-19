@@ -758,7 +758,8 @@ fun Application.apiRoutes(env: Env) {
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
             val uid = fishing.ensureUserByTgId(tgId)
-            val list = clubs.searchClubs(uid).map {
+            val query = call.request.queryParameters["q"]
+            val list = clubs.searchClubs(uid, query).map {
                 ClubSummaryDTO(
                     it.id,
                     it.name,

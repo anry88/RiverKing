@@ -119,7 +119,7 @@ function LocationsDrawer({open, onClose, me, onSelect}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('locations')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -178,7 +178,7 @@ function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[420px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('quests')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -229,7 +229,7 @@ function BaitsDrawer({open,onClose,me,onSelect}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('baits')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -275,7 +275,7 @@ function RodsDrawer({open,onClose,me,onSelect,onUnlock}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('rods')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -549,6 +549,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [searchError, setSearchError] = React.useState(null);
   const [selectedClubId, setSelectedClubId] = React.useState(null);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [name, setName] = React.useState('');
   const [confirming, setConfirming] = React.useState(false);
   const [createLoading, setCreateLoading] = React.useState(false);
@@ -588,6 +589,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setSearchLoading(false);
     setSearchError(null);
     setSelectedClubId(null);
+    setSearchQuery('');
     setName('');
     setConfirming(false);
     setCreateLoading(false);
@@ -632,26 +634,36 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   }, []);
 
-  const loadSearch = React.useCallback(async () => {
+  const loadSearch = React.useCallback(async (query) => {
     setSearchLoading(true);
     setSearchError(null);
     try{
-      const resp = await fetch(`/api/club/search`, {credentials:'include'});
+      const trimmed = typeof query === 'string' ? query.trim() : searchQuery.trim();
+      const url = trimmed
+        ? `/api/club/search?q=${encodeURIComponent(trimmed)}`
+        : '/api/club/search';
+      const resp = await fetch(url, {credentials:'include'});
       if(!resp.ok){
         if(resp.status===401) throw new Error('unauthorized');
         throw new Error('search_failed');
       }
       const data = await resp.json();
-      setSearch(Array.isArray(data) ? data : []);
-      if(!selectedClubId && data.length > 0){
-        setSelectedClubId(data[0]?.id || null);
+      const list = Array.isArray(data) ? data : [];
+      setSearch(list);
+      if(list.length === 0){
+        setSelectedClubId(null);
+      }else{
+        const hasSelected = selectedClubId && list.some(item => item.id === selectedClubId);
+        if(!hasSelected){
+          setSelectedClubId(list[0]?.id || null);
+        }
       }
     }catch(e){
       setSearchError(e.message==='unauthorized' ? t('authRequired') : t('clubSearchFailed'));
     }finally{
       setSearchLoading(false);
     }
-  }, [selectedClubId]);
+  }, [searchQuery, selectedClubId]);
 
   const loadChat = React.useCallback(async () => {
     setChatLoading(true);
@@ -776,6 +788,18 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setInfoError(null);
     setSettingsError(null);
   }, [club?.id]);
+
+  const searchTimeoutRef = React.useRef(null);
+  React.useEffect(() => {
+    if(mode !== 'search') return;
+    if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      loadSearch(searchQuery);
+    }, 300);
+    return () => {
+      if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [mode, searchQuery, loadSearch]);
 
   if(!active) return null;
 
@@ -1161,6 +1185,13 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         </div>
       ) : mode === 'search' ? (
         <div className="space-y-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e=>{ setSearchQuery(e.target.value); setSearchError(null); }}
+            placeholder={t('clubSearchPlaceholder')}
+            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10"
+          />
           {searchLoading ? (
             <div className="text-sm opacity-70">{t('loading')}</div>
           ) : searchError ? (
@@ -1197,9 +1228,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             <button
               type="button"
               className="flex-1 px-3 py-2 rounded-xl glass"
-              onClick={()=>{ loadSearch(); }}
+              onClick={()=>{ loadSearch(searchQuery); }}
               disabled={searchLoading}
-            >{t('clubSearchRefresh')}</button>
+            >{t('clubSearchSubmit')}</button>
             <button
               type="button"
               className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
