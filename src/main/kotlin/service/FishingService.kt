@@ -1648,9 +1648,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val fishId = picked[Fish.id].value
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
 
-        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
-        PendingCatches.insert {
-            it[PendingCatches.userId] = userId
+        val now = Instant.now()
+        val updated = PendingCatches.update({ PendingCatches.userId eq userId }) {
             it[PendingCatches.fishId] = fishId
             it[PendingCatches.weight] = weight
             it[PendingCatches.locationId] = locId
@@ -1658,7 +1657,20 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[PendingCatches.waitSeconds] = wait
             it[PendingCatches.reactionTime] = reactionTime
             it[PendingCatches.autoCatch] = auto
-            it[PendingCatches.createdAt] = Instant.now()
+            it[PendingCatches.createdAt] = now
+        }
+        if (updated == 0) {
+            PendingCatches.insert {
+                it[PendingCatches.userId] = userId
+                it[PendingCatches.fishId] = fishId
+                it[PendingCatches.weight] = weight
+                it[PendingCatches.locationId] = locId
+                it[PendingCatches.lureId] = lureId
+                it[PendingCatches.waitSeconds] = wait
+                it[PendingCatches.reactionTime] = reactionTime
+                it[PendingCatches.autoCatch] = auto
+                it[PendingCatches.createdAt] = now
+            }
         }
 
         HookResultDTO(true, auto)
