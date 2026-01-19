@@ -113,9 +113,6 @@ class ClubService {
                 countExpr,
             )
             .selectAll()
-        if (normalizedQuery != null) {
-            queryRows.andWhere { Clubs.name.lowerCase() like "%$normalizedQuery%" }
-        }
         val rows = queryRows
             .groupBy(Clubs.id, Clubs.name, Clubs.info, Clubs.minJoinWeightKg, Clubs.recruitingOpen)
             .map { row ->
@@ -129,6 +126,7 @@ class ClubService {
                     recruitingOpen = row[Clubs.recruitingOpen],
                 )
             }
+            .filter { normalizedQuery == null || it.name.lowercase().contains(normalizedQuery) }
             .filter { it.memberCount < MAX_MEMBERS }
             .filter { it.recruitingOpen }
             .filter { userTotalWeight >= it.minJoinWeightKg }
