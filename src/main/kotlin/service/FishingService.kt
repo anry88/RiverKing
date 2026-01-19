@@ -1783,7 +1783,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val questRewardCoins = questUpdates.sumOf { it.rewardCoins }
 
         if (rarity == "mythic" || rarity == "legendary") {
-            clubs.logRareCatchTx(userId, fishName, rarity, caughtAt)
+            clubs.logRareCatchTx(userId, fishName, locName, weight, rarity, caughtAt)
         }
 
         if (coinsAwarded != 0 || questRewardCoins != 0) {

@@ -560,6 +560,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [chatMessages, setChatMessages] = React.useState([]);
   const [chatLoading, setChatLoading] = React.useState(false);
   const [chatError, setChatError] = React.useState(null);
+  const chatScrollRef = React.useRef(null);
   const [infoDraft, setInfoDraft] = React.useState('');
   const [infoSaving, setInfoSaving] = React.useState(false);
   const [infoError, setInfoError] = React.useState(null);
@@ -801,6 +802,15 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     };
   }, [mode, searchQuery, loadSearch]);
 
+  React.useEffect(() => {
+    if(!chatOpen) return;
+    const node = chatScrollRef.current;
+    if(!node) return;
+    requestAnimationFrame(() => {
+      node.scrollTop = node.scrollHeight;
+    });
+  }, [chatOpen, chatMessages, chatLoading]);
+
   if(!active) return null;
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
@@ -896,25 +906,27 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const renderChatMessage = (message) => {
     if(!message) return message;
     const rarityColorMap = window.rarityColors || {};
-    const ruMatch = message.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(\.?)$/i);
+    const ruMatch = message.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(?: на ([^,]+), ([0-9.,]+) кг)?(\.?)$/i);
     if(ruMatch){
-      const [, prefix, rarityLabel, fishName, suffix] = ruMatch;
+      const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = ruMatch;
       const rarityKey = rarityLabel?.toLowerCase() === 'мифическую' ? 'mythic' : 'legendary';
       const className = rarityColorMap[rarityKey] || '';
       return (
         <span>
-          {prefix}{rarityLabel} рыбу: <span className={className}>{fishName}</span>{suffix}
+          {prefix}{rarityLabel} рыбу: <span className={className}>{fishName}</span>
+          {locationName ? ` на ${locationName}, ${weightLabel} кг` : ''}{suffix}
         </span>
       );
     }
-    const enMatch = message.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(\.?)$/i);
+    const enMatch = message.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(?: at ([^,]+), ([0-9.,]+) kg)?(\.?)$/i);
     if(enMatch){
-      const [, prefix, rarityLabel, fishName, suffix] = enMatch;
+      const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = enMatch;
       const rarityKey = rarityLabel?.toLowerCase() === 'mythic' ? 'mythic' : 'legendary';
       const className = rarityColorMap[rarityKey] || '';
       return (
         <span>
-          {prefix}{rarityLabel} fish: <span className={className}>{fishName}</span>{suffix}
+          {prefix}{rarityLabel} fish: <span className={className}>{fishName}</span>
+          {locationName ? ` at ${locationName}, ${weightLabel} kg` : ''}{suffix}
         </span>
       );
     }
@@ -954,7 +966,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                 <button onClick={()=>setChatOpen(false)} className="px-3 py-1 rounded-xl glass">✕</button>
               </div>
             </div>
-            <div className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+            <div ref={chatScrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
               {chatLoading ? (
                 <div className="text-sm opacity-70">{t('loading')}</div>
               ) : chatError ? (
