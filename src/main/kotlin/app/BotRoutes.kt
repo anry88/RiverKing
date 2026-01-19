@@ -319,6 +319,12 @@ fun Application.botRoutes(env: Env) {
                         assetName = "daily_ratings.png"
                     ) { _, _ -> "/daily_rating" },
                     InlineCommandInfo(
+                        name = "club_rating",
+                        ruDescription = "Рейтинг клуба за текущую неделю",
+                        enDescription = "View the current club weekly rating",
+                        assetName = "club_rating.png"
+                    ) { _, _ -> "/club_rating" },
+                    InlineCommandInfo(
                         name = "stats",
                         ruDescription = "Статистика по пойманной рыбе",
                         enDescription = "Your fishing stats",
@@ -1610,6 +1616,8 @@ fun Application.botRoutes(env: Env) {
                 "рейтинг" to "/daily_rating",
                 "rating" to "/daily_rating",
                 "leaderboard" to "/daily_rating",
+                "клуб" to "/club_rating",
+                "club" to "/club_rating",
                 "турнир" to "/tournament",
                 "tournament" to "/tournament",
             )
@@ -1699,6 +1707,7 @@ fun Application.botRoutes(env: Env) {
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
 /daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
+/club_rating — таблица текущей недели клуба
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
@@ -1720,6 +1729,7 @@ Available commands:
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
 /daily_rating — view the current placement of your best catch in today's daily rating
+/club_rating — view the current club weekly rating
 /stats — your fishing stats
 /language — choose your language
 /nickname — change your nickname""".trimIndent()
@@ -1913,6 +1923,47 @@ Available commands:
                             "$header\n$body"
                         }
                         logCommandMetric("daily_rating", source = source)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_rating" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val details = clubs.clubDetails(uid)
+                        val reply = if (details == null) {
+                            if (lang == "ru") {
+                                "Ты пока не состоишь в клубе. Вступить можно, открыв приложение."
+                            } else {
+                                "You are not in a club yet. You can join one by opening the app."
+                            }
+                        } else {
+                            val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                            val dateFormat = DateTimeFormatter.ofPattern("dd.MM", locale)
+                            val numberFormat = NumberFormat.getIntegerInstance(locale)
+                            val weekStart = details.currentWeek.weekStart
+                            val weekEnd = weekStart.plusDays(6)
+                            val dateRange = "${weekStart.format(dateFormat)}–${weekEnd.format(dateFormat)}"
+                            val totalCoins = numberFormat.format(details.currentWeek.totalCoins)
+                            val coinLabel = if (lang == "ru") "монет" else "coins"
+                            val fallbackName = if (lang == "ru") "Участник" else "Member"
+                            val header = if (lang == "ru") {
+                                "Клуб «${details.name}»\nНеделя: $dateRange"
+                            } else {
+                                "Club \"${details.name}\"\nWeek: $dateRange"
+                            }
+                            val body = details.currentWeek.members.mapIndexed { index, member ->
+                                val name = member.name ?: fallbackName
+                                val coins = numberFormat.format(member.coins)
+                                "${index + 1}. $name — $coins $coinLabel"
+                            }.joinToString("\n")
+                            val totalLine = if (lang == "ru") {
+                                "Всего за неделю: $totalCoins $coinLabel"
+                            } else {
+                                "Weekly total: $totalCoins $coinLabel"
+                            }
+                            listOf(header, body, totalLine).filter { it.isNotBlank() }.joinToString("\n\n")
+                        }
+                        logCommandMetric("club_rating", source = source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }
