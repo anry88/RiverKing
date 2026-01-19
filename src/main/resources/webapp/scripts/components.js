@@ -810,7 +810,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
-  const handleSaveInfo = async () => {
+  const handleSaveInfo = async (nextInfo) => {
+    if(infoSaving) return;
+    const infoValue = nextInfo ?? infoDraft;
+    if((club?.info || '') === infoValue) return;
     setInfoError(null);
     setInfoSaving(true);
     try{
@@ -818,7 +821,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         method:'POST',
         credentials:'include',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({info: infoDraft})
+        body: JSON.stringify({info: infoValue})
       });
       if(!resp.ok){
         const data = await resp.json().catch(()=> ({}));
@@ -833,10 +836,15 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
-  const handleSaveSettings = async () => {
-    const weightValue = Number(settingsWeight);
+  const handleSaveSettings = async (nextWeight, nextRecruiting) => {
+    if(settingsSaving) return;
+    const weightValue = Number(nextWeight ?? settingsWeight);
     if(!Number.isFinite(weightValue) || weightValue < 0){
       setSettingsError(t('clubInvalidMinWeight'));
+      return;
+    }
+    const recruitingValue = nextRecruiting ?? settingsRecruiting;
+    if(Math.round(club?.minJoinWeightKg || 0) === Math.round(weightValue) && !!club?.recruitingOpen === !!recruitingValue){
       return;
     }
     setSettingsError(null);
@@ -846,7 +854,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         method:'POST',
         credentials:'include',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({minJoinWeightKg: weightValue, recruitingOpen: settingsRecruiting})
+        body: JSON.stringify({minJoinWeightKg: weightValue, recruitingOpen: recruitingValue})
       });
       if(!resp.ok){
         const data = await resp.json().catch(()=> ({}));
@@ -863,10 +871,12 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
 
   const renderChatMessage = (message) => {
     if(!message) return message;
+    const rarityColorMap = window.rarityColors || {};
     const ruMatch = message.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(\.?)$/i);
     if(ruMatch){
       const [, prefix, rarityLabel, fishName, suffix] = ruMatch;
-      const className = rarityLabel?.toLowerCase() === 'мифическую' ? 'text-purple-300' : 'text-yellow-300';
+      const rarityKey = rarityLabel?.toLowerCase() === 'мифическую' ? 'mythic' : 'legendary';
+      const className = rarityColorMap[rarityKey] || '';
       return (
         <span>
           {prefix}{rarityLabel} рыбу: <span className={className}>{fishName}</span>{suffix}
@@ -876,7 +886,8 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     const enMatch = message.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(\.?)$/i);
     if(enMatch){
       const [, prefix, rarityLabel, fishName, suffix] = enMatch;
-      const className = rarityLabel?.toLowerCase() === 'mythic' ? 'text-purple-300' : 'text-yellow-300';
+      const rarityKey = rarityLabel?.toLowerCase() === 'mythic' ? 'mythic' : 'legendary';
+      const className = rarityColorMap[rarityKey] || '';
       return (
         <span>
           {prefix}{rarityLabel} fish: <span className={className}>{fishName}</span>{suffix}
@@ -956,33 +967,24 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             <div className="text-xs opacity-70">{club.memberCount}/{club.capacity}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-white/10">
+          <div className="p-3 rounded-xl border border-white/10 space-y-3">
             <div className="text-sm font-semibold mb-1">{t('clubInfoTitle')}</div>
             {canManageMembers ? (
               <div className="space-y-2">
                 <textarea
                   value={infoDraft}
                   onChange={e=>{ setInfoDraft(e.target.value); setInfoError(null); }}
+                  onBlur={e=>handleSaveInfo(e.target.value)}
                   maxLength={500}
                   rows={4}
                   className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
                   placeholder={t('clubInfoPlaceholder')}
                 />
                 {infoError && <div className="text-xs text-red-400">{infoError}</div>}
-                <button
-                  type="button"
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-xs"
-                  onClick={handleSaveInfo}
-                  disabled={infoSaving}
-                >{t('clubInfoSave')}</button>
               </div>
             ) : (
               <div className="text-xs opacity-70">{club.info?.trim() ? club.info : t('clubInfoPlaceholder')}</div>
             )}
-          </div>
-
-          <div className="p-3 rounded-xl border border-white/10">
-            <div className="text-sm font-semibold mb-2">{t('clubSettingsTitle')}</div>
             {canManageMembers ? (
               <div className="space-y-3">
                 <div className="space-y-1">
@@ -993,6 +995,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                     step="1"
                     value={settingsWeight}
                     onChange={e=>{ setSettingsWeight(e.target.value); setSettingsError(null); }}
+                    onBlur={e=>handleSaveSettings(e.target.value, settingsRecruiting)}
                     className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
                   />
                 </div>
@@ -1000,17 +1003,16 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                   <input
                     type="checkbox"
                     checked={settingsRecruiting}
-                    onChange={e=>{ setSettingsRecruiting(e.target.checked); setSettingsError(null); }}
+                    onChange={e=>{
+                      const nextValue = e.target.checked;
+                      setSettingsRecruiting(nextValue);
+                      setSettingsError(null);
+                      handleSaveSettings(settingsWeight, nextValue);
+                    }}
                   />
                   {t('clubRecruitingOpenLabel')}
                 </label>
                 {settingsError && <div className="text-xs text-red-400">{settingsError}</div>}
-                <button
-                  type="button"
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-xs"
-                  onClick={handleSaveSettings}
-                  disabled={settingsSaving}
-                >{t('clubSettingsSave')}</button>
               </div>
             ) : (
               <div className="space-y-1 text-xs opacity-70">
