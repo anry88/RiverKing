@@ -347,6 +347,8 @@ class ClubService {
     internal fun logRareCatchTx(
         userId: Long,
         fishName: String,
+        locationName: String,
+        weightKg: Double,
         rarity: String,
         at: Instant = Instant.now(),
     ) {
@@ -358,7 +360,12 @@ class ClubService {
             "legendary" -> "легендарную"
             else -> rarity
         }
-        addChatMessageTx(clubId, "$memberName поймал $rarityLabel рыбу: $fishName.", at)
+        val weightLabel = String.format(java.util.Locale.US, "%.2f", weightKg)
+        addChatMessageTx(
+            clubId,
+            "$memberName поймал $rarityLabel рыбу: $fishName на $locationName, $weightLabel кг.",
+            at
+        )
     }
 
     fun distributeWeeklyRewards(now: Instant = Instant.now()) {
