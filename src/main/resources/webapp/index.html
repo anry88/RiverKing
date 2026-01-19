@@ -25,7 +25,8 @@
       /* visualViewport fallback */
       --bottom-gap: 0px;
       --overlay: 0;
-      --ui-scale: calc(1 + 0.15 * var(--overlay));
+      --overlay-shift: calc(var(--overlay) * 4px);
+      --ui-scale: calc(1 + 0.05 * var(--overlay));
       --tg-topbar: 0px;
       /* высота верхнего бара Telegram, если не удаётся вычислить иначе */
 
@@ -260,15 +261,15 @@
 
     /* overlay-aware UI pieces */
     .app-header {
-      height: calc(28px * var(--ui-scale) + var(--safe-top-ui) + (var(--overlay) * 10px) + 13px);
+      height: calc(28px * var(--ui-scale) + var(--safe-top-ui) + var(--overlay-shift) + 13px);
       padding: 0 calc(16px * var(--ui-scale));
-      padding-top: calc(var(--safe-top-ui) + (var(--overlay) * 10px) + 8px);
+      padding-top: calc(var(--safe-top-ui) + var(--overlay-shift) + 8px);
       padding-bottom: 5px;
     }
 
     .app-footer {
-      padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px));
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px) + 5px);
+      padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
+      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
       padding: 8px calc(16px * var(--ui-scale));
       padding-top: 5px;
       display: flex;
@@ -277,7 +278,7 @@
     }
 
     .app-footer-placeholder {
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + (var(--overlay) * 10px));
+      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
       background: var(--tg-bg);
     }
 

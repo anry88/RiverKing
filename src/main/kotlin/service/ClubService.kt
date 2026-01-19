@@ -90,10 +90,11 @@ class ClubService {
         )
     }
 
-    fun searchClubs(userId: Long, limit: Int = 10): List<ClubSummary> = transaction {
+    fun searchClubs(userId: Long, query: String? = null, limit: Int = 10): List<ClubSummary> = transaction {
         val userTotalWeight = totalCaughtKg(userId)
+        val normalizedQuery = query?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
         val countExpr = ClubMembers.userId.count()
-        val rows = (Clubs leftJoin ClubMembers)
+        val queryRows = (Clubs leftJoin ClubMembers)
             .slice(
                 Clubs.id,
                 Clubs.name,
@@ -103,6 +104,10 @@ class ClubService {
                 countExpr,
             )
             .selectAll()
+        if (normalizedQuery != null) {
+            queryRows.andWhere { Clubs.name.lowerCase() like "%$normalizedQuery%" }
+        }
+        val rows = queryRows
             .groupBy(Clubs.id, Clubs.name, Clubs.info, Clubs.minJoinWeightKg, Clubs.recruitingOpen)
             .map { row ->
                 ClubSummary(
