@@ -654,17 +654,17 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       if(list.length === 0){
         setSelectedClubId(null);
       }else{
-        const hasSelected = selectedClubId && list.some(item => item.id === selectedClubId);
-        if(!hasSelected){
-          setSelectedClubId(list[0]?.id || null);
-        }
+        setSelectedClubId((currentId) => {
+          const hasSelected = currentId && list.some(item => item.id === currentId);
+          return hasSelected ? currentId : (list[0]?.id || null);
+        });
       }
     }catch(e){
       setSearchError(e.message==='unauthorized' ? t('authRequired') : t('clubSearchFailed'));
     }finally{
       setSearchLoading(false);
     }
-  }, [searchQuery, selectedClubId]);
+  }, [searchQuery]);
 
   const loadChat = React.useCallback(async () => {
     setChatLoading(true);
@@ -791,10 +791,18 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, [club?.id]);
 
   const searchTimeoutRef = React.useRef(null);
+  const lastAutoSearchQueryRef = React.useRef('');
   React.useEffect(() => {
     if(mode !== 'search') return;
+    const trimmed = searchQuery.trim();
+    if(!trimmed){
+      lastAutoSearchQueryRef.current = '';
+      return;
+    }
+    if(trimmed === lastAutoSearchQueryRef.current) return;
     if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
+      lastAutoSearchQueryRef.current = trimmed;
       loadSearch(searchQuery);
     }, 500);
     return () => {
