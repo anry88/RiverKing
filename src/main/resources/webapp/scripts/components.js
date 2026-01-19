@@ -766,6 +766,8 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const canManageMembers = React.useMemo(() => (
     club?.role === 'president' || club?.role === 'heir'
   ), [club?.role]);
+  const [infoEditOpen, setInfoEditOpen] = React.useState(false);
+  const infoPanelRef = React.useRef(null);
 
   const canActOnMember = React.useCallback((member) => {
     if(!club || !member) return false;
@@ -788,7 +790,25 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setSettingsRecruiting(!!club.recruitingOpen);
     setInfoError(null);
     setSettingsError(null);
+    setInfoEditOpen(false);
   }, [club?.id]);
+  React.useEffect(() => {
+    if(!canManageMembers) setInfoEditOpen(false);
+  }, [canManageMembers]);
+  React.useEffect(() => {
+    if(!infoEditOpen) return;
+    const handleOutside = (event) => {
+      if(infoPanelRef.current && !infoPanelRef.current.contains(event.target)){
+        setInfoEditOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [infoEditOpen]);
 
   const searchTimeoutRef = React.useRef(null);
   const lastAutoSearchQueryRef = React.useRef('');
@@ -1026,9 +1046,15 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             <div className="text-xs opacity-70">{club.memberCount}/{club.capacity}</div>
           </div>
 
-          <div className="p-3 rounded-xl border border-white/10 space-y-3">
+          <div
+            ref={infoPanelRef}
+            onClick={() => {
+              if(canManageMembers && !infoEditOpen) setInfoEditOpen(true);
+            }}
+            className={`p-3 rounded-xl border border-white/10 space-y-3 ${canManageMembers && !infoEditOpen ? 'cursor-pointer' : ''}`}
+          >
             <div className="text-sm font-semibold mb-1">{t('clubInfoTitle')}</div>
-            {canManageMembers ? (
+            {canManageMembers && infoEditOpen ? (
               <div className="space-y-2">
                 <textarea
                   value={infoDraft}
@@ -1044,7 +1070,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             ) : (
               <div className="text-xs opacity-70">{club.info?.trim() ? club.info : t('clubInfoPlaceholder')}</div>
             )}
-            {canManageMembers ? (
+            {canManageMembers && infoEditOpen ? (
               <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="text-xs opacity-70">{t('clubMinJoinWeightLabel')}</div>
