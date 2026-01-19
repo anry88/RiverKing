@@ -165,6 +165,9 @@ fun Application.apiRoutes(env: Env) {
         val role: String,
         val memberCount: Int,
         val capacity: Int,
+        val info: String,
+        val minJoinWeightKg: Double,
+        val recruitingOpen: Boolean,
         val currentWeek: ClubWeekDTO,
         val previousWeek: ClubWeekDTO,
     )
@@ -182,6 +185,9 @@ fun Application.apiRoutes(env: Env) {
         val name: String,
         val memberCount: Int,
         val capacity: Int,
+        val info: String,
+        val minJoinWeightKg: Double,
+        val recruitingOpen: Boolean,
     )
 
     fun ClubService.ClubWeekView.toDto(): ClubWeekDTO = ClubWeekDTO(
@@ -203,6 +209,9 @@ fun Application.apiRoutes(env: Env) {
         role = role,
         memberCount = memberCount,
         capacity = capacity,
+        info = info,
+        minJoinWeightKg = minJoinWeightKg,
+        recruitingOpen = recruitingOpen,
         currentWeek = currentWeek.toDto(),
         previousWeek = previousWeek.toDto(),
     )
@@ -748,9 +757,17 @@ fun Application.apiRoutes(env: Env) {
                 env.devMode     -> 1L
                 else            -> return@get call.respond(HttpStatusCode.Unauthorized)
             }
-            fishing.ensureUserByTgId(tgId)
-            val list = clubs.searchClubs().map {
-                ClubSummaryDTO(it.id, it.name, it.memberCount, it.capacity)
+            val uid = fishing.ensureUserByTgId(tgId)
+            val list = clubs.searchClubs(uid).map {
+                ClubSummaryDTO(
+                    it.id,
+                    it.name,
+                    it.memberCount,
+                    it.capacity,
+                    it.info,
+                    it.minJoinWeightKg,
+                    it.recruitingOpen,
+                )
             }
             call.respond(list)
         }
@@ -770,9 +787,12 @@ fun Application.apiRoutes(env: Env) {
             val details = try {
                 clubs.createClub(uid, req.name)
             } catch (e: ClubService.ClubException) {
-                val status = when (e.code) {
-                    "already_in_club", "weight_required", "not_enough_coins" -> HttpStatusCode.Conflict
-                    "name_empty", "name_too_long", "name_profanity" -> HttpStatusCode.BadRequest
+                val status = when {
+                    e.code == "already_in_club" -> HttpStatusCode.Conflict
+                    e.code.startsWith("weight_required") -> HttpStatusCode.Conflict
+                    e.code == "not_enough_coins" -> HttpStatusCode.Conflict
+                    e.code == "name_empty" || e.code == "name_too_long" || e.code == "name_profanity" ->
+                        HttpStatusCode.BadRequest
                     else -> HttpStatusCode.BadRequest
                 }
                 return@post call.respond(status, mapOf("error" to e.code))
@@ -792,9 +812,68 @@ fun Application.apiRoutes(env: Env) {
             val details = try {
                 clubs.joinClub(uid, clubId)
             } catch (e: ClubService.ClubException) {
+                val status = when {
+                    e.code == "already_in_club" -> HttpStatusCode.Conflict
+                    e.code == "club_full" -> HttpStatusCode.Conflict
+                    e.code == "recruitment_closed" -> HttpStatusCode.Conflict
+                    e.code.startsWith("weight_required") -> HttpStatusCode.Conflict
+                    e.code == "not_found" -> HttpStatusCode.NotFound
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/info") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            @Serializable data class ClubInfoReq(val info: String)
+            val req = try { call.receive<ClubInfoReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val details = try {
+                clubs.updateClubInfo(uid, req.info)
+            } catch (e: ClubService.ClubException) {
                 val status = when (e.code) {
-                    "already_in_club", "club_full" -> HttpStatusCode.Conflict
-                    "not_found" -> HttpStatusCode.NotFound
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "info_too_long" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(details.toDto())
+        }
+
+        post("/api/club/settings") {
+            val session = call.sessions.get<AppSession>()
+            val tgId = when {
+                session != null -> session.tgId
+                env.devMode     -> 1L
+                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
+            }
+            val uid = fishing.ensureUserByTgId(tgId)
+            @Serializable
+            data class ClubSettingsReq(
+                val minJoinWeightKg: Double,
+                val recruitingOpen: Boolean,
+            )
+            val req = try { call.receive<ClubSettingsReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val details = try {
+                clubs.updateClubSettings(uid, req.minJoinWeightKg, req.recruitingOpen)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    "forbidden" -> HttpStatusCode.Forbidden
+                    "invalid_min_weight" -> HttpStatusCode.BadRequest
                     else -> HttpStatusCode.BadRequest
                 }
                 return@post call.respond(status, mapOf("error" to e.code))

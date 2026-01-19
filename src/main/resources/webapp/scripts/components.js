@@ -559,6 +559,13 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [chatMessages, setChatMessages] = React.useState([]);
   const [chatLoading, setChatLoading] = React.useState(false);
   const [chatError, setChatError] = React.useState(null);
+  const [infoDraft, setInfoDraft] = React.useState('');
+  const [infoSaving, setInfoSaving] = React.useState(false);
+  const [infoError, setInfoError] = React.useState(null);
+  const [settingsWeight, setSettingsWeight] = React.useState('');
+  const [settingsRecruiting, setSettingsRecruiting] = React.useState(true);
+  const [settingsSaving, setSettingsSaving] = React.useState(false);
+  const [settingsError, setSettingsError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
 
   const roleLabel = React.useCallback(role => {
@@ -591,6 +598,13 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setChatMessages([]);
     setChatLoading(false);
     setChatError(null);
+    setInfoDraft('');
+    setInfoSaving(false);
+    setInfoError(null);
+    setSettingsWeight('');
+    setSettingsRecruiting(true);
+    setSettingsSaving(false);
+    setSettingsError(null);
   }, []);
 
   const loadClub = React.useCallback(async () => {
@@ -660,12 +674,19 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const parseClubError = React.useCallback((code, fallbackKey) => {
     if(code === 'already_in_club') return t('clubAlreadyIn');
     if(code === 'club_full') return t('clubFull');
-    if(code === 'weight_required') return t('clubNeedWeightError', CLUB_MIN_WEIGHT);
+    if(code === 'recruitment_closed') return t('clubRecruitmentClosed');
+    if(code?.startsWith('weight_required')) {
+      const weight = code.split(':')[1];
+      const value = weight ? Number(weight) : CLUB_MIN_WEIGHT;
+      return t('clubNeedWeightError', Number.isFinite(value) ? value : CLUB_MIN_WEIGHT);
+    }
     if(code === 'not_enough_coins') return t('clubNotEnoughCoins');
     if(code === 'name_empty') return t('clubNameEmpty');
     if(code === 'name_too_long') return t('clubNameTooLong');
     if(code === 'name_profanity') return t('clubNameProfanity');
     if(code === 'not_found') return t('clubNotFound');
+    if(code === 'info_too_long') return t('clubInfoTooLong');
+    if(code === 'invalid_min_weight') return t('clubInvalidMinWeight');
     return t(fallbackKey);
   }, []);
 
@@ -747,6 +768,15 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     loadClub();
   }, [active, resetState, loadClub]);
 
+  React.useEffect(() => {
+    if(!club) return;
+    setInfoDraft(club.info || '');
+    setSettingsWeight(String(Math.round(club.minJoinWeightKg || 0)));
+    setSettingsRecruiting(!!club.recruitingOpen);
+    setInfoError(null);
+    setSettingsError(null);
+  }, [club?.id]);
+
   if(!active) return null;
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
@@ -780,11 +810,87 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
+  const handleSaveInfo = async () => {
+    setInfoError(null);
+    setInfoSaving(true);
+    try{
+      const resp = await fetch(`/api/club/info`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({info: infoDraft})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'info_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+    }catch(e){
+      setInfoError(parseClubError(e.message, 'clubInfoFailed'));
+    }finally{
+      setInfoSaving(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    const weightValue = Number(settingsWeight);
+    if(!Number.isFinite(weightValue) || weightValue < 0){
+      setSettingsError(t('clubInvalidMinWeight'));
+      return;
+    }
+    setSettingsError(null);
+    setSettingsSaving(true);
+    try{
+      const resp = await fetch(`/api/club/settings`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({minJoinWeightKg: weightValue, recruitingOpen: settingsRecruiting})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'settings_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+    }catch(e){
+      setSettingsError(parseClubError(e.message, 'clubSettingsFailed'));
+    }finally{
+      setSettingsSaving(false);
+    }
+  };
+
+  const renderChatMessage = (message) => {
+    if(!message) return message;
+    const ruMatch = message.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(\.?)$/i);
+    if(ruMatch){
+      const [, prefix, rarityLabel, fishName, suffix] = ruMatch;
+      const className = rarityLabel?.toLowerCase() === 'мифическую' ? 'text-purple-300' : 'text-yellow-300';
+      return (
+        <span>
+          {prefix}{rarityLabel} рыбу: <span className={className}>{fishName}</span>{suffix}
+        </span>
+      );
+    }
+    const enMatch = message.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(\.?)$/i);
+    if(enMatch){
+      const [, prefix, rarityLabel, fishName, suffix] = enMatch;
+      const className = rarityLabel?.toLowerCase() === 'mythic' ? 'text-purple-300' : 'text-yellow-300';
+      return (
+        <span>
+          {prefix}{rarityLabel} fish: <span className={className}>{fishName}</span>{suffix}
+        </span>
+      );
+    }
+    return message;
+  };
+
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex items-center gap-2 mb-3">
         <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
-        <div className="flex-1 text-lg font-semibold">{t('club')}</div>
+        <div className="flex-1 text-lg font-semibold">{t('clubTitle')}</div>
         {mode === 'club' && club && (
           <button
             type="button"
@@ -826,7 +932,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                   return (
                     <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
                       <div className="text-xs opacity-70">{ts}</div>
-                      <div className="mt-1">{item.message}</div>
+                      <div className="mt-1">{renderChatMessage(item.message)}</div>
                     </div>
                   );
                 })
@@ -852,7 +958,66 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
 
           <div className="p-3 rounded-xl border border-white/10">
             <div className="text-sm font-semibold mb-1">{t('clubInfoTitle')}</div>
-            <div className="text-xs opacity-70">{t('clubInfoPlaceholder')}</div>
+            {canManageMembers ? (
+              <div className="space-y-2">
+                <textarea
+                  value={infoDraft}
+                  onChange={e=>{ setInfoDraft(e.target.value); setInfoError(null); }}
+                  maxLength={500}
+                  rows={4}
+                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
+                  placeholder={t('clubInfoPlaceholder')}
+                />
+                {infoError && <div className="text-xs text-red-400">{infoError}</div>}
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-xs"
+                  onClick={handleSaveInfo}
+                  disabled={infoSaving}
+                >{t('clubInfoSave')}</button>
+              </div>
+            ) : (
+              <div className="text-xs opacity-70">{club.info?.trim() ? club.info : t('clubInfoPlaceholder')}</div>
+            )}
+          </div>
+
+          <div className="p-3 rounded-xl border border-white/10">
+            <div className="text-sm font-semibold mb-2">{t('clubSettingsTitle')}</div>
+            {canManageMembers ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className="text-xs opacity-70">{t('clubMinJoinWeightLabel')}</div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={settingsWeight}
+                    onChange={e=>{ setSettingsWeight(e.target.value); setSettingsError(null); }}
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={settingsRecruiting}
+                    onChange={e=>{ setSettingsRecruiting(e.target.checked); setSettingsError(null); }}
+                  />
+                  {t('clubRecruitingOpenLabel')}
+                </label>
+                {settingsError && <div className="text-xs text-red-400">{settingsError}</div>}
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-xs"
+                  onClick={handleSaveSettings}
+                  disabled={settingsSaving}
+                >{t('clubSettingsSave')}</button>
+              </div>
+            ) : (
+              <div className="space-y-1 text-xs opacity-70">
+                <div>{t('clubSearchMinWeight', Math.round(club.minJoinWeightKg || 0))}</div>
+                <div>{t('clubRecruitingOpenLabel')}: {club.recruitingOpen ? '✅' : '❌'}</div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 text-sm">
@@ -1014,6 +1179,12 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                       <bdi>{item.name}</bdi>
                     </div>
                     <div className="text-xs opacity-70">{item.memberCount}/{item.capacity}</div>
+                  </div>
+                  <div className="mt-1 text-xs opacity-70">
+                    {item.info?.trim() ? item.info : t('clubInfoPlaceholder')}
+                  </div>
+                  <div className="mt-1 text-xs opacity-60">
+                    {t('clubSearchMinWeight', Math.round(item.minJoinWeightKg || 0))}
                   </div>
                 </button>
               ))}

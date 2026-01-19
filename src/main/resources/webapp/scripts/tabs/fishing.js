@@ -528,7 +528,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         onClick={onOpenClub}
         className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
       >
-        {t('club')}
+        {t('clubShort')}
       </button>
 
       <AssetImage

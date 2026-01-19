@@ -1482,6 +1482,9 @@ object QuestProgress : LongIdTable() {
 object Clubs : LongIdTable() {
     val name = varchar("name", 50)
     val presidentId = reference("president_id", Users)
+    val info = varchar("info", 500).default("")
+    val minJoinWeightKg = double("min_join_weight_kg").default(0.0)
+    val recruitingOpen = bool("recruiting_open").default(true)
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
 

@@ -27,6 +27,9 @@ class ClubService {
         val name: String,
         val memberCount: Int,
         val capacity: Int,
+        val info: String,
+        val minJoinWeightKg: Double,
+        val recruitingOpen: Boolean,
     )
 
     data class ClubMemberContribution(
@@ -48,6 +51,9 @@ class ClubService {
         val role: String,
         val memberCount: Int,
         val capacity: Int,
+        val info: String,
+        val minJoinWeightKg: Double,
+        val recruitingOpen: Boolean,
         val currentWeek: ClubWeekView,
         val previousWeek: ClubWeekView,
     )
@@ -76,26 +82,42 @@ class ClubService {
             role = role,
             memberCount = members.size,
             capacity = MAX_MEMBERS,
+            info = club[Clubs.info],
+            minJoinWeightKg = club[Clubs.minJoinWeightKg],
+            recruitingOpen = club[Clubs.recruitingOpen],
             currentWeek = currentWeek,
             previousWeek = previousWeek,
         )
     }
 
-    fun searchClubs(limit: Int = 10): List<ClubSummary> = transaction {
+    fun searchClubs(userId: Long, limit: Int = 10): List<ClubSummary> = transaction {
+        val userTotalWeight = totalCaughtKg(userId)
         val countExpr = ClubMembers.userId.count()
         val rows = (Clubs leftJoin ClubMembers)
-            .slice(Clubs.id, Clubs.name, countExpr)
+            .slice(
+                Clubs.id,
+                Clubs.name,
+                Clubs.info,
+                Clubs.minJoinWeightKg,
+                Clubs.recruitingOpen,
+                countExpr,
+            )
             .selectAll()
-            .groupBy(Clubs.id, Clubs.name)
+            .groupBy(Clubs.id, Clubs.name, Clubs.info, Clubs.minJoinWeightKg, Clubs.recruitingOpen)
             .map { row ->
                 ClubSummary(
                     id = row[Clubs.id].value,
                     name = row[Clubs.name],
                     memberCount = row[countExpr].toInt(),
                     capacity = MAX_MEMBERS,
+                    info = row[Clubs.info],
+                    minJoinWeightKg = row[Clubs.minJoinWeightKg],
+                    recruitingOpen = row[Clubs.recruitingOpen],
                 )
             }
             .filter { it.memberCount < MAX_MEMBERS }
+            .filter { it.recruitingOpen }
+            .filter { userTotalWeight >= it.minJoinWeightKg }
             .shuffled()
         rows.take(limit)
     }
@@ -108,7 +130,7 @@ class ClubService {
             }
             val total = totalCaughtKg(userId)
             if (total < MIN_CREATE_WEIGHT_KG) {
-                throw ClubException("weight_required")
+                throw ClubException(weightRequiredCode(MIN_CREATE_WEIGHT_KG))
             }
             val userRow = Users.select { Users.id eq userId }.forUpdate().single()
             val balance = userRow[Users.coins]
@@ -137,6 +159,14 @@ class ClubService {
                 throw ClubException("already_in_club")
             }
             val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: throw ClubException("not_found")
+            if (!club[Clubs.recruitingOpen]) {
+                throw ClubException("recruitment_closed")
+            }
+            val minWeightKg = club[Clubs.minJoinWeightKg]
+            val total = totalCaughtKg(userId)
+            if (total < minWeightKg) {
+                throw ClubException(weightRequiredCode(minWeightKg))
+            }
             val memberCount = ClubMembers.select { ClubMembers.clubId eq clubId }.count()
             if (memberCount >= MAX_MEMBERS.toLong()) {
                 throw ClubException("club_full")
@@ -147,6 +177,8 @@ class ClubService {
                 it[ClubMembers.role] = ROLE_NOVICE
                 it[joinedAt] = Instant.now()
             }
+            val memberName = displayNameByUserId(userId)
+            addChatMessageTx(club[Clubs.id].value, "$memberName вступил в клуб.")
         }
         return clubDetails(userId) ?: throw ClubException("join_failed")
     }
@@ -269,6 +301,42 @@ class ClubService {
                 )
             }
             .reversed()
+    }
+
+    fun updateClubInfo(userId: Long, info: String): ClubDetails {
+        val trimmed = info.trim()
+        if (trimmed.length > MAX_INFO_LENGTH) throw ClubException("info_too_long")
+        transaction {
+            val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
+                ?: throw ClubException("not_in_club")
+            ensureCanEditClub(membership[ClubMembers.role])
+            val clubId = membership[ClubMembers.clubId].value
+            Clubs.update({ Clubs.id eq clubId }) {
+                it[Clubs.info] = trimmed
+            }
+        }
+        return clubDetails(userId) ?: throw ClubException("update_failed")
+    }
+
+    fun updateClubSettings(
+        userId: Long,
+        minJoinWeightKg: Double,
+        recruitingOpen: Boolean,
+    ): ClubDetails {
+        if (minJoinWeightKg < 0.0 || minJoinWeightKg > MAX_JOIN_WEIGHT_KG) {
+            throw ClubException("invalid_min_weight")
+        }
+        transaction {
+            val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
+                ?: throw ClubException("not_in_club")
+            ensureCanEditClub(membership[ClubMembers.role])
+            val clubId = membership[ClubMembers.clubId].value
+            Clubs.update({ Clubs.id eq clubId }) {
+                it[Clubs.minJoinWeightKg] = minJoinWeightKg
+                it[Clubs.recruitingOpen] = recruitingOpen
+            }
+        }
+        return clubDetails(userId) ?: throw ClubException("update_failed")
     }
 
     internal fun logRareCatchTx(
@@ -437,6 +505,11 @@ class ClubService {
         if (!allowed) throw ClubException("forbidden")
     }
 
+    private fun ensureCanEditClub(actorRole: String) {
+        val allowed = actorRole == ROLE_PRESIDENT || actorRole == ROLE_HEIR
+        if (!allowed) throw ClubException("forbidden")
+    }
+
     private fun nextRole(role: String): String = when (role) {
         ROLE_NOVICE -> ROLE_VETERAN
         ROLE_VETERAN -> ROLE_HEIR
@@ -544,8 +617,10 @@ class ClubService {
     companion object {
         const val MAX_MEMBERS = 20
         const val MAX_NAME_LENGTH = 20
+        const val MAX_INFO_LENGTH = 500
         const val CREATE_COST_COINS = 1000L
         const val MIN_CREATE_WEIGHT_KG = 1000.0
+        const val MAX_JOIN_WEIGHT_KG = 1000000.0
         const val ROLE_PRESIDENT = "president"
         const val ROLE_HEIR = "heir"
         const val ROLE_VETERAN = "veteran"
@@ -554,6 +629,9 @@ class ClubService {
         const val CHAT_MESSAGE_MAX_LENGTH = 500
         private val CLUB_ZONE: ZoneId = ZoneId.of("Europe/Belgrade")
     }
+
+    private fun weightRequiredCode(minWeightKg: Double): String =
+        "weight_required:${"%.0f".format(minWeightKg)}"
 
     private enum class RoleAction {
         PROMOTE,
