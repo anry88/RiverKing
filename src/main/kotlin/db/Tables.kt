@@ -19,7 +19,19 @@ import org.jetbrains.exposed.sql.SortOrder
 object DB {
     fun init(env: Env) {
         // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
-        Database.connect(url = env.dbUrl, driver = "org.sqlite.JDBC")
+        Database.connect(
+            url = env.dbUrl,
+            driver = "org.sqlite.JDBC",
+            setupConnection = { connection ->
+                if (env.dbUrl.startsWith("jdbc:sqlite:")) {
+                    connection.createStatement().use { stmt ->
+                        stmt.execute("PRAGMA journal_mode=WAL")
+                        stmt.execute("PRAGMA synchronous=NORMAL")
+                        stmt.execute("PRAGMA busy_timeout=5000")
+                    }
+                }
+            },
+        )
         transaction {
             ensureRodCodeColumn()
             SchemaUtils.createMissingTablesAndColumns(
