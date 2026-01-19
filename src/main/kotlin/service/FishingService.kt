@@ -58,6 +58,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     data class DailyReward(val name: String, val qty: Int)
 
     private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
+    private val clubs = ClubService()
 
     @Serializable
     data class StartCastResult(
@@ -1768,6 +1769,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             weight = weight,
         )
         val questRewardCoins = questUpdates.sumOf { it.rewardCoins }
+
+        if (rarity == "mythic" || rarity == "legendary") {
+            clubs.logRareCatchTx(userId, fishName, rarity, caughtAt)
+        }
 
         if (coinsAwarded != 0 || questRewardCoins != 0) {
             Users.update({ Users.id eq userId }) {

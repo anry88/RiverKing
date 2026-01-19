@@ -2,12 +2,15 @@ package service
 
 import db.Catches
 import db.Clubs
+import db.ClubChatMessages
 import db.ClubMembers
 import db.ClubWeeklyContributions
 import db.ClubWeeklyRewards
 import db.Users
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.sanitizeName
@@ -47,6 +50,12 @@ class ClubService {
         val capacity: Int,
         val currentWeek: ClubWeekView,
         val previousWeek: ClubWeekView,
+    )
+
+    data class ClubChatMessage(
+        val id: Long,
+        val message: String,
+        val createdAt: Instant,
     )
 
     class ClubException(val code: String) : RuntimeException(code)
@@ -148,12 +157,14 @@ class ClubService {
                 ?: throw ClubException("not_in_club")
             val clubId = membership[ClubMembers.clubId].value
             val role = membership[ClubMembers.role]
+            val memberName = displayNameByUserId(userId)
             ClubMembers.deleteWhere { ClubMembers.userId eq userId }
             if (role == ROLE_PRESIDENT) {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
                     ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
                     ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
+                    ClubChatMessages.deleteWhere { ClubChatMessages.clubId eq clubId }
                     Clubs.deleteWhere { Clubs.id eq clubId }
                     return@transaction
                 }
@@ -165,6 +176,7 @@ class ClubService {
                     (ClubMembers.clubId eq clubId) and (ClubMembers.userId eq newPresidentId)
                 }) { it[ClubMembers.role] = ROLE_PRESIDENT }
             }
+            addChatMessageTx(clubId, "$memberName покинул клуб.")
         }
     }
 
@@ -183,6 +195,9 @@ class ClubService {
             ClubMembers.deleteWhere {
                 (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
             }
+            val actorName = displayNameByUserId(actor.userId)
+            val targetName = displayNameByUserId(target.userId)
+            addChatMessageTx(actor.clubId, "$actorName исключил $targetName из клуба.")
             actor.clubId
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
@@ -200,6 +215,9 @@ class ClubService {
             ClubMembers.update({
                 (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
             }) { it[ClubMembers.role] = ROLE_PRESIDENT }
+            val actorName = displayNameByUserId(actor.userId)
+            val targetName = displayNameByUserId(target.userId)
+            addChatMessageTx(actor.clubId, "$actorName назначил $targetName президентом клуба.")
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }
@@ -230,7 +248,44 @@ class ClubService {
                         (ClubWeeklyContributions.weekStart eq weekStart)
                 }) { it[ClubWeeklyContributions.coins] = current + coins }
             }
+            val memberName = displayNameByUserId(userId)
+            addChatMessageTx(clubId, "$memberName получил $coins монет за рейтинг.", at)
         }
+    }
+
+    fun clubChat(userId: Long): List<ClubChatMessage> = transaction {
+        val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
+            ?: throw ClubException("not_in_club")
+        val clubId = membership[ClubMembers.clubId].value
+        ClubChatMessages
+            .select { ClubChatMessages.clubId eq clubId }
+            .orderBy(ClubChatMessages.createdAt, SortOrder.DESC)
+            .limit(CHAT_LIMIT)
+            .map { row ->
+                ClubChatMessage(
+                    id = row[ClubChatMessages.id].value,
+                    message = row[ClubChatMessages.message],
+                    createdAt = row[ClubChatMessages.createdAt],
+                )
+            }
+            .reversed()
+    }
+
+    internal fun logRareCatchTx(
+        userId: Long,
+        fishName: String,
+        rarity: String,
+        at: Instant = Instant.now(),
+    ) {
+        val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull() ?: return
+        val clubId = membership[ClubMembers.clubId].value
+        val memberName = displayNameByUserId(userId)
+        val rarityLabel = when (rarity) {
+            "mythic" -> "мифическую"
+            "legendary" -> "легендарную"
+            else -> rarity
+        }
+        addChatMessageTx(clubId, "$memberName поймал $rarityLabel рыбу: $fishName.", at)
     }
 
     fun distributeWeeklyRewards(now: Instant = Instant.now()) {
@@ -365,6 +420,10 @@ class ClubService {
             ClubMembers.update({
                 (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
             }) { it[role] = nextRole }
+            val actorName = displayNameByUserId(actor.userId)
+            val targetName = displayNameByUserId(target.userId)
+            val verb = if (action == RoleAction.PROMOTE) "повысил" else "понизил"
+            addChatMessageTx(actor.clubId, "$actorName $verb $targetName.")
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }
@@ -452,6 +511,36 @@ class ClubService {
     private fun weekStart(date: LocalDate): LocalDate =
         date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
+    private fun displayNameByUserId(userId: Long): String {
+        val row = Users.select { Users.id eq userId }.singleOrNull() ?: return "Участник"
+        return displayName(row) ?: "Участник"
+    }
+
+    private fun addChatMessageTx(clubId: Long, message: String, at: Instant = Instant.now()) {
+        val trimmed = message.trim()
+        if (trimmed.isBlank()) return
+        ClubChatMessages.insert {
+            it[ClubChatMessages.clubId] = clubId
+            it[ClubChatMessages.message] = trimmed.take(CHAT_MESSAGE_MAX_LENGTH)
+            it[ClubChatMessages.createdAt] = at
+        }
+        trimChatTx(clubId)
+    }
+
+    private fun trimChatTx(clubId: Long) {
+        val keepIds = ClubChatMessages
+            .slice(ClubChatMessages.id)
+            .select { ClubChatMessages.clubId eq clubId }
+            .orderBy(ClubChatMessages.createdAt, SortOrder.DESC)
+            .limit(CHAT_LIMIT)
+            .map { it[ClubChatMessages.id].value }
+        if (keepIds.size < CHAT_LIMIT) return
+        val keepEntityIds = keepIds.map { EntityID(it, ClubChatMessages) }
+        ClubChatMessages.deleteWhere {
+            (ClubChatMessages.clubId eq clubId) and (ClubChatMessages.id notInList keepEntityIds)
+        }
+    }
+
     companion object {
         const val MAX_MEMBERS = 20
         const val MAX_NAME_LENGTH = 20
@@ -461,6 +550,8 @@ class ClubService {
         const val ROLE_HEIR = "heir"
         const val ROLE_VETERAN = "veteran"
         const val ROLE_NOVICE = "novice"
+        const val CHAT_LIMIT = 100
+        const val CHAT_MESSAGE_MAX_LENGTH = 500
         private val CLUB_ZONE: ZoneId = ZoneId.of("Europe/Belgrade")
     }
 
