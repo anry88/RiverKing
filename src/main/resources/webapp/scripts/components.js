@@ -796,7 +796,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
       loadSearch(searchQuery);
-    }, 300);
+    }, 500);
     return () => {
       if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
@@ -903,10 +903,25 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
+  const localizeChatMessage = (message) => {
+    if(typeof message !== 'string') return message;
+    const trimmed = message.trim();
+    if(!trimmed.startsWith('{')) return message;
+    try{
+      const payload = JSON.parse(trimmed);
+      if(!payload || typeof payload.key !== 'string') return message;
+      const params = payload.params && typeof payload.params === 'object' ? payload.params : undefined;
+      return t(payload.key, params);
+    }catch(e){
+      return message;
+    }
+  };
+
   const renderChatMessage = (message) => {
-    if(!message) return message;
+    const localizedMessage = localizeChatMessage(message);
+    if(!localizedMessage) return localizedMessage;
     const rarityColorMap = window.rarityColors || {};
-    const ruMatch = message.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(?: на ([^,]+), ([0-9.,]+) кг)?(\.?)$/i);
+    const ruMatch = localizedMessage.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(?: на ([^,]+), ([0-9.,]+) кг)?(\.?)$/i);
     if(ruMatch){
       const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = ruMatch;
       const rarityKey = rarityLabel?.toLowerCase() === 'мифическую' ? 'mythic' : 'legendary';
@@ -918,7 +933,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         </span>
       );
     }
-    const enMatch = message.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(?: at ([^,]+), ([0-9.,]+) kg)?(\.?)$/i);
+    const enMatch = localizedMessage.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(?: at ([^,]+), ([0-9.,]+) kg)?(\.?)$/i);
     if(enMatch){
       const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = enMatch;
       const rarityKey = rarityLabel?.toLowerCase() === 'mythic' ? 'mythic' : 'legendary';
@@ -930,7 +945,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         </span>
       );
     }
-    return message;
+    return localizedMessage;
   };
 
   return (

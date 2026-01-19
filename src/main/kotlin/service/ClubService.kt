@@ -7,6 +7,9 @@ import db.ClubMembers
 import db.ClubWeeklyContributions
 import db.ClubWeeklyRewards
 import db.Users
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -62,6 +65,12 @@ class ClubService {
         val id: Long,
         val message: String,
         val createdAt: Instant,
+    )
+
+    @Serializable
+    private data class ClubChatPayload(
+        val key: String,
+        val params: Map<String, String> = emptyMap(),
     )
 
     class ClubException(val code: String) : RuntimeException(code)
@@ -183,7 +192,10 @@ class ClubService {
                 it[joinedAt] = Instant.now()
             }
             val memberName = displayNameByUserId(userId)
-            addChatMessageTx(club[Clubs.id].value, "$memberName вступил в клуб.")
+            addChatMessageTx(
+                club[Clubs.id].value,
+                chatPayload("clubChatMemberJoined", mapOf("name" to memberName)),
+            )
         }
         return clubDetails(userId) ?: throw ClubException("join_failed")
     }
@@ -213,7 +225,7 @@ class ClubService {
                     (ClubMembers.clubId eq clubId) and (ClubMembers.userId eq newPresidentId)
                 }) { it[ClubMembers.role] = ROLE_PRESIDENT }
             }
-            addChatMessageTx(clubId, "$memberName покинул клуб.")
+            addChatMessageTx(clubId, chatPayload("clubChatMemberLeft", mapOf("name" to memberName)))
         }
     }
 
@@ -234,7 +246,16 @@ class ClubService {
             }
             val actorName = displayNameByUserId(actor.userId)
             val targetName = displayNameByUserId(target.userId)
-            addChatMessageTx(actor.clubId, "$actorName исключил $targetName из клуба.")
+            addChatMessageTx(
+                actor.clubId,
+                chatPayload(
+                    "clubChatMemberKicked",
+                    mapOf(
+                        "actor" to actorName,
+                        "target" to targetName,
+                    ),
+                ),
+            )
             actor.clubId
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
@@ -254,7 +275,16 @@ class ClubService {
             }) { it[ClubMembers.role] = ROLE_PRESIDENT }
             val actorName = displayNameByUserId(actor.userId)
             val targetName = displayNameByUserId(target.userId)
-            addChatMessageTx(actor.clubId, "$actorName назначил $targetName президентом клуба.")
+            addChatMessageTx(
+                actor.clubId,
+                chatPayload(
+                    "clubChatPresidentAppointed",
+                    mapOf(
+                        "actor" to actorName,
+                        "target" to targetName,
+                    ),
+                ),
+            )
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }
@@ -286,7 +316,17 @@ class ClubService {
                 }) { it[ClubWeeklyContributions.coins] = current + coins }
             }
             val memberName = displayNameByUserId(userId)
-            addChatMessageTx(clubId, "$memberName получил $coins монет за рейтинг.", at)
+            addChatMessageTx(
+                clubId,
+                chatPayload(
+                    "clubChatRatingReward",
+                    mapOf(
+                        "name" to memberName,
+                        "coins" to coins.toString(),
+                    ),
+                ),
+                at,
+            )
         }
     }
 
@@ -355,16 +395,22 @@ class ClubService {
         val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull() ?: return
         val clubId = membership[ClubMembers.clubId].value
         val memberName = displayNameByUserId(userId)
-        val rarityLabel = when (rarity) {
-            "mythic" -> "мифическую"
-            "legendary" -> "легендарную"
-            else -> rarity
-        }
         val weightLabel = String.format(java.util.Locale.US, "%.2f", weightKg)
         addChatMessageTx(
             clubId,
-            "$memberName поймал $rarityLabel рыбу: $fishName на $locationName, $weightLabel кг.",
-            at
+            chatPayload(
+                "clubChatRareCatch",
+                buildMap {
+                    put("name", memberName)
+                    put("rarity", rarity)
+                    put("fish", fishName)
+                    put("weight", weightLabel)
+                    if (locationName.isNotBlank()) {
+                        put("location", locationName)
+                    }
+                },
+            ),
+            at,
         )
     }
 
@@ -502,8 +548,17 @@ class ClubService {
             }) { it[role] = nextRole }
             val actorName = displayNameByUserId(actor.userId)
             val targetName = displayNameByUserId(target.userId)
-            val verb = if (action == RoleAction.PROMOTE) "повысил" else "понизил"
-            addChatMessageTx(actor.clubId, "$actorName $verb $targetName.")
+            val key = if (action == RoleAction.PROMOTE) "clubChatRolePromoted" else "clubChatRoleDemoted"
+            addChatMessageTx(
+                actor.clubId,
+                chatPayload(
+                    key,
+                    mapOf(
+                        "actor" to actorName,
+                        "target" to targetName,
+                    ),
+                ),
+            )
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }
@@ -610,6 +665,10 @@ class ClubService {
             it[ClubChatMessages.createdAt] = at
         }
         trimChatTx(clubId)
+    }
+
+    private fun chatPayload(key: String, params: Map<String, String> = emptyMap()): String {
+        return Json.encodeToString(ClubChatPayload(key, params))
     }
 
     private fun trimChatTx(clubId: Long) {

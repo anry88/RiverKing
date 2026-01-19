@@ -1145,6 +1145,18 @@
       clubChatEmpty: 'Сообщений пока нет.',
       clubChatFailed: 'Не удалось загрузить чат.',
       clubChatRefresh: 'Обновить',
+      clubChatMemberJoined: ({ name }) => `${name} вступил в клуб.`,
+      clubChatMemberLeft: ({ name }) => `${name} покинул клуб.`,
+      clubChatMemberKicked: ({ actor, target }) => `${actor} исключил ${target} из клуба.`,
+      clubChatPresidentAppointed: ({ actor, target }) => `${actor} назначил ${target} президентом клуба.`,
+      clubChatRolePromoted: ({ actor, target }) => `${actor} повысил ${target}.`,
+      clubChatRoleDemoted: ({ actor, target }) => `${actor} понизил ${target}.`,
+      clubChatRatingReward: ({ name, coins }) => `${name} получил ${coins} монет за рейтинг.`,
+      clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
+        const rarityLabel = rarity === 'mythic' ? 'мифическую' : (rarity === 'legendary' ? 'легендарную' : rarity);
+        const place = location && weight ? ` на ${location}, ${weight} кг` : '';
+        return `${name} поймал ${rarityLabel} рыбу: ${fish}${place}.`;
+      },
       clubCreate: 'Создать клуб',
       clubSearch: 'Поиск клуба',
       clubCreateCost: coins => `${coins} монет`,
@@ -1380,6 +1392,18 @@
       clubChatEmpty: 'No messages yet.',
       clubChatFailed: 'Failed to load chat.',
       clubChatRefresh: 'Refresh',
+      clubChatMemberJoined: ({ name }) => `${name} joined the club.`,
+      clubChatMemberLeft: ({ name }) => `${name} left the club.`,
+      clubChatMemberKicked: ({ actor, target }) => `${actor} kicked ${target} from the club.`,
+      clubChatPresidentAppointed: ({ actor, target }) => `${actor} appointed ${target} as club president.`,
+      clubChatRolePromoted: ({ actor, target }) => `${actor} promoted ${target}.`,
+      clubChatRoleDemoted: ({ actor, target }) => `${actor} demoted ${target}.`,
+      clubChatRatingReward: ({ name, coins }) => `${name} received ${coins} coins for rating.`,
+      clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
+        const rarityLabel = rarity === 'mythic' ? 'mythic' : (rarity === 'legendary' ? 'legendary' : rarity);
+        const place = location && weight ? ` at ${location}, ${weight} kg` : '';
+        return `${name} caught a ${rarityLabel} fish: ${fish}${place}.`;
+      },
       clubCreate: 'Create club',
       clubSearch: 'Find club',
       clubCreateCost: coins => `${coins} coins`,
