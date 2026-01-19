@@ -406,6 +406,13 @@
     13: ['Фьорд', 'Fjord'],
     14: ['Открытый океан', 'Open Ocean'],
   };
+  const LOCATION_TRANSLATIONS = {};
+  Object.values(LOCATION_NAMES).forEach(([ru, en]) => {
+    if (ru && en) {
+      LOCATION_TRANSLATIONS[ru] = en;
+      LOCATION_TRANSLATIONS[en] = ru;
+    }
+  });
 
   const LOCATION_BG_BY_NAME = {};
   Object.entries(LOCATION_NAMES).forEach(([id, names]) => {
@@ -766,6 +773,16 @@
     const info = getLureInfo(n);
     if (!info) return n;
     return lang === 'en' ? info.enName : info.ruName;
+  };
+  const translateFish = (name, lang = document.documentElement.lang) => {
+    if (!name) return name;
+    if (lang === 'en') return FISH_TRANSLATIONS[name] || name;
+    return name;
+  };
+  const translateLocation = (name, lang = document.documentElement.lang) => {
+    if (!name) return name;
+    if (lang === 'en') return LOCATION_TRANSLATIONS[name] || name;
+    return name;
   };
   const lureDescriptionText = (n, lang = document.documentElement.lang) => {
     const info = getLureInfo(n);
@@ -1154,8 +1171,12 @@
       clubChatRatingReward: ({ name, coins }) => `${name} получил ${coins} монет за рейтинг.`,
       clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
         const rarityLabel = rarity === 'mythic' ? 'мифическую' : (rarity === 'legendary' ? 'легендарную' : rarity);
-        const place = location && weight ? ` на ${location}, ${weight} кг` : '';
-        return `${name} поймал ${rarityLabel} рыбу: ${fish}${place}.`;
+        const fishLabel = translateFish(fish, 'ru');
+        const locationLabel = translateLocation(location, 'ru');
+        const place = locationLabel
+          ? ` на локации ${locationLabel}${weight ? `, ${weight} кг` : ''}`
+          : '';
+        return `${name} поймал ${rarityLabel} рыбу: ${fishLabel}${place}.`;
       },
       clubCreate: 'Создать клуб',
       clubSearch: 'Поиск клуба',
@@ -1401,8 +1422,12 @@
       clubChatRatingReward: ({ name, coins }) => `${name} received ${coins} coins for rating.`,
       clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
         const rarityLabel = rarity === 'mythic' ? 'mythic' : (rarity === 'legendary' ? 'legendary' : rarity);
-        const place = location && weight ? ` at ${location}, ${weight} kg` : '';
-        return `${name} caught a ${rarityLabel} fish: ${fish}${place}.`;
+        const fishLabel = translateFish(fish, 'en');
+        const locationLabel = translateLocation(location, 'en');
+        const place = locationLabel
+          ? ` at location ${locationLabel}${weight ? `, ${weight} kg` : ''}`
+          : '';
+        return `${name} caught a ${rarityLabel} fish: ${fishLabel}${place}.`;
       },
       clubCreate: 'Create club',
       clubSearch: 'Find club',
