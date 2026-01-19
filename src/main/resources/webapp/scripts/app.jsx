@@ -72,6 +72,7 @@ function App(){
   const [coinPurchasePack,setCoinPurchasePack] = React.useState(null);
   const [coinPurchaseProcessing,setCoinPurchaseProcessing] = React.useState(false);
   const [coinInsufficientOpen, setCoinInsufficientOpen] = React.useState(false);
+  const prevTabRef = React.useRef('fish');
   const [achievements, setAchievements] = React.useState([]);
   const [achievementsLoading, setAchievementsLoading] = React.useState(false);
   const [achievementsError, setAchievementsError] = React.useState(null);
@@ -87,6 +88,7 @@ function App(){
   const coinPurchasePriceLabel = coinPurchasePack
     ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
     : '';
+  const prizeSource = prize?.source || (prize?.rank > 0 ? 'tournament' : 'rating');
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
@@ -1140,7 +1142,13 @@ function App(){
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
               <AssetImage src={BOBBER_ICON} alt="prize" className="w-20 h-20 mx-auto mb-3 animate-bounce object-contain" />
-              <div className="mb-2">{t('prizeCongrats', prize.rank)}</div>
+              <div className="mb-2">
+                {prizeSource === 'club'
+                  ? t('clubPrizeCongrats')
+                  : prizeSource === 'rating'
+                    ? t('ratingPrizeCongrats')
+                    : t('prizeCongratsTournament', prize.rank)}
+              </div>
               <div className="text-lg font-semibold mb-1">
                 {prize.packageId === 'coins' || typeof prize.coins === 'number'
                   ? <>🪙 +{Number(prize.coins ?? prize.qty).toLocaleString(coinLocale)}</>
@@ -1292,6 +1300,18 @@ function App(){
               markCatchAnimationShown={markCatchAnimationShown}
               onCatchClick={handleCatchClick}
               onOpenQuests={openQuests}
+              onOpenClub={()=>{
+                prevTabRef.current = tab;
+                setTab('club');
+              }}
+            />
+          )}
+          {tab === 'club' && (
+            <ClubScreen
+              active={tab === 'club'}
+              onClose={()=>setTab(prevTabRef.current || 'fish')}
+              me={me}
+              onReloadProfile={reloadProfile}
             />
           )}
 
@@ -1344,12 +1364,14 @@ function App(){
           )}
         </div>
 
-        <BottomNav
-          tab={tab}
-          setTab={setTab}
-          dailyAvailable={me.dailyAvailable}
-          achievementsAvailable={achievementsClaimable}
-        />
+        {tab !== 'club' && (
+          <BottomNav
+            tab={tab}
+            setTab={setTab}
+            dailyAvailable={me.dailyAvailable}
+            achievementsAvailable={achievementsClaimable}
+          />
+        )}
 
         <QuestsDrawer
           open={questsOpen}

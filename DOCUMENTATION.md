@@ -19,4 +19,6 @@ In the mini‑app client (`resources/webapp`), the Guide tab now contains an Ach
 
 Daily and weekly quests are handled by `QuestService`, surfaced in the mini‑app through the Fishing tab quest drawer, and exposed via `/api/quests` plus the `/quests` bot command. Quest progress is updated after each catch and notifications are appended alongside achievement unlocks in the client and bot responses.
 
+Fishing clubs are managed by `ClubService`, which records membership, validates creation requirements, tracks weekly contributions from daily rating rewards, and issues weekly club coin payouts. The mini‑app surfaces the club panel from the Fishing tab, letting players create clubs, search for open clubs, and review current/last week contribution leaderboards.
+
 To understand how a specific function works, open the README for the relevant package and follow the links to the detailed files.

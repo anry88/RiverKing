@@ -406,6 +406,13 @@
     13: ['Фьорд', 'Fjord'],
     14: ['Открытый океан', 'Open Ocean'],
   };
+  const LOCATION_TRANSLATIONS = {};
+  Object.values(LOCATION_NAMES).forEach(([ru, en]) => {
+    if (ru && en) {
+      LOCATION_TRANSLATIONS[ru] = en;
+      LOCATION_TRANSLATIONS[en] = ru;
+    }
+  });
 
   const LOCATION_BG_BY_NAME = {};
   Object.entries(LOCATION_NAMES).forEach(([id, names]) => {
@@ -767,6 +774,16 @@
     if (!info) return n;
     return lang === 'en' ? info.enName : info.ruName;
   };
+  const translateFish = (name, lang = document.documentElement.lang) => {
+    if (!name) return name;
+    if (lang === 'en') return FISH_TRANSLATIONS[name] || name;
+    return name;
+  };
+  const translateLocation = (name, lang = document.documentElement.lang) => {
+    if (!name) return name;
+    if (lang === 'en') return LOCATION_TRANSLATIONS[name] || name;
+    return name;
+  };
   const lureDescriptionText = (n, lang = document.documentElement.lang) => {
     const info = getLureInfo(n);
     if (!info) return '';
@@ -1120,9 +1137,9 @@
       prizePlacesLabel: 'Призовых мест:',
       day: 'День',
       tapToClaim: 'Нажмите, чтобы получить',
-      prizeCongrats: rank => rank > 0
-        ? `Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`
-        : 'Поздравляем! Ваши призы за рейтинги готовы.',
+      prizeCongratsTournament: rank => `Поздравляем! Вы заняли ${rank} место в турнире. Ваш приз:`,
+      ratingPrizeCongrats: 'Поздравляем! Ваши призы за рейтинги готовы.',
+      clubPrizeCongrats: 'Поздравляем! Награда клуба за неделю готова.',
       hintFastBite: 'Чем быстрее реагируешь на клев, тем выше шанс поймать рыбу',
       hintWaitRare: 'Чем дольше ждешь клева, тем выше вероятность поймать редкую рыбу',
       hintTapPrize: 'Тапни на карточку в турнирной таблице, чтобы увидеть возможный приз',
@@ -1137,6 +1154,86 @@
       questCompleted: 'Выполнено',
       questRewardCoins: coins => `🪙 +${coins} монет`,
       questCompletedLine: ({ name, coins }) => `Квест выполнен: ${name} (+${coins} монет)`,
+      club: 'Рыболовный клуб',
+      clubShort: 'Клуб',
+      clubTitle: 'Рыболовный клуб',
+      clubChat: 'Чат',
+      clubChatTitle: 'Чат клуба',
+      clubChatEmpty: 'Сообщений пока нет.',
+      clubChatFailed: 'Не удалось загрузить чат.',
+      clubChatRefresh: 'Обновить',
+      clubChatMemberJoined: ({ name }) => `${name} вступил в клуб.`,
+      clubChatMemberLeft: ({ name }) => `${name} покинул клуб.`,
+      clubChatMemberKicked: ({ actor, target }) => `${actor} исключил ${target} из клуба.`,
+      clubChatPresidentAppointed: ({ actor, target }) => `${actor} назначил ${target} президентом клуба.`,
+      clubChatRolePromoted: ({ actor, target }) => `${actor} повысил ${target}.`,
+      clubChatRoleDemoted: ({ actor, target }) => `${actor} понизил ${target}.`,
+      clubChatRatingReward: ({ name, coins }) => `${name} получил ${coins} монет за рейтинг.`,
+      clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
+        const rarityLabel = rarity === 'mythic' ? 'мифическую' : (rarity === 'legendary' ? 'легендарную' : rarity);
+        const fishLabel = translateFish(fish, 'ru');
+        const locationLabel = translateLocation(location, 'ru');
+        const place = locationLabel
+          ? ` на локации ${locationLabel}${weight ? `, ${weight} кг` : ''}`
+          : '';
+        return `${name} поймал ${rarityLabel} рыбу: ${fishLabel}${place}.`;
+      },
+      clubCreate: 'Создать клуб',
+      clubSearch: 'Поиск клуба',
+      clubCreateCost: coins => `${coins} монет`,
+      clubNeedWeightError: kg => `Нужно наловить минимум ${kg} кг рыбы.`,
+      clubNamePlaceholder: 'Название клуба',
+      clubSearchPlaceholder: 'Название клуба',
+      clubNameHint: 'До 20 символов, без ругательств.',
+      clubCreateConfirm: ({ name, coins }) => `Вы уверены что хотите создать новый клуб под названием "${name}" за ${coins} монет?`,
+      clubConfirmCreate: 'Создать клуб',
+      clubSearchEmpty: 'Нет клубов со свободными местами.',
+      clubSearchRefresh: 'Обновить',
+      clubSearchSubmit: 'Найти',
+      clubJoin: 'Вступить',
+      clubFull: 'В клубе нет свободных мест.',
+      clubAlreadyIn: 'Вы уже состоите в клубе.',
+      clubNotEnoughCoins: 'Недостаточно монет для создания клуба.',
+      clubNameTooLong: 'Название клуба слишком длинное.',
+      clubNameEmpty: 'Введите название клуба.',
+      clubNameProfanity: 'Название клуба содержит недопустимые слова.',
+      clubLoadFailed: 'Не удалось загрузить клуб.',
+      clubSearchFailed: 'Не удалось загрузить список клубов.',
+      clubCreateFailed: 'Не удалось создать клуб.',
+      clubJoinFailed: 'Не удалось вступить в клуб.',
+      clubRecruitmentClosed: 'Набор в клуб закрыт.',
+      clubInfoFailed: 'Не удалось обновить информацию о клубе.',
+      clubSettingsFailed: 'Не удалось обновить настройки клуба.',
+      clubInfoTooLong: 'Описание клуба слишком длинное.',
+      clubInvalidMinWeight: 'Введите корректное значение минимального улова.',
+      clubNotFound: 'Клуб не найден.',
+      clubRolePresident: 'Президент',
+      clubRoleHeir: 'Наследник',
+      clubRoleVeteran: 'Ветеран',
+      clubRoleNovice: 'Новичок',
+      clubCurrentWeek: 'Текущая неделя',
+      clubPreviousWeek: 'Прошлая неделя',
+      clubWeeklyTotal: coins => `Итого за неделю: ${coins} монет`,
+      clubNoContributions: 'Пока нет взносов.',
+      clubLeave: 'Выйти из клуба',
+      clubLeaveFailed: 'Не удалось выйти из клуба.',
+      clubManageTitle: 'Участники',
+      clubPromote: 'Повысить',
+      clubDemote: 'Понизить',
+      clubKick: 'Исключить',
+      clubAppointPresident: 'Назначить президентом',
+      clubActionFailed: 'Не удалось изменить участника.',
+      clubConfirmKick: name => `Исключить ${name || 'участника'} из клуба?`,
+      clubConfirmLeave: 'Вы уверены что хотите выйти из клуба?',
+      clubInfoTitle: 'О клубе',
+      clubInfoPlaceholder: 'Информация о клубе скоро появится.',
+      clubInfoSave: 'Сохранить',
+      clubSettingsTitle: 'Настройки клуба',
+      clubMinJoinWeightLabel: 'Минимальный улов для вступления (кг)',
+      clubRecruitingOpenLabel: 'Набор открыт',
+      clubSettingsSave: 'Сохранить настройки',
+      clubSearchMinWeight: kg => `Мин. улов: ${kg} кг`,
+      back: 'Назад',
       achievementsEmpty: 'Пока нет достижений — продолжайте ловить рыбу!',
       achievementProgress: ({ progress, target }) => `${progress}/${target}`,
       achievementProgressLabel: ({ progress, target }) => `Прогресс ${progress}/${target}`,
@@ -1291,9 +1388,9 @@
       prizePlacesLabel: 'Prize places:',
       day: 'Day',
       tapToClaim: 'Tap to claim',
-      prizeCongrats: rank => rank > 0
-        ? `Congratulations! You placed ${rank} in the tournament. Your prize:`
-        : 'Congratulations! Your rating prizes are ready.',
+      prizeCongratsTournament: rank => `Congratulations! You placed ${rank} in the tournament. Your prize:`,
+      ratingPrizeCongrats: 'Congratulations! Your rating prizes are ready.',
+      clubPrizeCongrats: 'Congratulations! Your club weekly reward is ready.',
       hintFastBite: 'React to bites quickly for a better catch chance',
       hintWaitRare: 'Waiting longer for a bite increases the odds of rare fish',
       hintTapPrize: 'Tap a leaderboard card to see its potential prize',
@@ -1308,6 +1405,86 @@
       questCompleted: 'Completed',
       questRewardCoins: coins => `🪙 +${coins} coins`,
       questCompletedLine: ({ name, coins }) => `Quest completed: ${name} (+${coins} coins)`,
+      club: 'Fishing club',
+      clubShort: 'Club',
+      clubTitle: 'Fishing club',
+      clubChat: 'Chat',
+      clubChatTitle: 'Club chat',
+      clubChatEmpty: 'No messages yet.',
+      clubChatFailed: 'Failed to load chat.',
+      clubChatRefresh: 'Refresh',
+      clubChatMemberJoined: ({ name }) => `${name} joined the club.`,
+      clubChatMemberLeft: ({ name }) => `${name} left the club.`,
+      clubChatMemberKicked: ({ actor, target }) => `${actor} kicked ${target} from the club.`,
+      clubChatPresidentAppointed: ({ actor, target }) => `${actor} appointed ${target} as club president.`,
+      clubChatRolePromoted: ({ actor, target }) => `${actor} promoted ${target}.`,
+      clubChatRoleDemoted: ({ actor, target }) => `${actor} demoted ${target}.`,
+      clubChatRatingReward: ({ name, coins }) => `${name} received ${coins} coins for rating.`,
+      clubChatRareCatch: ({ name, rarity, fish, location, weight }) => {
+        const rarityLabel = rarity === 'mythic' ? 'mythic' : (rarity === 'legendary' ? 'legendary' : rarity);
+        const fishLabel = translateFish(fish, 'en');
+        const locationLabel = translateLocation(location, 'en');
+        const place = locationLabel
+          ? ` at location ${locationLabel}${weight ? `, ${weight} kg` : ''}`
+          : '';
+        return `${name} caught a ${rarityLabel} fish: ${fishLabel}${place}.`;
+      },
+      clubCreate: 'Create club',
+      clubSearch: 'Find club',
+      clubCreateCost: coins => `${coins} coins`,
+      clubNeedWeightError: kg => `Catch at least ${kg} kg of fish.`,
+      clubNamePlaceholder: 'Club name',
+      clubSearchPlaceholder: 'Club name',
+      clubNameHint: 'Up to 20 characters, no profanity.',
+      clubCreateConfirm: ({ name, coins }) => `Are you sure you want to create a new club named "${name}" for ${coins} coins?`,
+      clubConfirmCreate: 'Confirm creation',
+      clubSearchEmpty: 'No clubs with free slots.',
+      clubSearchRefresh: 'Refresh',
+      clubSearchSubmit: 'Search',
+      clubJoin: 'Join',
+      clubFull: 'This club is full.',
+      clubAlreadyIn: 'You are already in a club.',
+      clubNotEnoughCoins: 'Not enough coins to create a club.',
+      clubNameTooLong: 'Club name is too long.',
+      clubNameEmpty: 'Enter a club name.',
+      clubNameProfanity: 'Club name contains prohibited words.',
+      clubLoadFailed: 'Failed to load club.',
+      clubSearchFailed: 'Failed to load clubs.',
+      clubCreateFailed: 'Failed to create club.',
+      clubJoinFailed: 'Failed to join club.',
+      clubRecruitmentClosed: 'Club recruitment is closed.',
+      clubInfoFailed: 'Failed to update club info.',
+      clubSettingsFailed: 'Failed to update club settings.',
+      clubInfoTooLong: 'Club description is too long.',
+      clubInvalidMinWeight: 'Enter a valid minimum catch value.',
+      clubNotFound: 'Club not found.',
+      clubRolePresident: 'President',
+      clubRoleHeir: 'Heir',
+      clubRoleVeteran: 'Veteran',
+      clubRoleNovice: 'Novice',
+      clubCurrentWeek: 'This week',
+      clubPreviousWeek: 'Last week',
+      clubWeeklyTotal: coins => `Weekly total: ${coins} coins`,
+      clubNoContributions: 'No contributions yet.',
+      clubLeave: 'Leave club',
+      clubLeaveFailed: 'Failed to leave the club.',
+      clubManageTitle: 'Members',
+      clubPromote: 'Promote',
+      clubDemote: 'Demote',
+      clubKick: 'Kick',
+      clubAppointPresident: 'Appoint president',
+      clubActionFailed: 'Failed to update member.',
+      clubConfirmKick: name => `Kick ${name || 'member'} from the club?`,
+      clubConfirmLeave: 'Are you sure you want to leave the club?',
+      clubInfoTitle: 'About the club',
+      clubInfoPlaceholder: 'Club info will be available soon.',
+      clubInfoSave: 'Save',
+      clubSettingsTitle: 'Club settings',
+      clubMinJoinWeightLabel: 'Minimum catch to join (kg)',
+      clubRecruitingOpenLabel: 'Recruitment open',
+      clubSettingsSave: 'Save settings',
+      clubSearchMinWeight: kg => `Min catch: ${kg} kg`,
+      back: 'Back',
       achievementsEmpty: 'No achievements yet — keep fishing!',
       achievementProgress: ({ progress, target }) => `${progress}/${target}`,
       achievementProgressLabel: ({ progress, target }) => `Progress ${progress}/${target}`,

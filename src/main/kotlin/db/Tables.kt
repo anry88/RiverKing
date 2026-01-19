@@ -19,7 +19,19 @@ import org.jetbrains.exposed.sql.SortOrder
 object DB {
     fun init(env: Env) {
         // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
-        Database.connect(url = env.dbUrl, driver = "org.sqlite.JDBC")
+        Database.connect(
+            url = env.dbUrl,
+            driver = "org.sqlite.JDBC",
+            setupConnection = { connection ->
+                if (env.dbUrl.startsWith("jdbc:sqlite:")) {
+                    connection.createStatement().use { stmt ->
+                        stmt.execute("PRAGMA journal_mode=WAL")
+                        stmt.execute("PRAGMA synchronous=NORMAL")
+                        stmt.execute("PRAGMA busy_timeout=5000")
+                    }
+                }
+            },
+        )
         transaction {
             ensureRodCodeColumn()
             SchemaUtils.createMissingTablesAndColumns(
@@ -44,6 +56,11 @@ object DB {
                 Achievements,
                 AchievementProgress,
                 QuestProgress,
+                Clubs,
+                ClubMembers,
+                ClubWeeklyContributions,
+                ClubWeeklyRewards,
+                ClubChatMessages,
             )
             migrateFishNames()
             seedIfEmpty()
@@ -1472,4 +1489,47 @@ object QuestProgress : LongIdTable() {
     init {
         uniqueIndex(userId, code, period, periodStart)
     }
+}
+
+object Clubs : LongIdTable() {
+    val name = varchar("name", 50)
+    val presidentId = reference("president_id", Users)
+    val info = varchar("info", 500).default("")
+    val minJoinWeightKg = double("min_join_weight_kg").default(0.0)
+    val recruitingOpen = bool("recruiting_open").default(true)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object ClubMembers : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users).uniqueIndex()
+    val role = varchar("role", 20)
+    val joinedAt = timestamp("joined_at").clientDefault { Instant.now() }
+
+    init {
+        uniqueIndex(clubId, userId)
+    }
+}
+
+object ClubWeeklyContributions : Table() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users)
+    val weekStart = date("week_start")
+    val coins = integer("coins").default(0)
+    override val primaryKey = PrimaryKey(clubId, userId, weekStart)
+}
+
+object ClubWeeklyRewards : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users)
+    val weekStart = date("week_start")
+    val coins = integer("coins").default(0)
+    val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object ClubChatMessages : LongIdTable() {
+    val clubId = reference("club_id", Clubs)
+    val message = varchar("message", 500)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }

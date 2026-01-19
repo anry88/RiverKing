@@ -40,6 +40,7 @@ data class UserPrize(
     val qty: Int,
     val rank: Int,
     val coins: Int? = null,
+    val source: PrizeSource = PrizeSource.TOURNAMENT,
 )
 
 class TournamentService {

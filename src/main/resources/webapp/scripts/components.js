@@ -119,7 +119,7 @@ function LocationsDrawer({open, onClose, me, onSelect}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('locations')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -178,7 +178,7 @@ function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[420px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('quests')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -229,7 +229,7 @@ function BaitsDrawer({open,onClose,me,onSelect}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('baits')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -275,7 +275,7 @@ function RodsDrawer({open,onClose,me,onSelect,onUnlock}){
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
       <div
           className={`absolute right-0 inset-y-0 w-[88%] sm:w-[380px] glass transition-transform ${open? 'translate-x-0':'translate-x-full'} px-4 pb-safe flex flex-col`}
-          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + (var(--overlay) * 10px) + 8px)'}}>
+          style={{paddingTop:'calc(1rem + var(--safe-top-ui) + var(--overlay-shift) + 8px)'}}>
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{t('rods')}</div>
           <button onClick={onClose} className="px-3 py-1 rounded-xl hover:bg-white/10 leading-none">✕</button>
@@ -533,6 +533,793 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
           <button onClick={onClose} className="w-full py-2 rounded-xl glass">{t('cancel')}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ClubScreen({active,onClose,me,onReloadProfile}){
+  const CLUB_CREATE_COST = 1000;
+  const CLUB_MIN_WEIGHT = 1000;
+  const [mode, setMode] = React.useState('hub');
+  const [club, setClub] = React.useState(null);
+  const [clubTab, setClubTab] = React.useState('current');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [search, setSearch] = React.useState([]);
+  const [searchLoading, setSearchLoading] = React.useState(false);
+  const [searchError, setSearchError] = React.useState(null);
+  const [selectedClubId, setSelectedClubId] = React.useState(null);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [confirming, setConfirming] = React.useState(false);
+  const [createLoading, setCreateLoading] = React.useState(false);
+  const [createError, setCreateError] = React.useState(null);
+  const [joinLoading, setJoinLoading] = React.useState(false);
+  const [joinError, setJoinError] = React.useState(null);
+  const [chatOpen, setChatOpen] = React.useState(false);
+  const [chatMessages, setChatMessages] = React.useState([]);
+  const [chatLoading, setChatLoading] = React.useState(false);
+  const [chatError, setChatError] = React.useState(null);
+  const chatScrollRef = React.useRef(null);
+  const [infoDraft, setInfoDraft] = React.useState('');
+  const [infoSaving, setInfoSaving] = React.useState(false);
+  const [infoError, setInfoError] = React.useState(null);
+  const [settingsWeight, setSettingsWeight] = React.useState('');
+  const [settingsRecruiting, setSettingsRecruiting] = React.useState(true);
+  const [settingsSaving, setSettingsSaving] = React.useState(false);
+  const [settingsError, setSettingsError] = React.useState(null);
+  const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+
+  const roleLabel = React.useCallback(role => {
+    if(role === 'president') return t('clubRolePresident');
+    if(role === 'heir') return t('clubRoleHeir');
+    if(role === 'veteran') return t('clubRoleVeteran');
+    if(role === 'novice') return t('clubRoleNovice');
+    return role;
+  }, []);
+
+  const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
+
+  const resetState = React.useCallback(() => {
+    setMode('hub');
+    setClub(null);
+    setClubTab('current');
+    setLoading(false);
+    setError(null);
+    setSearch([]);
+    setSearchLoading(false);
+    setSearchError(null);
+    setSelectedClubId(null);
+    setSearchQuery('');
+    setName('');
+    setConfirming(false);
+    setCreateLoading(false);
+    setCreateError(null);
+    setJoinLoading(false);
+    setJoinError(null);
+    setChatOpen(false);
+    setChatMessages([]);
+    setChatLoading(false);
+    setChatError(null);
+    setInfoDraft('');
+    setInfoSaving(false);
+    setInfoError(null);
+    setSettingsWeight('');
+    setSettingsRecruiting(true);
+    setSettingsSaving(false);
+    setSettingsError(null);
+  }, []);
+
+  const loadClub = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try{
+      const resp = await fetch(`/api/club`, {credentials:'include'});
+      if(resp.status === 204){
+        setClub(null);
+        setMode('hub');
+        return;
+      }
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('load_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setClubTab('current');
+      setMode('club');
+    }catch(e){
+      setError(e.message==='unauthorized' ? t('authRequired') : t('clubLoadFailed'));
+    }finally{
+      setLoading(false);
+    }
+  }, []);
+
+  const loadSearch = React.useCallback(async (query) => {
+    setSearchLoading(true);
+    setSearchError(null);
+    try{
+      const trimmed = typeof query === 'string' ? query.trim() : searchQuery.trim();
+      const url = trimmed
+        ? `/api/club/search?q=${encodeURIComponent(trimmed)}`
+        : '/api/club/search';
+      const resp = await fetch(url, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('search_failed');
+      }
+      const data = await resp.json();
+      const list = Array.isArray(data) ? data : [];
+      setSearch(list);
+      if(list.length === 0){
+        setSelectedClubId(null);
+      }else{
+        setSelectedClubId((currentId) => {
+          const hasSelected = currentId && list.some(item => item.id === currentId);
+          return hasSelected ? currentId : (list[0]?.id || null);
+        });
+      }
+    }catch(e){
+      setSearchError(e.message==='unauthorized' ? t('authRequired') : t('clubSearchFailed'));
+    }finally{
+      setSearchLoading(false);
+    }
+  }, [searchQuery]);
+
+  const loadChat = React.useCallback(async () => {
+    setChatLoading(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat`, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('chat_failed');
+      }
+      const data = await resp.json();
+      setChatMessages(Array.isArray(data) ? data : []);
+    }catch(e){
+      setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
+    }finally{
+      setChatLoading(false);
+    }
+  }, []);
+
+  const parseClubError = React.useCallback((code, fallbackKey) => {
+    if(code === 'already_in_club') return t('clubAlreadyIn');
+    if(code === 'club_full') return t('clubFull');
+    if(code === 'recruitment_closed') return t('clubRecruitmentClosed');
+    if(code?.startsWith('weight_required')) {
+      const weight = code.split(':')[1];
+      const value = weight ? Number(weight) : CLUB_MIN_WEIGHT;
+      return t('clubNeedWeightError', Number.isFinite(value) ? value : CLUB_MIN_WEIGHT);
+    }
+    if(code === 'not_enough_coins') return t('clubNotEnoughCoins');
+    if(code === 'name_empty') return t('clubNameEmpty');
+    if(code === 'name_too_long') return t('clubNameTooLong');
+    if(code === 'name_profanity') return t('clubNameProfanity');
+    if(code === 'not_found') return t('clubNotFound');
+    if(code === 'info_too_long') return t('clubInfoTooLong');
+    if(code === 'invalid_min_weight') return t('clubInvalidMinWeight');
+    return t(fallbackKey);
+  }, []);
+
+  const handleCreate = React.useCallback(async () => {
+    const trimmed = name.trim();
+    setCreateError(null);
+    if(!trimmed){
+      setCreateError(t('clubNameEmpty'));
+      return;
+    }
+    if(trimmed.length > 20){
+      setCreateError(t('clubNameTooLong'));
+      return;
+    }
+    setCreateLoading(true);
+    try{
+      const resp = await fetch(`/api/club/create`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: trimmed})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'create_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setMode('club');
+      setClubTab('current');
+      setName('');
+      setConfirming(false);
+      onReloadProfile?.();
+    }catch(e){
+      setCreateError(parseClubError(e.message, 'clubCreateFailed'));
+    }finally{
+      setCreateLoading(false);
+    }
+  }, [name, onReloadProfile, parseClubError]);
+
+  const handleJoin = React.useCallback(async () => {
+    if(!selectedClubId) return;
+    setJoinError(null);
+    setJoinLoading(true);
+    try{
+      const resp = await fetch(`/api/club/${selectedClubId}/join`, {method:'POST', credentials:'include'});
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'join_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+      setMode('club');
+      setClubTab('current');
+      setSelectedClubId(null);
+      onReloadProfile?.();
+    }catch(e){
+      setJoinError(parseClubError(e.message, 'clubJoinFailed'));
+    }finally{
+      setJoinLoading(false);
+    }
+  }, [selectedClubId, onReloadProfile, parseClubError]);
+
+  const canManageMembers = React.useMemo(() => (
+    club?.role === 'president' || club?.role === 'heir'
+  ), [club?.role]);
+  const [infoEditOpen, setInfoEditOpen] = React.useState(false);
+  const infoPanelRef = React.useRef(null);
+
+  const canActOnMember = React.useCallback((member) => {
+    if(!club || !member) return false;
+    if(member.userId === me?.id) return false;
+    if(club.role === 'president') return member.role !== 'president';
+    if(club.role === 'heir') return member.role === 'veteran' || member.role === 'novice';
+    return false;
+  }, [club, me?.id]);
+
+  React.useEffect(() => {
+    if(!active) return;
+    resetState();
+    loadClub();
+  }, [active, resetState, loadClub]);
+
+  React.useEffect(() => {
+    if(!club) return;
+    setInfoDraft(club.info || '');
+    setSettingsWeight(String(Math.round(club.minJoinWeightKg || 0)));
+    setSettingsRecruiting(!!club.recruitingOpen);
+    setInfoError(null);
+    setSettingsError(null);
+    setInfoEditOpen(false);
+  }, [club?.id]);
+  React.useEffect(() => {
+    if(!canManageMembers) setInfoEditOpen(false);
+  }, [canManageMembers]);
+  React.useEffect(() => {
+    if(!infoEditOpen) return;
+    const handleOutside = (event) => {
+      if(infoPanelRef.current && !infoPanelRef.current.contains(event.target)){
+        setInfoEditOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [infoEditOpen]);
+
+  const searchTimeoutRef = React.useRef(null);
+  const lastAutoSearchQueryRef = React.useRef('');
+  React.useEffect(() => {
+    if(mode !== 'search') return;
+    const trimmed = searchQuery.trim();
+    if(!trimmed){
+      lastAutoSearchQueryRef.current = '';
+      return;
+    }
+    if(trimmed === lastAutoSearchQueryRef.current) return;
+    if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      lastAutoSearchQueryRef.current = trimmed;
+      loadSearch(searchQuery);
+    }, 500);
+    return () => {
+      if(searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [mode, searchQuery, loadSearch]);
+
+  React.useEffect(() => {
+    if(!chatOpen) return;
+    const node = chatScrollRef.current;
+    if(!node) return;
+    requestAnimationFrame(() => {
+      node.scrollTop = node.scrollHeight;
+    });
+  }, [chatOpen, chatMessages, chatLoading]);
+
+  if(!active) return null;
+
+  const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
+
+  const handleLeave = async () => {
+    if(!window.confirm(t('clubConfirmLeave'))) return;
+    try{
+      const resp = await fetch(`/api/club/leave`, {method:'POST', credentials:'include'});
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'leave_failed');
+      }
+      resetState();
+      onReloadProfile?.();
+    }catch(e){
+      setError(t('clubLeaveFailed'));
+    }
+  };
+
+  const handleMemberAction = async (memberId, action) => {
+    try{
+      const resp = await fetch(`/api/club/members/${memberId}/${action}`, {method:'POST', credentials:'include'});
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'action_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+    }catch(e){
+      setError(t('clubActionFailed'));
+    }
+  };
+
+  const handleSaveInfo = async (nextInfo) => {
+    if(infoSaving) return;
+    const infoValue = nextInfo ?? infoDraft;
+    if((club?.info || '') === infoValue) return;
+    setInfoError(null);
+    setInfoSaving(true);
+    try{
+      const resp = await fetch(`/api/club/info`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({info: infoValue})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'info_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+    }catch(e){
+      setInfoError(parseClubError(e.message, 'clubInfoFailed'));
+    }finally{
+      setInfoSaving(false);
+    }
+  };
+
+  const handleSaveSettings = async (nextWeight, nextRecruiting) => {
+    if(settingsSaving) return;
+    const weightValue = Number(nextWeight ?? settingsWeight);
+    if(!Number.isFinite(weightValue) || weightValue < 0){
+      setSettingsError(t('clubInvalidMinWeight'));
+      return;
+    }
+    const recruitingValue = nextRecruiting ?? settingsRecruiting;
+    if(Math.round(club?.minJoinWeightKg || 0) === Math.round(weightValue) && !!club?.recruitingOpen === !!recruitingValue){
+      return;
+    }
+    setSettingsError(null);
+    setSettingsSaving(true);
+    try{
+      const resp = await fetch(`/api/club/settings`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({minJoinWeightKg: weightValue, recruitingOpen: recruitingValue})
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'settings_failed');
+      }
+      const data = await resp.json();
+      setClub(data);
+    }catch(e){
+      setSettingsError(parseClubError(e.message, 'clubSettingsFailed'));
+    }finally{
+      setSettingsSaving(false);
+    }
+  };
+
+  const localizeChatMessage = (message) => {
+    if(typeof message !== 'string') return message;
+    const trimmed = message.trim();
+    if(!trimmed.startsWith('{')) return message;
+    try{
+      const payload = JSON.parse(trimmed);
+      if(!payload || typeof payload.key !== 'string') return message;
+      const params = payload.params && typeof payload.params === 'object' ? payload.params : undefined;
+      return t(payload.key, params);
+    }catch(e){
+      return message;
+    }
+  };
+
+  const renderChatMessage = (message) => {
+    const localizedMessage = localizeChatMessage(message);
+    if(!localizedMessage) return localizedMessage;
+    const rarityColorMap = window.rarityColors || {};
+    const ruMatch = localizedMessage.match(/^(.*поймал )(?:(мифическую|легендарную)) рыбу: (.+?)(?: на ([^,]+), ([0-9.,]+) кг)?(\.?)$/i);
+    if(ruMatch){
+      const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = ruMatch;
+      const rarityKey = rarityLabel?.toLowerCase() === 'мифическую' ? 'mythic' : 'legendary';
+      const className = rarityColorMap[rarityKey] || '';
+      return (
+        <span>
+          {prefix}{rarityLabel} рыбу: <span className={className}>{fishName}</span>
+          {locationName ? ` на ${locationName}, ${weightLabel} кг` : ''}{suffix}
+        </span>
+      );
+    }
+    const enMatch = localizedMessage.match(/^(.*caught a )(?:(mythic|legendary)) fish: (.+?)(?: at ([^,]+), ([0-9.,]+) kg)?(\.?)$/i);
+    if(enMatch){
+      const [, prefix, rarityLabel, fishName, locationName, weightLabel, suffix] = enMatch;
+      const rarityKey = rarityLabel?.toLowerCase() === 'mythic' ? 'mythic' : 'legendary';
+      const className = rarityColorMap[rarityKey] || '';
+      return (
+        <span>
+          {prefix}{rarityLabel} fish: <span className={className}>{fishName}</span>
+          {locationName ? ` at ${locationName}, ${weightLabel} kg` : ''}{suffix}
+        </span>
+      );
+    }
+    return localizedMessage;
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
+        <div className="flex-1 text-lg font-semibold">{t('clubTitle')}</div>
+        {mode === 'club' && club && (
+          <button
+            type="button"
+            className="px-3 py-1 rounded-xl glass text-sm"
+            onClick={()=>{
+              setChatOpen(true);
+              loadChat();
+            }}
+          >{t('clubChat')}</button>
+        )}
+      </div>
+
+      {chatOpen && (
+        <div className="fixed inset-0 z-50">
+          <div onClick={()=>setChatOpen(false)} className="absolute inset-0 bg-black/60"></div>
+          <div className="absolute inset-x-4 top-16 bottom-16 glass rounded-2xl p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-lg font-semibold">{t('clubChatTitle')}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1 rounded-xl glass text-sm"
+                  onClick={loadChat}
+                  disabled={chatLoading}
+                >{t('clubChatRefresh')}</button>
+                <button onClick={()=>setChatOpen(false)} className="px-3 py-1 rounded-xl glass">✕</button>
+              </div>
+            </div>
+            <div ref={chatScrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+              {chatLoading ? (
+                <div className="text-sm opacity-70">{t('loading')}</div>
+              ) : chatError ? (
+                <div className="text-sm opacity-70">{chatError}</div>
+              ) : chatMessages.length === 0 ? (
+                <div className="text-sm opacity-70">{t('clubChatEmpty')}</div>
+              ) : (
+                chatMessages.map(item => {
+                  const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
+                  return (
+                    <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
+                      <div className="text-xs opacity-70">{ts}</div>
+                      <div className="mt-1">{renderChatMessage(item.message)}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-sm opacity-70">{t('loading')}</div>
+      ) : error ? (
+        <div className="text-sm opacity-70">{error}</div>
+      ) : mode === 'club' && club ? (
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-base font-semibold">{club.name}</div>
+              <div className="text-xs opacity-70">{roleLabel(club.role)}</div>
+            </div>
+            <div className="text-xs opacity-70">{club.memberCount}/{club.capacity}</div>
+          </div>
+
+          <div
+            ref={infoPanelRef}
+            onClick={() => {
+              if(canManageMembers && !infoEditOpen) setInfoEditOpen(true);
+            }}
+            className={`p-3 rounded-xl border border-white/10 space-y-3 ${canManageMembers && !infoEditOpen ? 'cursor-pointer' : ''}`}
+          >
+            <div className="text-sm font-semibold mb-1">{t('clubInfoTitle')}</div>
+            {canManageMembers && infoEditOpen ? (
+              <div className="space-y-2">
+                <textarea
+                  value={infoDraft}
+                  onChange={e=>{ setInfoDraft(e.target.value); setInfoError(null); }}
+                  onBlur={e=>handleSaveInfo(e.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
+                  placeholder={t('clubInfoPlaceholder')}
+                />
+                {infoError && <div className="text-xs text-red-400">{infoError}</div>}
+              </div>
+            ) : (
+              <div className="text-xs opacity-70">{club.info?.trim() ? club.info : t('clubInfoPlaceholder')}</div>
+            )}
+            {canManageMembers && infoEditOpen ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className="text-xs opacity-70">{t('clubMinJoinWeightLabel')}</div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={settingsWeight}
+                    onChange={e=>{ setSettingsWeight(e.target.value); setSettingsError(null); }}
+                    onBlur={e=>handleSaveSettings(e.target.value, settingsRecruiting)}
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-xs"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={settingsRecruiting}
+                    onChange={e=>{
+                      const nextValue = e.target.checked;
+                      setSettingsRecruiting(nextValue);
+                      setSettingsError(null);
+                      handleSaveSettings(settingsWeight, nextValue);
+                    }}
+                  />
+                  {t('clubRecruitingOpenLabel')}
+                </label>
+                {settingsError && <div className="text-xs text-red-400">{settingsError}</div>}
+              </div>
+            ) : (
+              <div className="space-y-1 text-xs opacity-70">
+                <div>{t('clubSearchMinWeight', Math.round(club.minJoinWeightKg || 0))}</div>
+                <div>{t('clubRecruitingOpenLabel')}: {club.recruitingOpen ? '✅' : '❌'}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
+              onClick={()=>setClubTab('current')}
+              className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('clubCurrentWeek')}</button>
+            <button
+              type="button"
+              onClick={()=>setClubTab('previous')}
+              className={`flex-1 py-2 rounded-xl ${clubTab==='previous' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('clubPreviousWeek')}</button>
+          </div>
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {(weekData?.members || []).length === 0 ? (
+              <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
+            ) : (
+              weekData.members.map(member => (
+                <div key={member.userId} className="p-2 rounded-xl border border-white/10 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-sm">
+                        <bdi>{member.name || '—'}</bdi>
+                      </div>
+                      <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                    </div>
+                    <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
+                  </div>
+                  {canManageMembers && canActOnMember(member) && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {member.role !== 'heir' && member.role !== 'president' && (
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded-lg glass"
+                          onClick={()=>handleMemberAction(member.userId, 'promote')}
+                        >{t('clubPromote')}</button>
+                      )}
+                      {member.role !== 'novice' && (
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded-lg glass"
+                          onClick={()=>handleMemberAction(member.userId, 'demote')}
+                        >{t('clubDemote')}</button>
+                      )}
+                      <button
+                        type="button"
+                        className="px-2 py-1 rounded-lg glass text-red-300"
+                        onClick={()=>{
+                          if(window.confirm(t('clubConfirmKick', member.name || '—'))){
+                            handleMemberAction(member.userId, 'kick');
+                          }
+                        }}
+                      >{t('clubKick')}</button>
+                      {club.role === 'president' && member.role === 'heir' && (
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded-lg bg-yellow-400 text-black"
+                          onClick={()=>handleMemberAction(member.userId, 'appoint-president')}
+                        >{t('clubAppointPresident')}</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="text-sm opacity-80 text-right">
+            {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
+          </div>
+          <button
+            type="button"
+            className="w-full px-3 py-2 rounded-xl glass text-red-300"
+            onClick={handleLeave}
+          >{t('clubLeave')}</button>
+        </div>
+      ) : mode === 'create' ? (
+        <div className="space-y-3">
+          {!canCreate && (
+            <div className="text-sm opacity-70">{t('clubNeedWeightError', CLUB_MIN_WEIGHT)}</div>
+          )}
+          {canCreate && (
+            <>
+              <div className="text-sm opacity-70">{t('clubNameHint')}</div>
+              <input
+                type="text"
+                maxLength={20}
+                value={name}
+                onChange={e=>{ setName(e.target.value); setCreateError(null); }}
+                className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10"
+                placeholder={t('clubNamePlaceholder')}
+              />
+              {createError && <div className="text-sm text-red-400">{createError}</div>}
+              {confirming ? (
+                <div className="space-y-3">
+                  <div className="text-sm opacity-80">{t('clubCreateConfirm', { name: name.trim(), coins: CLUB_CREATE_COST })}</div>
+                  <div className="flex gap-2 text-sm">
+                    <button
+                      type="button"
+                      className="flex-1 px-3 py-2 rounded-xl glass"
+                      onClick={()=>setConfirming(false)}
+                      disabled={createLoading}
+                    >{t('cancel')}</button>
+                    <button
+                      type="button"
+                      className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+                      onClick={handleCreate}
+                      disabled={createLoading}
+                    >{t('clubConfirmCreate')}</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 rounded-xl bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-60"
+                  onClick={()=>{
+                    const trimmed = name.trim();
+                    if(!trimmed){
+                      setCreateError(t('clubNameEmpty'));
+                      return;
+                    }
+                    if(trimmed.length > 20){
+                      setCreateError(t('clubNameTooLong'));
+                      return;
+                    }
+                    setConfirming(true);
+                    setCreateError(null);
+                  }}
+                  disabled={createLoading}
+                >{t('clubCreateCost', CLUB_CREATE_COST)}</button>
+              )}
+            </>
+          )}
+          <button
+            type="button"
+            className="w-full px-3 py-2 rounded-xl glass"
+            onClick={()=>{ setMode('hub'); setConfirming(false); setCreateError(null); }}
+          >{t('back')}</button>
+        </div>
+      ) : mode === 'search' ? (
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e=>{ setSearchQuery(e.target.value); setSearchError(null); }}
+            placeholder={t('clubSearchPlaceholder')}
+            className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10"
+          />
+          {searchLoading ? (
+            <div className="text-sm opacity-70">{t('loading')}</div>
+          ) : searchError ? (
+            <div className="text-sm opacity-70">{searchError}</div>
+          ) : search.length === 0 ? (
+            <div className="text-sm opacity-70">{t('clubSearchEmpty')}</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {search.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={()=>setSelectedClubId(item.id)}
+                  className={`w-full text-left p-3 rounded-xl border ${selectedClubId===item.id ? 'border-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:bg-white/5'}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-semibold text-sm">
+                      <bdi>{item.name}</bdi>
+                    </div>
+                    <div className="text-xs opacity-70">{item.memberCount}/{item.capacity}</div>
+                  </div>
+                  <div className="mt-1 text-xs opacity-70">
+                    {item.info?.trim() ? item.info : t('clubInfoPlaceholder')}
+                  </div>
+                  <div className="mt-1 text-xs opacity-60">
+                    {t('clubSearchMinWeight', Math.round(item.minJoinWeightKg || 0))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {joinError && <div className="text-sm text-red-400">{joinError}</div>}
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
+              className="flex-1 px-3 py-2 rounded-xl glass"
+              onClick={()=>{ loadSearch(searchQuery); }}
+              disabled={searchLoading}
+            >{t('clubSearchSubmit')}</button>
+            <button
+              type="button"
+              className="flex-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60"
+              onClick={handleJoin}
+              disabled={joinLoading || !selectedClubId || searchLoading || searchError}
+            >{t('clubJoin')}</button>
+          </div>
+          <button
+            type="button"
+            className="w-full px-3 py-2 rounded-xl glass"
+            onClick={()=>{ setMode('hub'); setJoinError(null); }}
+          >{t('back')}</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <button
+            type="button"
+            className="w-full px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500"
+            onClick={()=>{ setMode('create'); setCreateError(null); setConfirming(false); }}
+          >{t('clubCreate')}</button>
+          <button
+            type="button"
+            className="w-full px-3 py-2 rounded-xl glass"
+            onClick={()=>{ setMode('search'); loadSearch(); }}
+          >{t('clubSearch')}</button>
+          {createError && <div className="text-sm text-red-400">{createError}</div>}
+        </div>
+      )}
     </div>
   );
 }
