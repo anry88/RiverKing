@@ -18,6 +18,15 @@ import org.jetbrains.exposed.sql.SortOrder
 
 object DB {
     fun init(env: Env) {
+        val databaseConfig = if (env.dbUrl.startsWith("jdbc:sqlite:")) {
+            DatabaseConfig {
+                defaultRepetitionAttempts = 10
+                defaultMinRepetitionDelay = 50
+                defaultMaxRepetitionDelay = 1000
+            }
+        } else {
+            DatabaseConfig {}
+        }
         // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
         Database.connect(
             url = env.dbUrl,
@@ -27,10 +36,11 @@ object DB {
                     connection.createStatement().use { stmt ->
                         stmt.execute("PRAGMA journal_mode=WAL")
                         stmt.execute("PRAGMA synchronous=NORMAL")
-                        stmt.execute("PRAGMA busy_timeout=5000")
+                        stmt.execute("PRAGMA busy_timeout=10000")
                     }
                 }
             },
+            databaseConfig = databaseConfig,
         )
         transaction {
             ensureRodCodeColumn()
