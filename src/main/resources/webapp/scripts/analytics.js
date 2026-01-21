@@ -1,6 +1,6 @@
 (() => {
     const config = window.APP_CONFIG?.tgAnalytics || {};
-    const TOKEN = config.token;
+    const TOKEN = config.token?.trim();
     const SCRIPT_URL = config.scriptUrl || 'https://tganalytics.xyz/index.js';
 
     const getAnalytics = () =>
@@ -20,6 +20,30 @@
         return false;
     };
 
+    const initAnalytics = () => {
+        const analytics = getAnalytics();
+        if (!analytics) return false;
+        if (typeof analytics === 'function') {
+            analytics('init', TOKEN);
+            return true;
+        }
+        if (typeof analytics.init === 'function') {
+            try {
+                analytics.init({ token: TOKEN });
+                return true;
+            } catch (e) {
+                try {
+                    analytics.init(TOKEN);
+                    return true;
+                } catch (innerError) {
+                    console.warn('TG Analytics init failed', innerError);
+                    return false;
+                }
+            }
+        }
+        return false;
+    };
+
     const loadScript = () => new Promise((resolve, reject) => {
         if (!SCRIPT_URL) {
             reject(new Error('TG Analytics script URL missing'));
@@ -33,6 +57,10 @@
         script.async = true;
         script.src = SCRIPT_URL;
         script.dataset.tgAnalytics = 'true';
+        if (TOKEN) {
+            script.dataset.token = TOKEN;
+            script.dataset.tgAnalyticsToken = TOKEN;
+        }
         script.onload = () => resolve();
         script.onerror = () => reject(new Error('Failed to load TG Analytics SDK'));
         document.head.appendChild(script);
@@ -46,7 +74,7 @@
             }
             try {
                 await loadScript();
-                if (!callAnalytics('init', TOKEN)) {
+                if (!initAnalytics()) {
                     console.warn('TG Analytics SDK loaded, but init handler missing');
                     return;
                 }
