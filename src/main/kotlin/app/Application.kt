@@ -92,7 +92,8 @@ fun main() {
                     window.APP_CONFIG = {
                         tgAnalytics: {
                             token: "${env.tgAnalyticsToken}",
-                            scriptUrl: "${env.tgAnalyticsScriptUrl}"
+                            scriptUrl: "${env.tgAnalyticsScriptUrl}",
+                            appName: "${env.tgAnalyticsAppName}"
                         }
                     };
                 """.trimIndent()

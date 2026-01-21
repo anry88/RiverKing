@@ -2,9 +2,10 @@
     const config = window.APP_CONFIG?.tgAnalytics || {};
     const TOKEN = config.token?.trim();
     const SCRIPT_URL = config.scriptUrl || 'https://tganalytics.xyz/index.js';
+    const APP_NAME = config.appName?.trim();
 
     const getAnalytics = () =>
-        window.tgAnalytics || window.tganalytics || window.TGAnalytics;
+        window.telegramAnalytics || window.tgAnalytics || window.tganalytics || window.TGAnalytics;
 
     const callAnalytics = (method, ...args) => {
         const analytics = getAnalytics();
@@ -28,7 +29,12 @@
             return true;
         }
         if (typeof analytics.init === 'function') {
-            analytics.init(TOKEN);
+            if (analytics === window.telegramAnalytics) {
+                const payload = APP_NAME ? { token: TOKEN, appName: APP_NAME } : { token: TOKEN };
+                analytics.init(payload);
+            } else {
+                analytics.init(TOKEN);
+            }
             return true;
         }
         return true;

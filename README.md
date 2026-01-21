@@ -37,6 +37,8 @@ The mini app uses TG Analytics (`tganalytics.xyz`). To enable it you need a proj
    TG_ANALYTICS_TOKEN=your_token
    # Optional override for the SDK URL (defaults to https://tganalytics.xyz/index.js)
    TG_ANALYTICS_SCRIPT_URL=https://tganalytics.xyz/index.js
+   # Optional app name for the SDK init payload (telegramAnalytics)
+   TG_ANALYTICS_APP_NAME=river_king
    ```
 4. Restart the server. It serves `/app/config.js` with these values and the webapp initializes TG Analytics automatically.
 
