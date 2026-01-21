@@ -14,8 +14,9 @@ data class Env(
     val adminTgId: Long,
     val providerToken: String,
     val botName: String,
-    val telemetreeProjectId: String,
-    val telemetreeApiKey: String,
+    val tgAnalyticsToken: String,
+    val tgAnalyticsScriptUrl: String,
+    val tgAnalyticsAppName: String,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -37,8 +38,9 @@ data class Env(
                 adminTgId = props.getProperty("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,
                 providerToken = props.getProperty("PROVIDER_TOKEN") ?: "stars",
                 botName = props.getProperty("BOT_NAME") ?: error("BOT_NAME required"),
-                telemetreeProjectId = props.getProperty("TELEMETREE_PROJECT_ID") ?: "",
-                telemetreeApiKey = props.getProperty("TELEMETREE_API_KEY") ?: "",
+                tgAnalyticsToken = props.getProperty("TG_ANALYTICS_TOKEN") ?: "",
+                tgAnalyticsScriptUrl = props.getProperty("TG_ANALYTICS_SCRIPT_URL") ?: "",
+                tgAnalyticsAppName = props.getProperty("TG_ANALYTICS_APP_NAME") ?: "",
             )
         }
     }

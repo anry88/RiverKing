@@ -16,6 +16,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.Metrics
 import util.sanitizeName
 import java.time.DayOfWeek
 import java.time.Instant
@@ -162,6 +163,7 @@ class ClubService {
                 it[joinedAt] = Instant.now()
             }
         }
+        Metrics.counter("club_create_total")
         return clubDetails(userId) ?: throw ClubException("create_failed")
     }
 
@@ -195,10 +197,12 @@ class ClubService {
                 chatPayload("clubChatMemberJoined", mapOf("name" to memberName)),
             )
         }
+        Metrics.counter("club_join_total")
         return clubDetails(userId) ?: throw ClubException("join_failed")
     }
 
     fun leaveClub(userId: Long) {
+        var deleted = false
         transaction {
             val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
                 ?: throw ClubException("not_in_club")
@@ -213,6 +217,7 @@ class ClubService {
                     ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
                     ClubChatMessages.deleteWhere { ClubChatMessages.clubId eq clubId }
                     Clubs.deleteWhere { Clubs.id eq clubId }
+                    deleted = true
                     return@transaction
                 }
                 val heirs = remaining.filter { it[ClubMembers.role] == ROLE_HEIR }
@@ -224,6 +229,9 @@ class ClubService {
                 }) { it[ClubMembers.role] = ROLE_PRESIDENT }
             }
             addChatMessageTx(clubId, chatPayload("clubChatMemberLeft", mapOf("name" to memberName)))
+        }
+        if (deleted) {
+            Metrics.counter("club_delete_total")
         }
     }
 
@@ -256,6 +264,7 @@ class ClubService {
             )
             actor.clubId
         }
+        Metrics.counter("club_kick_total")
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }
 
@@ -557,6 +566,10 @@ class ClubService {
                     ),
                 ),
             )
+        }
+        when (action) {
+            RoleAction.PROMOTE -> Metrics.counter("club_promote_total")
+            RoleAction.DEMOTE -> Metrics.counter("club_demote_total")
         }
         return clubDetails(actorId) ?: throw ClubException("update_failed")
     }

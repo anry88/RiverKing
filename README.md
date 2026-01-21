@@ -26,6 +26,24 @@ Full MVP codebase: Kotlin/Ktor + Exposed + SQLite, Telegram Mini App.
 4. Inside the Telegram mini app, the client sends `initData` → the server verifies the signature and creates a session (`/api/auth/telegram`).
 5. Available API endpoints: `/api/me`, `/api/daily`, `/api/location/{id}`, `/api/cast`.
 
+## Analytics (TG Analytics / tganalytics.xyz)
+
+The mini app uses TG Analytics (`tganalytics.xyz`). To enable it you need a project token.
+
+1. Create a TG Analytics account and project in the tganalytics.xyz dashboard.
+2. Copy the **token** from the project settings.
+3. Add it to `src/main/resources/config.properties`:
+   ```properties
+   TG_ANALYTICS_TOKEN=your_token
+   # Optional override for the SDK URL (defaults to https://tganalytics.xyz/index.js)
+   TG_ANALYTICS_SCRIPT_URL=https://tganalytics.xyz/index.js
+   # Optional app name for the SDK init payload (telegramAnalytics)
+   TG_ANALYTICS_APP_NAME=river_king
+   ```
+4. Restart the server. It serves `/app/config.js` with these values and the webapp initializes TG Analytics automatically.
+
+If the token is missing, the client logs `TG Analytics token missing, analytics disabled` and skips analytics.
+
 ## Nicknames and profanity filter
 
 - On startup the server walks through existing nicknames in the database and masks profane words with asterisks.

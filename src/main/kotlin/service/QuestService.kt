@@ -20,6 +20,7 @@ import org.jetbrains.exposed.sql.sum
 import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import util.Metrics
 import util.Rng
 import java.time.DayOfWeek
 import java.time.Instant
@@ -477,6 +478,7 @@ object QuestService {
                     it[QuestProgress.completedAt] = now
                     it[QuestProgress.updatedAt] = now
                 }
+                Metrics.counter("quests_complete_total", mapOf("period" to def.period.code))
                 completions.add(
                     QuestUpdate(
                         code = def.code,

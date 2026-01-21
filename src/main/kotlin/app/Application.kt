@@ -90,9 +90,10 @@ fun main() {
             get("/app/config.js") {
                 val js = """
                     window.APP_CONFIG = {
-                        telemetree: {
-                            projectId: "${env.telemetreeProjectId}",
-                            apiKey: "${env.telemetreeApiKey}"
+                        tgAnalytics: {
+                            token: "${env.tgAnalyticsToken}",
+                            scriptUrl: "${env.tgAnalyticsScriptUrl}",
+                            appName: "${env.tgAnalyticsAppName}"
                         }
                     };
                 """.trimIndent()

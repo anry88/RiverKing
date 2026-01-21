@@ -26,6 +26,8 @@ const tgParam = (()=>{
   }catch{ return null; }
 })();
 
+const MAIN_TAB_IDS = new Set(['fish', 'tournaments', 'ratings', 'guide', 'shop']);
+
 const FAIL_REACTION_SECONDS = 5.1;
 const BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 const AssetImage = window.AssetImage;
@@ -84,11 +86,38 @@ function App(){
   const [quests, setQuests] = React.useState({ daily: [], weekly: [] });
   const [questsLoading, setQuestsLoading] = React.useState(false);
   const [questsError, setQuestsError] = React.useState(null);
+  const analyticsPrevTabRef = React.useRef(tab);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
   const coinPurchasePriceLabel = coinPurchasePack
     ? Number(coinPurchasePack.coinPrice).toLocaleString(coinLocale)
     : '';
   const prizeSource = prize?.source || (prize?.rank > 0 ? 'tournament' : 'rating');
+  const buildAnalyticsParams = React.useCallback((params) => (
+    Object.fromEntries(
+      Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    )
+  ), []);
+  const trackEvent = React.useCallback((eventName, params = {}) => {
+    if (window.Analytics?.track) {
+      window.Analytics.track(eventName, params);
+    }
+  }, []);
+  const getTabLabel = React.useCallback((tabId) => {
+    switch (tabId) {
+      case 'fish':
+        return t('fishing');
+      case 'tournaments':
+        return t('tournaments');
+      case 'ratings':
+        return t('ratings');
+      case 'guide':
+        return t('guide');
+      case 'shop':
+        return t('shop');
+      default:
+        return tabId;
+    }
+  }, [t]);
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
@@ -175,6 +204,27 @@ function App(){
       setQuestsLoading(false);
     }
   }, [t]);
+
+  React.useEffect(() => {
+    trackEvent('app_open', buildAnalyticsParams({
+      tab,
+      ref_token: refToken,
+      platform: tg?.platform,
+      start_param: tg?.initDataUnsafe?.start_param,
+    }));
+  }, [buildAnalyticsParams, trackEvent]);
+
+  React.useEffect(() => {
+    const prevTab = analyticsPrevTabRef.current;
+    if (prevTab !== tab && MAIN_TAB_IDS.has(tab)) {
+      trackEvent('tab_opened', buildAnalyticsParams({
+        tab_id: tab,
+        tab_label: getTabLabel(tab),
+        previous_tab: prevTab,
+      }));
+    }
+    analyticsPrevTabRef.current = tab;
+  }, [tab, buildAnalyticsParams, getTabLabel, trackEvent]);
 
   React.useEffect(()=>{
     if(tab === 'guide'){
