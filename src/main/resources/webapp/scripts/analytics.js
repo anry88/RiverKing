@@ -20,6 +20,10 @@
         }
         return false;
     };
+    const TRACK_METHODS = ['track', 'event', 'trackEvent'];
+    const callAnalyticsTrack = (eventName, params) => (
+        TRACK_METHODS.some((method) => callAnalytics(method, eventName, params))
+    );
 
     const initAnalytics = () => {
         const analytics = getAnalytics();
@@ -64,7 +68,7 @@
 
     const flushQueue = (queue) => {
         queue.forEach(({ eventName, params }) => {
-            if (!callAnalytics('track', eventName, params)) {
+            if (!callAnalyticsTrack(eventName, params)) {
                 console.warn('TG Analytics SDK not ready, queued event dropped', eventName);
             }
         });
@@ -99,7 +103,7 @@
                     pendingEvents.push({ eventName, params });
                     return;
                 }
-                if (!callAnalytics('track', eventName, params)) {
+                if (!callAnalyticsTrack(eventName, params)) {
                     console.warn('TG Analytics SDK not ready, event skipped', eventName);
                     return;
                 }
