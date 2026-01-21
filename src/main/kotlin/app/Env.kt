@@ -16,6 +16,7 @@ data class Env(
     val botName: String,
     val tgAnalyticsToken: String,
     val tgAnalyticsScriptUrl: String,
+    val tgAnalyticsAppName: String,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -39,6 +40,7 @@ data class Env(
                 botName = props.getProperty("BOT_NAME") ?: error("BOT_NAME required"),
                 tgAnalyticsToken = props.getProperty("TG_ANALYTICS_TOKEN") ?: "",
                 tgAnalyticsScriptUrl = props.getProperty("TG_ANALYTICS_SCRIPT_URL") ?: "",
+                tgAnalyticsAppName = props.getProperty("TG_ANALYTICS_APP_NAME") ?: "",
             )
         }
     }
