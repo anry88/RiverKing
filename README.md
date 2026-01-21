@@ -26,6 +26,21 @@ Full MVP codebase: Kotlin/Ktor + Exposed + SQLite, Telegram Mini App.
 4. Inside the Telegram mini app, the client sends `initData` → the server verifies the signature and creates a session (`/api/auth/telegram`).
 5. Available API endpoints: `/api/me`, `/api/daily`, `/api/location/{id}`, `/api/cast`.
 
+## Analytics (Telemetree)
+
+The mini app includes a Telemetree integration. To enable it you need a Telemetree project and API key.
+
+1. Create a Telemetree account and project in the Telemetree dashboard.
+2. In the project settings copy the **Project ID** and **API key**.
+3. Add them to `src/main/resources/config.properties`:
+   ```properties
+   TELEMETREE_PROJECT_ID=your_project_id
+   TELEMETREE_API_KEY=your_api_key
+   ```
+4. Restart the server. It serves `/app/config.js` with these values and the webapp initializes Telemetree automatically.
+
+If the values are missing, the client logs `Telemetree credentials missing, analytics disabled` and skips analytics.
+
 ## Nicknames and profanity filter
 
 - On startup the server walks through existing nicknames in the database and masks profane words with asterisks.
