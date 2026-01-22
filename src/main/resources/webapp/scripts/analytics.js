@@ -20,7 +20,7 @@
         }
         return false;
     };
-    const TRACK_METHODS = ['track', 'event', 'trackEvent'];
+    const TRACK_METHODS = ['track', 'event', 'trackEvent', 'recordEvent', 'collectEvent'];
     const callAnalyticsTrack = (eventName, params) => (
         TRACK_METHODS.some((method) => callAnalytics(method, eventName, params))
     );
@@ -29,6 +29,12 @@
         if (!analytics) return false;
         if (typeof analytics === 'function') return true;
         return TRACK_METHODS.some((method) => typeof analytics[method] === 'function');
+    };
+    const hasInitMethod = () => {
+        const analytics = getAnalytics();
+        if (!analytics) return false;
+        if (typeof analytics === 'function') return true;
+        return typeof analytics.init === 'function';
     };
 
     const initAnalytics = () => {
@@ -114,6 +120,8 @@
 
     const pendingEvents = [];
     let analyticsReady = false;
+    let analyticsSupportsTracking = false;
+    let trackingUnsupportedWarned = false;
     let initInProgress = false;
     let initRequested = false;
 
@@ -121,7 +129,7 @@
     const RETRY_DELAY_MS = Number.isFinite(config.retryDelayMs) ? config.retryDelayMs : 200;
 
     const waitForAnalytics = (attempt = 0) => {
-        if (!hasTrackMethod()) {
+        if (!hasInitMethod()) {
             if (getAnalytics() && !initRequested) {
                 initRequested = initAnalytics();
             }
@@ -143,10 +151,21 @@
             }
             return;
         }
+        analyticsSupportsTracking = hasTrackMethod();
         initAnalytics();
         analyticsReady = true;
         initInProgress = false;
-        flushQueue(pendingEvents.splice(0, pendingEvents.length));
+        if (!analyticsSupportsTracking) {
+            const droppedCount = pendingEvents.length;
+            pendingEvents.splice(0, pendingEvents.length);
+            if (droppedCount > 0) {
+                console.warn('TG Analytics SDK ready without tracking methods; queued events dropped', {
+                    count: droppedCount
+                });
+            }
+        } else {
+            flushQueue(pendingEvents.splice(0, pendingEvents.length));
+        }
         console.log('TG Analytics ready');
     };
 
@@ -181,6 +200,13 @@
                     pendingEvents.push({ eventName, params });
                     if (!initInProgress) {
                         window.Analytics.init();
+                    }
+                    return;
+                }
+                if (!analyticsSupportsTracking) {
+                    if (!trackingUnsupportedWarned) {
+                        console.warn('TG Analytics SDK does not expose tracking methods; event dropped');
+                        trackingUnsupportedWarned = true;
                     }
                     return;
                 }
