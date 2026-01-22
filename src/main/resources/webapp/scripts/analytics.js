@@ -50,20 +50,42 @@
         return true;
     };
 
+    const SCRIPT_STATE_ATTR = 'tgAnalyticsState';
     const loadScript = () => new Promise((resolve, reject) => {
         if (!SCRIPT_URL) {
             reject(new Error('TG Analytics script URL missing'));
             return;
         }
-        if (document.querySelector('script[data-tg-analytics]')) {
+        const existingScript = document.querySelector('script[data-tg-analytics]');
+        if (existingScript) {
             console.debug('TG Analytics SDK script already present');
-            resolve();
+            const state = existingScript.dataset[SCRIPT_STATE_ATTR];
+            if (state === 'loaded') {
+                resolve();
+                return;
+            }
+            if (state === 'error') {
+                reject(new Error('Failed to load TG Analytics SDK'));
+                return;
+            }
+            if (state) {
+                console.debug('TG Analytics SDK script state', { state });
+            }
+            existingScript.addEventListener('load', () => {
+                existingScript.dataset[SCRIPT_STATE_ATTR] = 'loaded';
+                resolve();
+            }, { once: true });
+            existingScript.addEventListener('error', () => {
+                existingScript.dataset[SCRIPT_STATE_ATTR] = 'error';
+                reject(new Error('Failed to load TG Analytics SDK'));
+            }, { once: true });
             return;
         }
         const script = document.createElement('script');
         script.async = true;
         script.src = SCRIPT_URL;
         script.dataset.tgAnalytics = 'true';
+        script.dataset[SCRIPT_STATE_ATTR] = 'loading';
         if (TOKEN) {
             script.dataset.token = TOKEN;
             script.dataset.tgAnalyticsToken = TOKEN;
@@ -71,9 +93,14 @@
         console.debug('TG Analytics SDK loading', { scriptUrl: SCRIPT_URL });
         script.onload = () => {
             console.debug('TG Analytics SDK script loaded');
+            script.dataset[SCRIPT_STATE_ATTR] = 'loaded';
             resolve();
         };
-        script.onerror = () => reject(new Error('Failed to load TG Analytics SDK'));
+        script.onerror = () => {
+            console.error('TG Analytics SDK script failed to load', { scriptUrl: SCRIPT_URL });
+            script.dataset[SCRIPT_STATE_ATTR] = 'error';
+            reject(new Error('Failed to load TG Analytics SDK'));
+        };
         document.head.appendChild(script);
     });
 
@@ -104,7 +131,14 @@
                 }
                 setTimeout(() => waitForAnalytics(attempt + 1), RETRY_DELAY_MS);
             } else {
-                console.warn('TG Analytics SDK not ready after retries');
+                const analytics = getAnalytics();
+                const analyticsInfo = analytics
+                    ? { type: typeof analytics, keys: Object.keys(analytics) }
+                    : { type: 'missing' };
+                console.warn('TG Analytics SDK not ready after retries', {
+                    attempts: MAX_RETRIES,
+                    analytics: analyticsInfo
+                });
                 initInProgress = false;
             }
             return;
@@ -133,7 +167,11 @@
                 }
                 waitForAnalytics();
             } catch (e) {
-                console.error('Failed to initialize TG Analytics', e);
+                console.error('Failed to initialize TG Analytics', {
+                    error: e,
+                    scriptUrl: SCRIPT_URL,
+                    tokenPresent: Boolean(TOKEN)
+                });
                 initInProgress = false;
             }
         },
