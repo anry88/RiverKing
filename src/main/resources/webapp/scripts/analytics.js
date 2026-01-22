@@ -56,6 +56,7 @@
             return;
         }
         if (document.querySelector('script[data-tg-analytics]')) {
+            console.debug('TG Analytics SDK script already present');
             resolve();
             return;
         }
@@ -67,7 +68,11 @@
             script.dataset.token = TOKEN;
             script.dataset.tgAnalyticsToken = TOKEN;
         }
-        script.onload = () => resolve();
+        console.debug('TG Analytics SDK loading', { scriptUrl: SCRIPT_URL });
+        script.onload = () => {
+            console.debug('TG Analytics SDK script loaded');
+            resolve();
+        };
         script.onerror = () => reject(new Error('Failed to load TG Analytics SDK'));
         document.head.appendChild(script);
     });
@@ -84,12 +89,19 @@
     let analyticsReady = false;
     let initInProgress = false;
 
+    const MAX_RETRIES = Number.isFinite(config.maxRetries) ? config.maxRetries : 10;
+    const RETRY_DELAY_MS = Number.isFinite(config.retryDelayMs) ? config.retryDelayMs : 200;
+
     const waitForAnalytics = (attempt = 0) => {
         if (!hasTrackMethod()) {
-            if (attempt < 10) {
-                setTimeout(() => waitForAnalytics(attempt + 1), 200);
+            if (attempt < MAX_RETRIES) {
+                if (attempt === 0) {
+                    console.debug('TG Analytics SDK ready check started');
+                }
+                setTimeout(() => waitForAnalytics(attempt + 1), RETRY_DELAY_MS);
             } else {
                 console.warn('TG Analytics SDK not ready after retries');
+                initInProgress = false;
             }
             return;
         }
