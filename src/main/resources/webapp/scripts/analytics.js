@@ -24,6 +24,12 @@
     const callAnalyticsTrack = (eventName, params) => (
         TRACK_METHODS.some((method) => callAnalytics(method, eventName, params))
     );
+    const hasTrackMethod = () => {
+        const analytics = getAnalytics();
+        if (!analytics) return false;
+        if (typeof analytics === 'function') return true;
+        return TRACK_METHODS.some((method) => typeof analytics[method] === 'function');
+    };
 
     const initAnalytics = () => {
         const analytics = getAnalytics();
@@ -76,6 +82,23 @@
 
     const pendingEvents = [];
     let analyticsReady = false;
+    let initInProgress = false;
+
+    const waitForAnalytics = (attempt = 0) => {
+        if (!hasTrackMethod()) {
+            if (attempt < 10) {
+                setTimeout(() => waitForAnalytics(attempt + 1), 200);
+            } else {
+                console.warn('TG Analytics SDK not ready after retries');
+            }
+            return;
+        }
+        initAnalytics();
+        analyticsReady = true;
+        initInProgress = false;
+        flushQueue(pendingEvents.splice(0, pendingEvents.length));
+        console.log('TG Analytics ready');
+    };
 
     window.Analytics = {
         init: async function () {
@@ -84,27 +107,33 @@
                 return;
             }
             try {
+                if (initInProgress || analyticsReady) return;
+                initInProgress = true;
                 await loadScript();
                 if (!getAnalytics()) {
                     console.error('TG Analytics SDK loaded, but global object missing');
+                    initInProgress = false;
                     return;
                 }
-                initAnalytics();
-                analyticsReady = true;
-                flushQueue(pendingEvents.splice(0, pendingEvents.length));
-                console.log('TG Analytics ready');
+                waitForAnalytics();
             } catch (e) {
                 console.error('Failed to initialize TG Analytics', e);
+                initInProgress = false;
             }
         },
         track: function (eventName, params = {}) {
             try {
                 if (!analyticsReady) {
                     pendingEvents.push({ eventName, params });
+                    if (!initInProgress) {
+                        window.Analytics.init();
+                    }
                     return;
                 }
                 if (!callAnalyticsTrack(eventName, params)) {
-                    console.warn('TG Analytics SDK not ready, event skipped', eventName);
+                    pendingEvents.push({ eventName, params });
+                    analyticsReady = false;
+                    window.Analytics.init();
                     return;
                 }
                 console.log(`[Analytics] Tracked: ${eventName}`, params);
