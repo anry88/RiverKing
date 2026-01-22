@@ -88,12 +88,16 @@
     const pendingEvents = [];
     let analyticsReady = false;
     let initInProgress = false;
+    let initRequested = false;
 
     const MAX_RETRIES = Number.isFinite(config.maxRetries) ? config.maxRetries : 10;
     const RETRY_DELAY_MS = Number.isFinite(config.retryDelayMs) ? config.retryDelayMs : 200;
 
     const waitForAnalytics = (attempt = 0) => {
         if (!hasTrackMethod()) {
+            if (getAnalytics() && !initRequested) {
+                initRequested = initAnalytics();
+            }
             if (attempt < MAX_RETRIES) {
                 if (attempt === 0) {
                     console.debug('TG Analytics SDK ready check started');
