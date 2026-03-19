@@ -1,6 +1,5 @@
 package service
 
-import app.Env
 import db.Catches
 import db.DB
 import db.Fish
@@ -12,26 +11,11 @@ import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import support.testEnv
 
 class RatingPrizeServiceTest {
-    private fun testEnv(name: String) = Env(
-        botToken = "",
-        telegramWebhookSecret = "",
-        publicBaseUrl = "http://localhost",
-        dbUrl = "jdbc:sqlite:file:$name?mode=memory&cache=shared",
-        dbUser = "",
-        dbPass = "",
-        port = 0,
-        devMode = true,
-        adminTgId = 0L,
-        providerToken = "",
-        botName = "",
-    )
-
     @Test
     fun aggregatePrizeIdIsPreciselyRepresentable() {
         val asDouble = RATING_AGGREGATE_PRIZE_ID.toDouble()
