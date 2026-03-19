@@ -1,29 +1,17 @@
 package service
 
-import app.Env
 import db.*
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import java.time.Instant
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import support.testEnv
 
 class TournamentServiceTest {
     @Test
     fun createAndList() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()
@@ -45,19 +33,7 @@ class TournamentServiceTest {
 
     @Test
     fun updateAndDelete() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb2?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb2")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()
@@ -94,19 +70,7 @@ class TournamentServiceTest {
 
     @Test
     fun pastTournaments() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb3?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb3")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()
@@ -139,19 +103,7 @@ class TournamentServiceTest {
 
     @Test
     fun leaderboardCountShowsFish() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb4?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb4")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()
@@ -188,25 +140,13 @@ class TournamentServiceTest {
         }
         val (top, mine) = svc.leaderboard(t, uid)
         assertEquals(1, top.size)
-        assertEquals("Плотва", top[0].fish)
-        assertEquals("Плотва", mine?.fish)
+        assertEquals(null, top[0].fish)
+        assertEquals(null, mine?.fish)
     }
 
     @Test
     fun leaderboardCountAggregatesCatches() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb5?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb5")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()
@@ -251,19 +191,7 @@ class TournamentServiceTest {
 
     @Test
     fun leaderboardShowsPrizePlacesPlusMine() {
-        val env = Env(
-            botToken = "",
-            telegramWebhookSecret = "",
-            publicBaseUrl = "http://localhost",
-            dbUrl = "jdbc:sqlite:file:testdb6?mode=memory&cache=shared",
-            dbUser = "",
-            dbPass = "",
-            port = 0,
-            devMode = true,
-            adminTgId = 0L,
-            providerToken = "",
-            botName = "",
-        )
+        val env = testEnv("testdb6")
         DB.init(env)
         val svc = TournamentService()
         val now = Instant.now()

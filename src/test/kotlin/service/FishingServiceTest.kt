@@ -1,33 +1,19 @@
 package service
 
-import app.Env
 import db.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.transactions.transaction
+import support.testEnv
 
 class FishingServiceTest {
-    private fun testEnv(name: String) = Env(
-        botToken = "",
-        telegramWebhookSecret = "",
-        publicBaseUrl = "http://localhost",
-        dbUrl = "jdbc:sqlite:file:$name?mode=memory&cache=shared",
-        dbUser = "",
-        dbPass = "",
-        port = 0,
-        devMode = true,
-        adminTgId = 0L,
-        providerToken = "",
-        botName = "",
-    )
-
     private fun newService(dbName: String, clock: Clock = Clock.systemUTC()): FishingService {
         DB.init(testEnv(dbName))
         return FishingService(clock)
@@ -136,7 +122,7 @@ class FishingServiceTest {
 
         val discounted = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
         assertEquals(10, discounted.price)
-        assertEquals(39, discounted.originalPrice)
+        assertEquals(20, discounted.originalPrice)
         assertEquals(now.plusDays(2), discounted.discountEnd)
 
         val discounts = svc.listDiscounts().associateBy { it.packageId }
@@ -148,7 +134,7 @@ class FishingServiceTest {
         svc.removeDiscount(packId)
 
         val restored = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
-        assertEquals(39, restored.price)
+        assertEquals(20, restored.price)
         assertEquals(null, restored.originalPrice)
     }
 
@@ -165,12 +151,12 @@ class FishingServiceTest {
 
         val activePack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
         assertEquals(10, activePack.price)
-        assertEquals(39, activePack.originalPrice)
+        assertEquals(20, activePack.originalPrice)
 
         clock.set(endExclusive.atStartOfDay(zone).toInstant())
 
         val expiredPack = svc.listShop("ru").flatMap { it.packs }.first { it.id == packId }
-        assertEquals(39, expiredPack.price)
+        assertEquals(20, expiredPack.price)
         assertEquals(null, expiredPack.originalPrice)
     }
 

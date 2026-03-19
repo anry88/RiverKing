@@ -1,12 +1,7 @@
 package util
 
-import app.Env
 import db.DB
 import db.Users
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.update
-import service.FishingService
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -14,22 +9,13 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import service.FishingService
+import support.testEnv
 
 class UserMetricsTest {
-    private fun testEnv(name: String) = Env(
-        botToken = "",
-        telegramWebhookSecret = "",
-        publicBaseUrl = "http://localhost",
-        dbUrl = "jdbc:sqlite:file:$name?mode=memory&cache=shared",
-        dbUser = "",
-        dbPass = "",
-        port = 0,
-        devMode = true,
-        adminTgId = 0L,
-        providerToken = "",
-        botName = "",
-    )
-
     private class MutableClock(private var current: Instant) : Clock() {
         override fun getZone(): ZoneId = ZoneOffset.UTC
         override fun withZone(zone: ZoneId): Clock = this
