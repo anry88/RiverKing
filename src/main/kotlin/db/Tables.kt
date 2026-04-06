@@ -71,6 +71,7 @@ object DB {
                 ClubWeeklyContributions,
                 ClubWeeklyRewards,
                 ClubChatMessages,
+                SubscriptionNotifications,
             )
             migrateFishNames()
             seedIfEmpty()
@@ -1318,6 +1319,18 @@ object Users : LongIdTable() {
     val lastCastAt = timestamp("last_cast_at").nullable()
     val autoFishUntil = timestamp("auto_fish_until").nullable()
     val referredBy = reference("referred_by", Users).nullable()
+    val canReceiveNotifications = bool("can_receive_notifications").default(true)
+}
+
+object SubscriptionNotifications : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val expiresAt = timestamp("expires_at")
+    val type = varchar("type", 20) // "3-day", "1-day"
+    val sentAt = timestamp("sent_at").clientDefault { Instant.now() }
+
+    init {
+        uniqueIndex(userId, expiresAt, type)
+    }
 }
 
 object Locations : LongIdTable() {

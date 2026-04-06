@@ -296,6 +296,26 @@ object I18n {
             ruDescription = "Для редкой хищной морской рыбы.",
             enDescription = "For rare predatory saltwater fish.",
         ),
+        "btn-shop" to "🛒 To Shop",
+        "btn-autofish" to "🤖 Buy Auto-fishing",
+        "btn-prizes" to "🎁 My Prizes",
+        "3-day-reminder" to "🎣 Your auto-catch subscription expires in less than 3 days! Renew it in the shop to keep the robot fishing for you.",
+        "1-day-reminder" to "🎣 Attention! Your auto-catch subscription ends in less than 24 hours. Don't forget to check the shop!",
+        "prizes-reminder" to "🎁 You have unclaimed prizes! Let's go get them.",
+    )
+
+    private val ru = mapOf(
+        "btn-shop" to "🛒 В магазин",
+        "btn-autofish" to "🤖 Купить автоловлю",
+        "btn-prizes" to "🎁 Мои призы",
+        "3-day-reminder" to "🎣 Твоя подписка на автоловлю истекает меньше чем через 3 дня! Продли её в магазине, чтобы робот продолжал ловить рыбу за тебя.",
+        "1-day-reminder" to "🎣 Внимание! Подписка на автоловлю закончится меньше чем через 24 часа. Не забудь заглянуть в магазин!",
+        "prizes-reminder" to "🎁 У тебя есть неполученные призы! Давай скорее их заберем.",
+        "Искра" to "Spark",
+        "Роса" to "Dew",
+        "Поток" to "Stream",
+        "Глубь" to "Abyss",
+        "Шторм" to "Storm",
     )
 
     private val rods = mapOf(
