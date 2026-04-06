@@ -4,6 +4,7 @@ import io.ktor.server.application.*
 import kotlinx.coroutines.*
 import service.*
 import java.time.*
+import kotlin.coroutines.coroutineContext
 import db.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -64,6 +65,8 @@ object Scheduler {
                     runPrizeReminders(notifications, fishing)
                     lastPrizeReminderDate = today
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 log.error("Error in daily jobs loop", e)
             }
