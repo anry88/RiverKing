@@ -247,7 +247,7 @@ object I18n {
         val enDescription: String,
     )
 
-    private val lures = mapOf(
+    private val lures: Map<String, LureTexts> = mapOf(
         "Пресная мирная" to LureTexts(
             ruName = "Зерновая крошка",
             enName = "Grain Crumble",
@@ -377,6 +377,17 @@ object I18n {
         "Подписки" to "Subscriptions",
         "Автоловля" to "Auto Catch",
         "Робот ловит за вас целый месяц и не упустит ни одной рыбы" to "Robot catches fish for you for a whole month and won't miss any fish",
+        "🛒 В магазин" to "🛒 To Shop",
+        "🤖 Купить автоловлю" to "🤖 Buy Auto-fishing",
+        "🎁 Мои призы" to "🎁 My Prizes",
+        "🎁 Забрать реферальные награды" to "🎁 Claim referral rewards",
+        "Реферальные награды" to "Referral Rewards",
+        "Бонус за приглашенных друзей:" to "Bonus for invited friends:",
+        "К сожалению, не удалось забрать реферальные награды. Попробуйте позже." to "Unfortunately, failed to claim referral rewards. Try again later.",
+        "Реферальные награды успешно получены!" to "Referral rewards claimed successfully!",
+        "🎣 Твоя подписка на автоловлю истекает меньше чем через 3 дня! Продли её в магазине, чтобы робот продолжал ловить рыбу за тебя." to "🎣 Your auto-catch subscription expires in less than 3 days! Renew it in the shop to keep the robot fishing for you.",
+        "🎣 Внимание! Подписка на автоловлю закончится меньше чем через 24 часа. Не забудь заглянуть в магазин!" to "🎣 Attention! Your auto-catch subscription ends in less than 24 hours. Don't forget to check the shop!",
+        "🎁 У тебя есть неполученные призы! Давай скорее их заберем." to "🎁 You have unclaimed prizes! Let's go get them.",
     )
 
     fun fish(name: String, lang: String) = if (lang == "en") fish[name] ?: name else name

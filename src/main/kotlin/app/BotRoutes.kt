@@ -1135,6 +1135,7 @@ fun Application.botRoutes(env: Env) {
                 showWhenEmpty: Boolean = false,
             ) {
                 val actual = prizes ?: prizeService.pendingPrizes(uid)
+                val referralRewards = ReferralService.pendingRewardsSimple(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
                 val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
                 val emptyBody = if (lang == "ru") {
@@ -1155,7 +1156,19 @@ fun Application.botRoutes(env: Env) {
                     if (lureName != prize.packageId) return lureName
                     return prize.packageId.replace('_', ' ')
                 }
-                if (actual.isEmpty()) {
+
+                fun displayRefName(packageId: String): String {
+                    if (packageId == "autofish_week") {
+                        return if (lang == "ru") "Автоловля (неделя)" else "Auto Catch (week)"
+                    }
+                    val name = packNames[packageId]
+                    if (name != null) return name
+                    val lureName = I18n.lure(packageId, lang)
+                    if (lureName != packageId) return lureName
+                    return packageId.replace('_', ' ')
+                }
+
+                if (actual.isEmpty() && referralRewards.isEmpty()) {
                     val body = if (showWhenEmpty) emptyBody else ""
                     val baseText = buildString {
                         if (!prefixText.isNullOrBlank()) append(prefixText)
@@ -1169,28 +1182,41 @@ fun Application.botRoutes(env: Env) {
                     }
                     return
                 }
-                val body = run {
-                    val header = if (lang == "ru") {
-                        "Призы, которые можно получить:"
-                    } else {
-                        "Prizes you can claim:"
-                    }
-                    val lines = actual.joinToString("\n") { prize ->
-                        val name = displayName(prize)
-                        val qty = if (prize.packageId == COIN_PRIZE_ID) {
-                            val amount = prize.coins ?: prize.qty
-                            " +$amount"
-                        } else if (prize.qty > 1) {
-                            " x${prize.qty}"
+                val body = buildString {
+                    if (actual.isNotEmpty()) {
+                        val header = if (lang == "ru") {
+                            "Призы, которые можно получить:"
                         } else {
-                            ""
+                            "Prizes you can claim:"
                         }
-                        val place = if (prize.rank > 0) {
-                            if (lang == "ru") " (место #${prize.rank})" else " (place #${prize.rank})"
-                        } else ""
-                        "• $name$qty$place"
+                        append(header)
+                        actual.forEach { prize ->
+                            val name = displayName(prize)
+                            val qty = if (prize.packageId == COIN_PRIZE_ID) {
+                                val amount = prize.coins ?: prize.qty
+                                " +$amount"
+                            } else if (prize.qty > 1) {
+                                " x${prize.qty}"
+                            } else {
+                                ""
+                            }
+                            val place = if (prize.rank > 0) {
+                                if (lang == "ru") " (место #${prize.rank})" else " (place #${prize.rank})"
+                            } else ""
+                            append("\n• $name$qty$place")
+                        }
                     }
-                    "$header\n$lines"
+                    if (referralRewards.isNotEmpty()) {
+                        if (actual.isNotEmpty()) append("\n\n")
+                        val refTitle = I18n.text("Реферальные награды", lang)
+                        val refPrefix = I18n.text("Бонус за приглашенных друзей:", lang)
+                        append("$refTitle\n$refPrefix")
+                        referralRewards.forEach { reward ->
+                            val name = displayRefName(reward.packageId)
+                            val qty = if (reward.qty > 1) " x${reward.qty}" else ""
+                            append("\n• $name$qty")
+                        }
+                    }
                 }
                 val baseText = buildString {
                     if (!prefixText.isNullOrBlank()) {
@@ -1199,16 +1225,20 @@ fun Application.botRoutes(env: Env) {
                     }
                     append(body)
                 }
-                val markup = Json.encodeToString(
-                    InlineKeyboardMarkup(
-                        actual.map { prize ->
-                            val name = displayName(prize)
-                            val short = if (name.length > 32) name.take(29) + "…" else name
-                            val qty = if (prize.qty > 1) " x${prize.qty}" else ""
-                            listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}"))
-                        }
-                    )
-                )
+
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                actual.forEach { prize ->
+                    val name = displayName(prize)
+                    val short = if (name.length > 32) name.take(29) + "…" else name
+                    val qty = if (prize.qty > 1) " x${prize.qty}" else ""
+                    buttons.add(listOf(InlineKeyboardButton("🎁 $short$qty", "/prizeclaim ${ownedData(uid, prize.id)}")))
+                }
+                if (referralRewards.isNotEmpty()) {
+                    val label = I18n.text("🎁 Забрать реферальные награды", lang)
+                    buttons.add(listOf(InlineKeyboardButton(label, "/prizerefclaim ${ownedData(uid, uid)}")))
+                }
+
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
                 trySend(chatId, baseText, markup, replyToMessageId)
             }
 
@@ -2897,6 +2927,30 @@ Available commands:
                             chatId,
                             lang,
                             prefix = success,
+                            replyToMessageId = replyTo,
+                            showWhenEmpty = true,
+                        )
+                        return true
+                    }
+                    "/prizerefclaim" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val successPrefix = try {
+                            ReferralService.claimAllRewards(uid, fishing)
+                            logCommandMetric("prizes_ref_claim", mapOf("result" to "claimed"), source)
+                            I18n.text("Реферальные награды успешно получены!", lang)
+                        } catch (e: Exception) {
+                            log.error("prizes_ref_claim failed uid={}", uid, e)
+                            logCommandMetric("prizes_ref_claim", mapOf("result" to "error"), source)
+                            I18n.text("К сожалению, не удалось забрать реферальные награды. Попробуйте позже.", lang)
+                        }
+                        sendPrizes(
+                            uid,
+                            chatId,
+                            lang,
+                            prefix = successPrefix,
                             replyToMessageId = replyTo,
                             showWhenEmpty = true,
                         )
