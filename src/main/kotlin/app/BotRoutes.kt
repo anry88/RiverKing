@@ -1135,7 +1135,7 @@ fun Application.botRoutes(env: Env) {
                 showWhenEmpty: Boolean = false,
             ) {
                 val actual = prizes ?: prizeService.pendingPrizes(uid)
-                val referralRewards = if (prizes == null) ReferralService.pendingRewardsSimple(uid) else emptyList()
+                val referralRewards = ReferralService.pendingRewardsSimple(uid)
                 val packNames = fishing.listShop(lang).flatMap { it.packs }.associate { it.id to it.name }
                 val prefixText = prefix?.trim()?.takeIf { it.isNotEmpty() }
                 val emptyBody = if (lang == "ru") {
