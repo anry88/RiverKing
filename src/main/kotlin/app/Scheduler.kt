@@ -113,9 +113,13 @@ object Scheduler {
             }
 
             if (!alreadySent) {
-                val textKey = if (type == "1-day") "1-day-reminder" else "3-day-reminder"
+                val textKey = if (type == "1-day") {
+                    "🎣 Внимание! Подписка на автоловлю закончится меньше чем через 24 часа. Не забудь заглянуть в магазин!"
+                } else {
+                    "🎣 Твоя подписка на автоловлю истекает меньше чем через 3 дня! Продли её в магазине, чтобы робот продолжал ловить рыбу за тебя."
+                }
                 val text = service.I18n.text(textKey, lang)
-                val btnText = service.I18n.text("btn-autofish", lang)
+                val btnText = service.I18n.text("🤖 Купить автоловлю", lang)
 
                 if (notifications.sendNotification(uid, tgId, text, btnText, "/buy $uid:autofish")) {
                     transaction {
@@ -151,8 +155,8 @@ object Scheduler {
             val tgId = user[Users.tgId]
             val lang = user[Users.language]
 
-            val text = service.I18n.text("prizes-reminder", lang)
-            val btnText = service.I18n.text("btn-prizes", lang)
+            val text = service.I18n.text("🎁 У тебя есть неполученные призы! Давай скорее их заберем.", lang)
+            val btnText = service.I18n.text("🎁 Мои призы", lang)
 
             notifications.sendNotification(uid, tgId, text, btnText, "/prizes")
             delay(100)
