@@ -172,6 +172,7 @@ fun RiverKingApp(
                                     strings = strings,
                                     viewModel = viewModel,
                                     catch = catch,
+                                    cachedCard = state.selectedCatchCard?.takeIf { state.selectedCatch?.id == catch.id },
                                 )
                             }
                         },
@@ -317,13 +318,14 @@ private suspend fun shareCatchCard(
     strings: RiverStrings,
     viewModel: RiverKingViewModel,
     catch: CatchDto,
+    cachedCard: ByteArray? = null,
 ) {
     if (catch.id <= 0L) {
         viewModel.showError(strings.unavailable)
         return
     }
     runCatching {
-        val bytes = viewModel.downloadCatchCard(catch.id)
+        val bytes = cachedCard ?: viewModel.downloadCatchCard(catch.id)
         val dir = File(activity.cacheDir, "shared").apply { mkdirs() }
         val file = File(dir, "catch-${catch.id}.png")
         file.writeBytes(bytes)
@@ -334,6 +336,10 @@ private suspend fun shareCatchCard(
             append(String.format(java.util.Locale.US, "%.2f kg", catch.weight))
             append(" • ")
             append(catch.location)
+            catch.user?.let {
+                append('\n')
+                append(it)
+            }
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"

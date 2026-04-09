@@ -46,6 +46,7 @@ data class RiverStrings(
     val claimRewards: String,
     val copyLink: String,
     val shareLink: String,
+    val viewAll: String,
     val openClub: String,
     val searchClub: String,
     val createClub: String,
@@ -80,6 +81,15 @@ data class RiverStrings(
     val unavailable: String,
     val purchaseForCoins: String,
     val payWithGoogle: String,
+    val currentLabel: String,
+    val dailyRewardReady: String,
+    val dailyStreakLabel: String,
+    val dailyReturnTomorrow: String,
+    val chooseLocation: String,
+    val chooseRod: String,
+    val chooseBait: String,
+    val dailyQuestsLabel: String,
+    val weeklyQuestsLabel: String,
 )
 
 @Composable
@@ -128,6 +138,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             claimRewards = "Забрать награды",
             copyLink = "Скопировать ссылку",
             shareLink = "Поделиться",
+            viewAll = "Смотреть всё",
             openClub = "Открыть клуб",
             searchClub = "Поиск клубов",
             createClub = "Создать клуб",
@@ -162,6 +173,15 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             unavailable = "Недоступно",
             purchaseForCoins = "Купить за монеты",
             payWithGoogle = "Купить через Google Play",
+            currentLabel = "Текущая",
+            dailyRewardReady = "Награда готова",
+            dailyStreakLabel = "Серия",
+            dailyReturnTomorrow = "Завтра серия продолжится здесь",
+            chooseLocation = "Выбор локации",
+            chooseRod = "Выбор удочки",
+            chooseBait = "Выбор наживки",
+            dailyQuestsLabel = "Ежедневные",
+            weeklyQuestsLabel = "Недельные",
         )
     } else {
         RiverStrings(
@@ -207,6 +227,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             claimRewards = "Claim rewards",
             copyLink = "Copy link",
             shareLink = "Share",
+            viewAll = "View all",
             openClub = "Open club",
             searchClub = "Search clubs",
             createClub = "Create club",
@@ -241,6 +262,15 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             unavailable = "Unavailable",
             purchaseForCoins = "Buy with coins",
             payWithGoogle = "Buy with Google Play",
+            currentLabel = "Current",
+            dailyRewardReady = "Reward ready",
+            dailyStreakLabel = "Streak",
+            dailyReturnTomorrow = "Come back tomorrow to continue the streak",
+            chooseLocation = "Choose water",
+            chooseRod = "Choose rod",
+            chooseBait = "Choose bait",
+            dailyQuestsLabel = "Daily",
+            weeklyQuestsLabel = "Weekly",
         )
     }
 }
@@ -275,6 +305,29 @@ fun RiverStrings.rarityLabel(rarity: String?): String = when (rarity) {
     "mythic" -> if (login == "Логин") "Мифическая" else "Mythic"
     "legendary" -> if (login == "Логин") "Легендарная" else "Legendary"
     else -> rarity.orEmpty()
+}
+
+fun RiverStrings.dayLabel(day: Int): String =
+    if (login == "Логин") "День $day" else "Day $day"
+
+fun RiverStrings.questRewardLabel(coins: Int): String =
+    if (login == "Логин") "Награда: $coins монет" else "Reward: $coins coins"
+
+fun RiverStrings.rodBonusLabel(bonusWater: String?, bonusPredator: Boolean?): String {
+    if (bonusWater == null) {
+        return if (login == "Логин") "Без бонуса к типу воды" else "No water bonus"
+    }
+    return when {
+        bonusWater == "fresh" && bonusPredator == true ->
+            if (login == "Логин") "Бонус к пресным хищникам" else "Bonus for freshwater predators"
+        bonusWater == "fresh" && bonusPredator == false ->
+            if (login == "Логин") "Бонус к пресной мирной рыбе" else "Bonus for freshwater peaceful fish"
+        bonusWater == "salt" && bonusPredator == true ->
+            if (login == "Логин") "Бонус к морским хищникам" else "Bonus for saltwater predators"
+        bonusWater == "salt" && bonusPredator == false ->
+            if (login == "Логин") "Бонус к морской мирной рыбе" else "Bonus for saltwater peaceful fish"
+        else -> if (login == "Логин") "Особый бонус удилища" else "Special rod bonus"
+    }
 }
 
 fun RiverStrings.playBillingMessage(code: String): String = when (code) {

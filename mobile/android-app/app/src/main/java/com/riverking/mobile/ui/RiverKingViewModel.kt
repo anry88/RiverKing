@@ -151,6 +151,7 @@ data class RiverKingUiState(
     val profileRefreshing: Boolean = false,
     val error: String? = null,
     val selectedCatch: CatchDto? = null,
+    val selectedCatchCard: ByteArray? = null,
     val catchLoading: Boolean = false,
     val lastAchievementReward: AchievementClaimDto? = null,
     val fishing: FishingUiState = FishingUiState(),
@@ -420,19 +421,33 @@ class RiverKingViewModel(
     }
 
     fun dismissCatchDetails() {
-        _state.update { it.copy(selectedCatch = null, catchLoading = false) }
+        _state.update { it.copy(selectedCatch = null, selectedCatchCard = null, catchLoading = false) }
     }
 
     fun openCatchDetails(catch: CatchDto) {
         val catchId = catch.id
         if (catchId <= 0L) {
-            _state.update { it.copy(selectedCatch = catch) }
+            _state.update { it.copy(selectedCatch = catch, selectedCatchCard = null) }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(catchLoading = true, selectedCatch = catch) }
-            val detailed = runCatching { repository.catchDetails(catchId) }.getOrDefault(catch)
-            _state.update { it.copy(selectedCatch = detailed, catchLoading = false) }
+            _state.update { it.copy(catchLoading = true, selectedCatch = catch, selectedCatchCard = null) }
+            val (detailed, cardBytes) = coroutineScope {
+                val detailsDeferred = async { runCatching { repository.catchDetails(catchId) }.getOrDefault(catch) }
+                val cardDeferred = async { runCatching { repository.catchCard(catchId) }.getOrNull() }
+                detailsDeferred.await() to cardDeferred.await()
+            }
+            _state.update { current ->
+                if (current.selectedCatch?.id != catchId) {
+                    current
+                } else {
+                    current.copy(
+                        selectedCatch = detailed,
+                        selectedCatchCard = cardBytes,
+                        catchLoading = false,
+                    )
+                }
+            }
         }
     }
 
@@ -1018,7 +1033,7 @@ class RiverKingViewModel(
     }
 
     fun dismissCatchError() {
-        _state.update { it.copy(selectedCatch = null, catchLoading = false) }
+        _state.update { it.copy(selectedCatch = null, selectedCatchCard = null, catchLoading = false) }
     }
 
     fun isGoogleEnabled(): Boolean = BuildConfig.GOOGLE_AUTH_ENABLED
