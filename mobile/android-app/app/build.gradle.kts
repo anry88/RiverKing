@@ -41,11 +41,13 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".play"
             versionNameSuffix = "-play"
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
         }
         create("direct") {
             dimension = "distribution"
             applicationIdSuffix = ".direct"
             versionNameSuffix = "-direct"
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"direct\"")
         }
     }
 
@@ -110,11 +112,13 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.credentials:credentials:1.6.0-rc02")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0-rc02")
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")

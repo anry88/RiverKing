@@ -139,13 +139,6 @@ data class DailyClaimResponseDto(
     val dailyStreak: Int = 0,
 )
 
-data class FishingFlowResult(
-    val start: StartCastResultDto,
-    val hook: HookResultDto,
-    val cast: CastResultDto,
-    val me: MeResponseDto,
-)
-
 @Serializable
 data class PrizeSpecDto(
     val packageId: String,
@@ -275,4 +268,140 @@ data class QuestDto(
 data class QuestListDto(
     val daily: List<QuestDto>,
     val weekly: List<QuestDto>,
+)
+
+@Serializable
+data class AchievementRewardDto(
+    val packageId: String,
+    val qty: Int,
+    val coins: Int? = null,
+)
+
+@Serializable
+data class AchievementClaimDto(
+    val code: String,
+    val rewards: List<AchievementRewardDto> = emptyList(),
+)
+
+@Serializable
+data class ShopPackageDto(
+    val id: String,
+    val name: String,
+    val desc: String,
+    val price: Int,
+    val until: String? = null,
+    val originalPrice: Int? = null,
+    val discountStart: String? = null,
+    val discountEnd: String? = null,
+    val coinPrice: Int? = null,
+    val rodCode: String? = null,
+)
+
+@Serializable
+data class ShopCategoryDto(
+    val id: String,
+    val name: String,
+    val packs: List<ShopPackageDto> = emptyList(),
+)
+
+@Serializable
+data class ShopPurchaseResultDto(
+    val lures: List<LureDto> = emptyList(),
+    val currentLureId: Long? = null,
+)
+
+@Serializable
+data class ReferralInfoDto(
+    val token: String,
+    val invited: List<String> = emptyList(),
+    val link: String,
+    val telegramLink: String = link,
+    val androidShareText: String = "",
+    val webFallbackLink: String = link,
+)
+
+@Serializable
+data class ReferralLinkDto(
+    val token: String,
+    val link: String,
+    val telegramLink: String = link,
+    val androidShareText: String = "",
+    val webFallbackLink: String = link,
+)
+
+@Serializable
+data class ReferralRewardDto(
+    val packageId: String,
+    val qty: Int,
+    val name: String,
+)
+
+@Serializable
+data class ClubMemberDto(
+    val userId: Long,
+    val name: String? = null,
+    val role: String,
+    val coins: Int,
+)
+
+@Serializable
+data class ClubWeekDto(
+    val weekStart: String,
+    val totalCoins: Int,
+    val members: List<ClubMemberDto> = emptyList(),
+)
+
+@Serializable
+data class ClubDetailsDto(
+    val id: Long,
+    val name: String,
+    val role: String,
+    val memberCount: Int,
+    val capacity: Int,
+    val info: String,
+    val minJoinWeightKg: Double,
+    val recruitingOpen: Boolean,
+    val currentWeek: ClubWeekDto,
+    val previousWeek: ClubWeekDto,
+)
+
+@Serializable
+data class ClubChatMessageDto(
+    val id: Long,
+    val message: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class ClubSummaryDto(
+    val id: Long,
+    val name: String,
+    val memberCount: Int,
+    val capacity: Int,
+    val info: String,
+    val minJoinWeightKg: Double,
+    val recruitingOpen: Boolean,
+)
+
+@Serializable
+data class ClubCreateRequestDto(
+    val name: String,
+)
+
+@Serializable
+data class ClubInfoRequestDto(
+    val info: String,
+)
+
+@Serializable
+data class ClubSettingsRequestDto(
+    val minJoinWeightKg: Double,
+    val recruitingOpen: Boolean,
+)
+
+@Serializable
+data class PlayPurchaseCompleteRequestDto(
+    val purchaseToken: String,
+    val orderId: String,
+    val purchaseTimeMillis: Long? = null,
 )

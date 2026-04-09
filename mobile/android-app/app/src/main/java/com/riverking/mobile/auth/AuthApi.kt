@@ -7,6 +7,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -60,6 +61,14 @@ class AuthApi(
         }
     }
 
+    suspend fun updateLanguage(accessToken: String, language: String) {
+        client.post("$baseUrl/api/language") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(mapOf("language" to language))
+        }
+    }
+
     suspend fun changeLocation(accessToken: String, locationId: Long) {
         client.post("$baseUrl/api/location/$locationId") {
             bearerAuth(accessToken)
@@ -102,12 +111,27 @@ class AuthApi(
             setBody(CastRequestDto(wait = wait, reaction = reaction, success = success))
         }.body()
 
+    suspend fun catchDetails(accessToken: String, catchId: Long): CatchDto =
+        client.get("$baseUrl/api/catches/$catchId") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun catchCard(accessToken: String, catchId: Long): ByteArray =
+        client.get("$baseUrl/api/catches/$catchId/card") {
+            bearerAuth(accessToken)
+        }.body()
+
     suspend fun currentTournament(accessToken: String): CurrentTournamentDto? {
         val response = client.get("$baseUrl/api/tournament/current") {
             bearerAuth(accessToken)
         }
         return if (response.status == HttpStatusCode.NoContent) null else response.body()
     }
+
+    suspend fun tournament(accessToken: String, tournamentId: Long): CurrentTournamentDto =
+        client.get("$baseUrl/api/tournament/$tournamentId") {
+            bearerAuth(accessToken)
+        }.body()
 
     suspend fun upcomingTournaments(accessToken: String): List<TournamentDto> =
         client.get("$baseUrl/api/tournaments/upcoming") {
@@ -140,18 +164,135 @@ class AuthApi(
             bearerAuth(accessToken)
         }.body()
 
+    suspend fun claimAchievement(accessToken: String, code: String): AchievementClaimDto =
+        client.post("$baseUrl/api/achievements/$code/claim") {
+            bearerAuth(accessToken)
+        }.body()
+
     suspend fun quests(accessToken: String): QuestListDto =
         client.get("$baseUrl/api/quests") {
             bearerAuth(accessToken)
         }.body()
 
-    suspend fun personalLocationRatings(accessToken: String, locationId: String): List<CatchDto> =
-        client.get("$baseUrl/api/ratings/personal/location/$locationId") {
+    suspend fun ratings(
+        accessToken: String,
+        mode: String,
+        filter: String,
+        id: String,
+        period: String,
+        order: String,
+    ): List<CatchDto> =
+        client.get("$baseUrl/api/ratings/$mode/$filter/$id") {
+            bearerAuth(accessToken)
+            parameter("period", period)
+            parameter("order", order)
+        }.body()
+
+    suspend fun club(accessToken: String): ClubDetailsDto? {
+        val response = client.get("$baseUrl/api/club") {
+            bearerAuth(accessToken)
+        }
+        return if (response.status == HttpStatusCode.NoContent) null else response.body()
+    }
+
+    suspend fun clubChat(accessToken: String): List<ClubChatMessageDto> =
+        client.get("$baseUrl/api/club/chat") {
             bearerAuth(accessToken)
         }.body()
 
-    suspend fun globalLocationRatings(accessToken: String, locationId: String): List<CatchDto> =
-        client.get("$baseUrl/api/ratings/global/location/$locationId") {
+    suspend fun searchClubs(accessToken: String, query: String?): List<ClubSummaryDto> =
+        client.get("$baseUrl/api/club/search") {
+            bearerAuth(accessToken)
+            if (!query.isNullOrBlank()) parameter("q", query)
+        }.body()
+
+    suspend fun createClub(accessToken: String, name: String): ClubDetailsDto =
+        client.post("$baseUrl/api/club/create") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(ClubCreateRequestDto(name))
+        }.body()
+
+    suspend fun joinClub(accessToken: String, clubId: Long): ClubDetailsDto =
+        client.post("$baseUrl/api/club/$clubId/join") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun updateClubInfo(accessToken: String, info: String): ClubDetailsDto =
+        client.post("$baseUrl/api/club/info") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(ClubInfoRequestDto(info))
+        }.body()
+
+    suspend fun updateClubSettings(
+        accessToken: String,
+        minJoinWeightKg: Double,
+        recruitingOpen: Boolean,
+    ): ClubDetailsDto =
+        client.post("$baseUrl/api/club/settings") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(ClubSettingsRequestDto(minJoinWeightKg, recruitingOpen))
+        }.body()
+
+    suspend fun leaveClub(accessToken: String) {
+        client.post("$baseUrl/api/club/leave") {
+            bearerAuth(accessToken)
+        }
+    }
+
+    suspend fun clubMemberAction(accessToken: String, memberId: Long, action: String): ClubDetailsDto =
+        client.post("$baseUrl/api/club/members/$memberId/$action") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun shop(accessToken: String): List<ShopCategoryDto> =
+        client.get("$baseUrl/api/shop") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun buyShopWithCoins(accessToken: String, packId: String): ShopPurchaseResultDto =
+        client.post("$baseUrl/api/shop/$packId/coins") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun completePlayPurchase(
+        accessToken: String,
+        packId: String,
+        purchaseToken: String,
+        orderId: String,
+        purchaseTimeMillis: Long? = null,
+    ): ShopPurchaseResultDto =
+        client.post("$baseUrl/api/shop/$packId/play/complete") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(
+                PlayPurchaseCompleteRequestDto(
+                    purchaseToken = purchaseToken,
+                    orderId = orderId,
+                    purchaseTimeMillis = purchaseTimeMillis,
+                )
+            )
+        }.body()
+
+    suspend fun referrals(accessToken: String): ReferralInfoDto =
+        client.get("$baseUrl/api/referrals") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun generateReferral(accessToken: String): ReferralLinkDto =
+        client.post("$baseUrl/api/referrals") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun referralRewards(accessToken: String): List<ReferralRewardDto> =
+        client.get("$baseUrl/api/referrals/rewards") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun claimReferralRewards(accessToken: String): ShopPurchaseResultDto =
+        client.post("$baseUrl/api/referrals/rewards/claim") {
             bearerAuth(accessToken)
         }.body()
 }

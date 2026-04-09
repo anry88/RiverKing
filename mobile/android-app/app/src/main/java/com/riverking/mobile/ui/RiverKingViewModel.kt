@@ -3,37 +3,77 @@ package com.riverking.mobile.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.riverking.mobile.BuildConfig
+import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AuthRepository
 import com.riverking.mobile.auth.CastResultDto
 import com.riverking.mobile.auth.CatchDto
+import com.riverking.mobile.auth.ClubChatMessageDto
+import com.riverking.mobile.auth.ClubDetailsDto
+import com.riverking.mobile.auth.ClubSummaryDto
 import com.riverking.mobile.auth.CurrentTournamentDto
 import com.riverking.mobile.auth.GuideDto
+import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.MeResponseDto
 import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.QuestListDto
+import com.riverking.mobile.auth.ReferralInfoDto
+import com.riverking.mobile.auth.ReferralRewardDto
+import com.riverking.mobile.auth.ShopCategoryDto
 import com.riverking.mobile.auth.StartCastResultDto
 import com.riverking.mobile.auth.TournamentDto
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 enum class AuthMode {
     LOGIN,
     REGISTER,
 }
 
-enum class RatingsScope {
-    ALL,
-    CURRENT,
+enum class FishingPhase {
+    READY,
+    COOLDOWN,
+    WAITING_BITE,
+    BITING,
+    TAP_CHALLENGE,
+    RESOLVING,
+}
+
+enum class RatingsMode(val apiValue: String) {
+    PERSONAL("personal"),
+    GLOBAL("global"),
+}
+
+enum class RatingsPeriod(val apiValue: String) {
+    TODAY("today"),
+    YESTERDAY("yesterday"),
+    WEEK("week"),
+    MONTH("month"),
+    YEAR("year"),
+    ALL("all"),
+}
+
+enum class RatingsOrder(val apiValue: String) {
+    DESC("desc"),
+    ASC("asc"),
 }
 
 data class FishingUiState(
-    val busy: Boolean = false,
+    val phase: FishingPhase = FishingPhase.READY,
+    val phaseTimeLeftMillis: Long = 0L,
+    val tapCount: Int = 0,
+    val tapGoal: Int = TAP_CHALLENGE_GOAL,
+    val autoCastEnabled: Boolean = false,
+    val castWaitSeconds: Int = 0,
     val lastStart: StartCastResultDto? = null,
     val lastCast: CastResultDto? = null,
 )
@@ -45,14 +85,21 @@ data class TournamentsUiState(
     val upcoming: List<TournamentDto> = emptyList(),
     val past: List<TournamentDto> = emptyList(),
     val prizes: List<PrizeDto> = emptyList(),
+    val selectedTournamentId: Long? = null,
+    val selectedTournament: CurrentTournamentDto? = null,
+    val selectedTournamentLoading: Boolean = false,
 )
 
 data class RatingsUiState(
     val loaded: Boolean = false,
     val loading: Boolean = false,
-    val scope: RatingsScope = RatingsScope.ALL,
-    val personal: List<CatchDto> = emptyList(),
-    val global: List<CatchDto> = emptyList(),
+    val mode: RatingsMode = RatingsMode.GLOBAL,
+    val period: RatingsPeriod = RatingsPeriod.TODAY,
+    val order: RatingsOrder = RatingsOrder.DESC,
+    val locationId: String = "all",
+    val fishId: String = "all",
+    val fishOptions: List<GuideFishDto> = emptyList(),
+    val entries: List<CatchDto> = emptyList(),
 )
 
 data class GuideUiState(
@@ -61,6 +108,25 @@ data class GuideUiState(
     val guide: GuideDto? = null,
     val achievements: List<AchievementDto> = emptyList(),
     val quests: QuestListDto? = null,
+)
+
+data class ClubUiState(
+    val loaded: Boolean = false,
+    val loading: Boolean = false,
+    val club: ClubDetailsDto? = null,
+    val searchResults: List<ClubSummaryDto> = emptyList(),
+    val searchLoading: Boolean = false,
+    val chat: List<ClubChatMessageDto> = emptyList(),
+    val chatLoading: Boolean = false,
+)
+
+data class ShopUiState(
+    val loaded: Boolean = false,
+    val loading: Boolean = false,
+    val categories: List<ShopCategoryDto> = emptyList(),
+    val referrals: ReferralInfoDto? = null,
+    val referralRewards: List<ReferralRewardDto> = emptyList(),
+    val referralsLoading: Boolean = false,
 )
 
 data class RiverKingUiState(
@@ -73,10 +139,15 @@ data class RiverKingUiState(
     val working: Boolean = false,
     val profileRefreshing: Boolean = false,
     val error: String? = null,
+    val selectedCatch: CatchDto? = null,
+    val catchLoading: Boolean = false,
+    val lastAchievementReward: AchievementClaimDto? = null,
     val fishing: FishingUiState = FishingUiState(),
     val tournaments: TournamentsUiState = TournamentsUiState(),
     val ratings: RatingsUiState = RatingsUiState(),
     val guide: GuideUiState = GuideUiState(),
+    val club: ClubUiState = ClubUiState(),
+    val shop: ShopUiState = ShopUiState(),
 )
 
 class RiverKingViewModel(
@@ -85,8 +156,20 @@ class RiverKingViewModel(
     private val _state = MutableStateFlow(RiverKingUiState())
     val state: StateFlow<RiverKingUiState> = _state.asStateFlow()
 
+    private var waitJob: Job? = null
+    private var biteJob: Job? = null
+    private var tapJob: Job? = null
+    private var cooldownJob: Job? = null
+    private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
+    private var biteStartedAtMillis: Long = 0L
+
     init {
         bootstrap()
+    }
+
+    override fun onCleared() {
+        cancelFishingJobs()
+        super.onCleared()
     }
 
     fun updateLogin(value: String) {
@@ -164,14 +247,36 @@ class RiverKingViewModel(
             _state.update { it.copy(working = true, error = null) }
             try {
                 val me = repository.updateNickname(nickname)
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false) }
+                warmupPlayerSurfaces()
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
                         working = false,
-                        error = null,
+                        error = repository.describeError(error),
                     )
                 }
+            }
+        }
+    }
+
+    fun changeLanguage(language: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.changeLanguage(language)
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        ratings = it.ratings.copy(loaded = false),
+                        guide = it.guide.copy(loaded = false),
+                        shop = it.shop.copy(loaded = false),
+                        tournaments = it.tournaments.copy(loaded = false, selectedTournament = null),
+                    )
+                }
+                warmupPlayerSurfaces()
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -202,28 +307,17 @@ class RiverKingViewModel(
     }
 
     fun claimDaily() {
-        if (state.value.fishing.busy) return
+        if (state.value.fishing.phase == FishingPhase.RESOLVING) return
         viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    fishing = it.fishing.copy(busy = true),
-                    error = null,
-                )
-            }
+            _state.update { it.copy(working = true, error = null) }
             try {
                 val me = repository.claimDaily()
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
-                        fishing = current.fishing.copy(busy = false),
-                        error = null,
-                    )
-                }
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false) }
             } catch (error: Throwable) {
-                _state.update { current ->
-                    current.copy(
-                        fishing = current.fishing.copy(busy = false),
+                _state.update {
+                    it.copy(
+                        working = false,
                         error = repository.describeError(error),
                     )
                 }
@@ -231,33 +325,68 @@ class RiverKingViewModel(
         }
     }
 
-    fun performQuickCast() {
-        if (state.value.fishing.busy) return
+    fun toggleAutoCast() {
+        _state.update {
+            val enabled = !it.fishing.autoCastEnabled
+            it.copy(fishing = it.fishing.copy(autoCastEnabled = enabled))
+        }
+        val shouldStart = state.value.fishing.autoCastEnabled &&
+            state.value.me?.autoFish == true &&
+            state.value.fishing.phase == FishingPhase.READY
+        if (shouldStart) {
+            beginCast(auto = true)
+        }
+    }
+
+    fun beginCast(auto: Boolean = false) {
+        val current = state.value
+        val me = current.me ?: return
+        if (current.fishing.phase != FishingPhase.READY) return
+        val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }
+        if (currentLure == null || currentLure.qty <= 0) {
+            _state.update { it.copy(error = "No bait available") }
+            return
+        }
+
         viewModelScope.launch {
             _state.update {
                 it.copy(
-                    fishing = it.fishing.copy(busy = true),
+                    fishing = it.fishing.copy(phase = FishingPhase.RESOLVING, phaseTimeLeftMillis = 0L),
                     error = null,
                 )
             }
             try {
-                val result = repository.performQuickCast()
-                _state.update { current ->
-                    current.copy(
-                        me = result.me,
-                        nickname = result.me.username.orEmpty(),
-                        fishing = current.fishing.copy(
-                            busy = false,
-                            lastStart = result.start,
-                            lastCast = result.cast,
+                val start = repository.startCast()
+                val waitSeconds = Random.nextInt(5, 31)
+                val nextLureId = start.currentLureId ?: me.currentLureId
+                _state.update { currentState ->
+                    currentState.copy(
+                        me = currentState.me?.let { profile ->
+                            profile.copy(
+                                currentLureId = nextLureId,
+                                lures = profile.lures.map { lure ->
+                                    if (lure.id == me.currentLureId) {
+                                        lure.copy(qty = (lure.qty - 1).coerceAtLeast(0))
+                                    } else {
+                                        lure
+                                    }
+                                },
+                            )
+                        },
+                        fishing = currentState.fishing.copy(
+                            phase = FishingPhase.WAITING_BITE,
+                            phaseTimeLeftMillis = waitSeconds * 1_000L,
+                            castWaitSeconds = waitSeconds,
+                            lastStart = start,
+                            lastCast = null,
                         ),
-                        error = null,
                     )
                 }
+                launchWaitCountdown(waitSeconds)
             } catch (error: Throwable) {
-                _state.update { current ->
-                    current.copy(
-                        fishing = current.fishing.copy(busy = false),
+                _state.update {
+                    it.copy(
+                        fishing = it.fishing.copy(phase = FishingPhase.READY, phaseTimeLeftMillis = 0L),
                         error = repository.describeError(error),
                     )
                 }
@@ -265,80 +394,34 @@ class RiverKingViewModel(
         }
     }
 
-    fun selectLocation(locationId: Long) {
-        if (state.value.fishing.busy) return
-        viewModelScope.launch {
-            _state.update { it.copy(fishing = it.fishing.copy(busy = true), error = null) }
-            try {
-                val me = repository.changeLocation(locationId)
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
-                        fishing = current.fishing.copy(busy = false),
-                        ratings = current.ratings.takeUnless { it.scope == RatingsScope.CURRENT }
-                            ?: current.ratings.copy(loaded = false),
-                        error = null,
-                    )
-                }
-            } catch (error: Throwable) {
-                _state.update { current ->
-                    current.copy(
-                        fishing = current.fishing.copy(busy = false),
-                        error = repository.describeError(error),
-                    )
-                }
-            }
+    fun hookFish() {
+        if (state.value.fishing.phase != FishingPhase.BITING) return
+        performHook(auto = false)
+    }
+
+    fun registerTap() {
+        if (state.value.fishing.phase != FishingPhase.TAP_CHALLENGE) return
+        val nextCount = state.value.fishing.tapCount + 1
+        _state.update { it.copy(fishing = it.fishing.copy(tapCount = nextCount)) }
+        if (nextCount >= TAP_CHALLENGE_GOAL) {
+            finalizeCatch(success = true)
         }
     }
 
-    fun selectLure(lureId: Long) {
-        if (state.value.fishing.busy) return
-        viewModelScope.launch {
-            _state.update { it.copy(fishing = it.fishing.copy(busy = true), error = null) }
-            try {
-                val me = repository.changeLure(lureId)
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
-                        fishing = current.fishing.copy(busy = false),
-                        error = null,
-                    )
-                }
-            } catch (error: Throwable) {
-                _state.update { current ->
-                    current.copy(
-                        fishing = current.fishing.copy(busy = false),
-                        error = repository.describeError(error),
-                    )
-                }
-            }
-        }
+    fun dismissCatchDetails() {
+        _state.update { it.copy(selectedCatch = null, catchLoading = false) }
     }
 
-    fun selectRod(rodId: Long) {
-        if (state.value.fishing.busy) return
+    fun openCatchDetails(catch: CatchDto) {
+        val catchId = catch.id
+        if (catchId <= 0L) {
+            _state.update { it.copy(selectedCatch = catch) }
+            return
+        }
         viewModelScope.launch {
-            _state.update { it.copy(fishing = it.fishing.copy(busy = true), error = null) }
-            try {
-                val me = repository.changeRod(rodId)
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
-                        fishing = current.fishing.copy(busy = false),
-                        error = null,
-                    )
-                }
-            } catch (error: Throwable) {
-                _state.update { current ->
-                    current.copy(
-                        fishing = current.fishing.copy(busy = false),
-                        error = repository.describeError(error),
-                    )
-                }
-            }
+            _state.update { it.copy(catchLoading = true, selectedCatch = catch) }
+            val detailed = runCatching { repository.catchDetails(catchId) }.getOrDefault(catch)
+            _state.update { it.copy(selectedCatch = detailed, catchLoading = false) }
         }
     }
 
@@ -361,6 +444,8 @@ class RiverKingViewModel(
                         upcoming = upcoming.await(),
                         past = past.await(),
                         prizes = prizes.await(),
+                        selectedTournamentId = state.value.tournaments.selectedTournamentId,
+                        selectedTournament = state.value.tournaments.selectedTournament,
                     )
                 }
                 _state.update { it.copy(tournaments = data, error = null) }
@@ -375,17 +460,62 @@ class RiverKingViewModel(
         }
     }
 
+    fun openTournament(tournamentId: Long) {
+        if (state.value.tournaments.selectedTournamentLoading) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    tournaments = it.tournaments.copy(
+                        selectedTournamentId = tournamentId,
+                        selectedTournamentLoading = true,
+                    ),
+                    error = null,
+                )
+            }
+            try {
+                val tournament = repository.loadTournament(tournamentId)
+                _state.update {
+                    it.copy(
+                        tournaments = it.tournaments.copy(
+                            selectedTournamentId = tournamentId,
+                            selectedTournament = tournament,
+                            selectedTournamentLoading = false,
+                        ),
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        tournaments = it.tournaments.copy(selectedTournamentLoading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun closeTournamentDetails() {
+        _state.update {
+            it.copy(
+                tournaments = it.tournaments.copy(
+                    selectedTournament = null,
+                    selectedTournamentId = null,
+                    selectedTournamentLoading = false,
+                )
+            )
+        }
+    }
+
     fun claimPrize(prizeId: Long) {
         if (state.value.tournaments.loading) return
         viewModelScope.launch {
             _state.update { it.copy(tournaments = it.tournaments.copy(loading = true), error = null) }
             try {
                 val me = repository.claimPrize(prizeId)
-                _state.update { current ->
-                    current.copy(
-                        me = me,
-                        nickname = me.username.orEmpty(),
-                        tournaments = current.tournaments.copy(loaded = false, loading = false),
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        tournaments = it.tournaments.copy(loaded = false, loading = false),
                         error = null,
                     )
                 }
@@ -401,37 +531,66 @@ class RiverKingViewModel(
         }
     }
 
-    fun loadRatings(scope: RatingsScope = state.value.ratings.scope, force: Boolean = false) {
+    fun setRatingsMode(mode: RatingsMode) {
+        _state.update { it.copy(ratings = it.ratings.copy(mode = mode)) }
+        loadRatings(force = true)
+    }
+
+    fun setRatingsPeriod(period: RatingsPeriod) {
+        _state.update { it.copy(ratings = it.ratings.copy(period = period)) }
+        loadRatings(force = true)
+    }
+
+    fun setRatingsOrder(order: RatingsOrder) {
+        _state.update { it.copy(ratings = it.ratings.copy(order = order)) }
+        loadRatings(force = true)
+    }
+
+    fun setRatingsLocation(locationId: String) {
+        _state.update { it.copy(ratings = it.ratings.copy(locationId = locationId)) }
+        loadRatings(force = true)
+    }
+
+    fun setRatingsFish(fishId: String) {
+        _state.update { it.copy(ratings = it.ratings.copy(fishId = fishId)) }
+        loadRatings(force = true)
+    }
+
+    fun loadRatings(force: Boolean = false) {
         val me = state.value.me ?: return
         if (state.value.ratings.loading) return
-        if (!force && state.value.ratings.loaded && state.value.ratings.scope == scope) return
+        if (!force && state.value.ratings.loaded) return
         viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    ratings = it.ratings.copy(
-                        loading = true,
-                        scope = scope,
-                    ),
-                    error = null,
-                )
-            }
-            val locationId = when (scope) {
-                RatingsScope.ALL -> "all"
-                RatingsScope.CURRENT -> me.locationId.toString()
-            }
+            _state.update { it.copy(ratings = it.ratings.copy(loading = true), error = null) }
             try {
-                val data = coroutineScope {
-                    val personal = async { repository.loadPersonalLocationRatings(locationId) }
-                    val global = async { repository.loadGlobalLocationRatings(locationId) }
-                    RatingsUiState(
-                        loaded = true,
-                        loading = false,
-                        scope = scope,
-                        personal = personal.await(),
-                        global = global.await(),
+                val guide = if (state.value.ratings.fishOptions.isEmpty()) repository.loadGuide() else null
+                val ratingsState = state.value.ratings
+                val usingSpecies = ratingsState.fishId != "all"
+                val filter = if (usingSpecies) "species" else "location"
+                val id = if (usingSpecies) ratingsState.fishId else ratingsState.locationId
+                val raw = repository.loadRatings(
+                    mode = ratingsState.mode.apiValue,
+                    filter = filter,
+                    id = id,
+                    period = ratingsState.period.apiValue,
+                    order = ratingsState.order.apiValue,
+                )
+                val filtered = if (usingSpecies && ratingsState.locationId != "all") {
+                    val locationName = me.locations.firstOrNull { it.id.toString() == ratingsState.locationId }?.name
+                    if (locationName == null) raw else raw.filter { it.location == locationName }
+                } else {
+                    raw
+                }
+                _state.update {
+                    it.copy(
+                        ratings = it.ratings.copy(
+                            loaded = true,
+                            loading = false,
+                            entries = filtered,
+                            fishOptions = guide?.fish ?: it.ratings.fishOptions,
+                        ),
                     )
                 }
-                _state.update { it.copy(ratings = data, error = null) }
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -462,7 +621,15 @@ class RiverKingViewModel(
                         quests = quests.await(),
                     )
                 }
-                _state.update { it.copy(guide = data, error = null) }
+                _state.update {
+                    it.copy(
+                        guide = data,
+                        ratings = it.ratings.copy(
+                            fishOptions = data.guide?.fish ?: it.ratings.fishOptions,
+                        ),
+                        error = null,
+                    )
+                }
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -474,7 +641,327 @@ class RiverKingViewModel(
         }
     }
 
+    fun claimAchievement(code: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val reward = repository.claimAchievement(code)
+                val me = repository.refreshProfile()
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        lastAchievementReward = reward,
+                        guide = it.guide.copy(loaded = false),
+                    )
+                }
+                loadGuide(force = true)
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        working = false,
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissAchievementReward() {
+        _state.update { it.copy(lastAchievementReward = null) }
+    }
+
+    fun loadClub(force: Boolean = false) {
+        if (state.value.me == null) return
+        if (state.value.club.loading) return
+        if (!force && state.value.club.loaded) return
+        viewModelScope.launch {
+            _state.update { it.copy(club = it.club.copy(loading = true), error = null) }
+            try {
+                val club = repository.loadClub()
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(
+                            loaded = true,
+                            loading = false,
+                            club = club,
+                        )
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(loading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadClubChat() {
+        if (state.value.club.chatLoading) return
+        viewModelScope.launch {
+            _state.update { it.copy(club = it.club.copy(chatLoading = true), error = null) }
+            try {
+                val messages = repository.loadClubChat()
+                _state.update { it.copy(club = it.club.copy(chat = messages, chatLoading = false)) }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(chatLoading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun searchClubs(query: String?) {
+        if (state.value.club.searchLoading) return
+        viewModelScope.launch {
+            _state.update { it.copy(club = it.club.copy(searchLoading = true), error = null) }
+            try {
+                val results = repository.searchClubs(query)
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(
+                            searchResults = results,
+                            searchLoading = false,
+                        )
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(searchLoading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun createClub(name: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val club = repository.createClub(name)
+                val me = repository.refreshProfile()
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        club = it.club.copy(
+                            loaded = true,
+                            club = club,
+                            searchResults = emptyList(),
+                        ),
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun joinClub(clubId: Long) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val club = repository.joinClub(clubId)
+                val me = repository.refreshProfile()
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        club = it.club.copy(
+                            loaded = true,
+                            club = club,
+                        ),
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun updateClubInfo(info: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val club = repository.updateClubInfo(info)
+                _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun updateClubSettings(minJoinWeightKg: Double, recruitingOpen: Boolean) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val club = repository.updateClubSettings(minJoinWeightKg, recruitingOpen)
+                _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun leaveClub() {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                repository.leaveClub()
+                _state.update {
+                    it.copy(
+                        working = false,
+                        club = ClubUiState(),
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun clubMemberAction(memberId: Long, action: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val club = repository.clubMemberAction(memberId, action)
+                _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun loadShop(force: Boolean = false) {
+        if (state.value.me == null) return
+        if (state.value.shop.loading) return
+        if (!force && state.value.shop.loaded) return
+        viewModelScope.launch {
+            _state.update { it.copy(shop = it.shop.copy(loading = true), error = null) }
+            try {
+                val data = coroutineScope {
+                    val categories = async { repository.loadShop() }
+                    val referrals = async { repository.loadReferrals() }
+                    val rewards = async { repository.loadReferralRewards() }
+                    ShopUiState(
+                        loaded = true,
+                        loading = false,
+                        categories = categories.await(),
+                        referrals = referrals.await(),
+                        referralRewards = rewards.await(),
+                    )
+                }
+                _state.update { it.copy(shop = data) }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        shop = it.shop.copy(loading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun generateReferral() {
+        viewModelScope.launch {
+            _state.update { it.copy(shop = it.shop.copy(referralsLoading = true), error = null) }
+            try {
+                val link = repository.generateReferral()
+                _state.update {
+                    val current = it.shop.referrals
+                    it.copy(
+                        shop = it.shop.copy(
+                            referralsLoading = false,
+                            referrals = ReferralInfoDto(
+                                token = link.token,
+                                invited = current?.invited ?: emptyList(),
+                                link = link.link,
+                                telegramLink = link.telegramLink,
+                                androidShareText = link.androidShareText,
+                                webFallbackLink = link.webFallbackLink,
+                            )
+                        )
+                    )
+                }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        shop = it.shop.copy(referralsLoading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun claimReferralRewards() {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.claimReferralRewards()
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        shop = it.shop.copy(loaded = false),
+                    )
+                }
+                loadShop(force = true)
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun buyShopWithCoins(packId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.buyShopWithCoins(packId)
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false, shop = it.shop.copy(loaded = false)) }
+                loadShop(force = true)
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun completePlayPurchase(
+        packId: String,
+        purchaseToken: String,
+        orderId: String,
+        purchaseTimeMillis: Long? = null,
+    ) {
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.completePlayPurchase(
+                    packId = packId,
+                    purchaseToken = purchaseToken,
+                    orderId = orderId,
+                    purchaseTimeMillis = purchaseTimeMillis,
+                )
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false, shop = it.shop.copy(loaded = false)) }
+                loadShop(force = true)
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
     fun logout() {
+        cancelFishingJobs()
         viewModelScope.launch {
             repository.logout()
             _state.value = RiverKingUiState(loading = false)
@@ -489,7 +976,17 @@ class RiverKingViewModel(
         _state.update { it.copy(error = message) }
     }
 
+    fun dismissCatchError() {
+        _state.update { it.copy(selectedCatch = null, catchLoading = false) }
+    }
+
     fun isGoogleEnabled(): Boolean = BuildConfig.GOOGLE_AUTH_ENABLED
+
+    fun isPlayFlavor(): Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "play"
+
+    fun currentAccessToken(): String? = repository.currentAccessToken()
+
+    suspend fun downloadCatchCard(catchId: Long): ByteArray = repository.catchCard(catchId)
 
     private fun bootstrap() {
         viewModelScope.launch {
@@ -498,7 +995,11 @@ class RiverKingViewModel(
                 loading = false,
                 me = me,
                 nickname = me?.username.orEmpty(),
+                ratings = RatingsUiState(locationId = me?.locationId?.toString() ?: "all"),
             )
+            if (me != null) {
+                warmupPlayerSurfaces()
+            }
         }
     }
 
@@ -508,8 +1009,11 @@ class RiverKingViewModel(
                 loading = false,
                 me = me,
                 nickname = me.username.orEmpty(),
+                ratings = RatingsUiState(locationId = me.locationId.toString()),
+                fishing = FishingUiState(autoCastEnabled = false),
             )
         }
+        warmupPlayerSurfaces()
     }
 
     private fun applyProfileUpdate(me: MeResponseDto) {
@@ -522,8 +1026,255 @@ class RiverKingViewModel(
                     current.nickname
                 },
                 profileRefreshing = false,
-                error = null,
+                fishing = current.fishing.copy(autoCastEnabled = current.fishing.autoCastEnabled && me.autoFish),
+                ratings = current.ratings.copy(
+                    locationId = normalizeSelectedLocation(current.ratings.locationId, me),
+                ),
             )
         }
     }
+
+    private fun normalizeSelectedLocation(currentLocationId: String, me: MeResponseDto): String {
+        if (currentLocationId == "all") return currentLocationId
+        if (me.locations.any { it.id.toString() == currentLocationId }) return currentLocationId
+        return me.locationId.toString()
+    }
+
+    private fun warmupPlayerSurfaces() {
+        loadGuide(force = true)
+        loadShop(force = true)
+        loadClub(force = true)
+        loadTournaments(force = true)
+        loadRatings(force = true)
+    }
+
+    private fun launchWaitCountdown(waitSeconds: Int) {
+        waitJob?.cancel()
+        waitJob = viewModelScope.launch {
+            val startedAt = System.currentTimeMillis()
+            val totalMillis = waitSeconds * 1_000L
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - startedAt
+                val remaining = (totalMillis - elapsed).coerceAtLeast(0L)
+                _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
+                if (remaining <= 0L) break
+                delay(100L)
+            }
+            enterBitePhase()
+        }
+    }
+
+    private fun enterBitePhase() {
+        biteStartedAtMillis = System.currentTimeMillis()
+        _state.update {
+            it.copy(
+                fishing = it.fishing.copy(
+                    phase = FishingPhase.BITING,
+                    phaseTimeLeftMillis = BITE_WINDOW_MILLIS,
+                )
+            )
+        }
+        biteJob?.cancel()
+        biteJob = viewModelScope.launch {
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - biteStartedAtMillis
+                val remaining = (BITE_WINDOW_MILLIS - elapsed).coerceAtLeast(0L)
+                _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
+                if (remaining <= 0L) break
+                delay(50L)
+            }
+            performHook(auto = true)
+        }
+    }
+
+    private fun performHook(auto: Boolean) {
+        if (state.value.fishing.phase != FishingPhase.BITING) return
+        biteJob?.cancel()
+        val wait = state.value.fishing.castWaitSeconds
+        val reaction = if (auto) {
+            FAIL_REACTION_SECONDS
+        } else {
+            ((System.currentTimeMillis() - biteStartedAtMillis).coerceAtLeast(0L) / 1_000.0)
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(fishing = it.fishing.copy(phase = FishingPhase.RESOLVING)) }
+            try {
+                val result = repository.hook(wait = wait, reaction = reaction)
+                _state.update {
+                    it.copy(
+                        me = it.me?.copy(autoFish = result.autoFish),
+                        fishing = it.fishing.copy(autoCastEnabled = it.fishing.autoCastEnabled && result.autoFish),
+                    )
+                }
+                if (!result.success) {
+                    _state.update { it.copy(error = "The fish escaped") }
+                    startCooldown(triggerAutoCast = false)
+                    return@launch
+                }
+                hookReactionSeconds = reaction
+                startTapChallenge()
+            } catch (error: Throwable) {
+                _state.update { it.copy(error = repository.describeError(error)) }
+                startCooldown(triggerAutoCast = false)
+            }
+        }
+    }
+
+    private fun startTapChallenge() {
+        tapJob?.cancel()
+        _state.update {
+            it.copy(
+                fishing = it.fishing.copy(
+                    phase = FishingPhase.TAP_CHALLENGE,
+                    phaseTimeLeftMillis = TAP_CHALLENGE_MILLIS,
+                    tapCount = 0,
+                )
+            )
+        }
+        val startedAt = System.currentTimeMillis()
+        tapJob = viewModelScope.launch {
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - startedAt
+                val remaining = (TAP_CHALLENGE_MILLIS - elapsed).coerceAtLeast(0L)
+                _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
+                if (remaining <= 0L) break
+                delay(50L)
+            }
+            finalizeCatch(success = false)
+        }
+    }
+
+    private fun finalizeCatch(success: Boolean) {
+        if (state.value.fishing.phase != FishingPhase.TAP_CHALLENGE) return
+        tapJob?.cancel()
+        viewModelScope.launch {
+            _state.update { it.copy(fishing = it.fishing.copy(phase = FishingPhase.RESOLVING)) }
+            try {
+                val cast = repository.cast(
+                    wait = state.value.fishing.castWaitSeconds,
+                    reaction = hookReactionSeconds,
+                    success = success,
+                )
+                val me = repository.refreshProfile()
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        fishing = it.fishing.copy(lastCast = cast),
+                        selectedCatch = cast.catch ?: it.selectedCatch,
+                    )
+                }
+                if (cast.achievements.isNotEmpty() || cast.questUpdates.isNotEmpty()) {
+                    loadGuide(force = true)
+                }
+                loadTournaments(force = true)
+                startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
+            } catch (error: Throwable) {
+                _state.update { it.copy(error = repository.describeError(error)) }
+                startCooldown(triggerAutoCast = false)
+            }
+        }
+    }
+
+    private fun startCooldown(triggerAutoCast: Boolean) {
+        waitJob?.cancel()
+        biteJob?.cancel()
+        tapJob?.cancel()
+        cooldownJob?.cancel()
+        _state.update {
+            it.copy(
+                fishing = it.fishing.copy(
+                    phase = FishingPhase.COOLDOWN,
+                    phaseTimeLeftMillis = CAST_READY_DELAY_MILLIS,
+                    tapCount = 0,
+                )
+            )
+        }
+        val startedAt = System.currentTimeMillis()
+        cooldownJob = viewModelScope.launch {
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - startedAt
+                val remaining = (CAST_READY_DELAY_MILLIS - elapsed).coerceAtLeast(0L)
+                _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
+                if (remaining <= 0L) break
+                delay(50L)
+            }
+            _state.update {
+                it.copy(
+                    fishing = it.fishing.copy(
+                        phase = FishingPhase.READY,
+                        phaseTimeLeftMillis = 0L,
+                        tapCount = 0,
+                    )
+                )
+            }
+            if (triggerAutoCast && state.value.fishing.autoCastEnabled && state.value.me?.autoFish == true) {
+                beginCast(auto = true)
+            }
+        }
+    }
+
+    private fun cancelFishingJobs() {
+        waitJob?.cancel()
+        biteJob?.cancel()
+        tapJob?.cancel()
+        cooldownJob?.cancel()
+        waitJob = null
+        biteJob = null
+        tapJob = null
+        cooldownJob = null
+    }
+
+    fun selectLocation(locationId: Long) {
+        if (state.value.fishing.phase == FishingPhase.RESOLVING) return
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.changeLocation(locationId)
+                applyProfileUpdate(me)
+                _state.update {
+                    it.copy(
+                        working = false,
+                        ratings = it.ratings.copy(loaded = false, locationId = me.locationId.toString()),
+                    )
+                }
+                loadRatings(force = true)
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun selectLure(lureId: Long) {
+        if (state.value.fishing.phase == FishingPhase.RESOLVING) return
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.changeLure(lureId)
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun selectRod(rodId: Long) {
+        if (state.value.fishing.phase == FishingPhase.RESOLVING) return
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val me = repository.changeRod(rodId)
+                applyProfileUpdate(me)
+                _state.update { it.copy(working = false) }
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
 }
+
+private const val TAP_CHALLENGE_GOAL = 10
+private const val TAP_CHALLENGE_MILLIS = 5_000L
+private const val BITE_WINDOW_MILLIS = 5_000L
+private const val CAST_READY_DELAY_MILLIS = 3_000L
+private const val FAIL_REACTION_SECONDS = 9.99
