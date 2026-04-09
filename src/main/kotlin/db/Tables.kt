@@ -50,6 +50,7 @@ object DB {
                 AuthIdentities,
                 PasswordCredentials,
                 AuthSessions,
+                AccountLinkSessions,
                 Locations,
                 Fish,
                 Lures,
@@ -1504,6 +1505,23 @@ object AuthSessions : Table() {
     val expiresAt = timestamp("expires_at")
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
     val deviceInfo = varchar("device_info", 255).nullable()
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+object AccountLinkSessions : Table() {
+    val id = varchar("id", 64)
+    val purpose = varchar("purpose", 32)
+    val status = varchar("status", 20).default("pending")
+    val requesterUserId = reference("requester_user_id", Users).nullable()
+    val resolvedUserId = reference("resolved_user_id", Users).nullable()
+    val telegramUserId = long("telegram_user_id").nullable()
+    val telegramUsername = varchar("telegram_username", 100).nullable()
+    val errorCode = varchar("error_code", 100).nullable()
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+    val expiresAt = timestamp("expires_at")
+    val completedAt = timestamp("completed_at").nullable()
+    val consumedAt = timestamp("consumed_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

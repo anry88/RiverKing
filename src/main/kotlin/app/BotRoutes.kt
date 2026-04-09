@@ -178,6 +178,8 @@ private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyy
 fun Application.botRoutes(env: Env) {
     val bot = TelegramBot(env.botToken)
     val fishing = FishingService()
+    val auth = AuthService(env, fishing)
+    val telegramLinks = TelegramLinkService(env, fishing, auth)
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
@@ -399,6 +401,61 @@ fun Application.botRoutes(env: Env) {
                         username = it.username,
                         language = it.language_code
                     )
+                }
+            }
+
+            fun startPayloadMessage(
+                result: TelegramLinkService.TelegramStartCommandResult,
+            ): Pair<String, String?> {
+                val lang = result.language
+                val openButtonText = if (lang == "ru") "Открыть игру" else "Open game"
+                val openGameMarkup = """{"inline_keyboard":[[{"text":"$openButtonText","url":"https://t.me/${env.botName}?startapp"}]]}"""
+                return when (result.kind to result.code) {
+                    "mobile_login" to "completed",
+                    "mobile_login" to "already_completed" -> {
+                        if (lang == "ru") {
+                            "Вход через Telegram подтверждён. Вернись в мобильное приложение RiverKing."
+                        } else {
+                            "Telegram sign-in confirmed. Return to the RiverKing mobile app."
+                        } to null
+                    }
+                    "telegram_link" to "completed",
+                    "telegram_link" to "already_completed" -> {
+                        if (lang == "ru") {
+                            "Telegram-аккаунт привязан. Теперь этот профиль доступен и в Mini App, и в мобильном приложении."
+                        } else {
+                            "Your Telegram account is linked. This profile now works in both the Mini App and the mobile app."
+                        } to openGameMarkup
+                    }
+                    "telegram_link" to "telegram_already_bound" -> {
+                        if (lang == "ru") {
+                            "Этот Telegram-аккаунт уже связан с другим профилем RiverKing. В мобильном приложении войди через кнопку Telegram, чтобы открыть именно этот профиль."
+                        } else {
+                            "This Telegram account is already linked to another RiverKing profile. In the mobile app, use the Telegram sign-in button to open that profile."
+                        } to null
+                    }
+                    "telegram_link" to "user_already_linked_to_other_telegram" -> {
+                        if (lang == "ru") {
+                            "Текущий профиль уже привязан к другому Telegram-аккаунту."
+                        } else {
+                            "This RiverKing profile is already linked to another Telegram account."
+                        } to null
+                    }
+                    "mobile_login" to "session_expired",
+                    "telegram_link" to "session_expired" -> {
+                        if (lang == "ru") {
+                            "Ссылка устарела. Вернись в приложение и начни привязку заново."
+                        } else {
+                            "This link has expired. Go back to the app and start again."
+                        } to null
+                    }
+                    else -> {
+                        if (lang == "ru") {
+                            "Не удалось обработать запрос. Начни снова из приложения."
+                        } else {
+                            "I couldn't process this request. Start again from the app."
+                        } to null
+                    }
                 }
             }
 
@@ -1573,8 +1630,8 @@ fun Application.botRoutes(env: Env) {
                     shop.forEach { category ->
                         append("\n\n")
                         append(category.name)
-                        category.packs.forEach { pack ->
-                            val coinPrice = pack.coinPrice ?: return@forEach
+                        category.packs.forEach packLoop@{ pack ->
+                            val coinPrice = pack.coinPrice ?: return@packLoop
                             val priceText = formatter.format(coinPrice)
                             append("\n• ")
                             append(pack.name)
@@ -1715,10 +1772,27 @@ fun Application.botRoutes(env: Env) {
                         return true
                     }
                     "/start" -> {
-                        val uid = ensureUserId(from) ?: return false
-                        val lang = fishing.userLanguage(uid)
                         val params = arg?.let { mapOf("payload" to it) } ?: emptyMap()
                         logCommandMetric("start", params, source)
+                        val payload = arg
+                        if (payload != null && (payload.startsWith("login_") || payload.startsWith("link_"))) {
+                            val telegramUser = from ?: return false
+                            val result = telegramLinks.completeFromTelegramCommand(
+                                rawToken = payload,
+                                tgUser = TgWebAppAuth.TgUser(
+                                    id = telegramUser.id,
+                                    firstName = telegramUser.first_name,
+                                    lastName = telegramUser.last_name,
+                                    username = telegramUser.username,
+                                    languageCode = telegramUser.language_code,
+                                ),
+                            )
+                            val (message, markup) = startPayloadMessage(result)
+                            trySend(chatId, message, markup, replyTo)
+                            return true
+                        }
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
                         val message = if (lang == "ru") {
                             """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
 

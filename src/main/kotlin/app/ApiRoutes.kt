@@ -47,6 +47,7 @@ fun Application.apiRoutes(
 ) {
     val fishing = FishingService()
     val auth = AuthService(env, fishing)
+    val telegramLinks = TelegramLinkService(env, fishing, auth)
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val playPurchases = PlayPurchaseService(
@@ -297,6 +298,31 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class TelegramLinkStartDTO(
+        val sessionToken: String,
+        val telegramLink: String,
+        val expiresAt: Long,
+    )
+
+    @Serializable
+    data class TelegramMobileLoginStatusDTO(
+        val status: String,
+        val error: String? = null,
+        val accessToken: String? = null,
+        val accessTokenExpiresAt: Long? = null,
+        val refreshToken: String? = null,
+        val user: AuthUserDTO? = null,
+    )
+
+    @Serializable
+    data class TelegramLinkStatusDTO(
+        val status: String,
+        val error: String? = null,
+        val telegramLinked: Boolean = false,
+        val telegramUsername: String? = null,
+    )
+
+    @Serializable
     data class GoogleAuthReq(val idToken: String, val ref: String? = null)
 
     @Serializable
@@ -392,6 +418,61 @@ fun Application.apiRoutes(
             )
             call.sessions.set(AppSession(userId))
             call.respond(HttpStatusCode.OK)
+        }
+
+        post("/api/auth/telegram/mobile/start") {
+            val started = telegramLinks.startMobileLogin()
+            call.respond(
+                TelegramLinkStartDTO(
+                    sessionToken = started.sessionToken,
+                    telegramLink = started.telegramLink,
+                    expiresAt = started.expiresAt.epochSecond,
+                )
+            )
+        }
+
+        get("/api/auth/telegram/mobile/status/{token}") {
+            val token = call.parameters["token"]?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val status = telegramLinks.pollMobileLogin(token, deviceInfo = call.deviceInfo())
+            val authResult = status.authResult
+            call.respond(
+                TelegramMobileLoginStatusDTO(
+                    status = status.status,
+                    error = status.error,
+                    accessToken = authResult?.accessToken,
+                    accessTokenExpiresAt = authResult?.accessTokenExpiresAt?.epochSecond,
+                    refreshToken = authResult?.refreshToken,
+                    user = authResult?.let { currentUserSummary(it.userId) },
+                )
+            )
+        }
+
+        post("/api/auth/telegram/link/start") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val started = telegramLinks.startTelegramLink(uid)
+            call.respond(
+                TelegramLinkStartDTO(
+                    sessionToken = started.sessionToken,
+                    telegramLink = started.telegramLink,
+                    expiresAt = started.expiresAt.epochSecond,
+                )
+            )
+        }
+
+        get("/api/auth/telegram/link/status/{token}") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val token = call.parameters["token"]?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val status = telegramLinks.pollTelegramLink(uid, token)
+            call.respond(
+                TelegramLinkStatusDTO(
+                    status = status.status,
+                    error = status.error,
+                    telegramLinked = status.telegramLinked,
+                    telegramUsername = status.telegramUsername,
+                )
+            )
         }
 
         post("/api/auth/google") {
@@ -507,6 +588,13 @@ fun Application.apiRoutes(
                 Users.select { Users.id eq uid }.single()[Users.autoFishUntil]
                     ?.isAfter(Instant.now()) ?: false
             }
+            val telegramLinked = transaction {
+                Users.select { Users.id eq uid }.single()[Users.tgId] != null
+            }
+            val telegramUsername = transaction {
+                Users.select { Users.id eq uid }.single()[Users.username]
+                    ?.takeIf { telegramLinked && it.isNotBlank() }
+            }
             val totalCoins = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
             val todayCoins = fishing.todayCoins(uid)
 
@@ -532,6 +620,8 @@ fun Application.apiRoutes(
                 val language: String,
                 val coins: Long,
                 val todayCoins: Long,
+                val telegramLinked: Boolean,
+                val telegramUsername: String? = null,
             )
             call.respond(
                 MeResp(
@@ -555,6 +645,8 @@ fun Application.apiRoutes(
                     language,
                     totalCoins,
                     todayCoins,
+                    telegramLinked,
+                    telegramUsername,
                 )
             )
         }
