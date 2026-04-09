@@ -17,6 +17,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `src/main/kotlin/db/`: Exposed tables, schema creation, seed and migration helpers.
 - `src/main/kotlin/util/`: metrics, RNG helpers, profanity filtering, text sanitization, coin math.
 - `src/main/resources/webapp/`: Telegram Mini App frontend and shipped game assets.
+- `mobile/android-app/`: nested Android project with its own Gradle setup, mobile auth flows, and shared-backend client shell.
 - `src/test/kotlin/`: service and route tests.
 - `docs/`: product-facing repository materials and showcase assets.
 
@@ -25,7 +26,8 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Runtime stack: Kotlin + Ktor + Netty.
 - Persistence: Exposed over SQLite by default, with PostgreSQL-style connection config fields also supported.
 - Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session.
-- Product surfaces: Telegram Mini App frontend plus Telegram bot commands and admin flows.
+- Mobile auth: password and Google auth create bearer tokens plus refresh sessions for the Android client.
+- Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, and a nested Android client project.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.
@@ -39,6 +41,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
    - [src/main/kotlin/service/README.md](src/main/kotlin/service/README.md)
    - [src/main/kotlin/db/README.md](src/main/kotlin/db/README.md)
    - [src/main/kotlin/util/README.md](src/main/kotlin/util/README.md)
+4. If the task touches Android, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
 4. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
 5. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
 
@@ -59,7 +62,17 @@ You usually need to touch:
 - `src/main/kotlin/app/ApiRoutes.kt`
 - `src/main/kotlin/app/Sessions.kt`
 - `src/main/kotlin/app/TgWebAppAuth.kt`
+- `src/main/kotlin/app/AuthService.kt`
 - a service under `src/main/kotlin/service/`
+
+### Android client
+
+You usually need to touch:
+
+- `mobile/android-app/app/src/main/java/com/riverking/mobile/ui/`
+- `mobile/android-app/app/src/main/java/com/riverking/mobile/auth/`
+- `mobile/android-app/app/build.gradle.kts`
+- `mobile/android-app/README.md`
 
 ### Game systems
 

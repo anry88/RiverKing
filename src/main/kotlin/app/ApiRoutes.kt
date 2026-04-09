@@ -39,6 +39,7 @@ import java.time.Instant
 
 fun Application.apiRoutes(env: Env) {
     val fishing = FishingService()
+    val auth = AuthService(env, fishing)
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
     val tournaments = TournamentService()
@@ -54,25 +55,18 @@ fun Application.apiRoutes(env: Env) {
     // that are served before the Sessions plugin runs.
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
-        if (path.startsWith("/app")) {
-            val qsTgId = call.request.queryParameters["tgId"]?.toLongOrNull()
-            val sessionTgId = call.sessions.get<AppSession>()?.tgId
-            if (qsTgId != null && sessionTgId != null && qsTgId != sessionTgId) {
-                call.sessions.clear<AppSession>()
-            }
-        }
         if (path != "/metrics") {
             val session = call.sessions.get<AppSession>()
-            val tgId = session?.tgId
+            val userId = session?.userId
             val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
             val body = if (call.request.httpMethod in listOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch)) {
                 try { call.receiveText() } catch (_: Exception) { "" }
             } else ""
             log.info(
-                "call {} {} tgId={} params={} body={}",
+                "call {} {} userId={} params={} body={}",
                 call.request.httpMethod.value,
                 call.request.uri,
-                tgId,
+                userId,
                 params,
                 body
             )
@@ -268,10 +262,78 @@ fun Application.apiRoutes(env: Env) {
         val mine: LeaderboardEntryDTO? = null,
     )
 
+    @Serializable
+    data class AuthUserDTO(
+        val id: Long,
+        val username: String?,
+        val needsNickname: Boolean,
+        val language: String,
+    )
+
+    @Serializable
+    data class AuthResponseDTO(
+        val accessToken: String,
+        val accessTokenExpiresAt: Long,
+        val refreshToken: String,
+        val user: AuthUserDTO,
+    )
+
+    @Serializable
+    data class GoogleAuthReq(val idToken: String, val ref: String? = null)
+
+    @Serializable
+    data class PasswordRegisterReq(
+        val login: String,
+        val password: String,
+        val language: String? = null,
+        val ref: String? = null,
+    )
+
+    @Serializable
+    data class PasswordLoginReq(val login: String, val password: String)
+
+    @Serializable
+    data class RefreshReq(val refreshToken: String)
+
+    fun ApplicationCall.deviceInfo(): String? =
+        request.headers[HttpHeaders.UserAgent]?.takeIf { it.isNotBlank() }
+
+    fun ApplicationCall.bearerToken(): String? {
+        val header = request.headers[HttpHeaders.Authorization] ?: return null
+        if (!header.startsWith("Bearer ", ignoreCase = true)) return null
+        return header.removePrefix("Bearer ").trim().takeIf { it.isNotBlank() }
+    }
+
+    fun currentUserSummary(userId: Long): AuthUserDTO {
+        val displayName = fishing.displayName(userId)
+        val language = fishing.userLanguage(userId)
+        return AuthUserDTO(
+            id = userId,
+            username = displayName,
+            needsNickname = displayName == null,
+            language = language,
+        )
+    }
+
+    fun buildAuthResponse(result: AuthService.AuthResult): AuthResponseDTO =
+        AuthResponseDTO(
+            accessToken = result.accessToken,
+            accessTokenExpiresAt = result.accessTokenExpiresAt.epochSecond,
+            refreshToken = result.refreshToken,
+            user = currentUserSummary(result.userId),
+        )
+
+    suspend fun ApplicationCall.requireUserId(): Long? {
+        sessions.get<AppSession>()?.userId?.let { return fishing.ensureUserById(it) }
+        bearerToken()?.let { token ->
+            auth.resolveAccessToken(token)?.let { return it }
+        }
+        return if (env.devMode) fishing.ensureUserByTgId(1L) else null
+    }
+
     routing {
         get("/api/assets/{path...}") {
-            val session = call.sessions.get<AppSession>()
-                ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val segments = call.parameters.getAll("path")?.takeIf { it.isNotEmpty() }
                 ?: return@get call.respond(HttpStatusCode.NotFound)
             val sanitized = segments.map { it.trim() }
@@ -301,9 +363,8 @@ fun Application.apiRoutes(env: Env) {
             if (initData.isBlank()) return@post call.respond(HttpStatusCode.BadRequest, "missing initData")
             val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
             catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
-            call.sessions.set(AppSession(tgUser.id))
             val ref = call.request.queryParameters["ref"]
-            fishing.ensureUserByTgId(
+            val userId = fishing.ensureUserByTgId(
                 tgUser.id,
                 tgUser.firstName,
                 tgUser.lastName,
@@ -311,18 +372,79 @@ fun Application.apiRoutes(env: Env) {
                 tgUser.languageCode,
                 ref,
             )
+            call.sessions.set(AppSession(userId))
             call.respond(HttpStatusCode.OK)
+        }
+
+        post("/api/auth/google") {
+            val req = try { call.receive<GoogleAuthReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val result = try {
+                auth.loginGoogle(
+                    idToken = req.idToken,
+                    refToken = req.ref,
+                    deviceInfo = call.deviceInfo(),
+                )
+            } catch (e: AuthService.AuthException) {
+                return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to e.message))
+            }
+            call.respond(buildAuthResponse(result))
+        }
+
+        post("/api/auth/password/register") {
+            val req = try { call.receive<PasswordRegisterReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val result = try {
+                auth.registerPassword(
+                    login = req.login,
+                    password = req.password,
+                    language = req.language,
+                    refToken = req.ref,
+                    deviceInfo = call.deviceInfo(),
+                )
+            } catch (e: AuthService.AuthException) {
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to e.message))
+            }
+            call.respond(buildAuthResponse(result))
+        }
+
+        post("/api/auth/password/login") {
+            val req = try { call.receive<PasswordLoginReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val result = try {
+                auth.loginPassword(req.login, req.password, call.deviceInfo())
+            } catch (e: AuthService.AuthException) {
+                return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to e.message))
+            }
+            call.respond(buildAuthResponse(result))
+        }
+
+        post("/api/auth/refresh") {
+            val req = try { call.receive<RefreshReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val result = try {
+                auth.refresh(req.refreshToken, call.deviceInfo())
+            } catch (e: AuthService.AuthException) {
+                return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to e.message))
+            }
+            call.respond(buildAuthResponse(result))
+        }
+
+        post("/api/auth/logout") {
+            val req = try { call.receive<RefreshReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            auth.logout(req.refreshToken)
+            call.respond(HttpStatusCode.NoContent)
         }
 
         // Profile
         get("/api/me") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             fishing.resetCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures = fishing.listLures(uid).map {
@@ -420,13 +542,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/nickname") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             @Serializable data class NickReq(val nickname: String)
             val req = call.receive<NickReq>()
             val sanitized = fishing.setNickname(uid, req.nickname)
@@ -434,13 +550,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/language") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             @Serializable data class LangReq(val language: String)
             val req = call.receive<LangReq>()
             fishing.setLanguage(uid, req.language)
@@ -448,13 +558,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/tournament/current") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val t = tournaments.currentTournament()
                 ?: return@get call.respond(HttpStatusCode.NoContent)
@@ -508,13 +612,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/achievements") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = AchievementService.list(uid, language)
             Metrics.counter("achievements_view_total", mapOf("source" to "app"))
@@ -522,13 +620,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/quests") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = QuestService.list(uid, language)
             Metrics.counter("quests_view_total", mapOf("source" to "app"))
@@ -536,14 +628,8 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/achievements/{code}/claim") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val code = call.parameters["code"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val uid = fishing.ensureUserByTgId(tgId)
             val reward = AchievementService.claim(uid, code)
                 ?: return@post call.respond(HttpStatusCode.NotFound)
             reward.rewards.forEach { prize ->
@@ -562,13 +648,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/tournament/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
             val t = tournaments.getTournament(id) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -622,13 +702,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/tournaments/upcoming") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = tournaments.upcomingTournaments().map { t ->
                 val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
@@ -649,13 +723,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/tournaments/past") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val list = tournaments.pastTournaments().map { t ->
                 val fishRarity = t.fish?.let { f -> if (f in rarityGroups) f else fishing.fishRarity(f) }
@@ -676,13 +744,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/prizes") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val pending = prizeService.pendingPrizes(uid).map {
                 PrizeDTO(
                     it.id,
@@ -697,14 +759,8 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/prizes/{id}/claim") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val (lures, current) = try {
                 prizeService.claimPrize(uid, id, fishing)
             } catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest) }
@@ -719,25 +775,13 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/club") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val details = clubs.clubDetails(uid) ?: return@get call.respond(HttpStatusCode.NoContent)
             call.respond(details.toDto())
         }
 
         get("/api/club/chat") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val messages = try {
                 clubs.clubChat(uid)
             } catch (e: ClubService.ClubException) {
@@ -751,13 +795,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/club/search") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val query = call.request.queryParameters["q"]
             val list = clubs.searchClubs(uid, query).map {
                 ClubSummaryDTO(
@@ -774,13 +812,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/create") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             @Serializable data class ClubCreateReq(val name: String)
             val req = try { call.receive<ClubCreateReq>() } catch (_: Exception) {
                 return@post call.respond(HttpStatusCode.BadRequest)
@@ -802,13 +834,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/{id}/join") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val clubId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val details = try {
                 clubs.joinClub(uid, clubId)
@@ -827,13 +853,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/info") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             @Serializable data class ClubInfoReq(val info: String)
             val req = try { call.receive<ClubInfoReq>() } catch (_: Exception) {
                 return@post call.respond(HttpStatusCode.BadRequest)
@@ -853,13 +873,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/settings") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             @Serializable
             data class ClubSettingsReq(
                 val minJoinWeightKg: Double,
@@ -883,13 +897,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/leave") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             try {
                 clubs.leaveClub(uid)
             } catch (e: ClubService.ClubException) {
@@ -903,13 +911,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/members/{id}/promote") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val details = try {
                 clubs.promoteMember(uid, targetId)
@@ -926,13 +928,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/members/{id}/demote") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val details = try {
                 clubs.demoteMember(uid, targetId)
@@ -949,13 +945,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/members/{id}/kick") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val details = try {
                 clubs.kickMember(uid, targetId)
@@ -972,13 +962,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/club/members/{id}/appoint-president") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val targetId = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             val details = try {
                 clubs.appointPresident(uid, targetId)
@@ -996,13 +980,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Daily baits
         post("/api/daily") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val res = fishing.giveDailyBaits(uid)
                 ?: return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "already claimed"))
@@ -1039,13 +1017,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Shop
         get("/api/shop") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val autoUntil = transaction { Users.select { Users.id eq uid }.single()[Users.autoFishUntil] }
             val lockedRodCodes = fishing.listRods(uid).filterNot { it.unlocked }.map { it.code }.toSet()
@@ -1079,19 +1051,13 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/shop/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            log.info("shop purchase click tgId={} pack={}", tgId, id)
+            log.info("shop purchase click userId={} pack={}", uid, id)
             Metrics.counter(
                 "shop_purchase_click_total",
                 mapOf("pack" to id, "currency" to "stars"),
             )
-            val uid = fishing.ensureUserByTgId(tgId)
             val packInfo = fishing.findPack(id)
             if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
                 Metrics.counter(
@@ -1114,7 +1080,7 @@ fun Application.apiRoutes(env: Env) {
                     "shop_purchase_failed_total",
                     mapOf("pack" to id, "currency" to "stars"),
                 )
-                log.warn("shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
+                log.warn("shop purchase failed userId={} pack={} err={}", uid, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
             }
             paymentReq?.let {
@@ -1136,24 +1102,18 @@ fun Application.apiRoutes(env: Env) {
                 "shop_purchase_complete_total",
                 mapOf("pack" to id, "currency" to "stars"),
             )
-            log.info("shop purchase success tgId={} pack={}", tgId, id)
+            log.info("shop purchase success userId={} pack={}", uid, id)
             call.respond(ShopBuyResp(res.first, res.second))
         }
 
         post("/api/shop/{id}/coins") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            log.info("coin shop purchase tgId={} pack={}", tgId, id)
+            log.info("coin shop purchase userId={} pack={}", uid, id)
             Metrics.counter(
                 "coin_shop_purchase_click_total",
                 mapOf("pack" to id, "currency" to "coins"),
             )
-            val uid = fishing.ensureUserByTgId(tgId)
             val language = fishing.userLanguage(uid)
             val result = try {
                 fishing.buyPackageWithCoins(uid, id)
@@ -1184,7 +1144,7 @@ fun Application.apiRoutes(env: Env) {
                     "coin_shop_purchase_failed_total",
                     mapOf("pack" to id, "currency" to "coins", "reason" to "error")
                 )
-                log.warn("coin shop purchase failed tgId={} pack={} err={}", tgId, id, e.message)
+                log.warn("coin shop purchase failed userId={} pack={} err={}", uid, id, e.message)
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
             }
             val localized = result.first.map {
@@ -1197,19 +1157,13 @@ fun Application.apiRoutes(env: Env) {
                 "coin_shop_purchase_complete_total",
                 mapOf("pack" to id, "currency" to "coins"),
             )
-            log.info("coin shop purchase success tgId={} pack={}", tgId, id)
+            log.info("coin shop purchase success userId={} pack={}", uid, id)
             call.respond(ShopBuyResp(localized, result.second))
         }
 
         get("/api/referrals") {
             Metrics.counter("referrals_get_total")
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val token = ReferralService.currentLink(uid) ?: ReferralService.generateLink(uid)
             val invited = ReferralService.invited(uid).mapNotNull { fishing.displayName(it) }
             val link = "https://t.me/${env.botName}?startapp=$token"
@@ -1220,13 +1174,7 @@ fun Application.apiRoutes(env: Env) {
 
         post("/api/referrals") {
             Metrics.counter("referrals_post_total")
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val token = ReferralService.generateLink(uid)
             val link = "https://t.me/${env.botName}?startapp=$token"
             @Serializable
@@ -1236,13 +1184,7 @@ fun Application.apiRoutes(env: Env) {
 
         get("/api/referrals/rewards") {
             Metrics.counter("referral_rewards_get_total")
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val shopItems = fishing.listShop(language).flatMap { it.packs }
             val rewards = ReferralService.pendingRewardsSimple(uid).map {
@@ -1257,13 +1199,7 @@ fun Application.apiRoutes(env: Env) {
 
         post("/api/referrals/rewards/claim") {
             Metrics.counter("referral_rewards_claim_total")
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val (lures, current) = ReferralService.claimAllRewards(uid, fishing)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures2 = lures.map {
@@ -1276,26 +1212,14 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/autofish/disable") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             fishing.disableAutoFish(uid)
             call.respond(HttpStatusCode.NoContent)
         }
 
         // Guide data
         get("/api/guide") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val data = fishing.guide(language)
             call.respond(data)
@@ -1303,13 +1227,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Change location
         post("/api/location/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             try {
                 fishing.setLocation(uid, id)
@@ -1323,13 +1241,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Start cast: consume lure and validate
         post("/api/start-cast") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             try {
                 val result = fishing.startCast(uid)
                 call.respond(result)
@@ -1342,20 +1254,14 @@ fun Application.apiRoutes(env: Env) {
 
         // Hook result: determine if fish can be caught
         post("/api/hook") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val req = call.receive<HookReq>()
             val res = try {
                 fishing.hook(uid, req.wait, req.reaction, applyBeginnerProtection = false)
             } catch (e: Exception) {
                 log.warn(
-                    "hook failed tgId={} wait={} reaction={} err={}",
-                    tgId,
+                    "hook failed userId={} wait={} reaction={} err={}",
+                    uid,
                     req.wait,
                     req.reaction,
                     e.message
@@ -1374,13 +1280,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Cast result / finalize catch
         post("/api/cast") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<CastReq>()
             val res = try {
@@ -1393,8 +1293,8 @@ fun Application.apiRoutes(env: Env) {
                 )
             } catch (e: Exception) {
                 log.warn(
-                    "cast failed tgId={} wait={} reaction={} err={}",
-                    tgId,
+                    "cast failed userId={} wait={} reaction={} err={}",
+                    uid,
                     req.wait,
                     req.reaction,
                     e.message
@@ -1405,8 +1305,8 @@ fun Application.apiRoutes(env: Env) {
                 )
             }
             log.info(
-                "cast tgId={} wait={} reaction={} caught={} fish={} weight={} location={} rarity={}",
-                tgId,
+                "cast userId={} wait={} reaction={} caught={} fish={} weight={} location={} rarity={}",
+                uid,
                 req.wait,
                 req.reaction,
                 res.caught,
@@ -1465,13 +1365,9 @@ fun Application.apiRoutes(env: Env) {
         }
 
         post("/api/catches/{id}/send") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val tgId = fishing.userTgId(uid)
+                ?: return@post call.respond(HttpStatusCode.Forbidden, mapOf("error" to "telegram_only"))
             val catchId = call.parameters["id"]?.toLongOrNull()
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
             val catch = fishing.catchById(uid, catchId)
@@ -1515,13 +1411,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Change lure
         post("/api/lure/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             try {
                 fishing.setLure(uid, id)
@@ -1533,13 +1423,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Change rod
         post("/api/rod/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@post call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"]?.toLongOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
             try {
                 fishing.setRod(uid, id)
@@ -1551,13 +1435,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Ratings - personal
         get("/api/ratings/personal/location/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val locationId = if (idParam.equals("all", ignoreCase = true)) {
                 null
@@ -1577,13 +1455,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/ratings/personal/species/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val fishId = if (idParam.equals("all", ignoreCase = true)) {
                 null
@@ -1604,13 +1476,7 @@ fun Application.apiRoutes(env: Env) {
 
         // Ratings - global
         get("/api/ratings/global/location/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val locationId = if (idParam.equals("all", ignoreCase = true)) {
@@ -1630,13 +1496,7 @@ fun Application.apiRoutes(env: Env) {
         }
 
         get("/api/ratings/global/species/{id}") {
-            val session = call.sessions.get<AppSession>()
-            val tgId = when {
-                session != null -> session.tgId
-                env.devMode     -> 1L
-                else            -> return@get call.respond(HttpStatusCode.Unauthorized)
-            }
-            val uid = fishing.ensureUserByTgId(tgId)
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val idParam = call.parameters["id"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val fishId = if (idParam.equals("all", ignoreCase = true)) {

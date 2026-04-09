@@ -43,9 +43,13 @@ object DB {
             databaseConfig = databaseConfig,
         )
         transaction {
-            ensureRodCodeColumn()
+            ensureUsersTableAllowsNullableTelegramId(env)
+            ensureRodCodeColumn(env)
             SchemaUtils.createMissingTablesAndColumns(
                 Users,
+                AuthIdentities,
+                PasswordCredentials,
+                AuthSessions,
                 Locations,
                 Fish,
                 Lures,
@@ -79,6 +83,121 @@ object DB {
             migrateCoins()
             backfillLastSeenAt()
             sanitizeExistingNicknames()
+            backfillTelegramIdentities()
+        }
+    }
+
+    private fun ensureUsersTableAllowsNullableTelegramId(env: Env) {
+        if (!env.dbUrl.startsWith("jdbc:sqlite:", ignoreCase = true)) return
+        val tx = TransactionManager.current()
+        val jdbc = tx.connection.connection as java.sql.Connection
+        val tableName = Users.tableName
+        val usersExists = jdbc.createStatement().use { stmt ->
+            stmt.executeQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND lower(name)=lower('$tableName')"
+            ).use { rs -> rs.next() }
+        }
+        if (!usersExists) return
+
+        val requiresMigration = jdbc.createStatement().use { stmt ->
+            stmt.executeQuery(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND lower(name)=lower('$tableName')"
+            ).use { rs ->
+                val createSql = if (rs.next()) rs.getString("sql").orEmpty() else ""
+                Regex("""\btg_id\b[^,]*\bnot null\b""", RegexOption.IGNORE_CASE).containsMatchIn(createSql)
+            }
+        }
+        if (!requiresMigration) return
+
+        jdbc.createStatement().use { stmt ->
+            stmt.execute("PRAGMA foreign_keys=OFF")
+            stmt.execute(
+                """
+                CREATE TABLE users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    tg_id BIGINT,
+                    first_name VARCHAR(100),
+                    last_name VARCHAR(100),
+                    username VARCHAR(100),
+                    nickname VARCHAR(100),
+                    language VARCHAR(10) NOT NULL DEFAULT 'en',
+                    level INTEGER NOT NULL,
+                    xp INTEGER NOT NULL,
+                    coins BIGINT NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL,
+                    last_seen_at TIMESTAMP,
+                    last_daily_at TIMESTAMP,
+                    daily_streak INTEGER NOT NULL DEFAULT 0,
+                    current_location_id BIGINT REFERENCES ${Locations.tableName}(id),
+                    current_lure_id BIGINT REFERENCES ${Lures.tableName}(id),
+                    current_rod_id BIGINT REFERENCES ${Rods.tableName}(id),
+                    cast_lure_id BIGINT REFERENCES ${Lures.tableName}(id),
+                    is_casting BOOLEAN NOT NULL DEFAULT 0,
+                    last_cast_at TIMESTAMP,
+                    auto_fish_until TIMESTAMP,
+                    referred_by BIGINT REFERENCES $tableName(id),
+                    can_receive_notifications BOOLEAN NOT NULL DEFAULT 1
+                )
+                """.trimIndent()
+            )
+            stmt.execute(
+                """
+                INSERT INTO users_new (
+                    id,
+                    tg_id,
+                    first_name,
+                    last_name,
+                    username,
+                    nickname,
+                    language,
+                    level,
+                    xp,
+                    coins,
+                    created_at,
+                    last_seen_at,
+                    last_daily_at,
+                    daily_streak,
+                    current_location_id,
+                    current_lure_id,
+                    current_rod_id,
+                    cast_lure_id,
+                    is_casting,
+                    last_cast_at,
+                    auto_fish_until,
+                    referred_by,
+                    can_receive_notifications
+                )
+                SELECT
+                    id,
+                    tg_id,
+                    first_name,
+                    last_name,
+                    username,
+                    nickname,
+                    language,
+                    level,
+                    xp,
+                    coins,
+                    created_at,
+                    last_seen_at,
+                    last_daily_at,
+                    daily_streak,
+                    current_location_id,
+                    current_lure_id,
+                    current_rod_id,
+                    cast_lure_id,
+                    is_casting,
+                    last_cast_at,
+                    auto_fish_until,
+                    referred_by,
+                    can_receive_notifications
+                FROM $tableName
+                """.trimIndent()
+            )
+            stmt.execute("DROP TABLE $tableName")
+            stmt.execute("ALTER TABLE users_new RENAME TO $tableName")
+            stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_tg_id_unique ON $tableName(tg_id)")
+            stmt.execute("PRAGMA foreign_keys=ON")
         }
     }
 
@@ -96,6 +215,30 @@ object DB {
             }
     }
 
+    private fun backfillTelegramIdentities() {
+        val existing = AuthIdentities
+            .slice(AuthIdentities.provider, AuthIdentities.subject)
+            .select { AuthIdentities.provider eq "telegram" }
+            .associate { it[AuthIdentities.subject] to true }
+
+        Users
+            .slice(Users.id, Users.tgId)
+            .select { Users.tgId.isNotNull() }
+            .forEach { row ->
+                val subject = row[Users.tgId]?.toString() ?: return@forEach
+                if (existing[subject] == true) return@forEach
+                AuthIdentities.insert {
+                    it[userId] = row[Users.id]
+                    it[provider] = "telegram"
+                    it[AuthIdentities.subject] = subject
+                    it[email] = null
+                    it[emailVerified] = false
+                    it[createdAt] = Instant.now()
+                    it[lastLoginAt] = Instant.now()
+                }
+            }
+    }
+
     private fun backfillLastSeenAt() {
         Users
             .slice(Users.id, Users.createdAt)
@@ -109,27 +252,36 @@ object DB {
             }
     }
 
-    private fun ensureRodCodeColumn() {
+    private fun ensureRodCodeColumn(env: Env) {
+        if (!env.dbUrl.startsWith("jdbc:sqlite:", ignoreCase = true)) return
         val tx = TransactionManager.current()
+        val jdbc = tx.connection.connection as java.sql.Connection
         val tableName = Rods.tableName
-        val rodsExists = tx.exec(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'"
-        ) { rs -> rs.next() } ?: false
+        val rodsExists = jdbc.createStatement().use { stmt ->
+            stmt.executeQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND lower(name)=lower('$tableName')"
+            ).use { rs -> rs.next() }
+        }
         if (!rodsExists) return
-        val hasCode = tx.exec("PRAGMA table_info($tableName)") { rs ->
-            var found = false
-            while (rs.next()) {
-                if (rs.getString("name").equals("code", ignoreCase = true)) {
-                    found = true
-                    break
+
+        val hasCode = jdbc.createStatement().use { stmt ->
+            stmt.executeQuery("PRAGMA table_info($tableName)").use { rs ->
+                var found = false
+                while (rs.next()) {
+                    if (rs.getString("name").equals("code", ignoreCase = true)) {
+                        found = true
+                        break
+                    }
                 }
+                found
             }
-            found
-        } ?: false
+        }
         if (hasCode) return
 
         // Add the column without NOT NULL constraint to avoid SQLite migration failures.
-        tx.exec("ALTER TABLE $tableName ADD COLUMN code VARCHAR(50)")
+        jdbc.createStatement().use { stmt ->
+            stmt.execute("ALTER TABLE $tableName ADD COLUMN code VARCHAR(50)")
+        }
 
         val predefined = mapOf(
             "Искра" to "spark",
@@ -1298,7 +1450,7 @@ object DB {
 // Table definitions
 
 object Users : LongIdTable() {
-    val tgId = long("tg_id").uniqueIndex()
+    val tgId = long("tg_id").nullable().uniqueIndex()
     val firstName = varchar("first_name", 100).nullable()
     val lastName = varchar("last_name", 100).nullable()
     val username = varchar("username", 100).nullable()
@@ -1320,6 +1472,40 @@ object Users : LongIdTable() {
     val autoFishUntil = timestamp("auto_fish_until").nullable()
     val referredBy = reference("referred_by", Users).nullable()
     val canReceiveNotifications = bool("can_receive_notifications").default(true)
+}
+
+object AuthIdentities : LongIdTable() {
+    val userId = reference("user_id", Users)
+    val provider = varchar("provider", 50)
+    val subject = varchar("subject", 255)
+    val email = varchar("email", 255).nullable()
+    val emailVerified = bool("email_verified").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+    val lastLoginAt = timestamp("last_login_at").nullable()
+
+    init {
+        uniqueIndex(provider, subject)
+        uniqueIndex(userId, provider)
+    }
+}
+
+object PasswordCredentials : LongIdTable() {
+    val userId = reference("user_id", Users).uniqueIndex()
+    val login = varchar("login", 100).uniqueIndex()
+    val passwordHash = varchar("password_hash", 255)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+}
+
+object AuthSessions : Table() {
+    val id = varchar("session_id", 64)
+    val userId = reference("user_id", Users)
+    val refreshTokenHash = varchar("refresh_token_hash", 128)
+    val expiresAt = timestamp("expires_at")
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+    val deviceInfo = varchar("device_info", 255).nullable()
+
+    override val primaryKey = PrimaryKey(id)
 }
 
 object SubscriptionNotifications : LongIdTable() {

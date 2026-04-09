@@ -3462,7 +3462,9 @@ Available commands:
                         broadcastStates.remove(userId)
                         try { bot.sendMessage(chatId, "Начинаю рассылку") } catch (e: Exception) { log.error("sendMessage failed chatId={}", chatId, e) }
                         val users = transaction {
-                            Users.slice(Users.tgId, Users.language).selectAll().map { it[Users.tgId] to it[Users.language] }
+                            Users.slice(Users.tgId, Users.language)
+                                .select { Users.tgId.isNotNull() }
+                                .map { it[Users.tgId]!! to it[Users.language] }
                         }
                         broadcastScope.launch {
                             users.forEachIndexed { index, (uid, lang) ->

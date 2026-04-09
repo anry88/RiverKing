@@ -3,7 +3,7 @@ package app
 import io.ktor.server.application.*
 import io.ktor.server.sessions.*
 
-data class AppSession(val tgId: Long)
+data class AppSession(val userId: Long)
 
 /**
  * Configure session cookies. Cookies should only be marked `Secure`

@@ -1,0 +1,181 @@
+package app
+
+import db.DB
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.doublereceive.DoubleReceive
+import io.ktor.server.testing.testApplication
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import support.testEnv
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+
+class AuthRoutesTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Serializable
+    private data class AuthResponse(
+        val accessToken: String,
+        val refreshToken: String,
+        val user: AuthUser,
+    )
+
+    @Serializable
+    private data class AuthUser(
+        val id: Long,
+        val needsNickname: Boolean,
+        val language: String,
+    )
+
+    @Test
+    fun `password auth uses shared me endpoint and refresh logout flow`() = testApplication {
+        val env = testEnv("password-auth-routes").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val register = client.post("/api/auth/password/register") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"login":"angler.one","password":"password123","language":"ru"}""")
+        }
+        assertEquals(HttpStatusCode.OK, register.status)
+        val registered = json.decodeFromString<AuthResponse>(register.bodyAsText())
+        assertEquals(true, registered.user.needsNickname)
+        assertEquals("ru", registered.user.language)
+
+        val login = client.post("/api/auth/password/login") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"login":"angler.one","password":"password123"}""")
+        }
+        assertEquals(HttpStatusCode.OK, login.status)
+        val loggedIn = json.decodeFromString<AuthResponse>(login.bodyAsText())
+        assertEquals(registered.user.id, loggedIn.user.id)
+
+        val meBeforeNickname = client.get("/api/me") {
+            bearerAuth(loggedIn.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, meBeforeNickname.status)
+        val meBeforeBody = json.parseToJsonElement(meBeforeNickname.bodyAsText()).jsonObject
+        assertEquals(true, meBeforeBody.getValue("needsNickname").jsonPrimitive.boolean)
+
+        val nickname = client.post("/api/nickname") {
+            bearerAuth(loggedIn.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"nickname":"Captain River"}""")
+        }
+        assertEquals(HttpStatusCode.OK, nickname.status)
+
+        val meAfterNickname = client.get("/api/me") {
+            bearerAuth(loggedIn.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, meAfterNickname.status)
+        val meAfterBody = json.parseToJsonElement(meAfterNickname.bodyAsText()).jsonObject
+        assertEquals("Captain River", meAfterBody.getValue("username").jsonPrimitive.content)
+        assertEquals(false, meAfterBody.getValue("needsNickname").jsonPrimitive.boolean)
+
+        val logout = client.post("/api/auth/logout") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"refreshToken":"${loggedIn.refreshToken}"}""")
+        }
+        assertEquals(HttpStatusCode.NoContent, logout.status)
+
+        val refreshAfterLogout = client.post("/api/auth/refresh") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"refreshToken":"${loggedIn.refreshToken}"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, refreshAfterLogout.status)
+    }
+
+    @Test
+    fun `telegram auth stores shared user session cookie`() = testApplication {
+        val env = testEnv("telegram-auth-routes").copy(
+            botToken = "telegram-test-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val initData = signedTelegramInitData(
+            botToken = env.botToken,
+            userJson = """
+                {"id":777,"first_name":"River","last_name":"King","username":"riverking","language_code":"ru"}
+            """.trimIndent(),
+        )
+
+        val authResponse = client.post("/api/auth/telegram") {
+            header("Telegram-Init-Data", initData)
+        }
+        assertEquals(HttpStatusCode.OK, authResponse.status)
+
+        val sessionCookie = authResponse.headers[HttpHeaders.SetCookie]
+        assertNotNull(sessionCookie)
+
+        val me = client.get("/api/me") {
+            header(HttpHeaders.Cookie, sessionCookie.substringBefore(';'))
+        }
+        assertEquals(HttpStatusCode.OK, me.status)
+        val meBody = json.parseToJsonElement(me.bodyAsText()).jsonObject
+        assertEquals("ru", meBody.getValue("language").jsonPrimitive.content)
+        assertEquals(false, meBody.getValue("needsNickname").jsonPrimitive.boolean)
+    }
+
+    private fun Application.installAuthTestModule(env: Env) {
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        install(DoubleReceive)
+        installSessions(env)
+        DB.init(env)
+        apiRoutes(env)
+    }
+
+    private fun signedTelegramInitData(botToken: String, userJson: String): String {
+        val params = linkedMapOf(
+            "auth_date" to "1710000000",
+            "query_id" to "AAEAAAE",
+            "user" to userJson,
+        )
+        val dataCheckString = params.toList()
+            .sortedBy { it.first }
+            .joinToString("\n") { (key, value) -> "$key=$value" }
+        val secretKey = hmacSha256(
+            key = "WebAppData".toByteArray(StandardCharsets.UTF_8),
+            data = botToken.toByteArray(StandardCharsets.UTF_8),
+        )
+        val hash = hmacSha256(secretKey, dataCheckString.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val encodedParams = params.entries.joinToString("&") { (key, value) ->
+            "${urlEncode(key)}=${urlEncode(value)}"
+        }
+        return "$encodedParams&hash=$hash"
+    }
+
+    private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(key, "HmacSHA256"))
+        return mac.doFinal(data)
+    }
+
+    private fun urlEncode(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8)
+}

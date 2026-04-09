@@ -23,5 +23,9 @@ fun testEnv(name: String): Env {
     tgAnalyticsToken = "",
     tgAnalyticsScriptUrl = "",
     tgAnalyticsAppName = "",
+    authTokenSecret = "test-secret",
+    authAccessTokenTtlMinutes = 60L,
+    authRefreshTokenTtlDays = 30L,
+    googleAuthClientId = "",
 )
 }

@@ -148,6 +148,30 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .select { (Locations.unlockKg lessEq unlockedKg) and (Fish.water eq "salt") }
             .limit(1).any()
 
+    fun createUser(
+        tgId: Long? = null,
+        firstName: String? = null,
+        lastName: String? = null,
+        username: String? = null,
+        language: String? = null,
+        refToken: String? = null,
+    ): Long = transaction {
+        createUserInternal(
+            tgId = tgId,
+            firstName = firstName,
+            lastName = lastName,
+            username = username,
+            language = language,
+            refToken = refToken,
+        )
+    }
+
+    fun ensureUserById(userId: Long): Long = transaction {
+        val existing = Users.select { Users.id eq userId }.singleOrNull()
+            ?: error("unknown user")
+        touchUser(existing)
+    }
+
     fun ensureUserByTgId(
         tgId: Long,
         firstName: String? = null,
@@ -157,43 +181,18 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         refToken: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
-        val now = clock.instant()
-        if (existing == null) {
-            val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
-            val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
-            val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
-            val newId = Users.insertAndGetId {
-                it[Users.tgId] = tgId
-                it[level] = 1; it[xp] = 0; it[createdAt] = now
-                it[Users.lastSeenAt] = now
-                it[Users.firstName] = firstName
-                it[Users.lastName] = lastName
-                it[Users.username] = username
-                it[Users.language] = if (language?.startsWith("ru") == true) "ru" else "en"
-                it[currentLureId] = freshId
-                it[currentRodId] = baseRodId
-            }.value
-            InventoryLures.insert {
-                it[InventoryLures.userId] = newId
-                it[InventoryLures.lureId] = freshId
-                it[InventoryLures.qty] = 10
-            }
-            InventoryLures.insert {
-                it[InventoryLures.userId] = newId
-                it[InventoryLures.lureId] = predId
-                it[InventoryLures.qty] = 5
-            }
-            InventoryRods.insert {
-                it[InventoryRods.userId] = newId
-                it[InventoryRods.rodId] = baseRodId
-                it[InventoryRods.qty] = 1
-            }
-            if (refToken != null) {
-                ReferralService.setReferrer(newId, refToken)
-            }
-            newId
+        val userId = if (existing == null) {
+            createUserInternal(
+                tgId = tgId,
+                firstName = firstName,
+                lastName = lastName,
+                username = username,
+                language = language,
+                refToken = refToken,
+            )
         } else {
             val id = existing[Users.id].value
+            val now = clock.instant()
             val lastSeen = existing[Users.lastSeenAt]
             val shouldUpdateLastSeen = lastSeen == null || Duration.between(lastSeen, now) >= Duration.ofMinutes(1)
             if (firstName != null || lastName != null || username != null || shouldUpdateLastSeen) {
@@ -201,14 +200,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     if (firstName != null) it[Users.firstName] = firstName
                     if (lastName != null) it[Users.lastName] = lastName
                     if (username != null) it[Users.username] = username
+                    it[Users.tgId] = tgId
                     if (shouldUpdateLastSeen) it[Users.lastSeenAt] = now
                 }
             }
-            val total = totalKg(id)
-            ensureRodInventory(id, total)
-            ensureCurrentRod(id, total)
-            id
+            touchUser(existing)
         }
+        upsertTelegramIdentity(userId, tgId)
+        userId
     }
 
     fun setNickname(userId: Long, nickname: String): String = transaction {
@@ -227,6 +226,89 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
     fun userTgId(userId: Long): Long? = transaction {
         Users.select { Users.id eq userId }.singleOrNull()?.get(Users.tgId)
+    }
+
+    private fun createUserInternal(
+        tgId: Long? = null,
+        firstName: String? = null,
+        lastName: String? = null,
+        username: String? = null,
+        language: String? = null,
+        refToken: String? = null,
+    ): Long {
+        val now = clock.instant()
+        val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
+        val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
+        val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
+        val newId = Users.insertAndGetId {
+            it[Users.tgId] = tgId
+            it[level] = 1
+            it[xp] = 0
+            it[createdAt] = now
+            it[Users.lastSeenAt] = now
+            it[Users.firstName] = firstName
+            it[Users.lastName] = lastName
+            it[Users.username] = username
+            it[Users.language] = if (language?.startsWith("ru") == true) "ru" else "en"
+            it[currentLureId] = freshId
+            it[currentRodId] = baseRodId
+        }.value
+        InventoryLures.insert {
+            it[InventoryLures.userId] = newId
+            it[InventoryLures.lureId] = freshId
+            it[InventoryLures.qty] = 10
+        }
+        InventoryLures.insert {
+            it[InventoryLures.userId] = newId
+            it[InventoryLures.lureId] = predId
+            it[InventoryLures.qty] = 5
+        }
+        InventoryRods.insert {
+            it[InventoryRods.userId] = newId
+            it[InventoryRods.rodId] = baseRodId
+            it[InventoryRods.qty] = 1
+        }
+        if (refToken != null) {
+            ReferralService.setReferrer(newId, refToken)
+        }
+        return newId
+    }
+
+    private fun touchUser(row: ResultRow): Long {
+        val id = row[Users.id].value
+        val lastSeen = row[Users.lastSeenAt]
+        val now = clock.instant()
+        if (lastSeen == null || Duration.between(lastSeen, now) >= Duration.ofMinutes(1)) {
+            Users.update({ Users.id eq id }) { it[Users.lastSeenAt] = now }
+        }
+        val total = totalKg(id)
+        ensureRodInventory(id, total)
+        ensureCurrentRod(id, total)
+        return id
+    }
+
+    private fun upsertTelegramIdentity(userId: Long, tgId: Long) {
+        val subject = tgId.toString()
+        val existing = AuthIdentities.select {
+            (AuthIdentities.provider eq "telegram") and
+                (AuthIdentities.subject eq subject)
+        }.singleOrNull()
+        if (existing == null) {
+            AuthIdentities.insert {
+                it[AuthIdentities.userId] = userId
+                it[provider] = "telegram"
+                it[AuthIdentities.subject] = subject
+                it[email] = null
+                it[emailVerified] = false
+                it[createdAt] = clock.instant()
+                it[lastLoginAt] = clock.instant()
+            }
+        } else {
+            AuthIdentities.update({ AuthIdentities.id eq existing[AuthIdentities.id].value }) {
+                it[AuthIdentities.userId] = userId
+                it[lastLoginAt] = clock.instant()
+            }
+        }
     }
 
     fun displayName(userId: Long): String? = transaction {

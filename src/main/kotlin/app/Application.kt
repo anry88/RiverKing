@@ -90,6 +90,8 @@ fun main() {
             get("/app/config.js") {
                 val js = """
                     window.APP_CONFIG = {
+                        devMode: ${env.devMode},
+                        botName: "${env.botName}",
                         tgAnalytics: {
                             token: "${env.tgAnalyticsToken}",
                             scriptUrl: "${env.tgAnalyticsScriptUrl}",
