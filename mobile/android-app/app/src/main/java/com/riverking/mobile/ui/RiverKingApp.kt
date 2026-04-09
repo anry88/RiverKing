@@ -4,20 +4,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -27,25 +20,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.riverking.mobile.auth.GoogleSignInManager
 import kotlinx.coroutines.launch
-
-private enum class MainTab(val title: String) {
-    FISHING("Fishing"),
-    TOURNAMENTS("Tournaments"),
-    RATINGS("Ratings"),
-    GUIDE("Guide"),
-}
 
 @Composable
 fun RiverKingApp(
@@ -101,6 +85,16 @@ fun RiverKingApp(
                     else -> MainShell(
                         state = state,
                         onLogout = viewModel::logout,
+                        onRefreshProfile = viewModel::refreshProfile,
+                        onClaimDaily = viewModel::claimDaily,
+                        onQuickCast = viewModel::performQuickCast,
+                        onSelectLocation = viewModel::selectLocation,
+                        onSelectLure = viewModel::selectLure,
+                        onSelectRod = viewModel::selectRod,
+                        onLoadTournaments = viewModel::loadTournaments,
+                        onClaimPrize = viewModel::claimPrize,
+                        onLoadRatings = viewModel::loadRatings,
+                        onLoadGuide = viewModel::loadGuide,
                     )
                 }
             }
@@ -149,6 +143,7 @@ private fun AuthScreen(
             label = { Text("Password") },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.working,
+            visualTransformation = PasswordVisualTransformation(),
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
@@ -199,93 +194,6 @@ private fun NicknameScreen(
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Continue")
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MainShell(
-    state: RiverKingUiState,
-    onLogout: () -> Unit,
-) {
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
-    val me = state.me ?: return
-
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("RiverKing") },
-                actions = {
-                    TextButton(onClick = onLogout) {
-                        Text("Logout")
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                MainTab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        icon = {},
-                        label = { Text(tab.title) },
-                    )
-                }
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                Text(
-                    text = me.username ?: "Unnamed angler",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        StatCard("Coins", me.coins.toString(), Modifier.fillMaxWidth())
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        StatCard("Today", "${me.todayWeight} kg", Modifier.fillMaxWidth())
-                    }
-                }
-            }
-            item {
-                StatCard(
-                    title = selectedTab.title,
-                    value = when (selectedTab) {
-                        MainTab.FISHING -> "Use the shared /api/me, /api/cast and /api/hook flows here."
-                        MainTab.TOURNAMENTS -> "Tournament surfaces will reuse the existing backend endpoints."
-                        MainTab.RATINGS -> "Ratings will consume the same leaderboard contracts as the Mini App."
-                        MainTab.GUIDE -> "Guide and achievements stay on the common API."
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium)
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
         }
     }
 }
