@@ -54,6 +54,27 @@ Build both debug flavors:
 ./gradlew -p mobile/android-app :app:assembleDirectDebug :app:assemblePlayDebug
 ```
 
+Build scripts:
+
+```bash
+mobile/android-app/scripts/build-direct-debug-apk.sh
+mobile/android-app/scripts/build-play-debug-apk.sh
+mobile/android-app/scripts/build-direct-release-apk.sh
+mobile/android-app/scripts/build-play-release-apk.sh
+mobile/android-app/scripts/build-play-release-aab.sh
+mobile/android-app/scripts/build-debug-apks.sh
+mobile/android-app/scripts/build-release-artifacts.sh
+```
+
+Generic entrypoint:
+
+```bash
+mobile/android-app/scripts/build-android.sh release-artifacts
+mobile/android-app/scripts/build-android.sh play-release-aab --stacktrace
+```
+
+The scripts read the same environment variables as Gradle properties and print the final artifact paths after a successful build.
+
 Release outputs:
 
 ```bash
