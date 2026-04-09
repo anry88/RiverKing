@@ -119,6 +119,7 @@ import com.riverking.mobile.auth.GuideLocationDto
 import com.riverking.mobile.auth.GuideLureDto
 import com.riverking.mobile.auth.GuideRodDto
 import com.riverking.mobile.auth.LeaderboardEntryDto
+import com.riverking.mobile.auth.LocationDto
 import com.riverking.mobile.auth.MeResponseDto
 import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.PrizeSpecDto
@@ -126,6 +127,7 @@ import com.riverking.mobile.auth.QuestDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.ReferralInfoDto
 import com.riverking.mobile.auth.ReferralRewardDto
+import com.riverking.mobile.auth.RodDto
 import com.riverking.mobile.auth.ShopPackageDto
 import com.riverking.mobile.auth.TournamentDto
 import java.time.Instant
@@ -923,7 +925,11 @@ private fun GuideScreen(
                 GuideSection.LOCATIONS -> SectionCard(strings.guideWaters) {
                     guide.guide?.locations?.forEachIndexed { index, location ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLocationRow(location)
+                        GuideLocationRow(
+                            strings = strings,
+                            location = location,
+                            ownedLocation = me.locations.firstOrNull { it.id == location.id },
+                        )
                     } ?: Text(strings.noData)
                 }
                 GuideSection.FISH -> SectionCard(strings.guideFish) {
@@ -935,20 +941,28 @@ private fun GuideScreen(
                     } else {
                         fishList.forEachIndexed { index, fish ->
                             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            GuideFishRow(fish = fish, discovered = me.caughtFishIds.contains(fish.id))
+                            GuideFishRow(
+                                strings = strings,
+                                fish = fish,
+                                discovered = me.caughtFishIds.contains(fish.id),
+                            )
                         }
                     }
                 }
                 GuideSection.LURES -> SectionCard(strings.guideLures) {
                     guide.guide?.lures?.forEachIndexed { index, lure ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLureRow(lure)
+                        GuideLureRow(strings = strings, lure = lure)
                     } ?: Text(strings.noData)
                 }
                 GuideSection.RODS -> SectionCard(strings.guideRods) {
                     guide.guide?.rods?.forEachIndexed { index, rod ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideRodRow(rod)
+                        GuideRodRow(
+                            strings = strings,
+                            rod = rod,
+                            ownedRod = me.rods.firstOrNull { it.code == rod.code },
+                        )
                     } ?: Text(strings.noData)
                 }
                 GuideSection.ACHIEVEMENTS -> SectionCard(strings.achievements) {
@@ -2079,67 +2093,370 @@ private fun PickerRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GuideLocationRow(location: GuideLocationDto) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(location.name, fontWeight = FontWeight.SemiBold)
-        Text(location.fish.joinToString { "${it.name} (${it.rarity})" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(location.lures.joinToString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun GuideLocationRow(
+    strings: RiverStrings,
+    location: GuideLocationDto,
+    ownedLocation: LocationDto?,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+            ) {
+                locationBackgroundAsset(location.name)?.let { background ->
+                    AsyncImage(
+                        model = background,
+                        contentDescription = location.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.10f),
+                                    Color.Black.copy(alpha = 0.22f),
+                                    Color.Black.copy(alpha = 0.70f),
+                                )
+                            )
+                        )
+                )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        location.name,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CatchDetailChip(guideFishCountLabel(strings, location.fish.size))
+                        CatchDetailChip(guideLureCountLabel(strings, location.lures.size))
+                        CatchDetailChip(
+                            when {
+                                ownedLocation?.unlocked == true -> unlockedLabel(strings)
+                                ownedLocation != null -> requiresKgLabel(strings, ownedLocation.unlockKg)
+                                else -> strings.unavailable
+                            }
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(strings.guideFish, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    location.fish.forEach { fish ->
+                        GuideBadge(
+                            label = fish.name,
+                            accent = rarityColor(fish.rarity),
+                        )
+                    }
+                }
+                Text(strings.guideLures, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    location.lures.forEach { lure ->
+                        GuideBadge(
+                            label = lure,
+                            accent = lureAccentColor(lure),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GuideFishRow(
+    strings: RiverStrings,
+    fish: GuideFishDto,
+    discovered: Boolean,
+) {
+    val accent = rarityColor(fish.rarity)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.24f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(92.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.42f),
+                                accent.copy(alpha = 0.12f),
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (discovered) fish.name.take(1) else "?",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = if (discovered) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            if (discovered) fish.name else "?????",
+                            fontWeight = FontWeight.Bold,
+                            color = if (discovered) accent else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            if (discovered) strings.rarityLabel(fish.rarity) else catchToLearnLabel(strings),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    GuideBadge(
+                        label = if (discovered) discoveredLabel(strings) else hiddenLabel(strings),
+                        accent = if (discovered) Color(0xFF7CE38B) else Color(0xFF7A7F87),
+                    )
+                }
+                if (discovered) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        fish.locations.forEach { place ->
+                            GuideBadge(label = place, accent = Color(0xFF68D4FF))
+                        }
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        fish.lures.forEach { lure ->
+                            GuideBadge(label = lure, accent = lureAccentColor(lure))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GuideLureRow(strings: RiverStrings, lure: GuideLureDto) {
+    val accent = lureAccentColor(lure.name)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.28f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(lure.name, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${guideFishCountLabel(strings, lure.fish.size)} • ${guideLocationCountLabel(strings, lure.locations.size)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                GuideBadge(label = strings.bait, accent = accent)
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                lure.fish.forEach { fish ->
+                    GuideBadge(label = fish.name, accent = rarityColor(fish.rarity))
+                }
+            }
+            Text(
+                lure.locations.joinToString(" • "),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 
 @Composable
-private fun GuideFishRow(fish: GuideFishDto, discovered: Boolean) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(if (discovered) fish.name else "?????", fontWeight = FontWeight.SemiBold, color = rarityColor(fish.rarity))
-        Text(fish.locations.joinToString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(fish.lures.joinToString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun GuideLureRow(lure: GuideLureDto) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(lure.name, fontWeight = FontWeight.SemiBold)
-        Text(lure.locations.joinToString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(lure.fish.joinToString { it.name }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun GuideRodRow(rod: GuideRodDto) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(rod.name, fontWeight = FontWeight.SemiBold)
-        Text(rod.unlockKg.asKgCompact(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val bonuses = listOfNotNull(
-            rod.bonusWater?.let { "water: $it" },
-            rod.bonusPredator?.let { if (it) "predator bonus" else "peaceful bonus" },
-        )
-        if (bonuses.isNotEmpty()) {
-            Text(bonuses.joinToString(" • "), color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun GuideRodRow(
+    strings: RiverStrings,
+    rod: GuideRodDto,
+    ownedRod: RodDto?,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, Color(0xFFC9A46E).copy(alpha = 0.24f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AsyncImage(
+                model = rodImageAsset(rod.code),
+                contentDescription = rod.name,
+                modifier = Modifier
+                    .size(92.dp)
+                    .clip(RoundedCornerShape(22.dp)),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(rod.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                GuideBadge(
+                    label = when {
+                        ownedRod?.unlocked == true -> unlockedLabel(strings)
+                        ownedRod?.priceStars != null ->
+                            if (strings.login == "Логин") "Откроется на ${rod.unlockKg.asGuideKg()} • ${ownedRod.priceStars}★" else "Unlocks at ${rod.unlockKg.asGuideKg()} • ${ownedRod.priceStars}★"
+                        else -> requiresKgLabel(strings, rod.unlockKg)
+                    },
+                    accent = if (ownedRod?.unlocked == true) Color(0xFF7CE38B) else Color(0xFFC9A46E),
+                )
+                Text(
+                    strings.rodBonusLabel(rod.bonusWater, rod.bonusPredator),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun AchievementRow(strings: RiverStrings, achievement: AchievementDto, onClaimAchievement: (String) -> Unit) {
-    Row(
+    val ratio = (achievement.progress / achievement.target.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f)
+    val accent = if (achievement.claimable) Color(0xFFFFD76A) else Color(0xFF7EA8FF)
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.26f)),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(achievement.name, fontWeight = FontWeight.SemiBold)
-            Text(achievement.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${achievement.progressLabel}/${achievement.targetLabel}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (achievement.claimable) {
-            Button(onClick = { onClaimAchievement(achievement.code) }) {
-                Text(strings.claim)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AsyncImage(
+                model = achievementArtAsset(achievement.code, achievement.levelIndex),
+                contentDescription = achievement.name,
+                modifier = Modifier
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(20.dp)),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(achievement.name, fontWeight = FontWeight.Bold)
+                        Text(achievement.description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    GuideBadge(label = achievement.level, accent = accent)
+                }
+                Text(
+                    "${achievement.progressLabel}/${achievement.targetLabel}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.08f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(ratio)
+                            .fillMaxSize()
+                            .background(accent),
+                    )
+                }
+                if (achievement.claimable) {
+                    Button(onClick = { onClaimAchievement(achievement.code) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(strings.claim)
+                    }
+                }
             }
-        } else {
-            Text(achievement.level, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun GuideBadge(label: String, accent: Color) {
+    Surface(
+        color = accent.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.42f)),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -3019,6 +3336,62 @@ private fun humanizePackId(packId: String): String = when {
     packId.startsWith("autofish") -> "Autofish"
     else -> packId.replace('_', ' ')
 }
+
+private fun lureAccentColor(name: String): Color =
+    if (name.contains("+")) Color(0xFFFFD76A) else Color(0xFF8FE388)
+
+private fun rodImageAsset(code: String): String = assetUrl(
+    when (code) {
+        "spark" -> "/app/assets/rods/yellow_rod.png"
+        "dew" -> "/app/assets/rods/green_rod.png"
+        "stream" -> "/app/assets/rods/blue_rod.png"
+        "abyss" -> "/app/assets/rods/black_rod.png"
+        "storm" -> "/app/assets/rods/silver_rod.png"
+        else -> "/app/assets/rods/yellow_rod.png"
+    }
+)
+
+private fun achievementArtAsset(code: String, levelIndex: Int): String {
+    val suffix = when (levelIndex.coerceIn(0, 4)) {
+        0 -> "grey"
+        1 -> "bronze"
+        2 -> "silver"
+        3 -> "gold"
+        else -> "platinum"
+    }
+    val base = if (code.endsWith("_all_fish")) {
+        "explorer_${code.removeSuffix("_all_fish")}"
+    } else {
+        code
+    }
+    return assetUrl("/app/assets/achievements/${base}_$suffix.png")
+}
+
+private fun guideFishCountLabel(strings: RiverStrings, count: Int): String =
+    if (strings.login == "Логин") "$count рыб" else "$count fish"
+
+private fun guideLureCountLabel(strings: RiverStrings, count: Int): String =
+    if (strings.login == "Логин") "$count наживок" else "$count lures"
+
+private fun guideLocationCountLabel(strings: RiverStrings, count: Int): String =
+    if (strings.login == "Логин") "$count локаций" else "$count locations"
+
+private fun unlockedLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Открыто" else "Unlocked"
+
+private fun requiresKgLabel(strings: RiverStrings, unlockKg: Double): String =
+    if (strings.login == "Логин") "Откроется на ${unlockKg.asGuideKg()}" else "Unlock at ${unlockKg.asGuideKg()}"
+
+private fun catchToLearnLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Поймайте, чтобы открыть" else "Catch it to reveal details"
+
+private fun discoveredLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Открыто" else "Discovered"
+
+private fun hiddenLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Скрыто" else "Hidden"
+
+private fun Double.asGuideKg(): String = String.format(Locale.US, "%.0f kg", this)
 
 private fun phaseAccentColor(phase: FishingPhase): Color = when (phase) {
     FishingPhase.READY -> Color(0xFF4EA8DE)
