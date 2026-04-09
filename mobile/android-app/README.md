@@ -12,11 +12,15 @@ Nested Android project for the RiverKing mobile client.
 
 - Shared auth with `Google sign-in` and `login/password`.
 - Telegram Mini App remains a separate, Telegram-only surface.
-- Working Android tabs for:
-  - fishing with quick-cast flow over shared `/api/start-cast`, `/api/hook`, `/api/cast`
-  - tournaments and pending prize claiming
-  - ratings over shared leaderboard endpoints
-  - guide, achievements, and quests
+- Android shell now mirrors the TG client much more closely:
+  - six-tab layout: fishing, tournaments, ratings, guide, club, shop
+  - custom dark game-theme with header stats, language toggle, and badgeable bottom navigation
+  - full staged fishing flow over shared `/api/start-cast`, `/api/hook`, `/api/cast`
+  - quick-cast removed from the public Android UX
+  - catch details dialog plus native Android share sheet backed by `/api/catches/{id}/card`
+  - tournaments, ratings, guide, achievements, quests, club, referrals, and shop surfaces running on shared backend contracts
+- `direct` keeps the shop visible but disables real-money packs.
+- `play` debug builds can exercise the new `play/complete` backend contract with debug purchase ids; production Play verification still needs final hardening before store release.
 - Debug builds currently verified for both `direct` and `play` flavors.
 
 ## Local setup

@@ -31,6 +31,7 @@ import service.AchievementRewardDTO
 import service.QuestService
 import service.ClubService
 import service.PrizeSource
+import db.Payments
 import db.Users
 import service.PayService
 import service.StarsPaymentService
@@ -113,6 +114,13 @@ fun Application.apiRoutes(env: Env) {
         val providerChargeId: String? = null,
         val amount: Int = 0,
         val currency: String = "XTR",
+    )
+
+    @Serializable
+    data class PlayPurchaseReq(
+        val purchaseToken: String,
+        val orderId: String,
+        val purchaseTimeMillis: Long? = null,
     )
 
     @Serializable
@@ -1106,6 +1114,55 @@ fun Application.apiRoutes(env: Env) {
             call.respond(ShopBuyResp(res.first, res.second))
         }
 
+        post("/api/shop/{id}/play/complete") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val req = try { call.receive<PlayPurchaseReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            if (req.purchaseToken.isBlank() || req.orderId.isBlank()) {
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_purchase"))
+            }
+            val duplicate = transaction {
+                !Payments.select {
+                    ((Payments.providerChargeId eq req.purchaseToken) or (Payments.telegramChargeId eq req.orderId)) and
+                        (Payments.refunded eq false)
+                }.empty()
+            }
+            if (duplicate) {
+                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "duplicate_purchase"))
+            }
+            log.info("play purchase complete userId={} pack={} orderId={}", uid, id, req.orderId)
+            Metrics.counter(
+                "shop_purchase_click_total",
+                mapOf("pack" to id, "currency" to "play"),
+            )
+            val packInfo = fishing.findPack(id)
+            if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
+                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "rod_unlocked"))
+            }
+            val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
+                log.warn("play purchase failed userId={} pack={} err={}", uid, id, e.message)
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
+            }
+            PayService.recordPayment(
+                uid,
+                id,
+                PayService.PaymentInfo(
+                    providerChargeId = req.purchaseToken,
+                    telegramChargeId = req.orderId,
+                    amount = packInfo?.price ?: 0,
+                    currency = "PLAY",
+                )
+            )
+            packInfo?.let { ReferralService.onPurchase(uid, it) }
+            Metrics.counter(
+                "shop_purchase_complete_total",
+                mapOf("pack" to id, "currency" to "play"),
+            )
+            call.respond(ShopBuyResp(res.first, res.second))
+        }
+
         post("/api/shop/{id}/coins") {
             val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
             val id = call.parameters["id"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -1164,22 +1221,64 @@ fun Application.apiRoutes(env: Env) {
         get("/api/referrals") {
             Metrics.counter("referrals_get_total")
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val token = ReferralService.currentLink(uid) ?: ReferralService.generateLink(uid)
             val invited = ReferralService.invited(uid).mapNotNull { fishing.displayName(it) }
-            val link = "https://t.me/${env.botName}?startapp=$token"
+            val telegramLink = "https://t.me/${env.botName}?startapp=$token"
+            val shareText = if (language == "ru") {
+                "Присоединяйся к RiverKing: $telegramLink"
+            } else {
+                "Join RiverKing: $telegramLink"
+            }
             @Serializable
-            data class ReferralsResp(val token: String, val invited: List<String>, val link: String)
-            call.respond(ReferralsResp(token, invited, link))
+            data class ReferralsResp(
+                val token: String,
+                val invited: List<String>,
+                val link: String,
+                val telegramLink: String,
+                val androidShareText: String,
+                val webFallbackLink: String,
+            )
+            call.respond(
+                ReferralsResp(
+                    token = token,
+                    invited = invited,
+                    link = telegramLink,
+                    telegramLink = telegramLink,
+                    androidShareText = shareText,
+                    webFallbackLink = env.publicBaseUrl.trimEnd('/'),
+                )
+            )
         }
 
         post("/api/referrals") {
             Metrics.counter("referrals_post_total")
             val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val token = ReferralService.generateLink(uid)
             val link = "https://t.me/${env.botName}?startapp=$token"
+            val shareText = if (language == "ru") {
+                "Присоединяйся к RiverKing: $link"
+            } else {
+                "Join RiverKing: $link"
+            }
             @Serializable
-            data class ReferralLinkResp(val token: String, val link: String)
-            call.respond(ReferralLinkResp(token, link))
+            data class ReferralLinkResp(
+                val token: String,
+                val link: String,
+                val telegramLink: String,
+                val androidShareText: String,
+                val webFallbackLink: String,
+            )
+            call.respond(
+                ReferralLinkResp(
+                    token = token,
+                    link = link,
+                    telegramLink = link,
+                    androidShareText = shareText,
+                    webFallbackLink = env.publicBaseUrl.trimEnd('/'),
+                )
+            )
         }
 
         get("/api/referrals/rewards") {
@@ -1362,6 +1461,46 @@ fun Application.apiRoutes(env: Env) {
                     questUpdates = localizedQuestUpdates,
                 )
             )
+        }
+
+        get("/api/catches/{id}") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val catchId = call.parameters["id"]?.toLongOrNull()
+                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val catch = fishing.catchById(uid, catchId)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            call.respond(
+                catch.copy(
+                    fish = I18n.fish(catch.fish, language),
+                    location = I18n.location(catch.location, language),
+                )
+            )
+        }
+
+        get("/api/catches/{id}/card") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val catchId = call.parameters["id"]?.toLongOrNull()
+                ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val catch = fishing.catchById(uid, catchId)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val fishName = I18n.fish(catch.fish, language)
+            val locationName = I18n.location(catch.location, language)
+            val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+            val image = generateCatchImage(
+                catch.fish,
+                catch.location,
+                fishName,
+                locationName,
+                catch.weight,
+                catch.rarity,
+                language,
+                anglerName = catch.user,
+                caughtAt = caughtAt,
+            ) ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respondBytes(image, ContentType.Image.PNG)
         }
 
         post("/api/catches/{id}/send") {
