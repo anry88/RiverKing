@@ -19,6 +19,26 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+sealed interface TelegramLoginPollResult {
+    data object Pending : TelegramLoginPollResult
+
+    data object Expired : TelegramLoginPollResult
+
+    data class Authorized(val me: MeResponseDto) : TelegramLoginPollResult
+
+    data class Failed(val error: String) : TelegramLoginPollResult
+}
+
+sealed interface TelegramLinkPollResult {
+    data object Pending : TelegramLinkPollResult
+
+    data object Expired : TelegramLinkPollResult
+
+    data class Completed(val me: MeResponseDto) : TelegramLinkPollResult
+
+    data class Failed(val error: String) : TelegramLinkPollResult
+}
+
 class AuthRepository(
     private val sessionStore: SecureSessionStore,
 ) {
@@ -66,6 +86,38 @@ class AuthRepository(
         persist(response)
         return api.me(response.accessToken)
     }
+
+    suspend fun startTelegramLogin(): TelegramLinkStartDto =
+        api.startTelegramLogin()
+
+    suspend fun pollTelegramLogin(sessionToken: String): TelegramLoginPollResult {
+        val response = api.pollTelegramLogin(sessionToken)
+        return when (response.status) {
+            "pending" -> TelegramLoginPollResult.Pending
+            "expired" -> TelegramLoginPollResult.Expired
+            "authorized" -> {
+                val authResponse = response.toAuthResponse()
+                    ?: return TelegramLoginPollResult.Failed(humanizeError(response.error ?: "telegram_login_invalid"))
+                persist(authResponse)
+                TelegramLoginPollResult.Authorized(api.me(authResponse.accessToken))
+            }
+            else -> TelegramLoginPollResult.Failed(humanizeError(response.error ?: "telegram_login_failed"))
+        }
+    }
+
+    suspend fun startTelegramLink(): TelegramLinkStartDto =
+        withFreshAccessToken { accessToken -> api.startTelegramLink(accessToken) }
+
+    suspend fun pollTelegramLink(sessionToken: String): TelegramLinkPollResult =
+        withFreshAccessToken { accessToken ->
+            val response = api.pollTelegramLink(accessToken, sessionToken)
+            when (response.status) {
+                "pending" -> TelegramLinkPollResult.Pending
+                "expired" -> TelegramLinkPollResult.Expired
+                "completed" -> TelegramLinkPollResult.Completed(api.me(accessToken))
+                else -> TelegramLinkPollResult.Failed(humanizeError(response.error ?: "telegram_link_failed"))
+            }
+        }
 
     suspend fun updateNickname(nickname: String): MeResponseDto {
         return withFreshAccessToken { accessToken ->
@@ -253,6 +305,19 @@ class AuthRepository(
         )
     }
 
+    private fun TelegramMobileLoginStatusDto.toAuthResponse(): AuthResponseDto? {
+        val accessToken = accessToken ?: return null
+        val expiresAt = accessTokenExpiresAt ?: return null
+        val refreshToken = refreshToken ?: return null
+        val user = user ?: return null
+        return AuthResponseDto(
+            accessToken = accessToken,
+            accessTokenExpiresAt = expiresAt,
+            refreshToken = refreshToken,
+            user = user,
+        )
+    }
+
     fun currentAccessToken(): String? = sessionStore.read()?.accessToken
 
     private suspend fun <T> withFreshAccessToken(block: suspend (String) -> T): T {
@@ -270,12 +335,22 @@ class AuthRepository(
     private suspend fun HttpResponse.readErrorMessage(): String? {
         val raw = bodyAsText().trim()
         if (raw.isBlank()) return null
-        return decodeErrorText(raw) ?: raw.removeSurrounding("\"")
+        val decoded = decodeErrorText(raw) ?: raw.removeSurrounding("\"")
+        return humanizeError(decoded)
     }
 
     private fun decodeErrorText(raw: String): String? {
         val parsed = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return null
         return parsed.stringValue("error") ?: parsed.stringValue("message")
+    }
+
+    private fun humanizeError(raw: String): String = when (raw) {
+        "telegram_already_bound" -> "This Telegram account is already linked to another profile"
+        "user_already_linked_to_other_telegram" -> "This profile is already linked to another Telegram account"
+        "session_expired" -> "This confirmation link has expired"
+        "invalid_session" -> "This confirmation session is no longer valid"
+        "login_session_used" -> "This Telegram sign-in link has already been used"
+        else -> raw
     }
 
     private fun JsonObject.stringValue(key: String): String? =

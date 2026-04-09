@@ -1,6 +1,7 @@
 package com.riverking.mobile.ui
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,6 +113,15 @@ fun RiverKingApp(
         viewModel.consumeError()
     }
 
+    LaunchedEffect(state.pendingExternalUrl) {
+        val url = state.pendingExternalUrl ?: return@LaunchedEffect
+        runCatching { openExternalUrl(activity, url) }
+            .onFailure { error ->
+                viewModel.showError(error.message ?: strings.unavailable)
+            }
+        viewModel.consumePendingExternalUrl()
+    }
+
     RiverTheme {
         Scaffold(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -132,6 +142,7 @@ fun RiverKingApp(
                         onPasswordChange = viewModel::updatePassword,
                         onToggleMode = viewModel::toggleAuthMode,
                         onSubmit = viewModel::submitPasswordAuth,
+                        onTelegramSignIn = viewModel::startTelegramLogin,
                         onGoogleSignIn = {
                             scope.launch {
                                 googleSignInManager.requestIdToken(activity)
@@ -198,6 +209,7 @@ fun RiverKingApp(
                         onUpdateClubSettings = viewModel::updateClubSettings,
                         onLeaveClub = viewModel::leaveClub,
                         onClubMemberAction = viewModel::clubMemberAction,
+                        onStartTelegramLink = viewModel::startTelegramLink,
                         onLoadShop = viewModel::loadShop,
                         onGenerateReferral = viewModel::generateReferral,
                         onShareReferral = { referral ->
@@ -235,8 +247,10 @@ private fun AuthScreen(
     onPasswordChange: (String) -> Unit,
     onToggleMode: () -> Unit,
     onSubmit: () -> Unit,
+    onTelegramSignIn: () -> Unit,
     onGoogleSignIn: () -> Unit,
 ) {
+    val authBusy = state.working || state.telegramLoginPending
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier
@@ -247,13 +261,21 @@ private fun AuthScreen(
             Text(strings.appTitle, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(strings.authSubtitle)
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onTelegramSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+                Text(strings.signInTelegram)
+            }
+            if (state.telegramLoginPending) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(strings.telegramLoginPending)
+            }
             Spacer(modifier = Modifier.height(24.dp))
             OutlinedTextField(
                 value = state.login,
                 onValueChange = onLoginChange,
                 label = { Text(strings.login) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.working,
+                enabled = !authBusy,
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -261,19 +283,19 @@ private fun AuthScreen(
                 onValueChange = onPasswordChange,
                 label = { Text(strings.password) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.working,
+                enabled = !authBusy,
                 visualTransformation = PasswordVisualTransformation(),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onSubmit, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onSubmit, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
                 Text(if (state.authMode == AuthMode.LOGIN) strings.signIn else strings.createAccount)
             }
-            TextButton(onClick = onToggleMode, enabled = !state.working) {
+            TextButton(onClick = onToggleMode, enabled = !authBusy) {
                 Text(if (state.authMode == AuthMode.LOGIN) strings.needAccount else strings.alreadyHaveAccount)
             }
             if (googleEnabled) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onGoogleSignIn, enabled = !state.working, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onGoogleSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
                     Text(strings.signInGoogle)
                 }
             }
@@ -363,4 +385,12 @@ private fun shareReferralInvite(
         putExtra(Intent.EXTRA_TEXT, body)
     }
     activity.startActivity(Intent.createChooser(sendIntent, null))
+}
+
+private fun openExternalUrl(
+    activity: ComponentActivity,
+    url: String,
+) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    activity.startActivity(intent)
 }

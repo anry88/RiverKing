@@ -35,6 +35,22 @@ class AuthApi(
             setBody(GoogleAuthRequest(idToken = idToken))
         }.body()
 
+    suspend fun startTelegramLogin(): TelegramLinkStartDto =
+        client.post("$baseUrl/api/auth/telegram/mobile/start").body()
+
+    suspend fun pollTelegramLogin(sessionToken: String): TelegramMobileLoginStatusDto =
+        client.get("$baseUrl/api/auth/telegram/mobile/status/$sessionToken").body()
+
+    suspend fun startTelegramLink(accessToken: String): TelegramLinkStartDto =
+        client.post("$baseUrl/api/auth/telegram/link/start") {
+            bearerAuth(accessToken)
+        }.body()
+
+    suspend fun pollTelegramLink(accessToken: String, sessionToken: String): TelegramLinkStatusDto =
+        client.get("$baseUrl/api/auth/telegram/link/status/$sessionToken") {
+            bearerAuth(accessToken)
+        }.body()
+
     suspend fun refresh(refreshToken: String): AuthResponseDto =
         client.post("$baseUrl/api/auth/refresh") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

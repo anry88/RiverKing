@@ -14,7 +14,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 **Why it is technically interesting**
 
 - Hybrid Telegram product surface: Mini App frontend plus bot commands and admin flows in one codebase.
-- Shared identity foundation: Telegram cookie sessions for the Mini App and bearer-token auth for mobile clients against the same gameplay API.
+- Shared identity foundation: Telegram cookie sessions for the Mini App plus bearer-token mobile auth with Telegram sign-in/linking against the same gameplay API.
 - Product-minded backend, not only a game loop: progression, retention systems, economy, moderation, payments, analytics, and scheduling.
 - Clear Kotlin layers for Ktor routes, gameplay services, Exposed persistence, shipped frontend assets, and an isolated Android project.
 
@@ -46,7 +46,7 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Product systems for progression, achievements, quests, tournament prize logic, club competition, referral rewards, and in-game economy.
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
-- A nested Android project with its own Gradle setup, auth screens, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
+- A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
 
 ## Architecture
 

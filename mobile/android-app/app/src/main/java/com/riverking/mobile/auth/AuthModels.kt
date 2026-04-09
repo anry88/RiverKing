@@ -20,6 +20,31 @@ data class AuthResponseDto(
 )
 
 @Serializable
+data class TelegramLinkStartDto(
+    val sessionToken: String,
+    val telegramLink: String,
+    val expiresAt: Long,
+)
+
+@Serializable
+data class TelegramMobileLoginStatusDto(
+    val status: String,
+    val error: String? = null,
+    val accessToken: String? = null,
+    val accessTokenExpiresAt: Long? = null,
+    val refreshToken: String? = null,
+    val user: AuthUserDto? = null,
+)
+
+@Serializable
+data class TelegramLinkStatusDto(
+    val status: String,
+    val error: String? = null,
+    val telegramLinked: Boolean = false,
+    val telegramUsername: String? = null,
+)
+
+@Serializable
 data class PasswordRegisterRequest(
     val login: String,
     val password: String,
@@ -52,6 +77,8 @@ data class MeResponseDto(
     val id: Long,
     val username: String? = null,
     val needsNickname: Boolean,
+    val telegramLinked: Boolean = false,
+    val telegramUsername: String? = null,
     val lures: List<LureDto> = emptyList(),
     val currentLureId: Long? = null,
     val rods: List<RodDto> = emptyList(),

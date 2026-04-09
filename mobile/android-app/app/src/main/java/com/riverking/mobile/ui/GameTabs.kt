@@ -204,6 +204,7 @@ fun MainShell(
     onUpdateClubSettings: (Double, Boolean) -> Unit,
     onLeaveClub: () -> Unit,
     onClubMemberAction: (Long, String) -> Unit,
+    onStartTelegramLink: () -> Unit,
     onLoadShop: (Boolean) -> Unit,
     onGenerateReferral: () -> Unit,
     onShareReferral: (ReferralInfoDto) -> Unit,
@@ -337,6 +338,8 @@ fun MainShell(
                     isPlayFlavor = isPlayFlavor,
                     modifier = Modifier.padding(padding),
                     clipboard = clipboard,
+                    me = me,
+                    onStartTelegramLink = onStartTelegramLink,
                     onRefresh = { onLoadShop(true) },
                     onGenerateReferral = onGenerateReferral,
                     onShareReferral = onShareReferral,
@@ -1139,6 +1142,8 @@ private fun ShopScreen(
     isPlayFlavor: Boolean,
     modifier: Modifier = Modifier,
     clipboard: ClipboardManager,
+    me: MeResponseDto,
+    onStartTelegramLink: () -> Unit,
     onRefresh: () -> Unit,
     onGenerateReferral: () -> Unit,
     onShareReferral: (ReferralInfoDto) -> Unit,
@@ -1153,6 +1158,14 @@ private fun ShopScreen(
     ) {
         item {
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(strings.refresh) }
+        }
+        item {
+            TelegramAccountCard(
+                strings = strings,
+                me = me,
+                pending = state.telegramLinkPending,
+                onStartTelegramLink = onStartTelegramLink,
+            )
         }
         item {
             ReferralCard(
@@ -1177,6 +1190,39 @@ private fun ShopScreen(
                         onPlayPurchase = { onPlayPurchase(pack.id) },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TelegramAccountCard(
+    strings: RiverStrings,
+    me: MeResponseDto,
+    pending: Boolean,
+    onStartTelegramLink: () -> Unit,
+) {
+    SectionCard(strings.telegramAccount) {
+        Text(
+            if (me.telegramLinked) strings.telegramLinkedTitle else strings.telegramNotLinkedTitle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        me.telegramUsername?.takeIf { it.isNotBlank() }?.let { username ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("@$username", color = MaterialTheme.colorScheme.secondary)
+        }
+        if (pending) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(strings.telegramLinkPending, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (!me.telegramLinked) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onStartTelegramLink,
+                enabled = !pending,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(strings.linkTelegram)
             }
         }
     }

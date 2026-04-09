@@ -21,6 +21,9 @@ import com.riverking.mobile.auth.ReferralInfoDto
 import com.riverking.mobile.auth.ReferralRewardDto
 import com.riverking.mobile.auth.ShopCategoryDto
 import com.riverking.mobile.auth.StartCastResultDto
+import com.riverking.mobile.auth.TelegramLinkPollResult
+import com.riverking.mobile.auth.TelegramLinkStartDto
+import com.riverking.mobile.auth.TelegramLoginPollResult
 import com.riverking.mobile.auth.TournamentDto
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -148,6 +151,9 @@ data class RiverKingUiState(
     val nickname: String = "",
     val authMode: AuthMode = AuthMode.LOGIN,
     val working: Boolean = false,
+    val telegramLoginPending: Boolean = false,
+    val telegramLinkPending: Boolean = false,
+    val pendingExternalUrl: String? = null,
     val profileRefreshing: Boolean = false,
     val error: String? = null,
     val selectedCatch: CatchDto? = null,
@@ -172,6 +178,8 @@ class RiverKingViewModel(
     private var biteJob: Job? = null
     private var tapJob: Job? = null
     private var cooldownJob: Job? = null
+    private var telegramLoginJob: Job? = null
+    private var telegramLinkJob: Job? = null
     private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
     private var biteStartedAtMillis: Long = 0L
 
@@ -181,6 +189,7 @@ class RiverKingViewModel(
 
     override fun onCleared() {
         cancelFishingJobs()
+        cancelTelegramJobs()
         super.onCleared()
     }
 
@@ -242,6 +251,67 @@ class RiverKingViewModel(
                 _state.update {
                     it.copy(
                         working = false,
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun startTelegramLogin() {
+        if (state.value.working || state.value.telegramLoginPending) return
+        telegramLoginJob?.cancel()
+        telegramLoginJob = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    working = true,
+                    error = null,
+                    telegramLoginPending = false,
+                )
+            }
+            try {
+                val started = repository.startTelegramLogin()
+                _state.update {
+                    it.copy(
+                        working = false,
+                        telegramLoginPending = true,
+                        pendingExternalUrl = started.telegramLink,
+                    )
+                }
+                awaitTelegramLogin(started)
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        working = false,
+                        telegramLoginPending = false,
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
+    fun startTelegramLink() {
+        val me = state.value.me ?: return
+        if (state.value.working || state.value.telegramLinkPending || me.telegramLinked) return
+        telegramLinkJob?.cancel()
+        telegramLinkJob = viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                val started = repository.startTelegramLink()
+                _state.update {
+                    it.copy(
+                        working = false,
+                        telegramLinkPending = true,
+                        pendingExternalUrl = started.telegramLink,
+                    )
+                }
+                awaitTelegramLink(started)
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        working = false,
+                        telegramLinkPending = false,
                         error = repository.describeError(error),
                     )
                 }
@@ -1018,6 +1088,7 @@ class RiverKingViewModel(
 
     fun logout() {
         cancelFishingJobs()
+        cancelTelegramJobs()
         viewModelScope.launch {
             repository.logout()
             _state.value = RiverKingUiState(loading = false)
@@ -1026,6 +1097,10 @@ class RiverKingViewModel(
 
     fun consumeError() {
         _state.update { it.copy(error = null) }
+    }
+
+    fun consumePendingExternalUrl() {
+        _state.update { it.copy(pendingExternalUrl = null) }
     }
 
     fun showError(message: String) {
@@ -1070,6 +1145,69 @@ class RiverKingViewModel(
             )
         }
         warmupPlayerSurfaces()
+    }
+
+    private suspend fun awaitTelegramLogin(started: TelegramLinkStartDto) {
+        while (true) {
+            when (val result = repository.pollTelegramLogin(started.sessionToken)) {
+                TelegramLoginPollResult.Pending -> delay(TELEGRAM_POLL_INTERVAL_MS)
+                TelegramLoginPollResult.Expired -> {
+                    _state.update {
+                        it.copy(
+                            telegramLoginPending = false,
+                            working = false,
+                            error = "Telegram sign-in expired",
+                        )
+                    }
+                    return
+                }
+                is TelegramLoginPollResult.Failed -> {
+                    _state.update {
+                        it.copy(
+                            telegramLoginPending = false,
+                            working = false,
+                            error = result.error,
+                        )
+                    }
+                    return
+                }
+                is TelegramLoginPollResult.Authorized -> {
+                    onAuthenticated(result.me)
+                    return
+                }
+            }
+        }
+    }
+
+    private suspend fun awaitTelegramLink(started: TelegramLinkStartDto) {
+        while (true) {
+            when (val result = repository.pollTelegramLink(started.sessionToken)) {
+                TelegramLinkPollResult.Pending -> delay(TELEGRAM_POLL_INTERVAL_MS)
+                TelegramLinkPollResult.Expired -> {
+                    _state.update {
+                        it.copy(
+                            telegramLinkPending = false,
+                            error = "Telegram link expired",
+                        )
+                    }
+                    return
+                }
+                is TelegramLinkPollResult.Failed -> {
+                    _state.update {
+                        it.copy(
+                            telegramLinkPending = false,
+                            error = result.error,
+                        )
+                    }
+                    return
+                }
+                is TelegramLinkPollResult.Completed -> {
+                    applyProfileUpdate(result.me)
+                    _state.update { it.copy(telegramLinkPending = false) }
+                    return
+                }
+            }
+        }
     }
 
     private fun applyProfileUpdate(me: MeResponseDto) {
@@ -1280,6 +1418,13 @@ class RiverKingViewModel(
         cooldownJob = null
     }
 
+    private fun cancelTelegramJobs() {
+        telegramLoginJob?.cancel()
+        telegramLinkJob?.cancel()
+        telegramLoginJob = null
+        telegramLinkJob = null
+    }
+
     fun selectLocation(locationId: Long) {
         if (state.value.fishing.phase == FishingPhase.RESOLVING) return
         viewModelScope.launch {
@@ -1333,4 +1478,5 @@ private const val TAP_CHALLENGE_GOAL = 10
 private const val TAP_CHALLENGE_MILLIS = 5_000L
 private const val BITE_WINDOW_MILLIS = 5_000L
 private const val CAST_READY_DELAY_MILLIS = 3_000L
+private const val TELEGRAM_POLL_INTERVAL_MS = 2_000L
 private const val FAIL_REACTION_SECONDS = 9.99
