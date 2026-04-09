@@ -1,6 +1,7 @@
 package app
 
 import db.DB
+import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -45,6 +46,16 @@ class AuthRoutesTest {
         val id: Long,
         val needsNickname: Boolean,
         val language: String,
+    )
+
+    @Serializable
+    private data class ReferralResponse(
+        val token: String,
+        val invited: List<String>,
+        val link: String,
+        val telegramLink: String,
+        val androidShareText: String,
+        val webFallbackLink: String,
     )
 
     @Test
@@ -141,12 +152,114 @@ class AuthRoutesTest {
         assertEquals(false, meBody.getValue("needsNickname").jsonPrimitive.boolean)
     }
 
+    @Test
+    fun `android referral and play purchase contracts expose mobile fields`() = testApplication {
+        val env = testEnv("android-referral-play").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            publicBaseUrl = "https://riverking.example",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val registered = registerPasswordUser(client, "angler.mobile", "password123")
+
+        val referrals = client.get("/api/referrals") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, referrals.status)
+        val referralBody = json.decodeFromString<ReferralResponse>(referrals.bodyAsText())
+        assertEquals(true, referralBody.link.startsWith("https://t.me/"))
+        assertEquals(referralBody.link, referralBody.telegramLink)
+        assertEquals(true, referralBody.androidShareText.isNotBlank())
+        assertEquals("https://riverking.example", referralBody.webFallbackLink)
+
+        val purchase = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-1","orderId":"play-order-1"}""")
+        }
+        assertEquals(HttpStatusCode.OK, purchase.status)
+
+        val duplicate = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-1","orderId":"play-order-1"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, duplicate.status)
+    }
+
+    @Test
+    fun `android catch details and share card endpoints return localized catch payloads`() = testApplication {
+        val env = testEnv("android-catch-card").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val registered = registerPasswordUser(client, "angler.catch", "password123")
+
+        val start = client.post("/api/start-cast") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, start.status)
+
+        val hook = client.post("/api/hook") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"wait":10,"reaction":0.6}""")
+        }
+        assertEquals(HttpStatusCode.OK, hook.status)
+        val hookBody = json.parseToJsonElement(hook.bodyAsText()).jsonObject
+        assertEquals(true, hookBody.getValue("success").jsonPrimitive.boolean)
+
+        val cast = client.post("/api/cast") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"wait":10,"reaction":0.6,"success":true}""")
+        }
+        assertEquals(HttpStatusCode.OK, cast.status)
+        val castBody = json.parseToJsonElement(cast.bodyAsText()).jsonObject
+        val catchId = castBody.getValue("catch").jsonObject.getValue("id").jsonPrimitive.content.toLong()
+
+        val details = client.get("/api/catches/$catchId") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, details.status)
+        val detailsBody = json.parseToJsonElement(details.bodyAsText()).jsonObject
+        assertEquals(true, detailsBody.getValue("fish").jsonPrimitive.content.isNotBlank())
+        assertEquals(true, detailsBody.getValue("location").jsonPrimitive.content.isNotBlank())
+
+        val card = client.get("/api/catches/$catchId/card") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, card.status)
+        assertEquals(ContentType.Image.PNG.toString(), card.headers[HttpHeaders.ContentType])
+        val bytes = card.body<ByteArray>()
+        assertEquals(true, bytes.isNotEmpty())
+    }
+
     private fun Application.installAuthTestModule(env: Env) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(DoubleReceive)
         installSessions(env)
         DB.init(env)
         apiRoutes(env)
+    }
+
+    private suspend fun registerPasswordUser(
+        client: io.ktor.client.HttpClient,
+        login: String,
+        password: String,
+        language: String = "en",
+    ): AuthResponse {
+        val register = client.post("/api/auth/password/register") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"login":"$login","password":"$password","language":"$language"}""")
+        }
+        assertEquals(HttpStatusCode.OK, register.status)
+        return json.decodeFromString(register.bodyAsText())
     }
 
     private fun signedTelegramInitData(botToken: String, userJson: String): String {
