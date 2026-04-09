@@ -8,6 +8,16 @@ plugins {
 val ktorVersion = "2.3.11"
 val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?) ?: "http://10.0.2.2:8080"
 val googleClientId = (findProperty("RIVERKING_GOOGLE_AUTH_CLIENT_ID") as String?) ?: ""
+val signingStoreFile = findProperty("RIVERKING_SIGNING_STORE_FILE") as String?
+val signingStorePassword = findProperty("RIVERKING_SIGNING_STORE_PASSWORD") as String?
+val signingKeyAlias = findProperty("RIVERKING_SIGNING_KEY_ALIAS") as String?
+val signingKeyPassword = findProperty("RIVERKING_SIGNING_KEY_PASSWORD") as String?
+val hasReleaseSigning = listOf(
+    signingStoreFile,
+    signingStorePassword,
+    signingKeyAlias,
+    signingKeyPassword,
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.riverking.mobile"
@@ -39,12 +49,28 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(requireNotNull(signingStoreFile))
+                storePassword = requireNotNull(signingStorePassword)
+                keyAlias = requireNotNull(signingKeyAlias)
+                keyPassword = requireNotNull(signingKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
         }
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

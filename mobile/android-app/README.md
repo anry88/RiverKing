@@ -25,6 +25,10 @@ Set these Gradle properties when building locally:
 
 - `RIVERKING_API_BASE_URL`
 - `RIVERKING_GOOGLE_AUTH_CLIENT_ID`
+- `RIVERKING_SIGNING_STORE_FILE`
+- `RIVERKING_SIGNING_STORE_PASSWORD`
+- `RIVERKING_SIGNING_KEY_ALIAS`
+- `RIVERKING_SIGNING_KEY_PASSWORD`
 
 Example:
 
@@ -39,3 +43,15 @@ Build both debug flavors:
 ```bash
 ./gradlew -p mobile/android-app :app:assembleDirectDebug :app:assemblePlayDebug
 ```
+
+Release outputs:
+
+```bash
+./gradlew -p mobile/android-app :app:assembleDirectRelease :app:bundlePlayRelease \
+  -PRIVERKING_SIGNING_STORE_FILE=/absolute/path/to/release.keystore \
+  -PRIVERKING_SIGNING_STORE_PASSWORD=... \
+  -PRIVERKING_SIGNING_KEY_ALIAS=... \
+  -PRIVERKING_SIGNING_KEY_PASSWORD=...
+```
+
+Without signing properties the `release` build type falls back to the debug signing config, which is acceptable only for local verification and not for distribution.
