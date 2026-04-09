@@ -84,6 +84,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.credentials:credentials:1.6.0-rc02")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0-rc02")
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")

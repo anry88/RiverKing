@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,6 +54,7 @@ fun RiverKingApp(
     activity: ComponentActivity,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val currentMe = state.me
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -75,7 +75,7 @@ fun RiverKingApp(
             ) {
                 when {
                     state.loading -> LoadingScreen()
-                    state.me == null -> AuthScreen(
+                    currentMe == null -> AuthScreen(
                         state = state,
                         googleEnabled = viewModel.isGoogleEnabled(),
                         onLoginChange = viewModel::updateLogin,
@@ -92,7 +92,7 @@ fun RiverKingApp(
                             }
                         },
                     )
-                    state.me.needsNickname -> NicknameScreen(
+                    currentMe.needsNickname -> NicknameScreen(
                         nickname = state.nickname,
                         busy = state.working,
                         onNicknameChange = viewModel::updateNickname,
@@ -255,8 +255,12 @@ private fun MainShell(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    StatCard("Coins", me.coins.toString(), Modifier.weight(1f))
-                    StatCard("Today", "${me.todayWeight} kg", Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f)) {
+                        StatCard("Coins", me.coins.toString(), Modifier.fillMaxWidth())
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        StatCard("Today", "${me.todayWeight} kg", Modifier.fillMaxWidth())
+                    }
                 }
             }
             item {

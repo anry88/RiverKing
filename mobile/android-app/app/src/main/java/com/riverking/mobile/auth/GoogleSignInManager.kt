@@ -3,8 +3,8 @@ package com.riverking.mobile.auth
 import androidx.activity.ComponentActivity
 import androidx.credentials.CustomCredential
 import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialException
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException

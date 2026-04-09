@@ -4,11 +4,12 @@ import com.riverking.mobile.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.contentType
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 
 class AuthApi(
     private val client: HttpClient,
@@ -16,31 +17,31 @@ class AuthApi(
 ) {
     suspend fun registerPassword(login: String, password: String): AuthResponseDto =
         client.post("$baseUrl/api/auth/password/register") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(PasswordRegisterRequest(login = login, password = password))
         }.body()
 
     suspend fun loginPassword(login: String, password: String): AuthResponseDto =
         client.post("$baseUrl/api/auth/password/login") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(PasswordLoginRequest(login = login, password = password))
         }.body()
 
     suspend fun loginGoogle(idToken: String): AuthResponseDto =
         client.post("$baseUrl/api/auth/google") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(GoogleAuthRequest(idToken = idToken))
         }.body()
 
     suspend fun refresh(refreshToken: String): AuthResponseDto =
         client.post("$baseUrl/api/auth/refresh") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(RefreshRequest(refreshToken))
         }.body()
 
     suspend fun logout(refreshToken: String) {
         client.post("$baseUrl/api/auth/logout") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(RefreshRequest(refreshToken))
         }
     }
@@ -53,7 +54,7 @@ class AuthApi(
     suspend fun updateNickname(accessToken: String, nickname: String) {
         client.post("$baseUrl/api/nickname") {
             bearerAuth(accessToken)
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(NicknameRequest(nickname))
         }
     }
