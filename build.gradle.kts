@@ -46,6 +46,7 @@ dependencies {
     implementation("de.mkammerer:argon2-jvm:2.12")
     implementation("com.google.api-client:google-api-client:2.7.0")
     implementation("com.google.http-client:google-http-client-gson:1.45.0")
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.30.1")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")

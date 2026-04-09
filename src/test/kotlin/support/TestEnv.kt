@@ -27,5 +27,7 @@ fun testEnv(name: String): Env {
     authAccessTokenTtlMinutes = 60L,
     authRefreshTokenTtlDays = 30L,
     googleAuthClientId = "",
+    googlePlayPackageName = "",
+    googlePlayServiceAccountFile = "",
 )
 }

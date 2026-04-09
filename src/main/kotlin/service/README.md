@@ -20,6 +20,7 @@ Manages the player lifecycle and fishing process.
 ## Shop and payments
 - **StarsPaymentService** creates invoices for Telegram Stars payments (`createInvoice`), validates amounts (`validatePayment`), and records completed payments (`completePayment`).
 - **PayService** tracks payment history and coin crediting: `recordPayment`, `listPayments`, plus duplicate checks.
+- **PlayPurchaseVerifier / PlayPurchaseService** verify Android `play` purchase tokens against Google Play, reject pending/cancelled/mismatched purchases, and only then grant entitlement plus record the payment.
 
 ## Additional services
 - **I18n** — catalog of localized names for fish, locations, rods, and lures; functions like `fish(code, lang)` and `location(code, lang)` are used by the API for readable responses.

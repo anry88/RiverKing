@@ -402,6 +402,6 @@ data class ClubSettingsRequestDto(
 @Serializable
 data class PlayPurchaseCompleteRequestDto(
     val purchaseToken: String,
-    val orderId: String,
+    val orderId: String? = null,
     val purchaseTimeMillis: Long? = null,
 )

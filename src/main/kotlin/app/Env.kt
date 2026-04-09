@@ -21,6 +21,8 @@ data class Env(
     val authAccessTokenTtlMinutes: Long,
     val authRefreshTokenTtlDays: Long,
     val googleAuthClientId: String,
+    val googlePlayPackageName: String,
+    val googlePlayServiceAccountFile: String,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -51,6 +53,8 @@ data class Env(
                 authAccessTokenTtlMinutes = props.getProperty("AUTH_ACCESS_TOKEN_TTL_MINUTES")?.toLongOrNull() ?: 60L,
                 authRefreshTokenTtlDays = props.getProperty("AUTH_REFRESH_TOKEN_TTL_DAYS")?.toLongOrNull() ?: 30L,
                 googleAuthClientId = props.getProperty("GOOGLE_AUTH_CLIENT_ID") ?: "",
+                googlePlayPackageName = props.getProperty("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
+                googlePlayServiceAccountFile = props.getProperty("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
             )
         }
     }

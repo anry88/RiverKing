@@ -18,20 +18,25 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.GoogleSignInManager
+import com.riverking.mobile.auth.ReferralInfoDto
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -46,6 +51,60 @@ fun RiverKingApp(
     val strings = rememberRiverStrings(currentMe?.language)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val latestStrings = rememberUpdatedState(strings)
+    val latestViewModel = rememberUpdatedState(viewModel)
+    val playBillingManager = remember(activity, scope) {
+        if (viewModel.isPlayFlavor()) {
+            PlayBillingManager(
+                context = activity.applicationContext,
+                scope = scope,
+            )
+        } else {
+            null
+        }
+    }
+
+    SideEffect {
+        playBillingManager?.onNotice = { code ->
+            latestViewModel.value.showError(latestStrings.value.playBillingMessage(code))
+        }
+        playBillingManager?.onSyncPurchase = { packId, purchaseToken, orderId, purchaseTimeMillis ->
+            latestViewModel.value.syncPlayPurchase(
+                packId = packId,
+                purchaseToken = purchaseToken,
+                orderId = orderId,
+                purchaseTimeMillis = purchaseTimeMillis,
+            )
+        }
+        playBillingManager?.accountIdProvider = {
+            latestViewModel.value.state.value.me?.id?.toString()
+        }
+        playBillingManager?.isConsumableProduct = { productId ->
+            latestViewModel.value.state.value.shop.categories
+                .flatMap { it.packs }
+                .firstOrNull { it.id == productId }
+                ?.rodCode == null
+        }
+    }
+
+    DisposableEffect(activity, playBillingManager) {
+        val manager = playBillingManager
+        if (manager == null) {
+            onDispose { }
+        } else {
+            manager.start()
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    manager.syncPurchases()
+                }
+            }
+            activity.lifecycle.addObserver(observer)
+            onDispose {
+                activity.lifecycle.removeObserver(observer)
+                manager.stop()
+            }
+        }
+    }
 
     LaunchedEffect(state.error) {
         val message = state.error ?: return@LaunchedEffect
@@ -140,20 +199,17 @@ fun RiverKingApp(
                         onClubMemberAction = viewModel::clubMemberAction,
                         onLoadShop = viewModel::loadShop,
                         onGenerateReferral = viewModel::generateReferral,
+                        onShareReferral = { referral ->
+                            shareReferralInvite(
+                                activity = activity,
+                                referral = referral,
+                            )
+                        },
                         onClaimReferralRewards = viewModel::claimReferralRewards,
                         onBuyShopWithCoins = viewModel::buyShopWithCoins,
                         onPlayPurchase = { packId ->
-                            if (viewModel.isPlayFlavor() && BuildConfig.DEBUG) {
-                                val stamp = System.currentTimeMillis()
-                                viewModel.completePlayPurchase(
-                                    packId = packId,
-                                    purchaseToken = "debug-$packId-$stamp",
-                                    orderId = "debug-$packId-$stamp",
-                                    purchaseTimeMillis = stamp,
-                                )
-                            } else {
-                                viewModel.showError(strings.playPurchaseUnavailable)
-                            }
+                            playBillingManager?.launchPurchase(activity, packId)
+                                ?: viewModel.showError(strings.playPurchaseUnavailable)
                         },
                     )
                 }
@@ -289,4 +345,16 @@ private suspend fun shareCatchCard(
     }.onFailure {
         viewModel.showError(it.message ?: strings.unavailable)
     }
+}
+
+private fun shareReferralInvite(
+    activity: ComponentActivity,
+    referral: ReferralInfoDto,
+) {
+    val body = referral.androidShareText.ifBlank { referral.link }
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
+    activity.startActivity(Intent.createChooser(sendIntent, null))
 }

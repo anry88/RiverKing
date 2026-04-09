@@ -165,6 +165,7 @@ fun MainShell(
     onClubMemberAction: (Long, String) -> Unit,
     onLoadShop: (Boolean) -> Unit,
     onGenerateReferral: () -> Unit,
+    onShareReferral: (ReferralInfoDto) -> Unit,
     onClaimReferralRewards: () -> Unit,
     onBuyShopWithCoins: (String) -> Unit,
     onPlayPurchase: (String) -> Unit,
@@ -298,6 +299,7 @@ fun MainShell(
                     clipboard = clipboard,
                     onRefresh = { onLoadShop(true) },
                     onGenerateReferral = onGenerateReferral,
+                    onShareReferral = onShareReferral,
                     onClaimReferralRewards = onClaimReferralRewards,
                     onBuyShopWithCoins = onBuyShopWithCoins,
                     onPlayPurchase = onPlayPurchase,
@@ -1021,6 +1023,7 @@ private fun ShopScreen(
     clipboard: ClipboardManager,
     onRefresh: () -> Unit,
     onGenerateReferral: () -> Unit,
+    onShareReferral: (ReferralInfoDto) -> Unit,
     onClaimReferralRewards: () -> Unit,
     onBuyShopWithCoins: (String) -> Unit,
     onPlayPurchase: (String) -> Unit,
@@ -1040,6 +1043,7 @@ private fun ShopScreen(
                 rewards = state.shop.referralRewards,
                 clipboard = clipboard,
                 onGenerateReferral = onGenerateReferral,
+                onShareReferral = onShareReferral,
                 onClaimReferralRewards = onClaimReferralRewards,
             )
         }
@@ -1282,6 +1286,7 @@ private fun ReferralCard(
     rewards: List<ReferralRewardDto>,
     clipboard: ClipboardManager,
     onGenerateReferral: () -> Unit,
+    onShareReferral: (ReferralInfoDto) -> Unit,
     onClaimReferralRewards: () -> Unit,
 ) {
     SectionCard(strings.inviteFriends) {
@@ -1292,14 +1297,21 @@ private fun ReferralCard(
                 Text(strings.generateLink)
             }
             OutlinedButton(
-                onClick = {
-                    referrals?.link?.let { clipboard.setText(AnnotatedString(it)) }
-                },
+                onClick = { referrals?.let(onShareReferral) },
                 modifier = Modifier.weight(1f),
                 enabled = referrals != null,
             ) {
-                Text(strings.copyLink)
+                Text(strings.shareLink)
             }
+        }
+        OutlinedButton(
+            onClick = {
+                referrals?.link?.let { clipboard.setText(AnnotatedString(it)) }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = referrals != null,
+        ) {
+            Text(strings.copyLink)
         }
         if (referrals != null) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -1370,7 +1382,7 @@ private fun ShopPackageRow(
                     Text(strings.shopDisabledDirect, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End)
                 } else {
                     Button(onClick = onPlayPurchase) {
-                        Text("${pack.price}★")
+                        Text(strings.payWithGoogle)
                     }
                 }
             }

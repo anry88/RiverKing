@@ -27,6 +27,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Persistence: Exposed over SQLite by default, with PostgreSQL-style connection config fields also supported.
 - Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session.
 - Mobile auth: password and Google auth create bearer tokens plus refresh sessions for the Android client.
+- Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
 - Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, and a nested Android client project.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.

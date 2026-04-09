@@ -31,6 +31,9 @@ import service.AchievementRewardDTO
 import service.QuestService
 import service.ClubService
 import service.PrizeSource
+import service.PlayPurchaseService
+import service.PlayPurchaseVerifier
+import service.GooglePlayPurchaseVerifier
 import db.Payments
 import db.Users
 import service.PayService
@@ -38,11 +41,18 @@ import service.StarsPaymentService
 import util.Metrics
 import java.time.Instant
 
-fun Application.apiRoutes(env: Env) {
+fun Application.apiRoutes(
+    env: Env,
+    playPurchaseVerifier: PlayPurchaseVerifier? = null,
+) {
     val fishing = FishingService()
     val auth = AuthService(env, fishing)
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
+    val playPurchases = PlayPurchaseService(
+        fishing = fishing,
+        verifier = playPurchaseVerifier ?: GooglePlayPurchaseVerifier.fromEnv(env),
+    )
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
@@ -119,7 +129,7 @@ fun Application.apiRoutes(env: Env) {
     @Serializable
     data class PlayPurchaseReq(
         val purchaseToken: String,
-        val orderId: String,
+        val orderId: String? = null,
         val purchaseTimeMillis: Long? = null,
     )
 
@@ -1120,47 +1130,52 @@ fun Application.apiRoutes(env: Env) {
             val req = try { call.receive<PlayPurchaseReq>() } catch (_: Exception) {
                 return@post call.respond(HttpStatusCode.BadRequest)
             }
-            if (req.purchaseToken.isBlank() || req.orderId.isBlank()) {
+            if (req.purchaseToken.isBlank()) {
                 return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_purchase"))
             }
-            val duplicate = transaction {
-                !Payments.select {
-                    ((Payments.providerChargeId eq req.purchaseToken) or (Payments.telegramChargeId eq req.orderId)) and
-                        (Payments.refunded eq false)
-                }.empty()
-            }
-            if (duplicate) {
-                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "duplicate_purchase"))
-            }
-            log.info("play purchase complete userId={} pack={} orderId={}", uid, id, req.orderId)
+            log.info(
+                "play purchase complete userId={} pack={} clientOrderId={} purchaseTimeMillis={}",
+                uid,
+                id,
+                req.orderId,
+                req.purchaseTimeMillis,
+            )
             Metrics.counter(
                 "shop_purchase_click_total",
                 mapOf("pack" to id, "currency" to "play"),
             )
-            val packInfo = fishing.findPack(id)
-            if (packInfo?.rodCode != null && fishing.hasRod(uid, packInfo.rodCode)) {
-                return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "rod_unlocked"))
+            when (val result = playPurchases.completePurchase(uid, id, req.purchaseToken)) {
+                is PlayPurchaseService.CompletionResult.Success -> {
+                    Metrics.counter(
+                        "shop_purchase_complete_total",
+                        mapOf("pack" to id, "currency" to "play"),
+                    )
+                    call.respond(ShopBuyResp(result.lures, result.currentLureId))
+                }
+                PlayPurchaseService.CompletionResult.Duplicate -> {
+                    Metrics.counter(
+                        "shop_purchase_denied_total",
+                        mapOf("pack" to id, "currency" to "play", "reason" to "duplicate_purchase"),
+                    )
+                    call.respond(HttpStatusCode.Conflict, mapOf("error" to "duplicate_purchase"))
+                }
+                is PlayPurchaseService.CompletionResult.Failure -> {
+                    val status = when (result.code) {
+                        "rod_unlocked",
+                        "purchase_pending",
+                        "purchase_cancelled",
+                        -> HttpStatusCode.Conflict
+                        "play_verification_unavailable" -> HttpStatusCode.ServiceUnavailable
+                        else -> HttpStatusCode.BadRequest
+                    }
+                    Metrics.counter(
+                        "shop_purchase_denied_total",
+                        mapOf("pack" to id, "currency" to "play", "reason" to result.code),
+                    )
+                    log.warn("play purchase denied userId={} pack={} err={}", uid, id, result.code)
+                    call.respond(status, mapOf("error" to result.code))
+                }
             }
-            val res = try { fishing.buyPackage(uid, id) } catch (e: Exception) {
-                log.warn("play purchase failed userId={} pack={} err={}", uid, id, e.message)
-                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package"))
-            }
-            PayService.recordPayment(
-                uid,
-                id,
-                PayService.PaymentInfo(
-                    providerChargeId = req.purchaseToken,
-                    telegramChargeId = req.orderId,
-                    amount = packInfo?.price ?: 0,
-                    currency = "PLAY",
-                )
-            )
-            packInfo?.let { ReferralService.onPurchase(uid, it) }
-            Metrics.counter(
-                "shop_purchase_complete_total",
-                mapOf("pack" to id, "currency" to "play"),
-            )
-            call.respond(ShopBuyResp(res.first, res.second))
         }
 
         post("/api/shop/{id}/coins") {

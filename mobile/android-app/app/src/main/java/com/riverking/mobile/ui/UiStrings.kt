@@ -45,6 +45,7 @@ data class RiverStrings(
     val generateLink: String,
     val claimRewards: String,
     val copyLink: String,
+    val shareLink: String,
     val openClub: String,
     val searchClub: String,
     val createClub: String,
@@ -55,6 +56,11 @@ data class RiverStrings(
     val noBait: String,
     val shopDisabledDirect: String,
     val playPurchaseUnavailable: String,
+    val playPurchasePending: String,
+    val playPurchaseCancelled: String,
+    val playPurchaseInvalid: String,
+    val playProductUnavailable: String,
+    val playFinalizeFailed: String,
     val chat: String,
     val loading: String,
     val currentTournament: String,
@@ -121,6 +127,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             generateLink = "Сгенерировать ссылку",
             claimRewards = "Забрать награды",
             copyLink = "Скопировать ссылку",
+            shareLink = "Поделиться",
             openClub = "Открыть клуб",
             searchClub = "Поиск клубов",
             createClub = "Создать клуб",
@@ -131,6 +138,11 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             noBait = "Нет наживки",
             shopDisabledDirect = "Платные наборы недоступны в direct-сборке",
             playPurchaseUnavailable = "Play-покупка пока недоступна в этой конфигурации",
+            playPurchasePending = "Покупка в Google Play ещё ожидает подтверждения",
+            playPurchaseCancelled = "Покупка отменена",
+            playPurchaseInvalid = "Google Play не подтвердил эту покупку",
+            playProductUnavailable = "Этот товар сейчас недоступен в Google Play",
+            playFinalizeFailed = "Покупка выдана, но Google Play ещё не завершил обработку",
             chat = "Чат",
             loading = "Загрузка...",
             currentTournament = "Текущий турнир",
@@ -194,6 +206,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             generateLink = "Generate link",
             claimRewards = "Claim rewards",
             copyLink = "Copy link",
+            shareLink = "Share",
             openClub = "Open club",
             searchClub = "Search clubs",
             createClub = "Create club",
@@ -204,6 +217,11 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             noBait = "No bait available",
             shopDisabledDirect = "Paid packs are unavailable in the direct build",
             playPurchaseUnavailable = "Play purchase is unavailable in this configuration",
+            playPurchasePending = "Google Play is still waiting to finalize this purchase",
+            playPurchaseCancelled = "Purchase cancelled",
+            playPurchaseInvalid = "Google Play did not confirm this purchase",
+            playProductUnavailable = "This product is currently unavailable in Google Play",
+            playFinalizeFailed = "The purchase was granted, but Google Play still needs to finish processing",
             chat = "Chat",
             loading = "Loading...",
             currentTournament = "Current tournament",
@@ -257,4 +275,22 @@ fun RiverStrings.rarityLabel(rarity: String?): String = when (rarity) {
     "mythic" -> if (login == "Логин") "Мифическая" else "Mythic"
     "legendary" -> if (login == "Логин") "Легендарная" else "Legendary"
     else -> rarity.orEmpty()
+}
+
+fun RiverStrings.playBillingMessage(code: String): String = when (code) {
+    "purchase_pending" -> playPurchasePending
+    "purchase_cancelled" -> playPurchaseCancelled
+    "play_product_unavailable" -> playProductUnavailable
+    "play_finalize_failed" -> playFinalizeFailed
+    "invalid_purchase",
+    "purchase_product_mismatch",
+    "purchase_user_mismatch",
+    "purchase_quantity_unsupported",
+    "purchase_already_consumed",
+    -> playPurchaseInvalid
+    "play_verification_unavailable",
+    "play_verification_failed",
+    "play_purchase_unavailable",
+    -> playPurchaseUnavailable
+    else -> code
 }

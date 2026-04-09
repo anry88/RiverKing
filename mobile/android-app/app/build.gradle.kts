@@ -118,6 +118,7 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0-rc02")
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.android.billingclient:billing-ktx:7.0.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-okhttp:$ktorVersion")

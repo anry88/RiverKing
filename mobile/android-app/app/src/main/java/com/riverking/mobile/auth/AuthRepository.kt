@@ -199,7 +199,7 @@ class AuthRepository(
     suspend fun completePlayPurchase(
         packId: String,
         purchaseToken: String,
-        orderId: String,
+        orderId: String? = null,
         purchaseTimeMillis: Long? = null,
     ): MeResponseDto {
         withFreshAccessToken { accessToken ->

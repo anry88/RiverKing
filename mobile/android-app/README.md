@@ -20,7 +20,8 @@ Nested Android project for the RiverKing mobile client.
   - catch details dialog plus native Android share sheet backed by `/api/catches/{id}/card`
   - tournaments, ratings, guide, achievements, quests, club, referrals, and shop surfaces running on shared backend contracts
 - `direct` keeps the shop visible but disables real-money packs.
-- `play` debug builds can exercise the new `play/complete` backend contract with debug purchase ids; production Play verification still needs final hardening before store release.
+- `play` uses real `BillingClient` / `ProductDetails` purchase flow and hands the purchase token to the backend for Google Play verification before entitlement delivery.
+- Android referrals now support both copy-link and native Android share sheet flows.
 - Debug builds currently verified for both `direct` and `play` flavors.
 
 ## Local setup
@@ -33,6 +34,11 @@ Set these Gradle properties when building locally:
 - `RIVERKING_SIGNING_STORE_PASSWORD`
 - `RIVERKING_SIGNING_KEY_ALIAS`
 - `RIVERKING_SIGNING_KEY_PASSWORD`
+
+The backend also needs Google Play verification configured before `/api/shop/{id}/play/complete` can work against real purchases:
+
+- `GOOGLE_PLAY_PACKAGE_NAME`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`
 
 Example:
 

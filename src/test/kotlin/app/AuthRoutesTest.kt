@@ -22,9 +22,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import service.PlayPurchaseVerificationResult
+import service.PlayPurchaseVerifier
+import service.VerifiedPlayLineItem
+import service.VerifiedPlayPurchase
 import support.testEnv
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
@@ -160,7 +165,20 @@ class AuthRoutesTest {
             publicBaseUrl = "https://riverking.example",
             devMode = false,
         )
-        application { installAuthTestModule(env) }
+        application {
+            installAuthTestModule(
+                env,
+                playPurchaseVerifier = FakePlayPurchaseVerifier(
+                    purchased = mapOf(
+                        "play-token-1" to verifiedPurchase(
+                            productId = "fresh_topup_s",
+                            accountId = "1",
+                            orderId = "gpa.1-1-1-1",
+                        )
+                    )
+                )
+            )
+        }
 
         val registered = registerPasswordUser(client, "angler.mobile", "password123")
 
@@ -187,6 +205,66 @@ class AuthRoutesTest {
             setBody("""{"purchaseToken":"play-token-1","orderId":"play-order-1"}""")
         }
         assertEquals(HttpStatusCode.Conflict, duplicate.status)
+    }
+
+    @Test
+    fun `android play purchase completion rejects pending cancelled and mismatched store states`() = testApplication {
+        val env = testEnv("android-referral-play-hardening").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application {
+            installAuthTestModule(
+                env,
+                playPurchaseVerifier = FakePlayPurchaseVerifier(
+                    purchased = mapOf(
+                        "play-token-mismatch" to verifiedPurchase(
+                            productId = "salt_boost_s",
+                            accountId = "1",
+                            orderId = "gpa.2-2-2-2",
+                        ),
+                        "play-token-wrong-user" to verifiedPurchase(
+                            productId = "fresh_topup_s",
+                            accountId = "999",
+                            orderId = "gpa.3-3-3-3",
+                        ),
+                    ),
+                    pending = setOf("play-token-pending"),
+                    cancelled = setOf("play-token-cancelled"),
+                )
+            )
+        }
+
+        val registered = registerPasswordUser(client, "angler.hardened", "password123")
+
+        val pending = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-pending"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, pending.status)
+
+        val cancelled = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-cancelled"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, cancelled.status)
+
+        val mismatch = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-mismatch"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, mismatch.status)
+
+        val wrongUser = client.post("/api/shop/fresh_topup_s/play/complete") {
+            bearerAuth(registered.accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"purchaseToken":"play-token-wrong-user"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, wrongUser.status)
     }
 
     @Test
@@ -240,12 +318,15 @@ class AuthRoutesTest {
         assertEquals(true, bytes.isNotEmpty())
     }
 
-    private fun Application.installAuthTestModule(env: Env) {
+    private fun Application.installAuthTestModule(
+        env: Env,
+        playPurchaseVerifier: PlayPurchaseVerifier? = null,
+    ) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         install(DoubleReceive)
         installSessions(env)
         DB.init(env)
-        apiRoutes(env)
+        apiRoutes(env, playPurchaseVerifier)
     }
 
     private suspend fun registerPasswordUser(
@@ -291,4 +372,36 @@ class AuthRoutesTest {
 
     private fun urlEncode(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8)
+
+    private fun verifiedPurchase(
+        productId: String,
+        accountId: String,
+        orderId: String,
+    ): VerifiedPlayPurchase = VerifiedPlayPurchase(
+        lineItems = listOf(
+            VerifiedPlayLineItem(
+                productId = productId,
+                quantity = 1,
+                acknowledgementState = "ACKNOWLEDGEMENT_STATE_PENDING",
+                consumptionState = "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
+            )
+        ),
+        orderId = orderId,
+        obfuscatedAccountId = accountId,
+        purchaseCompletionTime = Instant.parse("2026-04-09T10:15:30Z"),
+        isTestPurchase = true,
+    )
+
+    private class FakePlayPurchaseVerifier(
+        private val purchased: Map<String, VerifiedPlayPurchase> = emptyMap(),
+        private val pending: Set<String> = emptySet(),
+        private val cancelled: Set<String> = emptySet(),
+    ) : PlayPurchaseVerifier {
+        override suspend fun verifyPurchase(purchaseToken: String): PlayPurchaseVerificationResult {
+            purchased[purchaseToken]?.let { return PlayPurchaseVerificationResult.Purchased(it) }
+            if (purchaseToken in pending) return PlayPurchaseVerificationResult.Pending
+            if (purchaseToken in cancelled) return PlayPurchaseVerificationResult.Cancelled
+            return PlayPurchaseVerificationResult.NotFound
+        }
+    }
 }

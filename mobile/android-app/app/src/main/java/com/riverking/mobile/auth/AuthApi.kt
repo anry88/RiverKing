@@ -261,7 +261,7 @@ class AuthApi(
         accessToken: String,
         packId: String,
         purchaseToken: String,
-        orderId: String,
+        orderId: String? = null,
         purchaseTimeMillis: Long? = null,
     ): ShopPurchaseResultDto =
         client.post("$baseUrl/api/shop/$packId/play/complete") {

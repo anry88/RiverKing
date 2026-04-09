@@ -9,7 +9,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 - Delivers a Telegram Mini App fishing experience with cast, hook, and catch gameplay.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
-- Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, and a first-pass mobile shell.
+- Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
 
 **Why it is technically interesting**
 
@@ -46,7 +46,7 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Product systems for progression, achievements, quests, tournament prize logic, club competition, referral rewards, and in-game economy.
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
-- A nested Android project with its own Gradle setup, auth screens, nickname gate, and shared-API main shell placeholders.
+- A nested Android project with its own Gradle setup, auth screens, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
 
 ## Architecture
 
@@ -183,6 +183,8 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `AUTH_ACCESS_TOKEN_TTL_MINUTES`
 - `AUTH_REFRESH_TOKEN_TTL_DAYS`
 - `GOOGLE_AUTH_CLIENT_ID`
+- `GOOGLE_PLAY_PACKAGE_NAME`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`
 - `TG_ANALYTICS_TOKEN`
 - `TG_ANALYTICS_SCRIPT_URL`
 - `TG_ANALYTICS_APP_NAME`

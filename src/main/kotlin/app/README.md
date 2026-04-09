@@ -13,6 +13,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
   - Profile and progress: `GET /api/me` collects player state (lures, rods, locations, recent catches) via `FishingService` and `I18n`, and now serves both mini‑app sessions and bearer-token mobile clients.
   - Fishing: `POST /api/cast`, `POST /api/hook`, `POST /api/catch` drive the cast→hook→catch lifecycle using `FishingService.startCast`, `hook`, and `catch`.
   - Daily rewards and shop: `POST /api/daily`, `GET/POST /api/shop` call `FishingService.dailyReward`, `buyPackage`, and related payments (`StarsPaymentService`, `PayService`).
+  - Play Billing: `POST /api/shop/{id}/play/complete` verifies Android purchase tokens through the Google Play Developer API before delivering the entitlement and recording the payment.
   - Tournaments: `/api/tournament*` endpoints rely on `TournamentService` and `RatingPrizeService` to serve leaderboards and process rewards.
   - Clubs: `/api/club`, `/api/club/create`, `/api/club/search`, `/api/club/{id}/join` expose fishing club membership, creation, and discovery.
   - Referrals: `GET/POST /api/referrals` and `POST /api/referrals/apply` handle links via `ReferralService`.

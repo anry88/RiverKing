@@ -67,6 +67,17 @@ enum class RatingsOrder(val apiValue: String) {
     ASC("asc"),
 }
 
+sealed interface PlayPurchaseSyncResult {
+    data object Completed : PlayPurchaseSyncResult
+
+    data object Duplicate : PlayPurchaseSyncResult
+
+    data class Failed(
+        val code: String,
+        val message: String,
+    ) : PlayPurchaseSyncResult
+}
+
 data class FishingUiState(
     val phase: FishingPhase = FishingPhase.READY,
     val phaseTimeLeftMillis: Long = 0L,
@@ -936,26 +947,56 @@ class RiverKingViewModel(
         }
     }
 
+    suspend fun syncPlayPurchase(
+        packId: String,
+        purchaseToken: String,
+        orderId: String? = null,
+        purchaseTimeMillis: Long? = null,
+    ): PlayPurchaseSyncResult {
+        _state.update { it.copy(working = true, error = null) }
+        return try {
+            val me = repository.completePlayPurchase(
+                packId = packId,
+                purchaseToken = purchaseToken,
+                orderId = orderId,
+                purchaseTimeMillis = purchaseTimeMillis,
+            )
+            applyProfileUpdate(me)
+            _state.update { it.copy(working = false, shop = it.shop.copy(loaded = false)) }
+            loadShop(force = true)
+            PlayPurchaseSyncResult.Completed
+        } catch (error: Throwable) {
+            val message = repository.describeError(error)
+            _state.update { it.copy(working = false) }
+            when (message) {
+                "duplicate_purchase" -> PlayPurchaseSyncResult.Duplicate
+                else -> PlayPurchaseSyncResult.Failed(
+                    code = message,
+                    message = message,
+                )
+            }
+        }
+    }
+
     fun completePlayPurchase(
         packId: String,
         purchaseToken: String,
-        orderId: String,
+        orderId: String? = null,
         purchaseTimeMillis: Long? = null,
     ) {
         viewModelScope.launch {
-            _state.update { it.copy(working = true, error = null) }
-            try {
-                val me = repository.completePlayPurchase(
+            when (
+                val result = syncPlayPurchase(
                     packId = packId,
                     purchaseToken = purchaseToken,
                     orderId = orderId,
                     purchaseTimeMillis = purchaseTimeMillis,
                 )
-                applyProfileUpdate(me)
-                _state.update { it.copy(working = false, shop = it.shop.copy(loaded = false)) }
-                loadShop(force = true)
-            } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            ) {
+                PlayPurchaseSyncResult.Completed,
+                PlayPurchaseSyncResult.Duplicate,
+                -> Unit
+                is PlayPurchaseSyncResult.Failed -> showError(result.message)
             }
         }
     }
