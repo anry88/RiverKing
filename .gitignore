@@ -38,6 +38,7 @@ build/
 # Конфиг файл
 *.properties
 !config.example.properties
+!mobile/android-app/gradle.example.properties
 docs/raw-screens/
 
 /.gradle-home/wrapper/

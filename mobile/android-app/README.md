@@ -26,6 +26,8 @@ Nested Android project for the RiverKing mobile client.
 
 ## Local setup
 
+Use [gradle.example.properties](gradle.example.properties) as the full template for Android build properties. Copy it to `~/.gradle/gradle.properties` or take the `RIVERKING_*` entries from it and pass them through `-P...` flags. Keep `sdk.dir` in `mobile/android-app/local.properties` on each machine.
+
 Set these Gradle properties when building locally:
 
 - `RIVERKING_API_BASE_URL`
