@@ -118,8 +118,10 @@ import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.GuideLocationDto
 import com.riverking.mobile.auth.GuideLureDto
 import com.riverking.mobile.auth.GuideRodDto
+import com.riverking.mobile.auth.LeaderboardEntryDto
 import com.riverking.mobile.auth.MeResponseDto
 import com.riverking.mobile.auth.PrizeDto
+import com.riverking.mobile.auth.PrizeSpecDto
 import com.riverking.mobile.auth.QuestDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.ReferralInfoDto
@@ -651,6 +653,7 @@ private fun TournamentsScreen(
                     Text(strings.noData)
                 } else {
                     TournamentCard(
+                        strings = strings,
                         tournament = tournaments.current.tournament,
                         mine = tournaments.current.mine,
                         onClick = { onOpenTournament(tournaments.current.tournament.id) },
@@ -709,7 +712,7 @@ private fun TournamentsScreen(
                 SectionCard(strings.upcomingTournaments) {
                     tournaments.upcoming.forEachIndexed { index, tournament ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
                     }
                 }
             }
@@ -719,7 +722,7 @@ private fun TournamentsScreen(
                 SectionCard(strings.pastTournaments) {
                     tournaments.past.forEachIndexed { index, tournament ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
                     }
                 }
             }
@@ -742,6 +745,10 @@ private fun RatingsScreen(
 ) {
     val me = state.me ?: return
     val ratings = state.ratings
+    val showPrizePreview = ratings.mode == RatingsMode.GLOBAL &&
+        ratings.fishId == "all" &&
+        ratings.locationId != "all" &&
+        ratings.order == RatingsOrder.DESC
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -819,16 +826,20 @@ private fun RatingsScreen(
                 if (ratings.entries.isEmpty()) {
                     Text(strings.noData)
                 } else {
+                    if (showPrizePreview) {
+                        Text(
+                            if (strings.login == "Логин") "Призовые места подсвечены в строках рейтинга" else "Prize positions are highlighted in the ranking rows",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     ratings.entries.forEachIndexed { index, catch ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        CatchRow(
-                            title = buildString {
-                                if (catch.rank != null) append("#${catch.rank} ")
-                                append(catch.fish)
-                            },
-                            subtitle = listOfNotNull(catch.user, catch.location, catch.at?.let(::formatTimestamp)).joinToString(" • "),
-                            value = catch.weight.asKgCompact(),
-                            accent = rarityColor(catch.rarity),
+                        RatingsEntryCard(
+                            strings = strings,
+                            catch = catch,
+                            showPrizePreview = showPrizePreview,
                             onClick = { onOpenCatch(catch) },
                         )
                     }
@@ -2308,27 +2319,63 @@ private fun ClubMemberRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TournamentCard(tournament: TournamentDto, mine: com.riverking.mobile.auth.LeaderboardEntryDto?, onClick: () -> Unit) {
-    Column(
+private fun TournamentCard(
+    strings: RiverStrings,
+    tournament: TournamentDto,
+    mine: LeaderboardEntryDto?,
+    onClick: () -> Unit,
+) {
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f),
+        border = BorderStroke(
+            1.dp,
+            if (mine != null) Color(0xFF6FE7B7).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
+        ),
     ) {
-        Text(tournament.name, fontWeight = FontWeight.SemiBold)
-        Text("${formatEpoch(tournament.startTime)} → ${formatEpoch(tournament.endTime)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            listOfNotNull(tournament.location, tournament.fish, tournament.fishRarity).joinToString(" • "),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        mine?.let {
-            Text("#${it.rank} • ${it.value.asKgCompact()}", color = MaterialTheme.colorScheme.secondary)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(tournament.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${formatEpoch(tournament.startTime)} → ${formatEpoch(tournament.endTime)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                mine?.let {
+                    SceneBadge(
+                        text = "#${it.rank} • ${tournamentMetricValueLabel(tournament.metric, it.value)}",
+                        accent = Color(0xFF6FE7B7),
+                    )
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CatchDetailChip(tournamentFishLabel(strings, tournament))
+                CatchDetailChip(tournament.location ?: anyLocationLabel(strings))
+                CatchDetailChip(tournamentMetricLabel(strings, tournament.metric))
+                CatchDetailChip("${tournament.prizePlaces} ${strings.prizes.lowercase(Locale.getDefault())}")
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TournamentDialog(
     strings: RiverStrings,
@@ -2336,41 +2383,241 @@ private fun TournamentDialog(
     onDismiss: () -> Unit,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(details.tournament.name) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("${formatEpoch(details.tournament.startTime)} → ${formatEpoch(details.tournament.endTime)}")
-                details.mine?.let { Text("#${it.rank} • ${it.value.asKgCompact()}", color = MaterialTheme.colorScheme.secondary) }
-                details.leaderboard.forEach { entry ->
-                    CatchRow(
-                        title = "#${entry.rank} ${entry.user ?: "Unknown"}",
-                        subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
-                        value = entry.value.asKgCompact(),
-                        onClick = {
-                            if (entry.catchId != null && entry.fish != null && entry.location != null) {
-                                onOpenCatch(
-                                    CatchDto(
-                                        id = entry.catchId,
-                                        fish = entry.fish,
-                                        weight = entry.value,
-                                        location = entry.location,
-                                        rarity = details.tournament.fishRarity.orEmpty(),
-                                        user = entry.user,
-                                        userId = entry.userId,
-                                    )
-                                )
-                            }
-                        },
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(details.tournament.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CatchDetailChip(tournamentFishLabel(strings, details.tournament))
+                    CatchDetailChip(details.tournament.location ?: anyLocationLabel(strings))
+                    CatchDetailChip(tournamentMetricLabel(strings, details.tournament.metric))
+                    CatchDetailChip("${details.tournament.prizePlaces} ${strings.prizes.lowercase(Locale.getDefault())}")
+                }
+                Text(
+                    "${formatEpoch(details.tournament.startTime)} → ${formatEpoch(details.tournament.endTime)}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                details.mine?.let { mine ->
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            if (strings.login == "Логин") "Ваш результат" else "Your result",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        TournamentLeaderboardRow(
+                            strings = strings,
+                            tournament = details.tournament,
+                            entry = mine,
+                            highlighted = true,
+                            onOpenCatch = onOpenCatch,
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        if (strings.login == "Логин") "Лидерборд" else "Leaderboard",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    details.leaderboard.forEach { entry ->
+                        TournamentLeaderboardRow(
+                            strings = strings,
+                            tournament = details.tournament,
+                            entry = entry,
+                            highlighted = details.mine?.rank == entry.rank,
+                            onOpenCatch = onOpenCatch,
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(strings.continueLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingsEntryCard(
+    strings: RiverStrings,
+    catch: CatchDto,
+    showPrizePreview: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(
+            1.dp,
+            if (showPrizePreview && (catch.prizeCoins ?: 0) > 0) Color(0xFFFFD76A).copy(alpha = 0.42f)
+            else Color.White.copy(alpha = 0.08f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            catch.rank?.let { rank ->
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = rarityColor(catch.rarity).copy(alpha = 0.18f),
+                    border = BorderStroke(1.dp, rarityColor(catch.rarity).copy(alpha = 0.45f)),
+                ) {
+                    Text(
+                        "#$rank",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(strings.continueLabel) }
-        },
-    )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    catch.fish,
+                    fontWeight = FontWeight.SemiBold,
+                    color = rarityColor(catch.rarity),
+                )
+                Text(
+                    listOfNotNull(catch.user, catch.location, catch.at?.let(::formatTimestamp)).joinToString(" • "),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (showPrizePreview && (catch.prizeCoins ?: 0) > 0) {
+                    Text(
+                        "🪙 +${catch.prizeCoins}",
+                        color = Color(0xFFFFD76A),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(catch.weight.asKgCompact(), fontWeight = FontWeight.Bold)
+                Text(
+                    strings.rarityLabel(catch.rarity),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TournamentLeaderboardRow(
+    strings: RiverStrings,
+    tournament: TournamentDto,
+    entry: LeaderboardEntryDto,
+    highlighted: Boolean,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    val catch = tournamentEntryCatch(tournament, entry)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = catch != null) { catch?.let(onOpenCatch) },
+        shape = RoundedCornerShape(20.dp),
+        color = if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        border = BorderStroke(
+            1.dp,
+            if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color.White.copy(alpha = 0.06f),
+            ) {
+                Text(
+                    "#${entry.rank}",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(entry.user ?: unknownUserLabel(strings), fontWeight = FontWeight.SemiBold)
+                Text(
+                    tournamentEntrySubtitle(strings, tournament, entry),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                entry.prize?.let { prize ->
+                    PrizeChip(prize = prize)
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    tournamentMetricValueLabel(tournament.metric, entry.value),
+                    fontWeight = FontWeight.Bold,
+                )
+                if (highlighted) {
+                    Text(
+                        if (strings.login == "Логин") "Ваш результат" else "Your result",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrizeChip(prize: PrizeSpecDto) {
+    Surface(
+        color = Color(0x22FFD76A),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, Color(0x55FFD76A)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tournamentPrizeIconModel(prize)?.let { model ->
+                AsyncImage(
+                    model = model,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            } ?: Text("🪙")
+            Text(
+                tournamentPrizeLabel(prize),
+                color = Color(0xFFFFD76A),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2699,6 +2946,79 @@ private fun chipColors(selected: Boolean) = AssistChipDefaults.assistChipColors(
     containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
     labelColor = MaterialTheme.colorScheme.onSurface,
 )
+
+private fun tournamentFishLabel(strings: RiverStrings, tournament: TournamentDto): String = when {
+    !tournament.fish.isNullOrBlank() -> tournament.fish
+    !tournament.fishRarity.isNullOrBlank() ->
+        if (strings.login == "Логин") "${strings.rarityLabel(tournament.fishRarity)} рыба" else "${strings.rarityLabel(tournament.fishRarity)} fish"
+    else -> anyFishLabel(strings)
+}
+
+private fun tournamentMetricLabel(strings: RiverStrings, metric: String): String = when (metric) {
+    "max_weight" -> if (strings.login == "Логин") "Лучший вес" else "Best weight"
+    "min_weight" -> if (strings.login == "Логин") "Минимальный вес" else "Smallest weight"
+    "count" -> if (strings.login == "Логин") "Количество" else "Count"
+    "total_weight" -> if (strings.login == "Логин") "Суммарный вес" else "Total weight"
+    else -> metric
+}
+
+private fun tournamentMetricValueLabel(metric: String, value: Double): String = when (metric) {
+    "count" -> value.toInt().toString()
+    else -> value.asKgCompact()
+}
+
+private fun tournamentEntryCatch(tournament: TournamentDto, entry: LeaderboardEntryDto): CatchDto? {
+    if (tournament.metric == "count" || tournament.metric == "total_weight") return null
+    val catchId = entry.catchId ?: return null
+    val fish = entry.fish ?: return null
+    val location = entry.location ?: return null
+    return CatchDto(
+        id = catchId,
+        fish = fish,
+        weight = entry.value,
+        location = location,
+        rarity = tournament.fishRarity.orEmpty(),
+        user = entry.user,
+        userId = entry.userId,
+        at = entry.at?.let { Instant.ofEpochSecond(it).toString() },
+    )
+}
+
+private fun tournamentEntrySubtitle(strings: RiverStrings, tournament: TournamentDto, entry: LeaderboardEntryDto): String =
+    when {
+        tournament.metric == "count" || tournament.metric == "total_weight" ->
+            tournamentMetricLabel(strings, tournament.metric)
+        else -> listOfNotNull(
+            entry.fish ?: tournamentFishLabel(strings, tournament),
+            entry.location,
+            entry.at?.let { formatEpoch(it) },
+        ).joinToString(" • ").ifBlank { unknownUserLabel(strings) }
+    }
+
+private fun tournamentPrizeLabel(prize: PrizeSpecDto): String = when {
+    prize.packageId == "coins" || prize.coins != null -> "+${prize.coins ?: prize.qty}"
+    prize.qty > 1 -> "${humanizePackId(prize.packageId)} x${prize.qty}"
+    else -> humanizePackId(prize.packageId)
+}
+
+private fun tournamentPrizeIconModel(prize: PrizeSpecDto): String? = when {
+    prize.packageId == "coins" || prize.coins != null -> null
+    else -> shopIconAsset(prize.packageId)
+}
+
+private fun anyLocationLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Любая локация" else "Any location"
+
+private fun anyFishLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Любая рыба" else "Any fish"
+
+private fun unknownUserLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Неизвестно" else "Unknown"
+
+private fun humanizePackId(packId: String): String = when {
+    packId.startsWith("autofish") -> "Autofish"
+    else -> packId.replace('_', ' ')
+}
 
 private fun phaseAccentColor(phase: FishingPhase): Color = when (phase) {
     FishingPhase.READY -> Color(0xFF4EA8DE)
