@@ -43,10 +43,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Leaderboard
-import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.EmojiEvents
@@ -143,7 +143,7 @@ enum class MainTab(val icon: ImageVector) {
     FISHING(Icons.Rounded.SportsEsports),
     TOURNAMENTS(Icons.Rounded.EmojiEvents),
     RATINGS(Icons.Rounded.Leaderboard),
-    GUIDE(Icons.Rounded.MenuBook),
+    GUIDE(Icons.AutoMirrored.Rounded.MenuBook),
     CLUB(Icons.Rounded.Groups),
     SHOP(Icons.Rounded.ShoppingBag),
 }
@@ -537,7 +537,7 @@ private fun FishingScreen(
             } else {
                 InfoCard {
                     Text(strings.quests, fontWeight = FontWeight.SemiBold)
-                    Text(strings.loading, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LoadingStatePanel(strings.loading)
                     OutlinedButton(onClick = { onLoadGuide(true) }, modifier = Modifier.fillMaxWidth()) {
                         Text(strings.refresh)
                     }
@@ -652,7 +652,7 @@ private fun TournamentsScreen(
         item {
             SectionCard(strings.currentTournament) {
                 if (tournaments.current == null) {
-                    Text(strings.noData)
+                    EmptyStatePanel(strings.noData)
                 } else {
                     TournamentCard(
                         strings = strings,
@@ -826,7 +826,7 @@ private fun RatingsScreen(
         item {
             SectionCard(strings.ratings) {
                 if (ratings.entries.isEmpty()) {
-                    Text(strings.noData)
+                    EmptyStatePanel(strings.noData)
                 } else {
                     if (showPrizePreview) {
                         Text(
@@ -930,14 +930,14 @@ private fun GuideScreen(
                             location = location,
                             ownedLocation = me.locations.firstOrNull { it.id == location.id },
                         )
-                    } ?: Text(strings.noData)
+                    } ?: EmptyStatePanel(strings.noData)
                 }
                 GuideSection.FISH -> SectionCard(strings.guideFish) {
                     val fishList = guide.guide?.fish.orEmpty()
                         .filter { rarityFilter == "all" || it.rarity == rarityFilter }
                         .filter { !showCaughtOnly || me.caughtFishIds.contains(it.id) }
                     if (fishList.isEmpty()) {
-                        Text(strings.noData)
+                        EmptyStatePanel(strings.noData)
                     } else {
                         fishList.forEachIndexed { index, fish ->
                             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
@@ -953,7 +953,7 @@ private fun GuideScreen(
                     guide.guide?.lures?.forEachIndexed { index, lure ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                         GuideLureRow(strings = strings, lure = lure)
-                    } ?: Text(strings.noData)
+                    } ?: EmptyStatePanel(strings.noData)
                 }
                 GuideSection.RODS -> SectionCard(strings.guideRods) {
                     guide.guide?.rods?.forEachIndexed { index, rod ->
@@ -963,11 +963,11 @@ private fun GuideScreen(
                             rod = rod,
                             ownedRod = me.rods.firstOrNull { it.code == rod.code },
                         )
-                    } ?: Text(strings.noData)
+                    } ?: EmptyStatePanel(strings.noData)
                 }
                 GuideSection.ACHIEVEMENTS -> SectionCard(strings.achievements) {
                     if (guide.achievements.isEmpty()) {
-                        Text(strings.noData)
+                        EmptyStatePanel(strings.noData)
                     } else {
                         guide.achievements.forEachIndexed { index, achievement ->
                             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
@@ -1062,7 +1062,7 @@ private fun ClubScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     if (state.club.chat.isEmpty()) {
-                        Text(strings.noData)
+                        EmptyStatePanel(strings.noData)
                     } else {
                         state.club.chat.forEachIndexed { index, item ->
                             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
@@ -1345,8 +1345,8 @@ private fun FishingStageScene(
                 )
                 val linePath = Path().apply {
                     moveTo(rodBase.x, rodBase.y)
-                    quadraticBezierTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
-                    quadraticBezierTo(control.x, control.y, bobber.x, bobber.y)
+                    quadraticTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
+                    quadraticTo(control.x, control.y, bobber.x, bobber.y)
                 }
                 drawPath(
                     path = linePath,
@@ -1356,7 +1356,7 @@ private fun FishingStageScene(
                 drawPath(
                     path = Path().apply {
                         moveTo(rodBase.x, rodBase.y)
-                        quadraticBezierTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
+                        quadraticTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
                     },
                     color = Color(0xFF5F4128),
                     style = Stroke(width = 10f, cap = StrokeCap.Round),
@@ -1695,7 +1695,7 @@ private fun QuestPreviewCard(
     val activeQuests = quests.daily.take(2) + quests.weekly.take(2)
     SectionCard(strings.quests) {
         if (activeQuests.isEmpty()) {
-            Text(strings.noData)
+            EmptyStatePanel(strings.noData)
         } else {
             activeQuests.forEachIndexed { index, quest ->
                 if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
@@ -1896,9 +1896,9 @@ private fun QuestSheet(
         ) {
             Text(strings.quests, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             if (loading && quests == null) {
-                Text(strings.loading, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LoadingStatePanel(strings.loading)
             } else if (quests == null) {
-                Text(strings.noData, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EmptyStatePanel(strings.noData)
                 OutlinedButton(onClick = onReload, modifier = Modifier.fillMaxWidth()) {
                     Text(strings.refresh)
                 }
@@ -1920,7 +1920,7 @@ private fun QuestSection(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         if (items.isEmpty()) {
-            Text(strings.noData, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            EmptyStatePanel(strings.noData)
         } else {
             items.forEach { quest ->
                 Card(
@@ -3041,7 +3041,7 @@ private fun CatchDetailsDialog(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     if (loading && cardBitmap == null) {
-                        Text(strings.loading, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LoadingStatePanel(strings.loading)
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3155,6 +3155,47 @@ private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             content = content,
         )
+    }
+}
+
+@Composable
+private fun LoadingStatePanel(text: String, modifier: Modifier = Modifier) {
+    StatusPanel(text = text, modifier = modifier, accent = Color(0xFF68D4FF))
+}
+
+@Composable
+private fun EmptyStatePanel(text: String, modifier: Modifier = Modifier) {
+    StatusPanel(text = text, modifier = modifier, accent = MaterialTheme.colorScheme.secondary)
+}
+
+@Composable
+private fun StatusPanel(
+    text: String,
+    modifier: Modifier = Modifier,
+    accent: Color,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.44f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.20f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(accent, CircleShape)
+            )
+            Text(
+                text,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
