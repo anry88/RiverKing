@@ -10,10 +10,11 @@ import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import service.FishingService
+import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.util.UUID
+import java.util.Base64
 
 class TelegramLinkService(
     private val env: Env,
@@ -44,6 +45,7 @@ class TelegramLinkService(
         val kind: String,
         val code: String,
         val language: String,
+        val returnToAppUrl: String? = null,
     )
 
     private data class StoredSession(
@@ -144,10 +146,16 @@ class TelegramLinkService(
     ): TelegramStartCommandResult {
         return when {
             rawToken.startsWith(LinkPurpose.MOBILE_LOGIN.commandPrefix) -> {
-                completeMobileLogin(rawToken.removePrefix(LinkPurpose.MOBILE_LOGIN.commandPrefix), tgUser)
+                val sessionToken = rawToken.removePrefix(LinkPurpose.MOBILE_LOGIN.commandPrefix)
+                completeMobileLogin(sessionToken, tgUser).copy(
+                    returnToAppUrl = buildReturnToAppUrl("login", sessionToken),
+                )
             }
             rawToken.startsWith(LinkPurpose.TELEGRAM_LINK.commandPrefix) -> {
-                completeTelegramLink(rawToken.removePrefix(LinkPurpose.TELEGRAM_LINK.commandPrefix), tgUser)
+                val sessionToken = rawToken.removePrefix(LinkPurpose.TELEGRAM_LINK.commandPrefix)
+                completeTelegramLink(sessionToken, tgUser).copy(
+                    returnToAppUrl = buildReturnToAppUrl("link", sessionToken),
+                )
             }
             else -> TelegramStartCommandResult(
                 kind = "unknown",
@@ -385,16 +393,27 @@ class TelegramLinkService(
         )
     }
 
-    private fun generateToken(): String =
-        UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "")
+    private fun generateToken(): String {
+        val raw = ByteArray(24)
+        secureRandom.nextBytes(raw)
+        // Telegram deep-link start parameters are capped at 64 characters,
+        // so keep the session token compact enough for the login_/link_ prefix.
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
+    }
 
     private fun normalizeLanguage(raw: String?): String =
         if (raw?.startsWith("ru", ignoreCase = true) == true) "ru" else "en"
+
+    private fun buildReturnToAppUrl(
+        path: String,
+        sessionToken: String,
+    ): String = "riverking://auth/$path?token=$sessionToken"
 
     private fun now(): Instant = clock.instant()
 
     companion object {
         private const val TELEGRAM_PROVIDER = "telegram"
         private val SESSION_TTL: Duration = Duration.ofMinutes(10)
+        private val secureRandom = SecureRandom()
     }
 }

@@ -36,13 +36,61 @@ class SecureSessionStore(context: Context) {
             .apply()
     }
 
+    fun readLastLogin(): String? =
+        prefs.getString(KEY_LAST_LOGIN, null)?.takeIf { it.isNotBlank() }
+
+    fun writeLastLogin(login: String) {
+        prefs.edit()
+            .putString(KEY_LAST_LOGIN, login.trim().lowercase())
+            .apply()
+    }
+
+    fun readPendingTelegramLogin(): String? =
+        prefs.getString(KEY_PENDING_TELEGRAM_LOGIN, null)?.takeIf { it.isNotBlank() }
+
+    fun writePendingTelegramLogin(sessionToken: String) {
+        prefs.edit()
+            .putString(KEY_PENDING_TELEGRAM_LOGIN, sessionToken)
+            .apply()
+    }
+
+    fun clearPendingTelegramLogin() {
+        prefs.edit()
+            .remove(KEY_PENDING_TELEGRAM_LOGIN)
+            .apply()
+    }
+
+    fun readPendingTelegramLink(): String? =
+        prefs.getString(KEY_PENDING_TELEGRAM_LINK, null)?.takeIf { it.isNotBlank() }
+
+    fun writePendingTelegramLink(sessionToken: String) {
+        prefs.edit()
+            .putString(KEY_PENDING_TELEGRAM_LINK, sessionToken)
+            .apply()
+    }
+
+    fun clearPendingTelegramLink() {
+        prefs.edit()
+            .remove(KEY_PENDING_TELEGRAM_LINK)
+            .apply()
+    }
+
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .remove(KEY_ACCESS_EXPIRES_AT)
+            .remove(KEY_PENDING_TELEGRAM_LOGIN)
+            .remove(KEY_PENDING_TELEGRAM_LINK)
+            .apply()
     }
 
     companion object {
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_ACCESS_EXPIRES_AT = "access_expires_at"
+        private const val KEY_LAST_LOGIN = "last_login"
+        private const val KEY_PENDING_TELEGRAM_LOGIN = "pending_telegram_login"
+        private const val KEY_PENDING_TELEGRAM_LINK = "pending_telegram_link"
     }
 }

@@ -409,7 +409,14 @@ fun Application.botRoutes(env: Env) {
             ): Pair<String, String?> {
                 val lang = result.language
                 val openButtonText = if (lang == "ru") "Открыть игру" else "Open game"
+                val returnButtonText = if (lang == "ru") "Вернуться в приложение" else "Return to app"
                 val openGameMarkup = """{"inline_keyboard":[[{"text":"$openButtonText","url":"https://t.me/${env.botName}?startapp"}]]}"""
+                val returnToAppMarkup = result.returnToAppUrl?.let { url ->
+                    """{"inline_keyboard":[[{"text":"$returnButtonText","url":"$url"}]]}"""
+                }
+                val returnAndOpenMarkup = result.returnToAppUrl?.let { url ->
+                    """{"inline_keyboard":[[{"text":"$returnButtonText","url":"$url"}],[{"text":"$openButtonText","url":"https://t.me/${env.botName}?startapp"}]]}"""
+                }
                 return when (result.kind to result.code) {
                     "mobile_login" to "completed",
                     "mobile_login" to "already_completed" -> {
@@ -417,7 +424,7 @@ fun Application.botRoutes(env: Env) {
                             "Вход через Telegram подтверждён. Вернись в мобильное приложение RiverKing."
                         } else {
                             "Telegram sign-in confirmed. Return to the RiverKing mobile app."
-                        } to null
+                        } to returnToAppMarkup
                     }
                     "telegram_link" to "completed",
                     "telegram_link" to "already_completed" -> {
@@ -425,7 +432,7 @@ fun Application.botRoutes(env: Env) {
                             "Telegram-аккаунт привязан. Теперь этот профиль доступен и в Mini App, и в мобильном приложении."
                         } else {
                             "Your Telegram account is linked. This profile now works in both the Mini App and the mobile app."
-                        } to openGameMarkup
+                        } to (returnAndOpenMarkup ?: openGameMarkup)
                     }
                     "telegram_link" to "telegram_already_bound" -> {
                         if (lang == "ru") {

@@ -10,9 +10,24 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -28,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -38,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.GoogleSignInManager
 import com.riverking.mobile.auth.ReferralInfoDto
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -124,7 +142,7 @@ fun RiverKingApp(
 
     RiverTheme {
         Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { padding ->
             Box(
@@ -239,6 +257,7 @@ private fun LoadingScreen(strings: RiverStrings) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun AuthScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
@@ -251,50 +270,81 @@ private fun AuthScreen(
     onGoogleSignIn: () -> Unit,
 ) {
     val authBusy = state.working || state.telegramLoginPending
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    val scope = rememberCoroutineScope()
+    val loginBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val passwordBringIntoViewRequester = remember { BringIntoViewRequester() }
+    AuthBackdrop {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
         ) {
-            Text(strings.appTitle, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(strings.authSubtitle)
-            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = strings.appTitle,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = strings.authSubtitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            if (state.authMode == AuthMode.REGISTER) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = strings.registerRequirements,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
             Button(onClick = onTelegramSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
                 Text(strings.signInTelegram)
             }
             if (state.telegramLoginPending) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(strings.telegramLoginPending)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = strings.telegramLoginPending,
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             Spacer(modifier = Modifier.height(24.dp))
             OutlinedTextField(
                 value = state.login,
                 onValueChange = onLoginChange,
                 label = { Text(strings.login) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(loginBringIntoViewRequester, scope),
                 enabled = !authBusy,
+                singleLine = true,
+                colors = riverTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = state.password,
                 onValueChange = onPasswordChange,
                 label = { Text(strings.password) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(passwordBringIntoViewRequester, scope),
                 enabled = !authBusy,
                 visualTransformation = PasswordVisualTransformation(),
+                singleLine = true,
+                colors = riverTextFieldColors(),
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             Button(onClick = onSubmit, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
                 Text(if (state.authMode == AuthMode.LOGIN) strings.signIn else strings.createAccount)
             }
-            TextButton(onClick = onToggleMode, enabled = !authBusy) {
+            TextButton(onClick = onToggleMode, enabled = !authBusy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(if (state.authMode == AuthMode.LOGIN) strings.needAccount else strings.alreadyHaveAccount)
             }
             if (googleEnabled) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = onGoogleSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
                     Text(strings.signInGoogle)
                 }
@@ -304,6 +354,7 @@ private fun AuthScreen(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun NicknameScreen(
     strings: RiverStrings,
     nickname: String,
@@ -311,21 +362,31 @@ private fun NicknameScreen(
     onNicknameChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    val scope = rememberCoroutineScope()
+    val nicknameBringIntoViewRequester = remember { BringIntoViewRequester() }
+    AuthBackdrop {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
         ) {
-            Text(strings.chooseNickname)
+            Text(
+                text = strings.chooseNickname,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = nickname,
                 onValueChange = onNicknameChange,
                 label = { Text(strings.chooseNickname) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(nicknameBringIntoViewRequester, scope),
                 enabled = !busy,
+                singleLine = true,
+                colors = riverTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(16.dp))
             Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
@@ -334,6 +395,72 @@ private fun NicknameScreen(
         }
     }
 }
+
+@Composable
+@OptIn(ExperimentalFoundationApi::class)
+private fun AuthBackdrop(
+    content: @Composable () -> Unit,
+) {
+    val scrollState = rememberScrollState()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(RiverBackdropBrush)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp, vertical = 28.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 0.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun riverTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    cursorColor = MaterialTheme.colorScheme.primary,
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.bringIntoViewOnFocus(
+    requester: BringIntoViewRequester,
+    scope: CoroutineScope,
+): Modifier = this
+    .bringIntoViewRequester(requester)
+    .onFocusChanged { focusState ->
+        if (focusState.isFocused) {
+            scope.launch {
+                delay(150)
+                requester.bringIntoView()
+            }
+        }
+    }
 
 private suspend fun shareCatchCard(
     activity: ComponentActivity,
@@ -391,6 +518,26 @@ private fun openExternalUrl(
     activity: ComponentActivity,
     url: String,
 ) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-    activity.startActivity(intent)
+    val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    val telegramIntent = telegramIntent(url)
+    if (telegramIntent != null) {
+        runCatching { activity.startActivity(telegramIntent) }
+            .recoverCatching { activity.startActivity(fallbackIntent) }
+            .getOrThrow()
+        return
+    }
+    activity.startActivity(fallbackIntent)
+}
+
+private fun telegramIntent(url: String): Intent? {
+    val sourceUri = Uri.parse(url)
+    val host = sourceUri.host?.lowercase() ?: return null
+    if (host !in setOf("t.me", "www.t.me", "telegram.me", "www.telegram.me")) return null
+    val username = sourceUri.pathSegments.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
+    val builder = Uri.parse("tg://resolve").buildUpon()
+        .appendQueryParameter("domain", username)
+    sourceUri.getQueryParameter("start")?.let { builder.appendQueryParameter("start", it) }
+    sourceUri.getQueryParameter("startapp")?.let { builder.appendQueryParameter("startapp", it) }
+    sourceUri.getQueryParameter("startattach")?.let { builder.appendQueryParameter("startattach", it) }
+    return Intent(Intent.ACTION_VIEW, builder.build())
 }

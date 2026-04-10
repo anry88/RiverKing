@@ -3,7 +3,16 @@ package com.riverking.mobile.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+
+val RiverBackdropBrush = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFF0B1E26),
+        Color(0xFF122A33),
+        Color(0xFF08131A),
+    )
+)
 
 private val RiverDarkScheme = darkColorScheme(
     primary = Color(0xFF43D17C),
