@@ -59,6 +59,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -398,6 +399,7 @@ private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HeaderBar(
     me: MeResponseDto,
@@ -407,31 +409,47 @@ private fun HeaderBar(
     onChangeLanguage: (String) -> Unit,
 ) {
     val currentLocation = me.locations.firstOrNull { it.id == me.locationId }?.name.orEmpty()
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = me.username ?: strings.appTitle,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = currentLocation,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = me.username ?: strings.appTitle,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = currentLocation,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedButton(onClick = onLogout) { Text(strings.logout) }
         }
-        StatPill(title = "🪙", value = me.coins.toString())
-        StatPill(title = "kg", value = me.totalWeight.asKgCompact())
-        StatPill(title = "🔥", value = me.dailyStreak.toString())
-        LanguageToggle(currentLanguage = me.language, onChangeLanguage = onChangeLanguage)
-        OutlinedButton(onClick = onLogout) { Text(strings.logout) }
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatPill(title = "🪙", value = me.coins.toString())
+            StatPill(title = "kg", value = me.totalWeight.asKgCompact())
+            StatPill(title = "🔥", value = me.dailyStreak.toString())
+            LanguageToggle(currentLanguage = me.language, onChangeLanguage = onChangeLanguage)
+        }
     }
 }
 
@@ -483,14 +501,6 @@ private fun FishingScreen(
         item {
             HeroLocationCard(
                 title = currentLocation?.name ?: strings.water,
-                subtitle = when (state.fishing.phase) {
-                    FishingPhase.READY -> strings.castRod
-                    FishingPhase.COOLDOWN -> strings.castCooldown
-                    FishingPhase.WAITING_BITE -> strings.waitingBite
-                    FishingPhase.BITING -> strings.hook
-                    FishingPhase.TAP_CHALLENGE -> strings.tapFast
-                    FishingPhase.RESOLVING -> strings.casting
-                },
                 backgroundUrl = locationBackgroundAsset(currentLocation?.name),
                 scene = {
                     FishingStageScene(
@@ -1231,7 +1241,6 @@ private fun TelegramAccountCard(
 @Composable
 private fun HeroLocationCard(
     title: String,
-    subtitle: String,
     backgroundUrl: String?,
     scene: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
@@ -1245,6 +1254,7 @@ private fun HeroLocationCard(
                 AsyncImage(
                     model = backgroundUrl,
                     contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(28.dp)),
@@ -1261,7 +1271,6 @@ private fun HeroLocationCard(
             )
             Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 scene()
                 content()
             }
@@ -1315,68 +1324,53 @@ private fun FishingStageScene(
         animationSpec = tween(durationMillis = 850),
         label = "cast-y",
     )
-    val statusText = when (phase) {
-        FishingPhase.READY -> strings.castRod
-        FishingPhase.COOLDOWN -> "${strings.castCooldown} • ${timeLeft.toInt()}s"
-        FishingPhase.WAITING_BITE -> "${strings.waitingBite} • ${timeLeft.toInt()}s"
-        FishingPhase.BITING -> "${strings.hook} • ${String.format(Locale.US, "%.1f", timeLeft)}s"
-        FishingPhase.TAP_CHALLENGE -> "${strings.tapFast} ${state.fishing.tapCount}/${state.fishing.tapGoal}"
-        FishingPhase.RESOLVING -> strings.casting
-    }
 
     Surface(
         modifier = modifier,
-        color = Color(0x11141920),
+        color = Color.Transparent,
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = null,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val currentRodCode = state.me?.rods?.firstOrNull { it.id == state.me?.currentRodId }?.code
+            val rodUrl = rodAsset(currentRodCode)
+            val rodTipAnchor = rodTipAnchorPercentage(currentRodCode)
+
+            val rodImageRatio = 1536f / 1024f
+            val rodWFrac = 0.65f
+            val rodWidthDp = maxWidth * rodWFrac
+            val rodHeightDp = rodWidthDp / rodImageRatio
+            val rodLeftDp = maxWidth * 0.10f
+            val rodTopDp = maxHeight - rodHeightDp + (maxHeight * 0.15f)
+
+            coil.compose.AsyncImage(
+                model = rodUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .offset(x = rodLeftDp, y = rodTopDp)
+                    .width(rodWidthDp)
+                    .height(rodHeightDp),
+                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds
+            )
+
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val skyBrush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0x40DFF4FF),
-                        Color(0x181B3241),
-                        Color(0x10203344),
-                    )
-                )
-                drawRoundRect(brush = skyBrush)
-
                 val waterTop = size.height * 0.48f
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0x8831B1D5),
-                            Color(0xAA0D5778),
-                            Color(0xCC07344C),
-                        ),
-                        startY = waterTop,
-                        endY = size.height,
-                    ),
-                    topLeft = Offset(0f, waterTop),
-                    size = Size(size.width, size.height - waterTop),
-                )
 
-                val shorePath = Path().apply {
-                    moveTo(0f, size.height)
-                    lineTo(size.width * 0.18f, size.height * 0.72f)
-                    lineTo(size.width * 0.32f, size.height)
-                    close()
-                }
-                drawPath(
-                    path = shorePath,
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color(0xCC3B2E23), Color(0x994A3A2B)),
-                        start = Offset.Zero,
-                        end = Offset(size.width * 0.32f, size.height),
-                    ),
-                    style = Fill,
+                val rodBase = Offset(
+                    x = rodLeftDp.toPx() + rodWidthDp.toPx() * 0.383f,
+                    y = rodTopDp.toPx() + rodHeightDp.toPx() * 0.998f
                 )
+                val rodTip = Offset(
+                    x = rodLeftDp.toPx() + rodWidthDp.toPx() * rodTipAnchor.x,
+                    y = rodTopDp.toPx() + rodHeightDp.toPx() * rodTipAnchor.y
+                )
+                
+                val dx = rodTip.x - rodBase.x
+                val dy = rodTip.y - rodBase.y
+                val rodMid = Offset(rodBase.x + dx * 0.4f, rodBase.y + dy * 0.4f)
 
-                val rodBase = Offset(size.width * 0.16f, size.height * 0.86f)
-                val rodMid = Offset(size.width * 0.20f, size.height * 0.55f)
-                val rodTip = Offset(size.width * 0.29f, size.height * 0.22f)
                 val bobberOffset = if (inWater || phase == FishingPhase.RESOLVING) {
-                    sin(waveShift * (2f * PI).toFloat()) * size.height * when (phase) {
+                    kotlin.math.sin(waveShift * (2f * kotlin.math.PI).toFloat()) * size.height * when (phase) {
                         FishingPhase.BITING -> 0.028f
                         FishingPhase.TAP_CHALLENGE -> 0.022f
                         else -> 0.015f
@@ -1387,25 +1381,16 @@ private fun FishingStageScene(
                 val bobber = Offset(size.width * castX, size.height * castY + bobberOffset)
                 val control = Offset(
                     x = (rodTip.x + bobber.x) * 0.52f,
-                    y = min(rodTip.y, bobber.y) + if (inWater) size.height * 0.10f else size.height * 0.18f,
+                    y = kotlin.math.min(rodTip.y, bobber.y) + if (inWater) size.height * 0.10f else size.height * 0.18f,
                 )
                 val linePath = Path().apply {
-                    moveTo(rodBase.x, rodBase.y)
-                    quadraticTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
+                    moveTo(rodTip.x, rodTip.y)
                     quadraticTo(control.x, control.y, bobber.x, bobber.y)
                 }
                 drawPath(
                     path = linePath,
                     color = Color(0xFFF0E8D6),
                     style = Stroke(width = 4f, cap = StrokeCap.Round),
-                )
-                drawPath(
-                    path = Path().apply {
-                        moveTo(rodBase.x, rodBase.y)
-                        quadraticTo(rodMid.x, rodMid.y, rodTip.x, rodTip.y)
-                    },
-                    color = Color(0xFF5F4128),
-                    style = Stroke(width = 10f, cap = StrokeCap.Round),
                 )
 
                 repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
@@ -1442,67 +1427,6 @@ private fun FishingStageScene(
                         ),
                         size = Size(size.width * 0.12f, size.height * 0.06f),
                     )
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    SceneBadge(text = statusText, accent = phaseAccentColor(phase))
-                    state.fishing.lastCast?.let { cast ->
-                        if (cast.caught && cast.catch != null) {
-                            SceneBadge(
-                                text = "${cast.catch.fish} • ${cast.catch.weight.asKgCompact()}",
-                                accent = rarityColor(cast.catch.rarity),
-                            )
-                        } else if (!cast.caught) {
-                            SceneBadge(
-                                text = strings.fishEscaped,
-                                accent = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                }
-                if (phase == FishingPhase.TAP_CHALLENGE || phase == FishingPhase.BITING) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.34f),
-                            border = BorderStroke(1.dp, phaseAccentColor(phase).copy(alpha = 0.55f)),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    text = if (phase == FishingPhase.BITING) strings.hook else strings.tapFast,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                Text(
-                                    text = if (phase == FishingPhase.BITING) {
-                                        String.format(Locale.US, "%.1fs", timeLeft)
-                                    } else {
-                                        "${state.fishing.tapCount}/${state.fishing.tapGoal}"
-                                    },
-                                    color = phaseAccentColor(phase),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -1548,20 +1472,7 @@ private fun FishingActionCard(
                 .fillMaxWidth()
                 .padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = when (phase) {
-                    FishingPhase.READY -> strings.castRod
-                    FishingPhase.COOLDOWN -> "${strings.castCooldown} • ${timeLeft.toInt()}s"
-                    FishingPhase.WAITING_BITE -> "${strings.waitingBite} • ${timeLeft.toInt()}s"
-                    FishingPhase.BITING -> "${strings.hook} • ${String.format(Locale.US, "%.1f", timeLeft)}s"
-                    FishingPhase.TAP_CHALLENGE -> "${strings.tapFast} ${state.fishing.tapCount}/${state.fishing.tapGoal}"
-                    FishingPhase.RESOLVING -> strings.casting
-                },
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center,
-            )
             Button(
                 onClick = when (phase) {
                     FishingPhase.READY -> onBeginCast
@@ -3041,6 +2952,24 @@ private fun CatchDetailsDialog(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
+                    } else {
+                        val fishAsset = FISH_ASSET_MAP[catch.fish]?.let { assetUrl(it) }
+                        if (fishAsset != null) {
+                            AsyncImage(
+                                model = fishAsset,
+                                contentDescription = catch.fish,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .padding(bottom = 50.dp)
+                                    .size(160.dp)
+                                    .align(Alignment.Center)
+                            )
+                        } else if (loading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
                     }
                     Surface(
                         modifier = Modifier
@@ -3086,9 +3015,6 @@ private fun CatchDetailsDialog(
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    if (loading && cardBitmap == null) {
-                        LoadingStatePanel(strings.loading)
-                    }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -3543,6 +3469,29 @@ private fun localizeClubChatMessage(raw: String, strings: RiverStrings): String 
     }
 }
 
+private fun rodAsset(code: String?): String {
+    val path = when (code) {
+        "spark" -> "/app/assets/rods/yellow_rod.png"
+        "dew" -> "/app/assets/rods/green_rod.png"
+        "stream" -> "/app/assets/rods/blue_rod.png"
+        "abyss" -> "/app/assets/rods/black_rod.png"
+        "storm" -> "/app/assets/rods/silver_rod.png"
+        else -> "/app/assets/rods/yellow_rod.png"
+    }
+    return assetUrl(path)
+}
+
+private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.Offset {
+    return when (code) {
+        "spark" -> androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
+        "dew" -> androidx.compose.ui.geometry.Offset(0.13607f, 0.06641f)
+        "stream" -> androidx.compose.ui.geometry.Offset(0.155f, 0.07422f)
+        "abyss" -> androidx.compose.ui.geometry.Offset(0.14844f, 0.04688f)
+        "storm" -> androidx.compose.ui.geometry.Offset(0.125f, 0.07520f)
+        else -> androidx.compose.ui.geometry.Offset(0.07878f, 0.04785f)
+    }
+}
+
 private fun locationBackgroundAsset(location: String?): String? {
     val path = when (location) {
         "Пруд", "Pond" -> "/app/assets/backgrounds/pond.png"
@@ -3569,3 +3518,444 @@ private fun shopIconAsset(packId: String): String = assetUrl(
 )
 
 private fun assetUrl(path: String): String = BuildConfig.API_BASE_URL.trimEnd('/') + path
+
+private val FISH_ASSET_MAP = mapOf(
+    "Плотва" to "/app/assets/fish/plotva.png",
+    "Roach" to "/app/assets/fish/plotva.png",
+    "Окунь" to "/app/assets/fish/okun.png",
+    "Perch" to "/app/assets/fish/okun.png",
+    "Карась" to "/app/assets/fish/karas.png",
+    "Crucian Carp" to "/app/assets/fish/karas.png",
+    "Лещ" to "/app/assets/fish/lesch.png",
+    "Bream" to "/app/assets/fish/lesch.png",
+    "Щука" to "/app/assets/fish/schuka.png",
+    "Pike" to "/app/assets/fish/schuka.png",
+    "Карп" to "/app/assets/fish/karp.png",
+    "Carp" to "/app/assets/fish/karp.png",
+    "Сом европейский" to "/app/assets/fish/som.png",
+    "European Catfish" to "/app/assets/fish/som.png",
+    "Осётр европейский" to "/app/assets/fish/osetr.png",
+    "European Sturgeon" to "/app/assets/fish/osetr.png",
+    "Уклейка" to "/app/assets/fish/ukleyka.png",
+    "Bleak" to "/app/assets/fish/ukleyka.png",
+    "Линь" to "/app/assets/fish/lin.png",
+    "Tench" to "/app/assets/fish/lin.png",
+    "Ротан" to "/app/assets/fish/rotan.png",
+    "Rotan" to "/app/assets/fish/rotan.png",
+    "Судак" to "/app/assets/fish/sudak.png",
+    "Zander" to "/app/assets/fish/sudak.png",
+    "Чехонь" to "/app/assets/fish/chehon.png",
+    "Sabrefish" to "/app/assets/fish/chehon.png",
+    "Хариус" to "/app/assets/fish/harius.png",
+    "Grayling" to "/app/assets/fish/harius.png",
+    "Форель ручьевая" to "/app/assets/fish/forel_ruchevaya.png",
+    "Brook Trout" to "/app/assets/fish/forel_ruchevaya.png",
+    "Таймень" to "/app/assets/fish/taymen.png",
+    "Taimen" to "/app/assets/fish/taymen.png",
+    "Налим" to "/app/assets/fish/nalim.png",
+    "Burbot" to "/app/assets/fish/nalim.png",
+    "Сиг обыкновенный" to "/app/assets/fish/sig.png",
+    "Common Whitefish" to "/app/assets/fish/sig.png",
+    "Голавль" to "/app/assets/fish/golavl.png",
+    "Chub" to "/app/assets/fish/golavl.png",
+    "Жерех" to "/app/assets/fish/zhereh.png",
+    "Asp" to "/app/assets/fish/zhereh.png",
+    "Толстолобик" to "/app/assets/fish/tolstolobik.png",
+    "Bighead Carp" to "/app/assets/fish/tolstolobik.png",
+    "Амур белый" to "/app/assets/fish/beliy_amur.png",
+    "Grass Carp" to "/app/assets/fish/beliy_amur.png",
+    "Угорь европейский" to "/app/assets/fish/ugor_evropeyskiy.png",
+    "European Eel" to "/app/assets/fish/ugor_evropeyskiy.png",
+    "Стерлядь" to "/app/assets/fish/sterlyad.png",
+    "Sterlet" to "/app/assets/fish/sterlyad.png",
+    "Кефаль-лобан" to "/app/assets/fish/kefal.png",
+    "Flathead Grey Mullet" to "/app/assets/fish/kefal.png",
+    "Камбала морская" to "/app/assets/fish/kambala.png",
+    "Sea Flounder" to "/app/assets/fish/kambala.png",
+    "Сельдь" to "/app/assets/fish/seld.png",
+    "Herring" to "/app/assets/fish/seld.png",
+    "Ставрида" to "/app/assets/fish/stavrida.png",
+    "Horse Mackerel" to "/app/assets/fish/stavrida.png",
+    "Тихоокеанский клювач" to "/app/assets/fish/klyuvach_pacificocean.png",
+    "Pacific Snipefish" to "/app/assets/fish/klyuvach_pacificocean.png",
+    "Треска" to "/app/assets/fish/treska.png",
+    "Cod" to "/app/assets/fish/treska.png",
+    "Сайда" to "/app/assets/fish/sayda.png",
+    "Pollock" to "/app/assets/fish/sayda.png",
+    "Мерланг" to "/app/assets/fish/merlang.png",
+    "Whiting" to "/app/assets/fish/merlang.png",
+    "Форель морская" to "/app/assets/fish/morskaya_forel.png",
+    "Sea Trout" to "/app/assets/fish/morskaya_forel.png",
+    "Палтус" to "/app/assets/fish/paltus.png",
+    "Halibut" to "/app/assets/fish/paltus.png",
+    "Корюшка" to "/app/assets/fish/koryushka.png",
+    "Smelt" to "/app/assets/fish/koryushka.png",
+    "Лосось атлантический" to "/app/assets/fish/losos_atlanticheskiy.png",
+    "Atlantic Salmon" to "/app/assets/fish/losos_atlanticheskiy.png",
+    "Лаврак" to "/app/assets/fish/lavrak.png",
+    "Sea Bass" to "/app/assets/fish/lavrak.png",
+    "Скумбрия атлантическая" to "/app/assets/fish/skumbriya_atlanticheskaya.png",
+    "Atlantic Mackerel" to "/app/assets/fish/skumbriya_atlanticheskaya.png",
+    "Горбуша" to "/app/assets/fish/gorbusha.png",
+    "Pink Salmon" to "/app/assets/fish/gorbusha.png",
+    "Кета" to "/app/assets/fish/keta.png",
+    "Chum Salmon" to "/app/assets/fish/keta.png",
+    "Белуга" to "/app/assets/fish/beluga.png",
+    "Beluga" to "/app/assets/fish/beluga.png",
+    "Ёрш" to "/app/assets/fish/yorsh.png",
+    "Ruffe" to "/app/assets/fish/yorsh.png",
+    "Берш" to "/app/assets/fish/bersh.png",
+    "Volga Pikeperch" to "/app/assets/fish/bersh.png",
+    "Пескарь" to "/app/assets/fish/peskar.png",
+    "Gudgeon" to "/app/assets/fish/peskar.png",
+    "Густера" to "/app/assets/fish/gustera.png",
+    "Blue Bream" to "/app/assets/fish/gustera.png",
+    "Краснопёрка" to "/app/assets/fish/krasnopyorka.png",
+    "Rudd" to "/app/assets/fish/krasnopyorka.png",
+    "Елец" to "/app/assets/fish/elets.png",
+    "Dace" to "/app/assets/fish/elets.png",
+    "Верхоплавка" to "/app/assets/fish/verhoplavka.png",
+    "Topmouth Gudgeon" to "/app/assets/fish/verhoplavka.png",
+    "Вьюн" to "/app/assets/fish/vyun.png",
+    "Weather Loach" to "/app/assets/fish/vyun.png",
+    "Вобла" to "/app/assets/fish/vobla.png",
+    "Caspian Roach" to "/app/assets/fish/vobla.png",
+    "Гольян" to "/app/assets/fish/golyan.png",
+    "Minnow" to "/app/assets/fish/golyan.png",
+    "Язь" to "/app/assets/fish/yaz.png",
+    "Ide" to "/app/assets/fish/yaz.png",
+    "Бычок-кругляк" to "/app/assets/fish/bychyok.png",
+    "Round Goby" to "/app/assets/fish/bychyok.png",
+    "Килька" to "/app/assets/fish/kilka.png",
+    "Sprat" to "/app/assets/fish/kilka.png",
+    "Мойва" to "/app/assets/fish/mojva.png",
+    "Capelin" to "/app/assets/fish/mojva.png",
+    "Тарань" to "/app/assets/fish/taran.png",
+    "Black Sea Roach" to "/app/assets/fish/taran.png",
+    "Сардина" to "/app/assets/fish/sardina.png",
+    "Sardine" to "/app/assets/fish/sardina.png",
+    "Анчоус европейский" to "/app/assets/fish/anchous.png",
+    "European Anchovy" to "/app/assets/fish/anchous.png",
+    "Дорадо" to "/app/assets/fish/dorado.png",
+    "Dorado" to "/app/assets/fish/dorado.png",
+    "Ваху" to "/app/assets/fish/vahu.png",
+    "Wahoo" to "/app/assets/fish/vahu.png",
+    "Парусник" to "/app/assets/fish/parusnik.png",
+    "Sailfish" to "/app/assets/fish/parusnik.png",
+    "Рыба-меч" to "/app/assets/fish/ryba_mech.png",
+    "Swordfish" to "/app/assets/fish/ryba_mech.png",
+    "Марлин синий" to "/app/assets/fish/marlin_siniy.png",
+    "Blue Marlin" to "/app/assets/fish/marlin_siniy.png",
+    "Тунец синеперый" to "/app/assets/fish/tunets_sineperiy.png",
+    "Bluefin Tuna" to "/app/assets/fish/tunets_sineperiy.png",
+    "Акула мако" to "/app/assets/fish/akula_mako.png",
+    "Mako Shark" to "/app/assets/fish/akula_mako.png",
+    "Катран обыкновенный" to "/app/assets/fish/katran_simple.png",
+    "Spiny Dogfish" to "/app/assets/fish/katran_simple.png",
+    "Альбакор" to "/app/assets/fish/albakor.png",
+    "Albacore" to "/app/assets/fish/albakor.png",
+    "Голец арктический" to "/app/assets/fish/golets_arkticheskiy.png",
+    "Arctic Char" to "/app/assets/fish/golets_arkticheskiy.png",
+    "Форель кумжа" to "/app/assets/fish/forel_kumzha.png",
+    "Brown Trout" to "/app/assets/fish/forel_kumzha.png",
+    "Пикша" to "/app/assets/fish/piksha.png",
+    "Haddock" to "/app/assets/fish/piksha.png",
+    "Тюрбо" to "/app/assets/fish/tyurbo.png",
+    "Turbot" to "/app/assets/fish/tyurbo.png",
+    "Сайра" to "/app/assets/fish/sayra.png",
+    "Pacific Saury" to "/app/assets/fish/sayra.png",
+    "Летучая рыба" to "/app/assets/fish/letuchaya_ryba.png",
+    "Flying Fish" to "/app/assets/fish/letuchaya_ryba.png",
+    "Рыба-луна" to "/app/assets/fish/ryba_luna.png",
+    "Ocean Sunfish" to "/app/assets/fish/ryba_luna.png",
+    "Сельдяной король" to "/app/assets/fish/seldyanoy_korol.png",
+    "Oarfish" to "/app/assets/fish/seldyanoy_korol.png",
+    "Паку бурый" to "/app/assets/fish/tambaki.png",
+    "Brown Pacu" to "/app/assets/fish/tambaki.png",
+    "Паку краснобрюхий" to "/app/assets/fish/paku_krasnobryuhiy.png",
+    "Red-bellied Pacu" to "/app/assets/fish/paku_krasnobryuhiy.png",
+    "Паку чёрный" to "/app/assets/fish/paku_cherniy.png",
+    "Black Pacu" to "/app/assets/fish/paku_cherniy.png",
+    "Прохилодус красноштриховый" to "/app/assets/fish/prohilodus.png",
+    "Stripetail Prochilodus" to "/app/assets/fish/prohilodus.png",
+    "Лепоринус полосатый" to "/app/assets/fish/leporinus_polosatiy.png",
+    "Banded Leporinus" to "/app/assets/fish/leporinus_polosatiy.png",
+    "Метиннис серебристый" to "/app/assets/fish/metinnis_serebristiy.png",
+    "Silver Dollar" to "/app/assets/fish/metinnis_serebristiy.png",
+    "Пелядь" to "/app/assets/fish/pelyad.png",
+    "Peled Whitefish" to "/app/assets/fish/pelyad.png",
+    "Омуль арктический" to "/app/assets/fish/omul_arkticheskiy.png",
+    "Arctic Omul" to "/app/assets/fish/omul_arkticheskiy.png",
+    "Муксун" to "/app/assets/fish/muksun.png",
+    "Muksun Whitefish" to "/app/assets/fish/muksun.png",
+    "Анциструс обыкновенный" to "/app/assets/fish/ancistrus.png",
+    "Common Bristlenose" to "/app/assets/fish/ancistrus.png",
+    "Птеригоплихт парчовый" to "/app/assets/fish/pterigopliht_parchoviy.png",
+    "Sailfin Pleco" to "/app/assets/fish/pterigopliht_parchoviy.png",
+    "Отоцинклюс широкополосый" to "/app/assets/fish/otocinklyus.png",
+    "Banded Otocinclus" to "/app/assets/fish/otocinklyus.png",
+    "Карнегиелла мраморная" to "/app/assets/fish/karnegiella_mramornaya.png",
+    "Marbled Hatchetfish" to "/app/assets/fish/karnegiella_mramornaya.png",
+    "Тетра неоновая" to "/app/assets/fish/tetra_neonovaya.png",
+    "Neon Tetra" to "/app/assets/fish/tetra_neonovaya.png",
+    "Тернеция чёрная" to "/app/assets/fish/tetra_chernaya.png",
+    "Black Skirt Tetra" to "/app/assets/fish/tetra_chernaya.png",
+    "Рыба-лист амазонская" to "/app/assets/fish/ryba_list_amazonskaya.png",
+    "Amazon Leaf Fish" to "/app/assets/fish/ryba_list_amazonskaya.png",
+    "Арапайма" to "/app/assets/fish/arapayma.png",
+    "Arapaima" to "/app/assets/fish/arapayma.png",
+    "Ленок" to "/app/assets/fish/lenok.png",
+    "Lenok Trout" to "/app/assets/fish/lenok.png",
+    "Пиранья краснобрюхая" to "/app/assets/fish/piranya_krasnopuzaya.png",
+    "Red-bellied Piranha" to "/app/assets/fish/piranya_krasnopuzaya.png",
+    "Бикуда" to "/app/assets/fish/bikuda.png",
+    "Bicuda" to "/app/assets/fish/bikuda.png",
+    "Угорь электрический" to "/app/assets/fish/ugor_elektricheskiy.png",
+    "Electric Eel" to "/app/assets/fish/ugor_elektricheskiy.png",
+    "Сом краснохвостый" to "/app/assets/fish/krasnohvostiy_som.png",
+    "Redtail Catfish" to "/app/assets/fish/krasnohvostiy_som.png",
+    "Пимелодус пятнистый" to "/app/assets/fish/pimelodus_pyatnistiy.png",
+    "Spotted Pimelodus" to "/app/assets/fish/pimelodus_pyatnistiy.png",
+    "Сом веслоносый" to "/app/assets/fish/som_veslonosiy.png",
+    "Paddlefish" to "/app/assets/fish/som_veslonosiy.png",
+    "Пираиба" to "/app/assets/fish/piraiba.png",
+    "Piraiba" to "/app/assets/fish/piraiba.png",
+    "Дискус обыкновенный" to "/app/assets/fish/diskus.png",
+    "Common Discus" to "/app/assets/fish/diskus.png",
+    "Скалярия альтум" to "/app/assets/fish/skalyaria_altum.png",
+    "Altum Angelfish" to "/app/assets/fish/skalyaria_altum.png",
+    "Скалярия обыкновенная" to "/app/assets/fish/skalyaria_common.png",
+    "Freshwater Angelfish" to "/app/assets/fish/skalyaria_common.png",
+    "Апистограмма Агассиза" to "/app/assets/fish/apistogramma_agassiza.png",
+    "Agassiz's Cichlid" to "/app/assets/fish/apistogramma_agassiza.png",
+    "Тетра кардинальная" to "/app/assets/fish/tetra_kardinal.png",
+    "Cardinal Tetra" to "/app/assets/fish/tetra_kardinal.png",
+    "Тетра лимонная" to "/app/assets/fish/tetra_limonnaya.png",
+    "Lemon Tetra" to "/app/assets/fish/tetra_limonnaya.png",
+    "Тетра огненная" to "/app/assets/fish/tetra_ognennaya.png",
+    "Ember Tetra" to "/app/assets/fish/tetra_ognennaya.png",
+    "Тетра пингвин" to "/app/assets/fish/tetra_pingvin.png",
+    "Penguin Tetra" to "/app/assets/fish/tetra_pingvin.png",
+    "Тетра родостомус" to "/app/assets/fish/tetra_rodostomus.png",
+    "Rummy-nose Tetra" to "/app/assets/fish/tetra_rodostomus.png",
+    "Тетра чёрный неон" to "/app/assets/fish/tetra_black_neon.png",
+    "Black Neon Tetra" to "/app/assets/fish/tetra_black_neon.png",
+    "Коридорас панда" to "/app/assets/fish/koridorus_panda.png",
+    "Panda Cory" to "/app/assets/fish/koridorus_panda.png",
+    "Коридорас Штерба" to "/app/assets/fish/koridoras_shterba.png",
+    "Sterba's Corydoras" to "/app/assets/fish/koridoras_shterba.png",
+    "Татия леопардовая" to "/app/assets/fish/tatiya_leopardovaya.png",
+    "Leopard Tatia" to "/app/assets/fish/tatiya_leopardovaya.png",
+    "Торакатум" to "/app/assets/fish/torakatum.png",
+    "Hoplo Catfish" to "/app/assets/fish/torakatum.png",
+    "Нанностомус трифасциатус" to "/app/assets/fish/nannostomus.png",
+    "Three-Stripe Pencilfish" to "/app/assets/fish/nannostomus.png",
+    "Нанностомус маргинатус" to "/app/assets/fish/nannostomus_marginatus.png",
+    "Dwarf Pencilfish" to "/app/assets/fish/nannostomus_marginatus.png",
+    "Рамирези" to "/app/assets/fish/ramirezi.png",
+    "Ram Cichlid" to "/app/assets/fish/ramirezi.png",
+    "Аравана чёрная" to "/app/assets/fish/aravana_chernaya.png",
+    "Black Arowana" to "/app/assets/fish/aravana_chernaya.png",
+    "Астронотус глазчатый" to "/app/assets/fish/oskar.png",
+    "Oscar Cichlid" to "/app/assets/fish/oskar.png",
+    "Аймара" to "/app/assets/fish/aymara.png",
+    "Aimara" to "/app/assets/fish/aymara.png",
+    "Псевдоплатистома тигровая" to "/app/assets/fish/surubin.png",
+    "Tiger Shovelnose" to "/app/assets/fish/surubin.png",
+    "Брахиплатистома тигровая" to "/app/assets/fish/brahiplatistoma_tigrovaya.png",
+    "Tiger Catfish" to "/app/assets/fish/brahiplatistoma_tigrovaya.png",
+    "Пиранья чёрная" to "/app/assets/fish/piranya_chernaya.png",
+    "Black Piranha" to "/app/assets/fish/piranya_chernaya.png",
+    "Паяра" to "/app/assets/fish/payara.png",
+    "Payara" to "/app/assets/fish/payara.png",
+    "Мечерот обыкновенный" to "/app/assets/fish/mecherot_common.png",
+    "Common Freshwater Barracuda" to "/app/assets/fish/mecherot_common.png",
+    "Мечерот пятнистый" to "/app/assets/fish/mecherot_pyatnistiy.png",
+    "Spotted Freshwater Barracuda" to "/app/assets/fish/mecherot_pyatnistiy.png",
+    "Гимнотус угревидный" to "/app/assets/fish/gimnotus_ugrevidniy.png",
+    "Banded Knifefish" to "/app/assets/fish/gimnotus_ugrevidniy.png",
+    "Нож-рыба чёрная" to "/app/assets/fish/ryba_nozh_chernaya.png",
+    "Black Ghost Knifefish" to "/app/assets/fish/ryba_nozh_chernaya.png",
+    "Щучья цихлида" to "/app/assets/fish/schuchya_cihlida.png",
+    "Pike Cichlid" to "/app/assets/fish/schuchya_cihlida.png",
+    "Павлиний окунь" to "/app/assets/fish/pavliniy_okun.png",
+    "Peacock Bass" to "/app/assets/fish/pavliniy_okun.png",
+    "Цихлазома мезонаута" to "/app/assets/fish/cihlazoma_mezonauta.png",
+    "Flag Cichlid" to "/app/assets/fish/cihlazoma_mezonauta.png",
+    "Цихлазома северум" to "/app/assets/fish/cihlazoma_severum.png",
+    "Severum Cichlid" to "/app/assets/fish/cihlazoma_severum.png",
+    "Молочная рыба" to "/app/assets/fish/molochnaya_ryba.png",
+    "Milkfish" to "/app/assets/fish/molochnaya_ryba.png",
+    "Кефаль пятнистая" to "/app/assets/fish/kefal_pyatnistaya.png",
+    "Spotted Mullet" to "/app/assets/fish/kefal_pyatnistaya.png",
+    "Тиляпия мозамбикская" to "/app/assets/fish/tilyapiya_mozambikskaya.png",
+    "Mozambique Tilapia" to "/app/assets/fish/tilyapiya_mozambikskaya.png",
+    "Анчоус тропический" to "/app/assets/fish/anchous_tropicheskiy.png",
+    "Tropical Anchovy" to "/app/assets/fish/anchous_tropicheskiy.png",
+    "Сардина индийская" to "/app/assets/fish/sardina_indiyskaya.png",
+    "Indian Sardine" to "/app/assets/fish/sardina_indiyskaya.png",
+    "Сиган золотистый" to "/app/assets/fish/zolotistiy_shiponog.png",
+    "Golden Rabbitfish" to "/app/assets/fish/zolotistiy_shiponog.png",
+    "Бычок-пчёлка" to "/app/assets/fish/bychok_mangroviy.png",
+    "Bumblebee Goby" to "/app/assets/fish/bychok_mangroviy.png",
+    "Баррамунди" to "/app/assets/fish/barramundi.png",
+    "Barramundi" to "/app/assets/fish/barramundi.png",
+    "Снук" to "/app/assets/fish/snuk.png",
+    "Snook" to "/app/assets/fish/snuk.png",
+    "Луциан мангровый" to "/app/assets/fish/mangroviy_snapper.png",
+    "Mangrove Snapper" to "/app/assets/fish/mangroviy_snapper.png",
+    "Тарпон" to "/app/assets/fish/tarpon.png",
+    "Tarpon" to "/app/assets/fish/tarpon.png",
+    "Сом морской" to "/app/assets/fish/morskoy_som.png",
+    "Sea Catfish" to "/app/assets/fish/morskoy_som.png",
+    "Сарган морской" to "/app/assets/fish/morskoy_sargan.png",
+    "Needlefish" to "/app/assets/fish/morskoy_sargan.png",
+    "Каранкс голубой" to "/app/assets/fish/goluboy_trevalli.png",
+    "Blue Trevally" to "/app/assets/fish/goluboy_trevalli.png",
+    "Рыба-попугай" to "/app/assets/fish/ryba_popugay.png",
+    "Parrotfish" to "/app/assets/fish/ryba_popugay.png",
+    "Ангел императорский" to "/app/assets/fish/angel_imperatorskiy.png",
+    "Emperor Angelfish" to "/app/assets/fish/angel_imperatorskiy.png",
+    "Хирург голубой" to "/app/assets/fish/hirurg_goluboy.png",
+    "Blue Tang" to "/app/assets/fish/hirurg_goluboy.png",
+    "Бабочка нитеносная" to "/app/assets/fish/babochka_klinopolosaya.png",
+    "Threadfin Butterflyfish" to "/app/assets/fish/babochka_klinopolosaya.png",
+    "Хризиптера синяя" to "/app/assets/fish/damsel_siniy.png",
+    "Blue Damselfish" to "/app/assets/fish/damsel_siniy.png",
+    "Фузилёр жёлтохвостый" to "/app/assets/fish/fuziler_zheltohvostiy.png",
+    "Yellowtail Fusilier" to "/app/assets/fish/fuziler_zheltohvostiy.png",
+    "Барабулька тропическая" to "/app/assets/fish/barabulka_tropicheskaya.png",
+    "Tropical Goatfish" to "/app/assets/fish/barabulka_tropicheskaya.png",
+    "Барракуда большая" to "/app/assets/fish/barrakuda_bolschaya.png",
+    "Great Barracuda" to "/app/assets/fish/barrakuda_bolschaya.png",
+    "Конгер" to "/app/assets/fish/konger.png",
+    "Conger Eel" to "/app/assets/fish/konger.png",
+    "Каранкс гигантский" to "/app/assets/fish/gigantskiy_karanks.png",
+    "Giant Trevally" to "/app/assets/fish/gigantskiy_karanks.png",
+    "Пермит" to "/app/assets/fish/permit.png",
+    "Permit" to "/app/assets/fish/permit.png",
+    "Альбула" to "/app/assets/fish/kostlyavaya_ryba.png",
+    "Bonefish" to "/app/assets/fish/kostlyavaya_ryba.png",
+    "Скумбрия испанская" to "/app/assets/fish/ispanskaya_makrel.png",
+    "Spanish Mackerel" to "/app/assets/fish/ispanskaya_makrel.png",
+    "Группер коралловый" to "/app/assets/fish/koralloviy_grupper.png",
+    "Coral Grouper" to "/app/assets/fish/koralloviy_grupper.png",
+    "Спинорог-титан" to "/app/assets/fish/spinorog_titan.png",
+    "Titan Triggerfish" to "/app/assets/fish/spinorog_titan.png",
+    "Карп кои (Кохаку)" to "/app/assets/fish/koi_kohaku.png",
+    "Koi (Kohaku)" to "/app/assets/fish/koi_kohaku.png",
+    "Карп кои (Тайсё Сансёку)" to "/app/assets/fish/koi_taisho_sanke.png",
+    "Koi (Taisho Sanshoku)" to "/app/assets/fish/koi_taisho_sanke.png",
+    "Карп кои (Сёва Сансёку)" to "/app/assets/fish/koi_showa_sanshoku.png",
+    "Koi (Showa Sanshoku)" to "/app/assets/fish/koi_showa_sanshoku.png",
+    "Карп кои (Уцуримоно)" to "/app/assets/fish/koi_utsurimono.png",
+    "Koi (Utsurimono)" to "/app/assets/fish/koi_utsurimono.png",
+    "Карп кои (Бэкко)" to "/app/assets/fish/koi_bekko.png",
+    "Koi (Bekko)" to "/app/assets/fish/koi_bekko.png",
+    "Карп кои (Тантё)" to "/app/assets/fish/koi_tancho.png",
+    "Koi (Tancho)" to "/app/assets/fish/koi_tancho.png",
+    "Карп кои (Асаги)" to "/app/assets/fish/koi_asagi.png",
+    "Koi (Asagi)" to "/app/assets/fish/koi_asagi.png",
+    "Карп кои (Сюсуй)" to "/app/assets/fish/koi_shusui.png",
+    "Koi (Shusui)" to "/app/assets/fish/koi_shusui.png",
+    "Карп кои (Коромо)" to "/app/assets/fish/koi_koromo.png",
+    "Koi (Koromo)" to "/app/assets/fish/koi_koromo.png",
+    "Карп кои (Кингинрин)" to "/app/assets/fish/koi_kinginrin.png",
+    "Koi (Kinginrin)" to "/app/assets/fish/koi_kinginrin.png",
+    "Карп кои (Каваримоно)" to "/app/assets/fish/koi_kawarimono.png",
+    "Koi (Kawarimono)" to "/app/assets/fish/koi_kawarimono.png",
+    "Карп кои (Огон)" to "/app/assets/fish/koi_ogon.png",
+    "Koi (Ogon)" to "/app/assets/fish/koi_ogon.png",
+    "Карп кои (Хикари-моёмоно)" to "/app/assets/fish/koi_hikari_moyomono.png",
+    "Koi (Hikari Moyomono)" to "/app/assets/fish/koi_hikari_moyomono.png",
+    "Карп кои (Госики)" to "/app/assets/fish/koi_goshiki.png",
+    "Koi (Goshiki)" to "/app/assets/fish/koi_goshiki.png",
+    "Карп кои (Кумонрю)" to "/app/assets/fish/koi_kumonryu.png",
+    "Koi (Kumonryu)" to "/app/assets/fish/koi_kumonryu.png",
+    "Карп кои (Дойцу-гои)" to "/app/assets/fish/koi_doitsu.png",
+    "Koi (Doitsu-goi)" to "/app/assets/fish/koi_doitsu.png",
+    "Амур чёрный" to "/app/assets/fish/cherniy_amur.png",
+    "Black Amur" to "/app/assets/fish/cherniy_amur.png",
+    "Змееголов северный" to "/app/assets/fish/zmeegolov_severniy.png",
+    "Northern Snakehead" to "/app/assets/fish/zmeegolov_severniy.png",
+    "Щука амурская" to "/app/assets/fish/amurskaya_schuka.png",
+    "Amur Pike" to "/app/assets/fish/amurskaya_schuka.png",
+    "Кристивомер" to "/app/assets/fish/kristivomer.png",
+    "Lake Trout" to "/app/assets/fish/kristivomer.png",
+    "Лосось дунайский" to "/app/assets/fish/dunaiskiy_losos.png",
+    "Danube Salmon (Huchen)" to "/app/assets/fish/dunaiskiy_losos.png",
+    "Зунгаро" to "/app/assets/fish/zungaro.png",
+    "Zungaro Catfish" to "/app/assets/fish/zungaro.png",
+    "Скат моторо" to "/app/assets/fish/skat_motoro.png",
+    "Motoro Stingray" to "/app/assets/fish/skat_motoro.png",
+    "Пеленгас" to "/app/assets/fish/pelengas.png",
+    "Pelingas Mullet" to "/app/assets/fish/pelengas.png",
+    "Вырезуб" to "/app/assets/fish/vyrezub.png",
+    "Black Sea Shemaya" to "/app/assets/fish/vyrezub.png",
+    "Кубера" to "/app/assets/fish/kubera.png",
+    "Cubera Snapper" to "/app/assets/fish/kubera.png",
+    "Мурена европейская" to "/app/assets/fish/murena_european.png",
+    "European Moray" to "/app/assets/fish/murena_european.png",
+    "Мурена звёздчатая" to "/app/assets/fish/murena_zvezdchataya.png",
+    "Starry Moray" to "/app/assets/fish/murena_zvezdchataya.png",
+    "Мурена гигантская" to "/app/assets/fish/murena_gigantskaya.png",
+    "Giant Moray" to "/app/assets/fish/murena_gigantskaya.png",
+    "Зубатка пятнистая" to "/app/assets/fish/zubatka_pyatnistaya.png",
+    "Spotted Wolffish" to "/app/assets/fish/zubatka_pyatnistaya.png",
+    "Тунец желтоперый" to "/app/assets/fish/tunec_zeltoperiy.png",
+    "Yellowfin Tuna" to "/app/assets/fish/tunec_zeltoperiy.png",
+    "Снук чёрный" to "/app/assets/fish/chyorniy_snuk.png",
+    "Black Snook" to "/app/assets/fish/chyorniy_snuk.png",
+    "Рыба-наполеон" to "/app/assets/fish/ryba_napoleon.png",
+    "Napoleon Wrasse" to "/app/assets/fish/ryba_napoleon.png",
+    "Рыба-клоун" to "/app/assets/fish/ryba_kloun.png",
+    "Clownfish" to "/app/assets/fish/ryba_kloun.png",
+    "Кефаль мангровая" to "/app/assets/fish/kefal_mangrovaya.png",
+    "Mangrove Mullet" to "/app/assets/fish/kefal_mangrovaya.png",
+    "Сельдь тихоокеанская" to "/app/assets/fish/seld_tihookeanskaya.png",
+    "Pacific Herring" to "/app/assets/fish/seld_tihookeanskaya.png",
+    "Хромис рифовый" to "/app/assets/fish/hromis_rifoviy.png",
+    "Reef Chromis" to "/app/assets/fish/hromis_rifoviy.png",
+    "Дамсел жёлтохвостый" to "/app/assets/fish/damsel_zheltohvostiy.png",
+    "Yellowtail Damselfish" to "/app/assets/fish/damsel_zheltohvostiy.png",
+    "Морской конёк" to "/app/assets/fish/morskoy_konek.png",
+    "Seahorse" to "/app/assets/fish/morskoy_konek.png",
+    "Идол мавританский" to "/app/assets/fish/idol_mavritanskiy.png",
+    "Moorish Idol" to "/app/assets/fish/idol_mavritanskiy.png",
+    "Рыба-бабочка полосатая" to "/app/assets/fish/ryba_babochka_polosataya.png",
+    "Striped Butterflyfish" to "/app/assets/fish/ryba_babochka_polosataya.png",
+    "Гобиодон голубопятнистый" to "/app/assets/fish/gobiodon_golubopyatnistiy.png",
+    "Bluespotted Goby" to "/app/assets/fish/gobiodon_golubopyatnistiy.png",
+    "Сиган коричневопятнистый" to "/app/assets/fish/sigan_korichnevopyatnistiy.png",
+    "Brown-spotted Rabbitfish" to "/app/assets/fish/sigan_korichnevopyatnistiy.png",
+    "Хирург полосатый" to "/app/assets/fish/hirurg_polosatiy.png",
+    "Striped Surgeonfish" to "/app/assets/fish/hirurg_polosatiy.png",
+    "Луциан серебристо-пятнистый" to "/app/assets/fish/lucian_serebristo-pyatnistiy.png",
+    "Silverspot Snapper" to "/app/assets/fish/lucian_serebristo-pyatnistiy.png",
+    "Скорпена бородатая" to "/app/assets/fish/skorpena_borodataya.png",
+    "Bearded Scorpionfish" to "/app/assets/fish/skorpena_borodataya.png",
+    "Барракуда полосатая" to "/app/assets/fish/barrakuda_polosataya.png",
+    "Striped Barracuda" to "/app/assets/fish/barrakuda_polosataya.png",
+    "Каранкс шестиполосый" to "/app/assets/fish/karanks_polosatiy.png",
+    "Sixband Trevally" to "/app/assets/fish/karanks_polosatiy.png",
+    "Группер леопардовый коралловый" to "/app/assets/fish/grupper_leopardoviy_koralloviy.png",
+    "Leopard Coral Grouper" to "/app/assets/fish/grupper_leopardoviy_koralloviy.png",
+    "Иглорыл-агухон" to "/app/assets/fish/igloryl-aguhon.png",
+    "Agujon Needlefish" to "/app/assets/fish/igloryl-aguhon.png",
+    "Акула рифовая чёрнопёрая" to "/app/assets/fish/akula_rifovaya_chernoperaya.png",
+    "Blacktip Reef Shark" to "/app/assets/fish/akula_rifovaya_chernoperaya.png",
+    "Губан-чистильщик" to "/app/assets/fish/guban-chistilschik.png",
+    "Cleaner Wrasse" to "/app/assets/fish/guban-chistilschik.png",
+    "Сержант-майор атлантический" to "/app/assets/fish/sergant-major_atlanticheskiy.png",
+    "Atlantic Sergeant Major" to "/app/assets/fish/sergant-major_atlanticheskiy.png",
+    "Грамма королевская" to "/app/assets/fish/gramma_korolevskaya.png",
+    "Royal Gramma" to "/app/assets/fish/gramma_korolevskaya.png",
+    "Ангел королевский" to "/app/assets/fish/angel_korolevskiy.png",
+    "Queen Angelfish" to "/app/assets/fish/angel_korolevskiy.png",
+    "Мандариновая рыба" to "/app/assets/fish/mandarinivaya_ryba.png",
+    "Mandarin Dragonet" to "/app/assets/fish/mandarinivaya_ryba.png",
+    "Крылатка зебровая" to "/app/assets/fish/krylaka_zebrovaya.png",
+    "Zebra Lionfish" to "/app/assets/fish/krylaka_zebrovaya.png",
+    "Рыба-флейта" to "/app/assets/fish/ryba-fleita.png",
+    "Trumpetfish" to "/app/assets/fish/ryba-fleita.png",
+)
