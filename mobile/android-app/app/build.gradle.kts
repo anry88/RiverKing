@@ -6,7 +6,8 @@ plugins {
 }
 
 val ktorVersion = "2.3.11"
-val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?) ?: "http://10.0.2.2:8080"
+val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?)
+    ?: "https://v759468.hosted-by-vdsina.com"
 val googleClientId = (findProperty("RIVERKING_GOOGLE_AUTH_CLIENT_ID") as String?) ?: ""
 val signingStoreFile = findProperty("RIVERKING_SIGNING_STORE_FILE") as String?
 val signingStorePassword = findProperty("RIVERKING_SIGNING_STORE_PASSWORD") as String?
