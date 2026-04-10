@@ -73,6 +73,9 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            installation {
+                enableBaselineProfile = false
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
