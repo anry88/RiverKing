@@ -1285,7 +1285,6 @@ private fun FishingStageScene(
     modifier: Modifier = Modifier,
 ) {
     val phase = state.fishing.phase
-    val timeLeft = (state.fishing.phaseTimeLeftMillis / 1000.0).coerceAtLeast(0.0)
     val inWater = phase == FishingPhase.WAITING_BITE || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE
     val infinite = rememberInfiniteTransition(label = "fishing-scene")
     val waveShift by infinite.animateFloat(
@@ -1300,26 +1299,31 @@ private fun FishingStageScene(
         animationSpec = infiniteRepeatable(tween(durationMillis = 1400, easing = LinearEasing)),
         label = "ripple-progress",
     )
+
+    // --- Bobber position (relative fractions matching the TG webapp) ---
+    // In the TG webapp the bobber lands to the LEFT of the rod tip,
+    // in the water area (waterTop ~0.48, bobber Y ~0.60-0.80).
+    // When idle / ready the bobber sits near the shore (left side).
     val castX by animateFloatAsState(
         targetValue = when (phase) {
-            FishingPhase.READY -> 0.18f
-            FishingPhase.COOLDOWN -> 0.24f
-            FishingPhase.WAITING_BITE -> 0.76f
-            FishingPhase.BITING -> 0.78f
-            FishingPhase.TAP_CHALLENGE -> 0.79f
-            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.56f else 0.74f
+            FishingPhase.READY -> 0.09f
+            FishingPhase.COOLDOWN -> 0.12f
+            FishingPhase.WAITING_BITE -> 0.22f
+            FishingPhase.BITING -> 0.20f
+            FishingPhase.TAP_CHALLENGE -> 0.19f
+            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.28f else 0.21f
         },
         animationSpec = tween(durationMillis = 850),
         label = "cast-x",
     )
     val castY by animateFloatAsState(
         targetValue = when (phase) {
-            FishingPhase.READY -> 0.60f
-            FishingPhase.COOLDOWN -> 0.62f
-            FishingPhase.WAITING_BITE -> 0.69f
-            FishingPhase.BITING -> 0.66f
-            FishingPhase.TAP_CHALLENGE -> 0.64f
-            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.42f else 0.68f
+            FishingPhase.READY -> 0.45f
+            FishingPhase.COOLDOWN -> 0.48f
+            FishingPhase.WAITING_BITE -> 0.62f
+            FishingPhase.BITING -> 0.60f
+            FishingPhase.TAP_CHALLENGE -> 0.58f
+            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.40f else 0.61f
         },
         animationSpec = tween(durationMillis = 850),
         label = "cast-y",
@@ -1336,12 +1340,33 @@ private fun FishingStageScene(
             val rodUrl = rodAsset(currentRodCode)
             val rodTipAnchor = rodTipAnchorPercentage(currentRodCode)
 
-            val rodImageRatio = 1536f / 1024f
-            val rodWFrac = 0.65f
-            val rodWidthDp = maxWidth * rodWFrac
-            val rodHeightDp = rodWidthDp / rodImageRatio
-            val rodLeftDp = maxWidth * 0.10f
-            val rodTopDp = maxHeight - rodHeightDp + (maxHeight * 0.15f)
+            // --- Rod sizing matching the TG webapp ---
+            // ROD_IMG_SIZE = 1536 x 1024
+            val rodImgWidth = 1536f
+            val rodImgHeight = 1024f
+            // Target fractions (for fitting), then scaled by ROD_SIZE_MULT
+            val targetWFrac = 0.70f
+            val targetHFrac = 0.92f
+            val rodSizeMult = 1.5f
+            val rodScaleBase = min(
+                (maxWidth.value * targetWFrac) / rodImgWidth,
+                (maxHeight.value * targetHFrac) / rodImgHeight,
+            )
+            val rodScale = rodScaleBase * rodSizeMult
+            val rodWidthDp = (rodImgWidth * rodScale).dp
+            val rodHeightDp = (rodImgHeight * rodScale).dp
+
+            // --- Rod positioning matching the TG webapp ---
+            // ROD_BASE_X_FRACTION = 2/3  — the grip goes at 66% of scene width
+            // ROD_BASE_ANCHOR = { x: 0.383, y: 0.998 } — grip point in the rod image
+            val rodBaseXFraction = 2f / 3f
+            val rodBaseAnchorX = 0.383f
+            val baseDesiredX = maxWidth * rodBaseXFraction
+            val rodLeftDp = baseDesiredX - rodWidthDp * rodBaseAnchorX
+
+            // Push rod bottom below the scene (overshoot)
+            val rodBottomOvershoot = min(max(maxHeight.value * 0.08f, 50f), 140f).dp
+            val rodTopDp = maxHeight - rodHeightDp + rodBottomOvershoot
 
             coil.compose.AsyncImage(
                 model = rodUrl,
@@ -1350,27 +1375,21 @@ private fun FishingStageScene(
                     .offset(x = rodLeftDp, y = rodTopDp)
                     .width(rodWidthDp)
                     .height(rodHeightDp),
-                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds
+                contentScale = ContentScale.FillBounds
             )
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * 0.48f
 
-                val rodBase = Offset(
-                    x = rodLeftDp.toPx() + rodWidthDp.toPx() * 0.383f,
-                    y = rodTopDp.toPx() + rodHeightDp.toPx() * 0.998f
-                )
+                // Rod tip in pixel coordinates
                 val rodTip = Offset(
                     x = rodLeftDp.toPx() + rodWidthDp.toPx() * rodTipAnchor.x,
-                    y = rodTopDp.toPx() + rodHeightDp.toPx() * rodTipAnchor.y
+                    y = rodTopDp.toPx() + rodHeightDp.toPx() * rodTipAnchor.y,
                 )
-                
-                val dx = rodTip.x - rodBase.x
-                val dy = rodTip.y - rodBase.y
-                val rodMid = Offset(rodBase.x + dx * 0.4f, rodBase.y + dy * 0.4f)
 
+                // Bobber wave animation
                 val bobberOffset = if (inWater || phase == FishingPhase.RESOLVING) {
-                    kotlin.math.sin(waveShift * (2f * kotlin.math.PI).toFloat()) * size.height * when (phase) {
+                    sin(waveShift * (2f * PI).toFloat()) * size.height * when (phase) {
                         FishingPhase.BITING -> 0.028f
                         FishingPhase.TAP_CHALLENGE -> 0.022f
                         else -> 0.015f
@@ -1379,10 +1398,27 @@ private fun FishingStageScene(
                     0f
                 }
                 val bobber = Offset(size.width * castX, size.height * castY + bobberOffset)
-                val control = Offset(
-                    x = (rodTip.x + bobber.x) * 0.52f,
-                    y = kotlin.math.min(rodTip.y, bobber.y) + if (inWater) size.height * 0.10f else size.height * 0.18f,
-                )
+
+                // Fishing line from rod tip to bobber with natural sag
+                val dx = bobber.x - rodTip.x
+                val dy = bobber.y - rodTip.y
+                val dist = kotlin.math.hypot(dx, dy)
+                val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
+                val control = if (shouldShowSlack) {
+                    // Slack line when idle
+                    val sag = min(size.height * 0.22f, max(16f, dist * 0.55f))
+                    Offset(
+                        x = rodTip.x + dx * 0.55f,
+                        y = rodTip.y + dy * 0.5f + sag,
+                    )
+                } else {
+                    // Taut line when cast
+                    val gentleSag = min(size.height * 0.08f, dist * 0.12f)
+                    Offset(
+                        x = rodTip.x + dx * 0.5f,
+                        y = rodTip.y + dy * 0.5f + gentleSag,
+                    )
+                }
                 val linePath = Path().apply {
                     moveTo(rodTip.x, rodTip.y)
                     quadraticTo(control.x, control.y, bobber.x, bobber.y)
@@ -1390,9 +1426,10 @@ private fun FishingStageScene(
                 drawPath(
                     path = linePath,
                     color = Color(0xFFF0E8D6),
-                    style = Stroke(width = 4f, cap = StrokeCap.Round),
+                    style = Stroke(width = 3f, cap = StrokeCap.Round),
                 )
 
+                // Ripple circles around bobber
                 repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
                     val progress = ((rippleProgress + index * 0.35f) % 1f)
                     val radius = size.width * (0.04f + progress * 0.08f)
@@ -1404,6 +1441,7 @@ private fun FishingStageScene(
                     )
                 }
 
+                // Bobber (float)
                 val bobberRadius = size.width * 0.022f
                 drawCircle(color = Color(0xFFE8F0F4), radius = bobberRadius, center = bobber)
                 drawCircle(
@@ -1417,6 +1455,7 @@ private fun FishingStageScene(
                     center = bobber,
                 )
 
+                // Caught fish glow
                 if (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null) {
                     val catchColor = rarityColor(state.fishing.lastCast.catch.rarity)
                     drawOval(
@@ -2953,7 +2992,7 @@ private fun CatchDetailsDialog(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
-                        val fishAsset = FISH_ASSET_MAP[catch.fish]?.let { assetUrl(it) }
+                        val fishAsset = FISH_ASSET_MAP[catch.fish]?.let { localAsset(it) }
                         if (fishAsset != null) {
                             AsyncImage(
                                 model = fishAsset,
@@ -3353,14 +3392,14 @@ private fun humanizePackId(packId: String): String = when {
 private fun lureAccentColor(name: String): Color =
     if (name.contains("+")) Color(0xFFFFD76A) else Color(0xFF8FE388)
 
-private fun rodImageAsset(code: String): String = assetUrl(
+private fun rodImageAsset(code: String): String = localAsset(
     when (code) {
-        "spark" -> "/app/assets/rods/yellow_rod.png"
-        "dew" -> "/app/assets/rods/green_rod.png"
-        "stream" -> "/app/assets/rods/blue_rod.png"
-        "abyss" -> "/app/assets/rods/black_rod.png"
-        "storm" -> "/app/assets/rods/silver_rod.png"
-        else -> "/app/assets/rods/yellow_rod.png"
+        "spark" -> "rods/yellow_rod.webp"
+        "dew" -> "rods/green_rod.webp"
+        "stream" -> "rods/blue_rod.webp"
+        "abyss" -> "rods/black_rod.webp"
+        "storm" -> "rods/silver_rod.webp"
+        else -> "rods/yellow_rod.webp"
     }
 )
 
@@ -3377,7 +3416,7 @@ private fun achievementArtAsset(code: String, levelIndex: Int): String {
     } else {
         code
     }
-    return assetUrl("/app/assets/achievements/${base}_$suffix.png")
+    return serverAssetUrl("/app/assets/achievements/${base}_$suffix.png")
 }
 
 private fun guideFishCountLabel(strings: RiverStrings, count: Int): String =
@@ -3471,14 +3510,14 @@ private fun localizeClubChatMessage(raw: String, strings: RiverStrings): String 
 
 private fun rodAsset(code: String?): String {
     val path = when (code) {
-        "spark" -> "/app/assets/rods/yellow_rod.png"
-        "dew" -> "/app/assets/rods/green_rod.png"
-        "stream" -> "/app/assets/rods/blue_rod.png"
-        "abyss" -> "/app/assets/rods/black_rod.png"
-        "storm" -> "/app/assets/rods/silver_rod.png"
-        else -> "/app/assets/rods/yellow_rod.png"
+        "spark" -> "rods/yellow_rod.webp"
+        "dew" -> "rods/green_rod.webp"
+        "stream" -> "rods/blue_rod.webp"
+        "abyss" -> "rods/black_rod.webp"
+        "storm" -> "rods/silver_rod.webp"
+        else -> "rods/yellow_rod.webp"
     }
-    return assetUrl(path)
+    return localAsset(path)
 }
 
 private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.Offset {
@@ -3494,468 +3533,472 @@ private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.
 
 private fun locationBackgroundAsset(location: String?): String? {
     val path = when (location) {
-        "Пруд", "Pond" -> "/app/assets/backgrounds/pond.png"
-        "Болото", "Swamp" -> "/app/assets/backgrounds/swamp.png"
-        "Река", "River" -> "/app/assets/backgrounds/river.png"
-        "Озеро", "Lake" -> "/app/assets/backgrounds/lake.png"
-        "Водохранилище", "Reservoir" -> "/app/assets/backgrounds/reservoir.png"
-        "Горная река", "Mountain River" -> "/app/assets/backgrounds/mountain_river.png"
-        "Дельта реки", "River Delta" -> "/app/assets/backgrounds/river_delta.png"
-        "Прибрежье моря", "Sea Coast" -> "/app/assets/backgrounds/sea_coast.png"
-        "Фьорд", "Fjord" -> "/app/assets/backgrounds/fjord.png"
-        "Открытый океан", "Open Ocean" -> "/app/assets/backgrounds/open_ocean.png"
-        "Русло Амазонки", "Amazon Riverbed" -> "/app/assets/backgrounds/amazon_riverbed.png"
-        "Игапо, затопленный лес", "Flooded Forest" -> "/app/assets/backgrounds/flooded_forest.png"
-        "Мангровые заросли", "Mangroves" -> "/app/assets/backgrounds/mangroves.png"
-        "Коралловые отмели", "Coral Flats" -> "/app/assets/backgrounds/coral_flats.png"
+        "Пруд", "Pond" -> "backgrounds/pond.webp"
+        "Болото", "Swamp" -> "backgrounds/swamp.webp"
+        "Река", "River" -> "backgrounds/river.webp"
+        "Озеро", "Lake" -> "backgrounds/lake.webp"
+        "Водохранилище", "Reservoir" -> "backgrounds/reservoir.webp"
+        "Горная река", "Mountain River" -> "backgrounds/mountain_river.webp"
+        "Дельта реки", "River Delta" -> "backgrounds/river_delta.webp"
+        "Прибрежье моря", "Sea Coast" -> "backgrounds/sea_coast.webp"
+        "Фьорд", "Fjord" -> "backgrounds/fjord.webp"
+        "Открытый океан", "Open Ocean" -> "backgrounds/open_ocean.webp"
+        "Русло Амазонки", "Amazon Riverbed" -> "backgrounds/amazon_riverbed.webp"
+        "Игапо, затопленный лес", "Flooded Forest" -> "backgrounds/flooded_forest.webp"
+        "Мангровые заросли", "Mangroves" -> "backgrounds/mangroves.webp"
+        "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
         else -> null
     }
-    return path?.let(::assetUrl)
+    return path?.let(::localAsset)
 }
 
-private fun shopIconAsset(packId: String): String = assetUrl(
-    if (packId.startsWith("autofish")) "/app/assets/shop/autofish.png" else "/app/assets/shop/$packId.png"
+private fun shopIconAsset(packId: String): String = localAsset(
+    if (packId.startsWith("autofish")) "shop/autofish.webp" else "shop/$packId.webp"
 )
 
-private fun assetUrl(path: String): String = BuildConfig.API_BASE_URL.trimEnd('/') + path
+/** Load a bundled asset from android_asset via file URI (Coil supports this). */
+private fun localAsset(relativePath: String): String = "file:///android_asset/$relativePath"
+
+/** Load an asset from the server (used for achievements that are not bundled). */
+private fun serverAssetUrl(path: String): String = BuildConfig.API_BASE_URL.trimEnd('/') + path
 
 private val FISH_ASSET_MAP = mapOf(
-    "Плотва" to "/app/assets/fish/plotva.png",
-    "Roach" to "/app/assets/fish/plotva.png",
-    "Окунь" to "/app/assets/fish/okun.png",
-    "Perch" to "/app/assets/fish/okun.png",
-    "Карась" to "/app/assets/fish/karas.png",
-    "Crucian Carp" to "/app/assets/fish/karas.png",
-    "Лещ" to "/app/assets/fish/lesch.png",
-    "Bream" to "/app/assets/fish/lesch.png",
-    "Щука" to "/app/assets/fish/schuka.png",
-    "Pike" to "/app/assets/fish/schuka.png",
-    "Карп" to "/app/assets/fish/karp.png",
-    "Carp" to "/app/assets/fish/karp.png",
-    "Сом европейский" to "/app/assets/fish/som.png",
-    "European Catfish" to "/app/assets/fish/som.png",
-    "Осётр европейский" to "/app/assets/fish/osetr.png",
-    "European Sturgeon" to "/app/assets/fish/osetr.png",
-    "Уклейка" to "/app/assets/fish/ukleyka.png",
-    "Bleak" to "/app/assets/fish/ukleyka.png",
-    "Линь" to "/app/assets/fish/lin.png",
-    "Tench" to "/app/assets/fish/lin.png",
-    "Ротан" to "/app/assets/fish/rotan.png",
-    "Rotan" to "/app/assets/fish/rotan.png",
-    "Судак" to "/app/assets/fish/sudak.png",
-    "Zander" to "/app/assets/fish/sudak.png",
-    "Чехонь" to "/app/assets/fish/chehon.png",
-    "Sabrefish" to "/app/assets/fish/chehon.png",
-    "Хариус" to "/app/assets/fish/harius.png",
-    "Grayling" to "/app/assets/fish/harius.png",
-    "Форель ручьевая" to "/app/assets/fish/forel_ruchevaya.png",
-    "Brook Trout" to "/app/assets/fish/forel_ruchevaya.png",
-    "Таймень" to "/app/assets/fish/taymen.png",
-    "Taimen" to "/app/assets/fish/taymen.png",
-    "Налим" to "/app/assets/fish/nalim.png",
-    "Burbot" to "/app/assets/fish/nalim.png",
-    "Сиг обыкновенный" to "/app/assets/fish/sig.png",
-    "Common Whitefish" to "/app/assets/fish/sig.png",
-    "Голавль" to "/app/assets/fish/golavl.png",
-    "Chub" to "/app/assets/fish/golavl.png",
-    "Жерех" to "/app/assets/fish/zhereh.png",
-    "Asp" to "/app/assets/fish/zhereh.png",
-    "Толстолобик" to "/app/assets/fish/tolstolobik.png",
-    "Bighead Carp" to "/app/assets/fish/tolstolobik.png",
-    "Амур белый" to "/app/assets/fish/beliy_amur.png",
-    "Grass Carp" to "/app/assets/fish/beliy_amur.png",
-    "Угорь европейский" to "/app/assets/fish/ugor_evropeyskiy.png",
-    "European Eel" to "/app/assets/fish/ugor_evropeyskiy.png",
-    "Стерлядь" to "/app/assets/fish/sterlyad.png",
-    "Sterlet" to "/app/assets/fish/sterlyad.png",
-    "Кефаль-лобан" to "/app/assets/fish/kefal.png",
-    "Flathead Grey Mullet" to "/app/assets/fish/kefal.png",
-    "Камбала морская" to "/app/assets/fish/kambala.png",
-    "Sea Flounder" to "/app/assets/fish/kambala.png",
-    "Сельдь" to "/app/assets/fish/seld.png",
-    "Herring" to "/app/assets/fish/seld.png",
-    "Ставрида" to "/app/assets/fish/stavrida.png",
-    "Horse Mackerel" to "/app/assets/fish/stavrida.png",
-    "Тихоокеанский клювач" to "/app/assets/fish/klyuvach_pacificocean.png",
-    "Pacific Snipefish" to "/app/assets/fish/klyuvach_pacificocean.png",
-    "Треска" to "/app/assets/fish/treska.png",
-    "Cod" to "/app/assets/fish/treska.png",
-    "Сайда" to "/app/assets/fish/sayda.png",
-    "Pollock" to "/app/assets/fish/sayda.png",
-    "Мерланг" to "/app/assets/fish/merlang.png",
-    "Whiting" to "/app/assets/fish/merlang.png",
-    "Форель морская" to "/app/assets/fish/morskaya_forel.png",
-    "Sea Trout" to "/app/assets/fish/morskaya_forel.png",
-    "Палтус" to "/app/assets/fish/paltus.png",
-    "Halibut" to "/app/assets/fish/paltus.png",
-    "Корюшка" to "/app/assets/fish/koryushka.png",
-    "Smelt" to "/app/assets/fish/koryushka.png",
-    "Лосось атлантический" to "/app/assets/fish/losos_atlanticheskiy.png",
-    "Atlantic Salmon" to "/app/assets/fish/losos_atlanticheskiy.png",
-    "Лаврак" to "/app/assets/fish/lavrak.png",
-    "Sea Bass" to "/app/assets/fish/lavrak.png",
-    "Скумбрия атлантическая" to "/app/assets/fish/skumbriya_atlanticheskaya.png",
-    "Atlantic Mackerel" to "/app/assets/fish/skumbriya_atlanticheskaya.png",
-    "Горбуша" to "/app/assets/fish/gorbusha.png",
-    "Pink Salmon" to "/app/assets/fish/gorbusha.png",
-    "Кета" to "/app/assets/fish/keta.png",
-    "Chum Salmon" to "/app/assets/fish/keta.png",
-    "Белуга" to "/app/assets/fish/beluga.png",
-    "Beluga" to "/app/assets/fish/beluga.png",
-    "Ёрш" to "/app/assets/fish/yorsh.png",
-    "Ruffe" to "/app/assets/fish/yorsh.png",
-    "Берш" to "/app/assets/fish/bersh.png",
-    "Volga Pikeperch" to "/app/assets/fish/bersh.png",
-    "Пескарь" to "/app/assets/fish/peskar.png",
-    "Gudgeon" to "/app/assets/fish/peskar.png",
-    "Густера" to "/app/assets/fish/gustera.png",
-    "Blue Bream" to "/app/assets/fish/gustera.png",
-    "Краснопёрка" to "/app/assets/fish/krasnopyorka.png",
-    "Rudd" to "/app/assets/fish/krasnopyorka.png",
-    "Елец" to "/app/assets/fish/elets.png",
-    "Dace" to "/app/assets/fish/elets.png",
-    "Верхоплавка" to "/app/assets/fish/verhoplavka.png",
-    "Topmouth Gudgeon" to "/app/assets/fish/verhoplavka.png",
-    "Вьюн" to "/app/assets/fish/vyun.png",
-    "Weather Loach" to "/app/assets/fish/vyun.png",
-    "Вобла" to "/app/assets/fish/vobla.png",
-    "Caspian Roach" to "/app/assets/fish/vobla.png",
-    "Гольян" to "/app/assets/fish/golyan.png",
-    "Minnow" to "/app/assets/fish/golyan.png",
-    "Язь" to "/app/assets/fish/yaz.png",
-    "Ide" to "/app/assets/fish/yaz.png",
-    "Бычок-кругляк" to "/app/assets/fish/bychyok.png",
-    "Round Goby" to "/app/assets/fish/bychyok.png",
-    "Килька" to "/app/assets/fish/kilka.png",
-    "Sprat" to "/app/assets/fish/kilka.png",
-    "Мойва" to "/app/assets/fish/mojva.png",
-    "Capelin" to "/app/assets/fish/mojva.png",
-    "Тарань" to "/app/assets/fish/taran.png",
-    "Black Sea Roach" to "/app/assets/fish/taran.png",
-    "Сардина" to "/app/assets/fish/sardina.png",
-    "Sardine" to "/app/assets/fish/sardina.png",
-    "Анчоус европейский" to "/app/assets/fish/anchous.png",
-    "European Anchovy" to "/app/assets/fish/anchous.png",
-    "Дорадо" to "/app/assets/fish/dorado.png",
-    "Dorado" to "/app/assets/fish/dorado.png",
-    "Ваху" to "/app/assets/fish/vahu.png",
-    "Wahoo" to "/app/assets/fish/vahu.png",
-    "Парусник" to "/app/assets/fish/parusnik.png",
-    "Sailfish" to "/app/assets/fish/parusnik.png",
-    "Рыба-меч" to "/app/assets/fish/ryba_mech.png",
-    "Swordfish" to "/app/assets/fish/ryba_mech.png",
-    "Марлин синий" to "/app/assets/fish/marlin_siniy.png",
-    "Blue Marlin" to "/app/assets/fish/marlin_siniy.png",
-    "Тунец синеперый" to "/app/assets/fish/tunets_sineperiy.png",
-    "Bluefin Tuna" to "/app/assets/fish/tunets_sineperiy.png",
-    "Акула мако" to "/app/assets/fish/akula_mako.png",
-    "Mako Shark" to "/app/assets/fish/akula_mako.png",
-    "Катран обыкновенный" to "/app/assets/fish/katran_simple.png",
-    "Spiny Dogfish" to "/app/assets/fish/katran_simple.png",
-    "Альбакор" to "/app/assets/fish/albakor.png",
-    "Albacore" to "/app/assets/fish/albakor.png",
-    "Голец арктический" to "/app/assets/fish/golets_arkticheskiy.png",
-    "Arctic Char" to "/app/assets/fish/golets_arkticheskiy.png",
-    "Форель кумжа" to "/app/assets/fish/forel_kumzha.png",
-    "Brown Trout" to "/app/assets/fish/forel_kumzha.png",
-    "Пикша" to "/app/assets/fish/piksha.png",
-    "Haddock" to "/app/assets/fish/piksha.png",
-    "Тюрбо" to "/app/assets/fish/tyurbo.png",
-    "Turbot" to "/app/assets/fish/tyurbo.png",
-    "Сайра" to "/app/assets/fish/sayra.png",
-    "Pacific Saury" to "/app/assets/fish/sayra.png",
-    "Летучая рыба" to "/app/assets/fish/letuchaya_ryba.png",
-    "Flying Fish" to "/app/assets/fish/letuchaya_ryba.png",
-    "Рыба-луна" to "/app/assets/fish/ryba_luna.png",
-    "Ocean Sunfish" to "/app/assets/fish/ryba_luna.png",
-    "Сельдяной король" to "/app/assets/fish/seldyanoy_korol.png",
-    "Oarfish" to "/app/assets/fish/seldyanoy_korol.png",
-    "Паку бурый" to "/app/assets/fish/tambaki.png",
-    "Brown Pacu" to "/app/assets/fish/tambaki.png",
-    "Паку краснобрюхий" to "/app/assets/fish/paku_krasnobryuhiy.png",
-    "Red-bellied Pacu" to "/app/assets/fish/paku_krasnobryuhiy.png",
-    "Паку чёрный" to "/app/assets/fish/paku_cherniy.png",
-    "Black Pacu" to "/app/assets/fish/paku_cherniy.png",
-    "Прохилодус красноштриховый" to "/app/assets/fish/prohilodus.png",
-    "Stripetail Prochilodus" to "/app/assets/fish/prohilodus.png",
-    "Лепоринус полосатый" to "/app/assets/fish/leporinus_polosatiy.png",
-    "Banded Leporinus" to "/app/assets/fish/leporinus_polosatiy.png",
-    "Метиннис серебристый" to "/app/assets/fish/metinnis_serebristiy.png",
-    "Silver Dollar" to "/app/assets/fish/metinnis_serebristiy.png",
-    "Пелядь" to "/app/assets/fish/pelyad.png",
-    "Peled Whitefish" to "/app/assets/fish/pelyad.png",
-    "Омуль арктический" to "/app/assets/fish/omul_arkticheskiy.png",
-    "Arctic Omul" to "/app/assets/fish/omul_arkticheskiy.png",
-    "Муксун" to "/app/assets/fish/muksun.png",
-    "Muksun Whitefish" to "/app/assets/fish/muksun.png",
-    "Анциструс обыкновенный" to "/app/assets/fish/ancistrus.png",
-    "Common Bristlenose" to "/app/assets/fish/ancistrus.png",
-    "Птеригоплихт парчовый" to "/app/assets/fish/pterigopliht_parchoviy.png",
-    "Sailfin Pleco" to "/app/assets/fish/pterigopliht_parchoviy.png",
-    "Отоцинклюс широкополосый" to "/app/assets/fish/otocinklyus.png",
-    "Banded Otocinclus" to "/app/assets/fish/otocinklyus.png",
-    "Карнегиелла мраморная" to "/app/assets/fish/karnegiella_mramornaya.png",
-    "Marbled Hatchetfish" to "/app/assets/fish/karnegiella_mramornaya.png",
-    "Тетра неоновая" to "/app/assets/fish/tetra_neonovaya.png",
-    "Neon Tetra" to "/app/assets/fish/tetra_neonovaya.png",
-    "Тернеция чёрная" to "/app/assets/fish/tetra_chernaya.png",
-    "Black Skirt Tetra" to "/app/assets/fish/tetra_chernaya.png",
-    "Рыба-лист амазонская" to "/app/assets/fish/ryba_list_amazonskaya.png",
-    "Amazon Leaf Fish" to "/app/assets/fish/ryba_list_amazonskaya.png",
-    "Арапайма" to "/app/assets/fish/arapayma.png",
-    "Arapaima" to "/app/assets/fish/arapayma.png",
-    "Ленок" to "/app/assets/fish/lenok.png",
-    "Lenok Trout" to "/app/assets/fish/lenok.png",
-    "Пиранья краснобрюхая" to "/app/assets/fish/piranya_krasnopuzaya.png",
-    "Red-bellied Piranha" to "/app/assets/fish/piranya_krasnopuzaya.png",
-    "Бикуда" to "/app/assets/fish/bikuda.png",
-    "Bicuda" to "/app/assets/fish/bikuda.png",
-    "Угорь электрический" to "/app/assets/fish/ugor_elektricheskiy.png",
-    "Electric Eel" to "/app/assets/fish/ugor_elektricheskiy.png",
-    "Сом краснохвостый" to "/app/assets/fish/krasnohvostiy_som.png",
-    "Redtail Catfish" to "/app/assets/fish/krasnohvostiy_som.png",
-    "Пимелодус пятнистый" to "/app/assets/fish/pimelodus_pyatnistiy.png",
-    "Spotted Pimelodus" to "/app/assets/fish/pimelodus_pyatnistiy.png",
-    "Сом веслоносый" to "/app/assets/fish/som_veslonosiy.png",
-    "Paddlefish" to "/app/assets/fish/som_veslonosiy.png",
-    "Пираиба" to "/app/assets/fish/piraiba.png",
-    "Piraiba" to "/app/assets/fish/piraiba.png",
-    "Дискус обыкновенный" to "/app/assets/fish/diskus.png",
-    "Common Discus" to "/app/assets/fish/diskus.png",
-    "Скалярия альтум" to "/app/assets/fish/skalyaria_altum.png",
-    "Altum Angelfish" to "/app/assets/fish/skalyaria_altum.png",
-    "Скалярия обыкновенная" to "/app/assets/fish/skalyaria_common.png",
-    "Freshwater Angelfish" to "/app/assets/fish/skalyaria_common.png",
-    "Апистограмма Агассиза" to "/app/assets/fish/apistogramma_agassiza.png",
-    "Agassiz's Cichlid" to "/app/assets/fish/apistogramma_agassiza.png",
-    "Тетра кардинальная" to "/app/assets/fish/tetra_kardinal.png",
-    "Cardinal Tetra" to "/app/assets/fish/tetra_kardinal.png",
-    "Тетра лимонная" to "/app/assets/fish/tetra_limonnaya.png",
-    "Lemon Tetra" to "/app/assets/fish/tetra_limonnaya.png",
-    "Тетра огненная" to "/app/assets/fish/tetra_ognennaya.png",
-    "Ember Tetra" to "/app/assets/fish/tetra_ognennaya.png",
-    "Тетра пингвин" to "/app/assets/fish/tetra_pingvin.png",
-    "Penguin Tetra" to "/app/assets/fish/tetra_pingvin.png",
-    "Тетра родостомус" to "/app/assets/fish/tetra_rodostomus.png",
-    "Rummy-nose Tetra" to "/app/assets/fish/tetra_rodostomus.png",
-    "Тетра чёрный неон" to "/app/assets/fish/tetra_black_neon.png",
-    "Black Neon Tetra" to "/app/assets/fish/tetra_black_neon.png",
-    "Коридорас панда" to "/app/assets/fish/koridorus_panda.png",
-    "Panda Cory" to "/app/assets/fish/koridorus_panda.png",
-    "Коридорас Штерба" to "/app/assets/fish/koridoras_shterba.png",
-    "Sterba's Corydoras" to "/app/assets/fish/koridoras_shterba.png",
-    "Татия леопардовая" to "/app/assets/fish/tatiya_leopardovaya.png",
-    "Leopard Tatia" to "/app/assets/fish/tatiya_leopardovaya.png",
-    "Торакатум" to "/app/assets/fish/torakatum.png",
-    "Hoplo Catfish" to "/app/assets/fish/torakatum.png",
-    "Нанностомус трифасциатус" to "/app/assets/fish/nannostomus.png",
-    "Three-Stripe Pencilfish" to "/app/assets/fish/nannostomus.png",
-    "Нанностомус маргинатус" to "/app/assets/fish/nannostomus_marginatus.png",
-    "Dwarf Pencilfish" to "/app/assets/fish/nannostomus_marginatus.png",
-    "Рамирези" to "/app/assets/fish/ramirezi.png",
-    "Ram Cichlid" to "/app/assets/fish/ramirezi.png",
-    "Аравана чёрная" to "/app/assets/fish/aravana_chernaya.png",
-    "Black Arowana" to "/app/assets/fish/aravana_chernaya.png",
-    "Астронотус глазчатый" to "/app/assets/fish/oskar.png",
-    "Oscar Cichlid" to "/app/assets/fish/oskar.png",
-    "Аймара" to "/app/assets/fish/aymara.png",
-    "Aimara" to "/app/assets/fish/aymara.png",
-    "Псевдоплатистома тигровая" to "/app/assets/fish/surubin.png",
-    "Tiger Shovelnose" to "/app/assets/fish/surubin.png",
-    "Брахиплатистома тигровая" to "/app/assets/fish/brahiplatistoma_tigrovaya.png",
-    "Tiger Catfish" to "/app/assets/fish/brahiplatistoma_tigrovaya.png",
-    "Пиранья чёрная" to "/app/assets/fish/piranya_chernaya.png",
-    "Black Piranha" to "/app/assets/fish/piranya_chernaya.png",
-    "Паяра" to "/app/assets/fish/payara.png",
-    "Payara" to "/app/assets/fish/payara.png",
-    "Мечерот обыкновенный" to "/app/assets/fish/mecherot_common.png",
-    "Common Freshwater Barracuda" to "/app/assets/fish/mecherot_common.png",
-    "Мечерот пятнистый" to "/app/assets/fish/mecherot_pyatnistiy.png",
-    "Spotted Freshwater Barracuda" to "/app/assets/fish/mecherot_pyatnistiy.png",
-    "Гимнотус угревидный" to "/app/assets/fish/gimnotus_ugrevidniy.png",
-    "Banded Knifefish" to "/app/assets/fish/gimnotus_ugrevidniy.png",
-    "Нож-рыба чёрная" to "/app/assets/fish/ryba_nozh_chernaya.png",
-    "Black Ghost Knifefish" to "/app/assets/fish/ryba_nozh_chernaya.png",
-    "Щучья цихлида" to "/app/assets/fish/schuchya_cihlida.png",
-    "Pike Cichlid" to "/app/assets/fish/schuchya_cihlida.png",
-    "Павлиний окунь" to "/app/assets/fish/pavliniy_okun.png",
-    "Peacock Bass" to "/app/assets/fish/pavliniy_okun.png",
-    "Цихлазома мезонаута" to "/app/assets/fish/cihlazoma_mezonauta.png",
-    "Flag Cichlid" to "/app/assets/fish/cihlazoma_mezonauta.png",
-    "Цихлазома северум" to "/app/assets/fish/cihlazoma_severum.png",
-    "Severum Cichlid" to "/app/assets/fish/cihlazoma_severum.png",
-    "Молочная рыба" to "/app/assets/fish/molochnaya_ryba.png",
-    "Milkfish" to "/app/assets/fish/molochnaya_ryba.png",
-    "Кефаль пятнистая" to "/app/assets/fish/kefal_pyatnistaya.png",
-    "Spotted Mullet" to "/app/assets/fish/kefal_pyatnistaya.png",
-    "Тиляпия мозамбикская" to "/app/assets/fish/tilyapiya_mozambikskaya.png",
-    "Mozambique Tilapia" to "/app/assets/fish/tilyapiya_mozambikskaya.png",
-    "Анчоус тропический" to "/app/assets/fish/anchous_tropicheskiy.png",
-    "Tropical Anchovy" to "/app/assets/fish/anchous_tropicheskiy.png",
-    "Сардина индийская" to "/app/assets/fish/sardina_indiyskaya.png",
-    "Indian Sardine" to "/app/assets/fish/sardina_indiyskaya.png",
-    "Сиган золотистый" to "/app/assets/fish/zolotistiy_shiponog.png",
-    "Golden Rabbitfish" to "/app/assets/fish/zolotistiy_shiponog.png",
-    "Бычок-пчёлка" to "/app/assets/fish/bychok_mangroviy.png",
-    "Bumblebee Goby" to "/app/assets/fish/bychok_mangroviy.png",
-    "Баррамунди" to "/app/assets/fish/barramundi.png",
-    "Barramundi" to "/app/assets/fish/barramundi.png",
-    "Снук" to "/app/assets/fish/snuk.png",
-    "Snook" to "/app/assets/fish/snuk.png",
-    "Луциан мангровый" to "/app/assets/fish/mangroviy_snapper.png",
-    "Mangrove Snapper" to "/app/assets/fish/mangroviy_snapper.png",
-    "Тарпон" to "/app/assets/fish/tarpon.png",
-    "Tarpon" to "/app/assets/fish/tarpon.png",
-    "Сом морской" to "/app/assets/fish/morskoy_som.png",
-    "Sea Catfish" to "/app/assets/fish/morskoy_som.png",
-    "Сарган морской" to "/app/assets/fish/morskoy_sargan.png",
-    "Needlefish" to "/app/assets/fish/morskoy_sargan.png",
-    "Каранкс голубой" to "/app/assets/fish/goluboy_trevalli.png",
-    "Blue Trevally" to "/app/assets/fish/goluboy_trevalli.png",
-    "Рыба-попугай" to "/app/assets/fish/ryba_popugay.png",
-    "Parrotfish" to "/app/assets/fish/ryba_popugay.png",
-    "Ангел императорский" to "/app/assets/fish/angel_imperatorskiy.png",
-    "Emperor Angelfish" to "/app/assets/fish/angel_imperatorskiy.png",
-    "Хирург голубой" to "/app/assets/fish/hirurg_goluboy.png",
-    "Blue Tang" to "/app/assets/fish/hirurg_goluboy.png",
-    "Бабочка нитеносная" to "/app/assets/fish/babochka_klinopolosaya.png",
-    "Threadfin Butterflyfish" to "/app/assets/fish/babochka_klinopolosaya.png",
-    "Хризиптера синяя" to "/app/assets/fish/damsel_siniy.png",
-    "Blue Damselfish" to "/app/assets/fish/damsel_siniy.png",
-    "Фузилёр жёлтохвостый" to "/app/assets/fish/fuziler_zheltohvostiy.png",
-    "Yellowtail Fusilier" to "/app/assets/fish/fuziler_zheltohvostiy.png",
-    "Барабулька тропическая" to "/app/assets/fish/barabulka_tropicheskaya.png",
-    "Tropical Goatfish" to "/app/assets/fish/barabulka_tropicheskaya.png",
-    "Барракуда большая" to "/app/assets/fish/barrakuda_bolschaya.png",
-    "Great Barracuda" to "/app/assets/fish/barrakuda_bolschaya.png",
-    "Конгер" to "/app/assets/fish/konger.png",
-    "Conger Eel" to "/app/assets/fish/konger.png",
-    "Каранкс гигантский" to "/app/assets/fish/gigantskiy_karanks.png",
-    "Giant Trevally" to "/app/assets/fish/gigantskiy_karanks.png",
-    "Пермит" to "/app/assets/fish/permit.png",
-    "Permit" to "/app/assets/fish/permit.png",
-    "Альбула" to "/app/assets/fish/kostlyavaya_ryba.png",
-    "Bonefish" to "/app/assets/fish/kostlyavaya_ryba.png",
-    "Скумбрия испанская" to "/app/assets/fish/ispanskaya_makrel.png",
-    "Spanish Mackerel" to "/app/assets/fish/ispanskaya_makrel.png",
-    "Группер коралловый" to "/app/assets/fish/koralloviy_grupper.png",
-    "Coral Grouper" to "/app/assets/fish/koralloviy_grupper.png",
-    "Спинорог-титан" to "/app/assets/fish/spinorog_titan.png",
-    "Titan Triggerfish" to "/app/assets/fish/spinorog_titan.png",
-    "Карп кои (Кохаку)" to "/app/assets/fish/koi_kohaku.png",
-    "Koi (Kohaku)" to "/app/assets/fish/koi_kohaku.png",
-    "Карп кои (Тайсё Сансёку)" to "/app/assets/fish/koi_taisho_sanke.png",
-    "Koi (Taisho Sanshoku)" to "/app/assets/fish/koi_taisho_sanke.png",
-    "Карп кои (Сёва Сансёку)" to "/app/assets/fish/koi_showa_sanshoku.png",
-    "Koi (Showa Sanshoku)" to "/app/assets/fish/koi_showa_sanshoku.png",
-    "Карп кои (Уцуримоно)" to "/app/assets/fish/koi_utsurimono.png",
-    "Koi (Utsurimono)" to "/app/assets/fish/koi_utsurimono.png",
-    "Карп кои (Бэкко)" to "/app/assets/fish/koi_bekko.png",
-    "Koi (Bekko)" to "/app/assets/fish/koi_bekko.png",
-    "Карп кои (Тантё)" to "/app/assets/fish/koi_tancho.png",
-    "Koi (Tancho)" to "/app/assets/fish/koi_tancho.png",
-    "Карп кои (Асаги)" to "/app/assets/fish/koi_asagi.png",
-    "Koi (Asagi)" to "/app/assets/fish/koi_asagi.png",
-    "Карп кои (Сюсуй)" to "/app/assets/fish/koi_shusui.png",
-    "Koi (Shusui)" to "/app/assets/fish/koi_shusui.png",
-    "Карп кои (Коромо)" to "/app/assets/fish/koi_koromo.png",
-    "Koi (Koromo)" to "/app/assets/fish/koi_koromo.png",
-    "Карп кои (Кингинрин)" to "/app/assets/fish/koi_kinginrin.png",
-    "Koi (Kinginrin)" to "/app/assets/fish/koi_kinginrin.png",
-    "Карп кои (Каваримоно)" to "/app/assets/fish/koi_kawarimono.png",
-    "Koi (Kawarimono)" to "/app/assets/fish/koi_kawarimono.png",
-    "Карп кои (Огон)" to "/app/assets/fish/koi_ogon.png",
-    "Koi (Ogon)" to "/app/assets/fish/koi_ogon.png",
-    "Карп кои (Хикари-моёмоно)" to "/app/assets/fish/koi_hikari_moyomono.png",
-    "Koi (Hikari Moyomono)" to "/app/assets/fish/koi_hikari_moyomono.png",
-    "Карп кои (Госики)" to "/app/assets/fish/koi_goshiki.png",
-    "Koi (Goshiki)" to "/app/assets/fish/koi_goshiki.png",
-    "Карп кои (Кумонрю)" to "/app/assets/fish/koi_kumonryu.png",
-    "Koi (Kumonryu)" to "/app/assets/fish/koi_kumonryu.png",
-    "Карп кои (Дойцу-гои)" to "/app/assets/fish/koi_doitsu.png",
-    "Koi (Doitsu-goi)" to "/app/assets/fish/koi_doitsu.png",
-    "Амур чёрный" to "/app/assets/fish/cherniy_amur.png",
-    "Black Amur" to "/app/assets/fish/cherniy_amur.png",
-    "Змееголов северный" to "/app/assets/fish/zmeegolov_severniy.png",
-    "Northern Snakehead" to "/app/assets/fish/zmeegolov_severniy.png",
-    "Щука амурская" to "/app/assets/fish/amurskaya_schuka.png",
-    "Amur Pike" to "/app/assets/fish/amurskaya_schuka.png",
-    "Кристивомер" to "/app/assets/fish/kristivomer.png",
-    "Lake Trout" to "/app/assets/fish/kristivomer.png",
-    "Лосось дунайский" to "/app/assets/fish/dunaiskiy_losos.png",
-    "Danube Salmon (Huchen)" to "/app/assets/fish/dunaiskiy_losos.png",
-    "Зунгаро" to "/app/assets/fish/zungaro.png",
-    "Zungaro Catfish" to "/app/assets/fish/zungaro.png",
-    "Скат моторо" to "/app/assets/fish/skat_motoro.png",
-    "Motoro Stingray" to "/app/assets/fish/skat_motoro.png",
-    "Пеленгас" to "/app/assets/fish/pelengas.png",
-    "Pelingas Mullet" to "/app/assets/fish/pelengas.png",
-    "Вырезуб" to "/app/assets/fish/vyrezub.png",
-    "Black Sea Shemaya" to "/app/assets/fish/vyrezub.png",
-    "Кубера" to "/app/assets/fish/kubera.png",
-    "Cubera Snapper" to "/app/assets/fish/kubera.png",
-    "Мурена европейская" to "/app/assets/fish/murena_european.png",
-    "European Moray" to "/app/assets/fish/murena_european.png",
-    "Мурена звёздчатая" to "/app/assets/fish/murena_zvezdchataya.png",
-    "Starry Moray" to "/app/assets/fish/murena_zvezdchataya.png",
-    "Мурена гигантская" to "/app/assets/fish/murena_gigantskaya.png",
-    "Giant Moray" to "/app/assets/fish/murena_gigantskaya.png",
-    "Зубатка пятнистая" to "/app/assets/fish/zubatka_pyatnistaya.png",
-    "Spotted Wolffish" to "/app/assets/fish/zubatka_pyatnistaya.png",
-    "Тунец желтоперый" to "/app/assets/fish/tunec_zeltoperiy.png",
-    "Yellowfin Tuna" to "/app/assets/fish/tunec_zeltoperiy.png",
-    "Снук чёрный" to "/app/assets/fish/chyorniy_snuk.png",
-    "Black Snook" to "/app/assets/fish/chyorniy_snuk.png",
-    "Рыба-наполеон" to "/app/assets/fish/ryba_napoleon.png",
-    "Napoleon Wrasse" to "/app/assets/fish/ryba_napoleon.png",
-    "Рыба-клоун" to "/app/assets/fish/ryba_kloun.png",
-    "Clownfish" to "/app/assets/fish/ryba_kloun.png",
-    "Кефаль мангровая" to "/app/assets/fish/kefal_mangrovaya.png",
-    "Mangrove Mullet" to "/app/assets/fish/kefal_mangrovaya.png",
-    "Сельдь тихоокеанская" to "/app/assets/fish/seld_tihookeanskaya.png",
-    "Pacific Herring" to "/app/assets/fish/seld_tihookeanskaya.png",
-    "Хромис рифовый" to "/app/assets/fish/hromis_rifoviy.png",
-    "Reef Chromis" to "/app/assets/fish/hromis_rifoviy.png",
-    "Дамсел жёлтохвостый" to "/app/assets/fish/damsel_zheltohvostiy.png",
-    "Yellowtail Damselfish" to "/app/assets/fish/damsel_zheltohvostiy.png",
-    "Морской конёк" to "/app/assets/fish/morskoy_konek.png",
-    "Seahorse" to "/app/assets/fish/morskoy_konek.png",
-    "Идол мавританский" to "/app/assets/fish/idol_mavritanskiy.png",
-    "Moorish Idol" to "/app/assets/fish/idol_mavritanskiy.png",
-    "Рыба-бабочка полосатая" to "/app/assets/fish/ryba_babochka_polosataya.png",
-    "Striped Butterflyfish" to "/app/assets/fish/ryba_babochka_polosataya.png",
-    "Гобиодон голубопятнистый" to "/app/assets/fish/gobiodon_golubopyatnistiy.png",
-    "Bluespotted Goby" to "/app/assets/fish/gobiodon_golubopyatnistiy.png",
-    "Сиган коричневопятнистый" to "/app/assets/fish/sigan_korichnevopyatnistiy.png",
-    "Brown-spotted Rabbitfish" to "/app/assets/fish/sigan_korichnevopyatnistiy.png",
-    "Хирург полосатый" to "/app/assets/fish/hirurg_polosatiy.png",
-    "Striped Surgeonfish" to "/app/assets/fish/hirurg_polosatiy.png",
-    "Луциан серебристо-пятнистый" to "/app/assets/fish/lucian_serebristo-pyatnistiy.png",
-    "Silverspot Snapper" to "/app/assets/fish/lucian_serebristo-pyatnistiy.png",
-    "Скорпена бородатая" to "/app/assets/fish/skorpena_borodataya.png",
-    "Bearded Scorpionfish" to "/app/assets/fish/skorpena_borodataya.png",
-    "Барракуда полосатая" to "/app/assets/fish/barrakuda_polosataya.png",
-    "Striped Barracuda" to "/app/assets/fish/barrakuda_polosataya.png",
-    "Каранкс шестиполосый" to "/app/assets/fish/karanks_polosatiy.png",
-    "Sixband Trevally" to "/app/assets/fish/karanks_polosatiy.png",
-    "Группер леопардовый коралловый" to "/app/assets/fish/grupper_leopardoviy_koralloviy.png",
-    "Leopard Coral Grouper" to "/app/assets/fish/grupper_leopardoviy_koralloviy.png",
-    "Иглорыл-агухон" to "/app/assets/fish/igloryl-aguhon.png",
-    "Agujon Needlefish" to "/app/assets/fish/igloryl-aguhon.png",
-    "Акула рифовая чёрнопёрая" to "/app/assets/fish/akula_rifovaya_chernoperaya.png",
-    "Blacktip Reef Shark" to "/app/assets/fish/akula_rifovaya_chernoperaya.png",
-    "Губан-чистильщик" to "/app/assets/fish/guban-chistilschik.png",
-    "Cleaner Wrasse" to "/app/assets/fish/guban-chistilschik.png",
-    "Сержант-майор атлантический" to "/app/assets/fish/sergant-major_atlanticheskiy.png",
-    "Atlantic Sergeant Major" to "/app/assets/fish/sergant-major_atlanticheskiy.png",
-    "Грамма королевская" to "/app/assets/fish/gramma_korolevskaya.png",
-    "Royal Gramma" to "/app/assets/fish/gramma_korolevskaya.png",
-    "Ангел королевский" to "/app/assets/fish/angel_korolevskiy.png",
-    "Queen Angelfish" to "/app/assets/fish/angel_korolevskiy.png",
-    "Мандариновая рыба" to "/app/assets/fish/mandarinivaya_ryba.png",
-    "Mandarin Dragonet" to "/app/assets/fish/mandarinivaya_ryba.png",
-    "Крылатка зебровая" to "/app/assets/fish/krylaka_zebrovaya.png",
-    "Zebra Lionfish" to "/app/assets/fish/krylaka_zebrovaya.png",
-    "Рыба-флейта" to "/app/assets/fish/ryba-fleita.png",
-    "Trumpetfish" to "/app/assets/fish/ryba-fleita.png",
+    "Плотва" to "fish/plotva.webp",
+    "Roach" to "fish/plotva.webp",
+    "Окунь" to "fish/okun.webp",
+    "Perch" to "fish/okun.webp",
+    "Карась" to "fish/karas.webp",
+    "Crucian Carp" to "fish/karas.webp",
+    "Лещ" to "fish/lesch.webp",
+    "Bream" to "fish/lesch.webp",
+    "Щука" to "fish/schuka.webp",
+    "Pike" to "fish/schuka.webp",
+    "Карп" to "fish/karp.webp",
+    "Carp" to "fish/karp.webp",
+    "Сом европейский" to "fish/som.webp",
+    "European Catfish" to "fish/som.webp",
+    "Осётр европейский" to "fish/osetr.webp",
+    "European Sturgeon" to "fish/osetr.webp",
+    "Уклейка" to "fish/ukleyka.webp",
+    "Bleak" to "fish/ukleyka.webp",
+    "Линь" to "fish/lin.webp",
+    "Tench" to "fish/lin.webp",
+    "Ротан" to "fish/rotan.webp",
+    "Rotan" to "fish/rotan.webp",
+    "Судак" to "fish/sudak.webp",
+    "Zander" to "fish/sudak.webp",
+    "Чехонь" to "fish/chehon.webp",
+    "Sabrefish" to "fish/chehon.webp",
+    "Хариус" to "fish/harius.webp",
+    "Grayling" to "fish/harius.webp",
+    "Форель ручьевая" to "fish/forel_ruchevaya.webp",
+    "Brook Trout" to "fish/forel_ruchevaya.webp",
+    "Таймень" to "fish/taymen.webp",
+    "Taimen" to "fish/taymen.webp",
+    "Налим" to "fish/nalim.webp",
+    "Burbot" to "fish/nalim.webp",
+    "Сиг обыкновенный" to "fish/sig.webp",
+    "Common Whitefish" to "fish/sig.webp",
+    "Голавль" to "fish/golavl.webp",
+    "Chub" to "fish/golavl.webp",
+    "Жерех" to "fish/zhereh.webp",
+    "Asp" to "fish/zhereh.webp",
+    "Толстолобик" to "fish/tolstolobik.webp",
+    "Bighead Carp" to "fish/tolstolobik.webp",
+    "Амур белый" to "fish/beliy_amur.webp",
+    "Grass Carp" to "fish/beliy_amur.webp",
+    "Угорь европейский" to "fish/ugor_evropeyskiy.webp",
+    "European Eel" to "fish/ugor_evropeyskiy.webp",
+    "Стерлядь" to "fish/sterlyad.webp",
+    "Sterlet" to "fish/sterlyad.webp",
+    "Кефаль-лобан" to "fish/kefal.webp",
+    "Flathead Grey Mullet" to "fish/kefal.webp",
+    "Камбала морская" to "fish/kambala.webp",
+    "Sea Flounder" to "fish/kambala.webp",
+    "Сельдь" to "fish/seld.webp",
+    "Herring" to "fish/seld.webp",
+    "Ставрида" to "fish/stavrida.webp",
+    "Horse Mackerel" to "fish/stavrida.webp",
+    "Тихоокеанский клювач" to "fish/klyuvach_pacificocean.webp",
+    "Pacific Snipefish" to "fish/klyuvach_pacificocean.webp",
+    "Треска" to "fish/treska.webp",
+    "Cod" to "fish/treska.webp",
+    "Сайда" to "fish/sayda.webp",
+    "Pollock" to "fish/sayda.webp",
+    "Мерланг" to "fish/merlang.webp",
+    "Whiting" to "fish/merlang.webp",
+    "Форель морская" to "fish/morskaya_forel.webp",
+    "Sea Trout" to "fish/morskaya_forel.webp",
+    "Палтус" to "fish/paltus.webp",
+    "Halibut" to "fish/paltus.webp",
+    "Корюшка" to "fish/koryushka.webp",
+    "Smelt" to "fish/koryushka.webp",
+    "Лосось атлантический" to "fish/losos_atlanticheskiy.webp",
+    "Atlantic Salmon" to "fish/losos_atlanticheskiy.webp",
+    "Лаврак" to "fish/lavrak.webp",
+    "Sea Bass" to "fish/lavrak.webp",
+    "Скумбрия атлантическая" to "fish/skumbriya_atlanticheskaya.webp",
+    "Atlantic Mackerel" to "fish/skumbriya_atlanticheskaya.webp",
+    "Горбуша" to "fish/gorbusha.webp",
+    "Pink Salmon" to "fish/gorbusha.webp",
+    "Кета" to "fish/keta.webp",
+    "Chum Salmon" to "fish/keta.webp",
+    "Белуга" to "fish/beluga.webp",
+    "Beluga" to "fish/beluga.webp",
+    "Ёрш" to "fish/yorsh.webp",
+    "Ruffe" to "fish/yorsh.webp",
+    "Берш" to "fish/bersh.webp",
+    "Volga Pikeperch" to "fish/bersh.webp",
+    "Пескарь" to "fish/peskar.webp",
+    "Gudgeon" to "fish/peskar.webp",
+    "Густера" to "fish/gustera.webp",
+    "Blue Bream" to "fish/gustera.webp",
+    "Краснопёрка" to "fish/krasnopyorka.webp",
+    "Rudd" to "fish/krasnopyorka.webp",
+    "Елец" to "fish/elets.webp",
+    "Dace" to "fish/elets.webp",
+    "Верхоплавка" to "fish/verhoplavka.webp",
+    "Topmouth Gudgeon" to "fish/verhoplavka.webp",
+    "Вьюн" to "fish/vyun.webp",
+    "Weather Loach" to "fish/vyun.webp",
+    "Вобла" to "fish/vobla.webp",
+    "Caspian Roach" to "fish/vobla.webp",
+    "Гольян" to "fish/golyan.webp",
+    "Minnow" to "fish/golyan.webp",
+    "Язь" to "fish/yaz.webp",
+    "Ide" to "fish/yaz.webp",
+    "Бычок-кругляк" to "fish/bychyok.webp",
+    "Round Goby" to "fish/bychyok.webp",
+    "Килька" to "fish/kilka.webp",
+    "Sprat" to "fish/kilka.webp",
+    "Мойва" to "fish/mojva.webp",
+    "Capelin" to "fish/mojva.webp",
+    "Тарань" to "fish/taran.webp",
+    "Black Sea Roach" to "fish/taran.webp",
+    "Сардина" to "fish/sardina.webp",
+    "Sardine" to "fish/sardina.webp",
+    "Анчоус европейский" to "fish/anchous.webp",
+    "European Anchovy" to "fish/anchous.webp",
+    "Дорадо" to "fish/dorado.webp",
+    "Dorado" to "fish/dorado.webp",
+    "Ваху" to "fish/vahu.webp",
+    "Wahoo" to "fish/vahu.webp",
+    "Парусник" to "fish/parusnik.webp",
+    "Sailfish" to "fish/parusnik.webp",
+    "Рыба-меч" to "fish/ryba_mech.webp",
+    "Swordfish" to "fish/ryba_mech.webp",
+    "Марлин синий" to "fish/marlin_siniy.webp",
+    "Blue Marlin" to "fish/marlin_siniy.webp",
+    "Тунец синеперый" to "fish/tunets_sineperiy.webp",
+    "Bluefin Tuna" to "fish/tunets_sineperiy.webp",
+    "Акула мако" to "fish/akula_mako.webp",
+    "Mako Shark" to "fish/akula_mako.webp",
+    "Катран обыкновенный" to "fish/katran_simple.webp",
+    "Spiny Dogfish" to "fish/katran_simple.webp",
+    "Альбакор" to "fish/albakor.webp",
+    "Albacore" to "fish/albakor.webp",
+    "Голец арктический" to "fish/golets_arkticheskiy.webp",
+    "Arctic Char" to "fish/golets_arkticheskiy.webp",
+    "Форель кумжа" to "fish/forel_kumzha.webp",
+    "Brown Trout" to "fish/forel_kumzha.webp",
+    "Пикша" to "fish/piksha.webp",
+    "Haddock" to "fish/piksha.webp",
+    "Тюрбо" to "fish/tyurbo.webp",
+    "Turbot" to "fish/tyurbo.webp",
+    "Сайра" to "fish/sayra.webp",
+    "Pacific Saury" to "fish/sayra.webp",
+    "Летучая рыба" to "fish/letuchaya_ryba.webp",
+    "Flying Fish" to "fish/letuchaya_ryba.webp",
+    "Рыба-луна" to "fish/ryba_luna.webp",
+    "Ocean Sunfish" to "fish/ryba_luna.webp",
+    "Сельдяной король" to "fish/seldyanoy_korol.webp",
+    "Oarfish" to "fish/seldyanoy_korol.webp",
+    "Паку бурый" to "fish/tambaki.webp",
+    "Brown Pacu" to "fish/tambaki.webp",
+    "Паку краснобрюхий" to "fish/paku_krasnobryuhiy.webp",
+    "Red-bellied Pacu" to "fish/paku_krasnobryuhiy.webp",
+    "Паку чёрный" to "fish/paku_cherniy.webp",
+    "Black Pacu" to "fish/paku_cherniy.webp",
+    "Прохилодус красноштриховый" to "fish/prohilodus.webp",
+    "Stripetail Prochilodus" to "fish/prohilodus.webp",
+    "Лепоринус полосатый" to "fish/leporinus_polosatiy.webp",
+    "Banded Leporinus" to "fish/leporinus_polosatiy.webp",
+    "Метиннис серебристый" to "fish/metinnis_serebristiy.webp",
+    "Silver Dollar" to "fish/metinnis_serebristiy.webp",
+    "Пелядь" to "fish/pelyad.webp",
+    "Peled Whitefish" to "fish/pelyad.webp",
+    "Омуль арктический" to "fish/omul_arkticheskiy.webp",
+    "Arctic Omul" to "fish/omul_arkticheskiy.webp",
+    "Муксун" to "fish/muksun.webp",
+    "Muksun Whitefish" to "fish/muksun.webp",
+    "Анциструс обыкновенный" to "fish/ancistrus.webp",
+    "Common Bristlenose" to "fish/ancistrus.webp",
+    "Птеригоплихт парчовый" to "fish/pterigopliht_parchoviy.webp",
+    "Sailfin Pleco" to "fish/pterigopliht_parchoviy.webp",
+    "Отоцинклюс широкополосый" to "fish/otocinklyus.webp",
+    "Banded Otocinclus" to "fish/otocinklyus.webp",
+    "Карнегиелла мраморная" to "fish/karnegiella_mramornaya.webp",
+    "Marbled Hatchetfish" to "fish/karnegiella_mramornaya.webp",
+    "Тетра неоновая" to "fish/tetra_neonovaya.webp",
+    "Neon Tetra" to "fish/tetra_neonovaya.webp",
+    "Тернеция чёрная" to "fish/tetra_chernaya.webp",
+    "Black Skirt Tetra" to "fish/tetra_chernaya.webp",
+    "Рыба-лист амазонская" to "fish/ryba_list_amazonskaya.webp",
+    "Amazon Leaf Fish" to "fish/ryba_list_amazonskaya.webp",
+    "Арапайма" to "fish/arapayma.webp",
+    "Arapaima" to "fish/arapayma.webp",
+    "Ленок" to "fish/lenok.webp",
+    "Lenok Trout" to "fish/lenok.webp",
+    "Пиранья краснобрюхая" to "fish/piranya_krasnopuzaya.webp",
+    "Red-bellied Piranha" to "fish/piranya_krasnopuzaya.webp",
+    "Бикуда" to "fish/bikuda.webp",
+    "Bicuda" to "fish/bikuda.webp",
+    "Угорь электрический" to "fish/ugor_elektricheskiy.webp",
+    "Electric Eel" to "fish/ugor_elektricheskiy.webp",
+    "Сом краснохвостый" to "fish/krasnohvostiy_som.webp",
+    "Redtail Catfish" to "fish/krasnohvostiy_som.webp",
+    "Пимелодус пятнистый" to "fish/pimelodus_pyatnistiy.webp",
+    "Spotted Pimelodus" to "fish/pimelodus_pyatnistiy.webp",
+    "Сом веслоносый" to "fish/som_veslonosiy.webp",
+    "Paddlefish" to "fish/som_veslonosiy.webp",
+    "Пираиба" to "fish/piraiba.webp",
+    "Piraiba" to "fish/piraiba.webp",
+    "Дискус обыкновенный" to "fish/diskus.webp",
+    "Common Discus" to "fish/diskus.webp",
+    "Скалярия альтум" to "fish/skalyaria_altum.webp",
+    "Altum Angelfish" to "fish/skalyaria_altum.webp",
+    "Скалярия обыкновенная" to "fish/skalyaria_common.webp",
+    "Freshwater Angelfish" to "fish/skalyaria_common.webp",
+    "Апистограмма Агассиза" to "fish/apistogramma_agassiza.webp",
+    "Agassiz's Cichlid" to "fish/apistogramma_agassiza.webp",
+    "Тетра кардинальная" to "fish/tetra_kardinal.webp",
+    "Cardinal Tetra" to "fish/tetra_kardinal.webp",
+    "Тетра лимонная" to "fish/tetra_limonnaya.webp",
+    "Lemon Tetra" to "fish/tetra_limonnaya.webp",
+    "Тетра огненная" to "fish/tetra_ognennaya.webp",
+    "Ember Tetra" to "fish/tetra_ognennaya.webp",
+    "Тетра пингвин" to "fish/tetra_pingvin.webp",
+    "Penguin Tetra" to "fish/tetra_pingvin.webp",
+    "Тетра родостомус" to "fish/tetra_rodostomus.webp",
+    "Rummy-nose Tetra" to "fish/tetra_rodostomus.webp",
+    "Тетра чёрный неон" to "fish/tetra_black_neon.webp",
+    "Black Neon Tetra" to "fish/tetra_black_neon.webp",
+    "Коридорас панда" to "fish/koridorus_panda.webp",
+    "Panda Cory" to "fish/koridorus_panda.webp",
+    "Коридорас Штерба" to "fish/koridoras_shterba.webp",
+    "Sterba's Corydoras" to "fish/koridoras_shterba.webp",
+    "Татия леопардовая" to "fish/tatiya_leopardovaya.webp",
+    "Leopard Tatia" to "fish/tatiya_leopardovaya.webp",
+    "Торакатум" to "fish/torakatum.webp",
+    "Hoplo Catfish" to "fish/torakatum.webp",
+    "Нанностомус трифасциатус" to "fish/nannostomus.webp",
+    "Three-Stripe Pencilfish" to "fish/nannostomus.webp",
+    "Нанностомус маргинатус" to "fish/nannostomus_marginatus.webp",
+    "Dwarf Pencilfish" to "fish/nannostomus_marginatus.webp",
+    "Рамирези" to "fish/ramirezi.webp",
+    "Ram Cichlid" to "fish/ramirezi.webp",
+    "Аравана чёрная" to "fish/aravana_chernaya.webp",
+    "Black Arowana" to "fish/aravana_chernaya.webp",
+    "Астронотус глазчатый" to "fish/oskar.webp",
+    "Oscar Cichlid" to "fish/oskar.webp",
+    "Аймара" to "fish/aymara.webp",
+    "Aimara" to "fish/aymara.webp",
+    "Псевдоплатистома тигровая" to "fish/surubin.webp",
+    "Tiger Shovelnose" to "fish/surubin.webp",
+    "Брахиплатистома тигровая" to "fish/brahiplatistoma_tigrovaya.webp",
+    "Tiger Catfish" to "fish/brahiplatistoma_tigrovaya.webp",
+    "Пиранья чёрная" to "fish/piranya_chernaya.webp",
+    "Black Piranha" to "fish/piranya_chernaya.webp",
+    "Паяра" to "fish/payara.webp",
+    "Payara" to "fish/payara.webp",
+    "Мечерот обыкновенный" to "fish/mecherot_common.webp",
+    "Common Freshwater Barracuda" to "fish/mecherot_common.webp",
+    "Мечерот пятнистый" to "fish/mecherot_pyatnistiy.webp",
+    "Spotted Freshwater Barracuda" to "fish/mecherot_pyatnistiy.webp",
+    "Гимнотус угревидный" to "fish/gimnotus_ugrevidniy.webp",
+    "Banded Knifefish" to "fish/gimnotus_ugrevidniy.webp",
+    "Нож-рыба чёрная" to "fish/ryba_nozh_chernaya.webp",
+    "Black Ghost Knifefish" to "fish/ryba_nozh_chernaya.webp",
+    "Щучья цихлида" to "fish/schuchya_cihlida.webp",
+    "Pike Cichlid" to "fish/schuchya_cihlida.webp",
+    "Павлиний окунь" to "fish/pavliniy_okun.webp",
+    "Peacock Bass" to "fish/pavliniy_okun.webp",
+    "Цихлазома мезонаута" to "fish/cihlazoma_mezonauta.webp",
+    "Flag Cichlid" to "fish/cihlazoma_mezonauta.webp",
+    "Цихлазома северум" to "fish/cihlazoma_severum.webp",
+    "Severum Cichlid" to "fish/cihlazoma_severum.webp",
+    "Молочная рыба" to "fish/molochnaya_ryba.webp",
+    "Milkfish" to "fish/molochnaya_ryba.webp",
+    "Кефаль пятнистая" to "fish/kefal_pyatnistaya.webp",
+    "Spotted Mullet" to "fish/kefal_pyatnistaya.webp",
+    "Тиляпия мозамбикская" to "fish/tilyapiya_mozambikskaya.webp",
+    "Mozambique Tilapia" to "fish/tilyapiya_mozambikskaya.webp",
+    "Анчоус тропический" to "fish/anchous_tropicheskiy.webp",
+    "Tropical Anchovy" to "fish/anchous_tropicheskiy.webp",
+    "Сардина индийская" to "fish/sardina_indiyskaya.webp",
+    "Indian Sardine" to "fish/sardina_indiyskaya.webp",
+    "Сиган золотистый" to "fish/zolotistiy_shiponog.webp",
+    "Golden Rabbitfish" to "fish/zolotistiy_shiponog.webp",
+    "Бычок-пчёлка" to "fish/bychok_mangroviy.webp",
+    "Bumblebee Goby" to "fish/bychok_mangroviy.webp",
+    "Баррамунди" to "fish/barramundi.webp",
+    "Barramundi" to "fish/barramundi.webp",
+    "Снук" to "fish/snuk.webp",
+    "Snook" to "fish/snuk.webp",
+    "Луциан мангровый" to "fish/mangroviy_snapper.webp",
+    "Mangrove Snapper" to "fish/mangroviy_snapper.webp",
+    "Тарпон" to "fish/tarpon.webp",
+    "Tarpon" to "fish/tarpon.webp",
+    "Сом морской" to "fish/morskoy_som.webp",
+    "Sea Catfish" to "fish/morskoy_som.webp",
+    "Сарган морской" to "fish/morskoy_sargan.webp",
+    "Needlefish" to "fish/morskoy_sargan.webp",
+    "Каранкс голубой" to "fish/goluboy_trevalli.webp",
+    "Blue Trevally" to "fish/goluboy_trevalli.webp",
+    "Рыба-попугай" to "fish/ryba_popugay.webp",
+    "Parrotfish" to "fish/ryba_popugay.webp",
+    "Ангел императорский" to "fish/angel_imperatorskiy.webp",
+    "Emperor Angelfish" to "fish/angel_imperatorskiy.webp",
+    "Хирург голубой" to "fish/hirurg_goluboy.webp",
+    "Blue Tang" to "fish/hirurg_goluboy.webp",
+    "Бабочка нитеносная" to "fish/babochka_klinopolosaya.webp",
+    "Threadfin Butterflyfish" to "fish/babochka_klinopolosaya.webp",
+    "Хризиптера синяя" to "fish/damsel_siniy.webp",
+    "Blue Damselfish" to "fish/damsel_siniy.webp",
+    "Фузилёр жёлтохвостый" to "fish/fuziler_zheltohvostiy.webp",
+    "Yellowtail Fusilier" to "fish/fuziler_zheltohvostiy.webp",
+    "Барабулька тропическая" to "fish/barabulka_tropicheskaya.webp",
+    "Tropical Goatfish" to "fish/barabulka_tropicheskaya.webp",
+    "Барракуда большая" to "fish/barrakuda_bolschaya.webp",
+    "Great Barracuda" to "fish/barrakuda_bolschaya.webp",
+    "Конгер" to "fish/konger.webp",
+    "Conger Eel" to "fish/konger.webp",
+    "Каранкс гигантский" to "fish/gigantskiy_karanks.webp",
+    "Giant Trevally" to "fish/gigantskiy_karanks.webp",
+    "Пермит" to "fish/permit.webp",
+    "Permit" to "fish/permit.webp",
+    "Альбула" to "fish/kostlyavaya_ryba.webp",
+    "Bonefish" to "fish/kostlyavaya_ryba.webp",
+    "Скумбрия испанская" to "fish/ispanskaya_makrel.webp",
+    "Spanish Mackerel" to "fish/ispanskaya_makrel.webp",
+    "Группер коралловый" to "fish/koralloviy_grupper.webp",
+    "Coral Grouper" to "fish/koralloviy_grupper.webp",
+    "Спинорог-титан" to "fish/spinorog_titan.webp",
+    "Titan Triggerfish" to "fish/spinorog_titan.webp",
+    "Карп кои (Кохаку)" to "fish/koi_kohaku.webp",
+    "Koi (Kohaku)" to "fish/koi_kohaku.webp",
+    "Карп кои (Тайсё Сансёку)" to "fish/koi_taisho_sanke.webp",
+    "Koi (Taisho Sanshoku)" to "fish/koi_taisho_sanke.webp",
+    "Карп кои (Сёва Сансёку)" to "fish/koi_showa_sanshoku.webp",
+    "Koi (Showa Sanshoku)" to "fish/koi_showa_sanshoku.webp",
+    "Карп кои (Уцуримоно)" to "fish/koi_utsurimono.webp",
+    "Koi (Utsurimono)" to "fish/koi_utsurimono.webp",
+    "Карп кои (Бэкко)" to "fish/koi_bekko.webp",
+    "Koi (Bekko)" to "fish/koi_bekko.webp",
+    "Карп кои (Тантё)" to "fish/koi_tancho.webp",
+    "Koi (Tancho)" to "fish/koi_tancho.webp",
+    "Карп кои (Асаги)" to "fish/koi_asagi.webp",
+    "Koi (Asagi)" to "fish/koi_asagi.webp",
+    "Карп кои (Сюсуй)" to "fish/koi_shusui.webp",
+    "Koi (Shusui)" to "fish/koi_shusui.webp",
+    "Карп кои (Коромо)" to "fish/koi_koromo.webp",
+    "Koi (Koromo)" to "fish/koi_koromo.webp",
+    "Карп кои (Кингинрин)" to "fish/koi_kinginrin.webp",
+    "Koi (Kinginrin)" to "fish/koi_kinginrin.webp",
+    "Карп кои (Каваримоно)" to "fish/koi_kawarimono.webp",
+    "Koi (Kawarimono)" to "fish/koi_kawarimono.webp",
+    "Карп кои (Огон)" to "fish/koi_ogon.webp",
+    "Koi (Ogon)" to "fish/koi_ogon.webp",
+    "Карп кои (Хикари-моёмоно)" to "fish/koi_hikari_moyomono.webp",
+    "Koi (Hikari Moyomono)" to "fish/koi_hikari_moyomono.webp",
+    "Карп кои (Госики)" to "fish/koi_goshiki.webp",
+    "Koi (Goshiki)" to "fish/koi_goshiki.webp",
+    "Карп кои (Кумонрю)" to "fish/koi_kumonryu.webp",
+    "Koi (Kumonryu)" to "fish/koi_kumonryu.webp",
+    "Карп кои (Дойцу-гои)" to "fish/koi_doitsu.webp",
+    "Koi (Doitsu-goi)" to "fish/koi_doitsu.webp",
+    "Амур чёрный" to "fish/cherniy_amur.webp",
+    "Black Amur" to "fish/cherniy_amur.webp",
+    "Змееголов северный" to "fish/zmeegolov_severniy.webp",
+    "Northern Snakehead" to "fish/zmeegolov_severniy.webp",
+    "Щука амурская" to "fish/amurskaya_schuka.webp",
+    "Amur Pike" to "fish/amurskaya_schuka.webp",
+    "Кристивомер" to "fish/kristivomer.webp",
+    "Lake Trout" to "fish/kristivomer.webp",
+    "Лосось дунайский" to "fish/dunaiskiy_losos.webp",
+    "Danube Salmon (Huchen)" to "fish/dunaiskiy_losos.webp",
+    "Зунгаро" to "fish/zungaro.webp",
+    "Zungaro Catfish" to "fish/zungaro.webp",
+    "Скат моторо" to "fish/skat_motoro.webp",
+    "Motoro Stingray" to "fish/skat_motoro.webp",
+    "Пеленгас" to "fish/pelengas.webp",
+    "Pelingas Mullet" to "fish/pelengas.webp",
+    "Вырезуб" to "fish/vyrezub.webp",
+    "Black Sea Shemaya" to "fish/vyrezub.webp",
+    "Кубера" to "fish/kubera.webp",
+    "Cubera Snapper" to "fish/kubera.webp",
+    "Мурена европейская" to "fish/murena_european.webp",
+    "European Moray" to "fish/murena_european.webp",
+    "Мурена звёздчатая" to "fish/murena_zvezdchataya.webp",
+    "Starry Moray" to "fish/murena_zvezdchataya.webp",
+    "Мурена гигантская" to "fish/murena_gigantskaya.webp",
+    "Giant Moray" to "fish/murena_gigantskaya.webp",
+    "Зубатка пятнистая" to "fish/zubatka_pyatnistaya.webp",
+    "Spotted Wolffish" to "fish/zubatka_pyatnistaya.webp",
+    "Тунец желтоперый" to "fish/tunec_zeltoperiy.webp",
+    "Yellowfin Tuna" to "fish/tunec_zeltoperiy.webp",
+    "Снук чёрный" to "fish/chyorniy_snuk.webp",
+    "Black Snook" to "fish/chyorniy_snuk.webp",
+    "Рыба-наполеон" to "fish/ryba_napoleon.webp",
+    "Napoleon Wrasse" to "fish/ryba_napoleon.webp",
+    "Рыба-клоун" to "fish/ryba_kloun.webp",
+    "Clownfish" to "fish/ryba_kloun.webp",
+    "Кефаль мангровая" to "fish/kefal_mangrovaya.webp",
+    "Mangrove Mullet" to "fish/kefal_mangrovaya.webp",
+    "Сельдь тихоокеанская" to "fish/seld_tihookeanskaya.webp",
+    "Pacific Herring" to "fish/seld_tihookeanskaya.webp",
+    "Хромис рифовый" to "fish/hromis_rifoviy.webp",
+    "Reef Chromis" to "fish/hromis_rifoviy.webp",
+    "Дамсел жёлтохвостый" to "fish/damsel_zheltohvostiy.webp",
+    "Yellowtail Damselfish" to "fish/damsel_zheltohvostiy.webp",
+    "Морской конёк" to "fish/morskoy_konek.webp",
+    "Seahorse" to "fish/morskoy_konek.webp",
+    "Идол мавританский" to "fish/idol_mavritanskiy.webp",
+    "Moorish Idol" to "fish/idol_mavritanskiy.webp",
+    "Рыба-бабочка полосатая" to "fish/ryba_babochka_polosataya.webp",
+    "Striped Butterflyfish" to "fish/ryba_babochka_polosataya.webp",
+    "Гобиодон голубопятнистый" to "fish/gobiodon_golubopyatnistiy.webp",
+    "Bluespotted Goby" to "fish/gobiodon_golubopyatnistiy.webp",
+    "Сиган коричневопятнистый" to "fish/sigan_korichnevopyatnistiy.webp",
+    "Brown-spotted Rabbitfish" to "fish/sigan_korichnevopyatnistiy.webp",
+    "Хирург полосатый" to "fish/hirurg_polosatiy.webp",
+    "Striped Surgeonfish" to "fish/hirurg_polosatiy.webp",
+    "Луциан серебристо-пятнистый" to "fish/lucian_serebristo-pyatnistiy.webp",
+    "Silverspot Snapper" to "fish/lucian_serebristo-pyatnistiy.webp",
+    "Скорпена бородатая" to "fish/skorpena_borodataya.webp",
+    "Bearded Scorpionfish" to "fish/skorpena_borodataya.webp",
+    "Барракуда полосатая" to "fish/barrakuda_polosataya.webp",
+    "Striped Barracuda" to "fish/barrakuda_polosataya.webp",
+    "Каранкс шестиполосый" to "fish/karanks_polosatiy.webp",
+    "Sixband Trevally" to "fish/karanks_polosatiy.webp",
+    "Группер леопардовый коралловый" to "fish/grupper_leopardoviy_koralloviy.webp",
+    "Leopard Coral Grouper" to "fish/grupper_leopardoviy_koralloviy.webp",
+    "Иглорыл-агухон" to "fish/igloryl-aguhon.webp",
+    "Agujon Needlefish" to "fish/igloryl-aguhon.webp",
+    "Акула рифовая чёрнопёрая" to "fish/akula_rifovaya_chernoperaya.webp",
+    "Blacktip Reef Shark" to "fish/akula_rifovaya_chernoperaya.webp",
+    "Губан-чистильщик" to "fish/guban-chistilschik.webp",
+    "Cleaner Wrasse" to "fish/guban-chistilschik.webp",
+    "Сержант-майор атлантический" to "fish/sergant-major_atlanticheskiy.webp",
+    "Atlantic Sergeant Major" to "fish/sergant-major_atlanticheskiy.webp",
+    "Грамма королевская" to "fish/gramma_korolevskaya.webp",
+    "Royal Gramma" to "fish/gramma_korolevskaya.webp",
+    "Ангел королевский" to "fish/angel_korolevskiy.webp",
+    "Queen Angelfish" to "fish/angel_korolevskiy.webp",
+    "Мандариновая рыба" to "fish/mandarinivaya_ryba.webp",
+    "Mandarin Dragonet" to "fish/mandarinivaya_ryba.webp",
+    "Крылатка зебровая" to "fish/krylaka_zebrovaya.webp",
+    "Zebra Lionfish" to "fish/krylaka_zebrovaya.webp",
+    "Рыба-флейта" to "fish/ryba-fleita.webp",
+    "Trumpetfish" to "fish/ryba-fleita.webp",
 )
