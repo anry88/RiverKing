@@ -30,6 +30,8 @@ replay_pid*
 
 /.idea
 /shelf/
+/.vscode/
+/mobile/android-app/.idea/
 
 # Gradle
 .gradle/
