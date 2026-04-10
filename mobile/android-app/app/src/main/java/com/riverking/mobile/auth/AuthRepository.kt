@@ -18,6 +18,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 sealed interface TelegramLoginPollResult {
     data object Pending : TelegramLoginPollResult
@@ -47,6 +51,7 @@ class AuthRepository(
     }
 
     private val client = HttpClient(io.ktor.client.engine.okhttp.OkHttp) {
+        expectSuccess = true
         install(ContentNegotiation) {
             json(json)
         }
@@ -70,12 +75,14 @@ class AuthRepository(
     }
 
     suspend fun registerPassword(login: String, password: String): MeResponseDto {
+        sessionStore.writeLastLogin(login)
         val response = api.registerPassword(login, password)
         persist(response)
         return api.me(response.accessToken)
     }
 
     suspend fun loginPassword(login: String, password: String): MeResponseDto {
+        sessionStore.writeLastLogin(login)
         val response = api.loginPassword(login, password)
         persist(response)
         return api.me(response.accessToken)
@@ -292,7 +299,33 @@ class AuthRepository(
         is ClientRequestException -> error.response.readErrorMessage() ?: "Request failed"
         is ServerResponseException -> error.response.readErrorMessage() ?: "Server error"
         is ResponseException -> error.response.readErrorMessage() ?: "Request failed"
-        else -> error.message ?: "Request failed"
+        else -> humanizeThrowable(error)
+    }
+
+    fun isTransientNetworkError(error: Throwable): Boolean {
+        val cause = error.rootCause()
+        return cause is UnknownHostException ||
+            cause is ConnectException ||
+            cause is SocketTimeoutException ||
+            cause is IOException
+    }
+
+    private fun humanizeThrowable(error: Throwable): String {
+        val cause = error.rootCause()
+        return when (cause) {
+            is UnknownHostException -> "Can't reach the RiverKing server right now"
+            is ConnectException -> "Can't connect to the RiverKing server right now"
+            is SocketTimeoutException -> "The RiverKing server took too long to respond"
+            else -> error.message ?: cause.message ?: "Request failed"
+        }
+    }
+
+    private fun Throwable.rootCause(): Throwable {
+        var current: Throwable = this
+        while (current.cause != null && current.cause !== current) {
+            current = current.cause!!
+        }
+        return current
     }
 
     private fun persist(response: AuthResponseDto) {
@@ -320,6 +353,36 @@ class AuthRepository(
 
     fun currentAccessToken(): String? = sessionStore.read()?.accessToken
 
+    fun rememberLoginDraft(login: String) {
+        if (login.isBlank()) return
+        sessionStore.writeLastLogin(login)
+    }
+
+    fun lastLoginDraft(): String =
+        sessionStore.readLastLogin().orEmpty()
+
+    fun rememberPendingTelegramLogin(sessionToken: String) {
+        sessionStore.writePendingTelegramLogin(sessionToken)
+    }
+
+    fun pendingTelegramLogin(): String? =
+        sessionStore.readPendingTelegramLogin()
+
+    fun clearPendingTelegramLogin() {
+        sessionStore.clearPendingTelegramLogin()
+    }
+
+    fun rememberPendingTelegramLink(sessionToken: String) {
+        sessionStore.writePendingTelegramLink(sessionToken)
+    }
+
+    fun pendingTelegramLink(): String? =
+        sessionStore.readPendingTelegramLink()
+
+    fun clearPendingTelegramLink() {
+        sessionStore.clearPendingTelegramLink()
+    }
+
     private suspend fun <T> withFreshAccessToken(block: suspend (String) -> T): T {
         val stored = sessionStore.read() ?: error("Missing session")
         return try {
@@ -345,6 +408,13 @@ class AuthRepository(
     }
 
     private fun humanizeError(raw: String): String = when (raw) {
+        "invalid_credentials" -> "Incorrect login or password"
+        "login_taken" -> "This login is already taken"
+        "invalid_login" -> "Use 3-32 lowercase letters, digits, dot, underscore, or dash"
+        "invalid_password" -> "Password must be between 8 and 128 characters"
+        "invalid_refresh_token", "refresh_expired" -> "Your session expired. Sign in again"
+        "google_auth_disabled" -> "Google sign-in is not configured"
+        "invalid_google_token" -> "Google sign-in could not be verified"
         "telegram_already_bound" -> "This Telegram account is already linked to another profile"
         "user_already_linked_to_other_telegram" -> "This profile is already linked to another Telegram account"
         "session_expired" -> "This confirmation link has expired"

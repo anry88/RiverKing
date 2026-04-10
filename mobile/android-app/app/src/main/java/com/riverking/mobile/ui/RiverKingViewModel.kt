@@ -194,6 +194,7 @@ class RiverKingViewModel(
     }
 
     fun updateLogin(value: String) {
+        repository.rememberLoginDraft(value)
         _state.update { it.copy(login = value) }
     }
 
@@ -221,6 +222,19 @@ class RiverKingViewModel(
             _state.update { it.copy(error = "Login and password are required") }
             return
         }
+        if (state.value.authMode == AuthMode.REGISTER) {
+            when {
+                !REGISTER_LOGIN_REGEX.matches(login.lowercase()) -> {
+                    _state.update { it.copy(error = "Use 3-32 lowercase letters, digits, dot, underscore, or dash") }
+                    return
+                }
+                password.length !in 8..128 -> {
+                    _state.update { it.copy(error = "Password must be between 8 and 128 characters") }
+                    return
+                }
+            }
+        }
+        repository.rememberLoginDraft(login)
 
         viewModelScope.launch {
             _state.update { it.copy(working = true, error = null) }
@@ -271,6 +285,7 @@ class RiverKingViewModel(
             }
             try {
                 val started = repository.startTelegramLogin()
+                repository.rememberPendingTelegramLogin(started.sessionToken)
                 _state.update {
                     it.copy(
                         working = false,
@@ -278,7 +293,7 @@ class RiverKingViewModel(
                         pendingExternalUrl = started.telegramLink,
                     )
                 }
-                awaitTelegramLogin(started)
+                awaitTelegramLogin(started.sessionToken)
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -299,6 +314,7 @@ class RiverKingViewModel(
             _state.update { it.copy(working = true, error = null) }
             try {
                 val started = repository.startTelegramLink()
+                repository.rememberPendingTelegramLink(started.sessionToken)
                 _state.update {
                     it.copy(
                         working = false,
@@ -306,7 +322,7 @@ class RiverKingViewModel(
                         pendingExternalUrl = started.telegramLink,
                     )
                 }
-                awaitTelegramLink(started)
+                awaitTelegramLink(started.sessionToken)
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
@@ -1091,7 +1107,10 @@ class RiverKingViewModel(
         cancelTelegramJobs()
         viewModelScope.launch {
             repository.logout()
-            _state.value = RiverKingUiState(loading = false)
+            _state.value = RiverKingUiState(
+                loading = false,
+                login = repository.lastLoginDraft(),
+            )
         }
     }
 
@@ -1122,14 +1141,34 @@ class RiverKingViewModel(
     private fun bootstrap() {
         viewModelScope.launch {
             val me = repository.restoreProfile()
+            val rememberedLogin = repository.lastLoginDraft()
+            val pendingTelegramLogin = if (me == null) {
+                repository.pendingTelegramLogin()
+            } else {
+                repository.clearPendingTelegramLogin()
+                null
+            }
+            val pendingTelegramLink = if (me != null) {
+                repository.pendingTelegramLink()
+            } else {
+                repository.clearPendingTelegramLink()
+                null
+            }
             _state.value = RiverKingUiState(
                 loading = false,
                 me = me,
+                login = rememberedLogin,
                 nickname = me?.username.orEmpty(),
+                telegramLoginPending = pendingTelegramLogin != null,
+                telegramLinkPending = pendingTelegramLink != null,
                 ratings = RatingsUiState(locationId = me?.locationId?.toString() ?: "all"),
             )
             if (me != null) {
                 warmupPlayerSurfaces()
+            }
+            when {
+                pendingTelegramLogin != null -> resumeTelegramLogin(pendingTelegramLogin)
+                me != null && pendingTelegramLink != null -> resumeTelegramLink(pendingTelegramLink)
             }
         }
     }
@@ -1147,11 +1186,69 @@ class RiverKingViewModel(
         warmupPlayerSurfaces()
     }
 
-    private suspend fun awaitTelegramLogin(started: TelegramLinkStartDto) {
+    fun resumeTelegramLogin(sessionToken: String) {
+        if (state.value.me != null) {
+            repository.clearPendingTelegramLogin()
+            return
+        }
+        repository.rememberPendingTelegramLogin(sessionToken)
+        telegramLoginJob?.cancel()
+        telegramLoginJob = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    loading = false,
+                    working = false,
+                    telegramLoginPending = true,
+                    error = null,
+                )
+            }
+            awaitTelegramLogin(sessionToken)
+        }
+    }
+
+    fun resumeTelegramLink(sessionToken: String) {
+        if (state.value.me == null) {
+            repository.clearPendingTelegramLink()
+            return
+        }
+        repository.rememberPendingTelegramLink(sessionToken)
+        telegramLinkJob?.cancel()
+        telegramLinkJob = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    loading = false,
+                    working = false,
+                    telegramLinkPending = true,
+                    error = null,
+                )
+            }
+            awaitTelegramLink(sessionToken)
+        }
+    }
+
+    private suspend fun awaitTelegramLogin(sessionToken: String) {
         while (true) {
-            when (val result = repository.pollTelegramLogin(started.sessionToken)) {
+            val result = try {
+                repository.pollTelegramLogin(sessionToken)
+            } catch (error: Throwable) {
+                if (repository.isTransientNetworkError(error)) {
+                    delay(TELEGRAM_POLL_INTERVAL_MS)
+                    continue
+                }
+                repository.clearPendingTelegramLogin()
+                _state.update {
+                    it.copy(
+                        telegramLoginPending = false,
+                        working = false,
+                        error = repository.describeError(error),
+                    )
+                }
+                return
+            }
+            when (result) {
                 TelegramLoginPollResult.Pending -> delay(TELEGRAM_POLL_INTERVAL_MS)
                 TelegramLoginPollResult.Expired -> {
+                    repository.clearPendingTelegramLogin()
                     _state.update {
                         it.copy(
                             telegramLoginPending = false,
@@ -1162,6 +1259,7 @@ class RiverKingViewModel(
                     return
                 }
                 is TelegramLoginPollResult.Failed -> {
+                    repository.clearPendingTelegramLogin()
                     _state.update {
                         it.copy(
                             telegramLoginPending = false,
@@ -1172,6 +1270,7 @@ class RiverKingViewModel(
                     return
                 }
                 is TelegramLoginPollResult.Authorized -> {
+                    repository.clearPendingTelegramLogin()
                     onAuthenticated(result.me)
                     return
                 }
@@ -1179,11 +1278,28 @@ class RiverKingViewModel(
         }
     }
 
-    private suspend fun awaitTelegramLink(started: TelegramLinkStartDto) {
+    private suspend fun awaitTelegramLink(sessionToken: String) {
         while (true) {
-            when (val result = repository.pollTelegramLink(started.sessionToken)) {
+            val result = try {
+                repository.pollTelegramLink(sessionToken)
+            } catch (error: Throwable) {
+                if (repository.isTransientNetworkError(error)) {
+                    delay(TELEGRAM_POLL_INTERVAL_MS)
+                    continue
+                }
+                repository.clearPendingTelegramLink()
+                _state.update {
+                    it.copy(
+                        telegramLinkPending = false,
+                        error = repository.describeError(error),
+                    )
+                }
+                return
+            }
+            when (result) {
                 TelegramLinkPollResult.Pending -> delay(TELEGRAM_POLL_INTERVAL_MS)
                 TelegramLinkPollResult.Expired -> {
+                    repository.clearPendingTelegramLink()
                     _state.update {
                         it.copy(
                             telegramLinkPending = false,
@@ -1193,6 +1309,7 @@ class RiverKingViewModel(
                     return
                 }
                 is TelegramLinkPollResult.Failed -> {
+                    repository.clearPendingTelegramLink()
                     _state.update {
                         it.copy(
                             telegramLinkPending = false,
@@ -1202,6 +1319,7 @@ class RiverKingViewModel(
                     return
                 }
                 is TelegramLinkPollResult.Completed -> {
+                    repository.clearPendingTelegramLink()
                     applyProfileUpdate(result.me)
                     _state.update { it.copy(telegramLinkPending = false) }
                     return
@@ -1480,3 +1598,4 @@ private const val BITE_WINDOW_MILLIS = 5_000L
 private const val CAST_READY_DELAY_MILLIS = 3_000L
 private const val TELEGRAM_POLL_INTERVAL_MS = 2_000L
 private const val FAIL_REACTION_SECONDS = 9.99
+private val REGISTER_LOGIN_REGEX = Regex("^[a-z0-9._-]{3,32}$")

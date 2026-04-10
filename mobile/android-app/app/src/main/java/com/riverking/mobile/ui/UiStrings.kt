@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 data class RiverStrings(
     val appTitle: String,
     val authSubtitle: String,
+    val registerRequirements: String,
     val login: String,
     val password: String,
     val signIn: String,
@@ -104,7 +105,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
     if (language == "ru") {
         RiverStrings(
             appTitle = "RiverKing",
-            authSubtitle = "Android-клиент использует общий backend. Mini App остаётся только Telegram.",
+            authSubtitle = "Продолжите игру через Telegram или войдите по логину и паролю.",
+            registerRequirements = "Для нового аккаунта: логин 3-32 символа в нижнем регистре, пароль от 8 символов.",
             login = "Логин",
             password = "Пароль",
             signIn = "Войти",
@@ -178,8 +180,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             telegramLinkedTitle = "Telegram уже привязан к этому профилю",
             telegramNotLinkedTitle = "Привяжите Telegram, чтобы играть тем же профилем в Mini App и на Android",
             linkTelegram = "Привязать Telegram",
-            telegramLoginPending = "Подтверди вход в Telegram и вернись в приложение.",
-            telegramLinkPending = "Подтверди привязку в Telegram и вернись в приложение.",
+            telegramLoginPending = "Подтвердите вход в Telegram и нажмите кнопку возврата в приложении бота.",
+            telegramLinkPending = "Подтвердите привязку в Telegram и нажмите кнопку возврата в приложении бота.",
             rod = "Удочка",
             bait = "Наживка",
             water = "Локация",
@@ -200,7 +202,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
     } else {
         RiverStrings(
             appTitle = "RiverKing",
-            authSubtitle = "Android uses the shared backend. The Mini App remains Telegram-only.",
+            authSubtitle = "Continue with Telegram or sign in with your login and password.",
+            registerRequirements = "New accounts require a 3-32 character lowercase login and a password with at least 8 characters.",
             login = "Login",
             password = "Password",
             signIn = "Sign in",
@@ -274,8 +277,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             telegramLinkedTitle = "Telegram is already linked to this profile",
             telegramNotLinkedTitle = "Link Telegram to use the same profile in the Mini App and on Android",
             linkTelegram = "Link Telegram",
-            telegramLoginPending = "Confirm sign-in in Telegram, then return to the app.",
-            telegramLinkPending = "Confirm the link in Telegram, then return to the app.",
+            telegramLoginPending = "Confirm sign-in in Telegram, then use the return button in the bot.",
+            telegramLinkPending = "Confirm the link in Telegram, then use the return button in the bot.",
             rod = "Rod",
             bait = "Bait",
             water = "Water",

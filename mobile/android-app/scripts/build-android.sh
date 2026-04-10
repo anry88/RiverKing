@@ -5,8 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 ANDROID_PROJECT_DIR="$REPO_ROOT/mobile/android-app"
 GRADLEW="$REPO_ROOT/gradlew"
-DEFAULT_API_BASE_URL="http://10.0.2.2:8080"
-API_BASE_URL="${RIVERKING_API_BASE_URL:-$DEFAULT_API_BASE_URL}"
+API_BASE_URL="${RIVERKING_API_BASE_URL:-}"
 
 usage() {
     cat <<'EOF'
@@ -120,7 +119,9 @@ for task in "${tasks[@]}"; do
     gradle_args+=( "$task" )
 done
 
-gradle_args+=( "-PRIVERKING_API_BASE_URL=$API_BASE_URL" )
+if [[ -n "$API_BASE_URL" ]]; then
+    gradle_args+=( "-PRIVERKING_API_BASE_URL=$API_BASE_URL" )
+fi
 
 if [[ -n "${RIVERKING_GOOGLE_AUTH_CLIENT_ID:-}" ]]; then
     gradle_args+=( "-PRIVERKING_GOOGLE_AUTH_CLIENT_ID=$RIVERKING_GOOGLE_AUTH_CLIENT_ID" )
@@ -160,7 +161,11 @@ fi
 
 echo "==> RiverKing Android build"
 echo "target: $target"
-echo "api base url: $API_BASE_URL"
+if [[ -n "$API_BASE_URL" ]]; then
+    echo "api base url: $API_BASE_URL"
+else
+    echo "api base url: <from Gradle properties or module default>"
+fi
 echo "tasks: ${tasks[*]}"
 
 "$GRADLEW" "${gradle_args[@]}"
