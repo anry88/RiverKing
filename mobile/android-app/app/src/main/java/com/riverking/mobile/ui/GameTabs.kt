@@ -88,6 +88,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -101,10 +102,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
@@ -499,27 +503,24 @@ private fun FishingScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            HeroLocationCard(
+            FishingStageScene(
+                state = state,
+                strings = strings,
                 title = currentLocation?.name ?: strings.water,
                 backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                scene = {
-                    FishingStageScene(
-                        state = state,
-                        strings = strings,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(250.dp),
-                    )
-                },
-            ) {
-                FishingActionCard(
-                    state = state,
-                    strings = strings,
-                    onBeginCast = onBeginCast,
-                    onHookFish = onHookFish,
-                    onTapChallenge = onTapChallenge,
-                )
-            }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp),
+            )
+        }
+        item {
+            FishingActionCard(
+                state = state,
+                strings = strings,
+                onBeginCast = onBeginCast,
+                onHookFish = onHookFish,
+                onTapChallenge = onTapChallenge,
+            )
         }
         item {
             FishingEquipmentCard(
@@ -1239,51 +1240,23 @@ private fun TelegramAccountCard(
 }
 
 @Composable
-private fun HeroLocationCard(
-    title: String,
-    backgroundUrl: String?,
-    scene: @Composable () -> Unit = {},
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            if (backgroundUrl != null) {
-                AsyncImage(
-                    model = backgroundUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(28.dp)),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.6f))
-                        )
-                    )
-            )
-            Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                scene()
-                content()
-            }
-        }
-    }
-}
-
-@Composable
 private fun FishingStageScene(
     state: RiverKingUiState,
     strings: RiverStrings,
+    title: String,
+    backgroundUrl: String?,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val bobberBitmap = remember(context) {
+        try {
+            context.assets.open("menu/bobber.webp").use { 
+                BitmapFactory.decodeStream(it)?.asImageBitmap()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
     val phase = state.fishing.phase
     val inWater = phase == FishingPhase.WAITING_BITE || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE
     val infinite = rememberInfiniteTransition(label = "fishing-scene")
@@ -1329,13 +1302,36 @@ private fun FishingStageScene(
         label = "cast-y",
     )
 
-    Surface(
+    Card(
         modifier = modifier,
-        color = Color.Transparent,
-        shape = RoundedCornerShape(24.dp),
-        border = null,
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            if (backgroundUrl != null) {
+                coil.compose.AsyncImage(
+                    model = backgroundUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.6f))
+                        )
+                    )
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(20.dp)
+            )
+
             val currentRodCode = state.me?.rods?.firstOrNull { it.id == state.me?.currentRodId }?.code
             val rodUrl = rodAsset(currentRodCode)
             val rodTipAnchor = rodTipAnchorPercentage(currentRodCode)
@@ -1364,8 +1360,8 @@ private fun FishingStageScene(
             val baseDesiredX = maxWidth * rodBaseXFraction
             val rodLeftDp = baseDesiredX - rodWidthDp * rodBaseAnchorX
 
-            // Push rod bottom below the scene (overshoot)
-            val rodBottomOvershoot = min(max(maxHeight.value * 0.08f, 50f), 140f).dp
+            // Push rod bottom aligned with the scene
+            val rodBottomOvershoot = 50.dp
             val rodTopDp = maxHeight - rodHeightDp + rodBottomOvershoot
 
             coil.compose.AsyncImage(
@@ -1399,34 +1395,50 @@ private fun FishingStageScene(
                 }
                 val bobber = Offset(size.width * castX, size.height * castY + bobberOffset)
 
-                // Fishing line from rod tip to bobber with natural sag
-                val dx = bobber.x - rodTip.x
-                val dy = bobber.y - rodTip.y
+                // Rod line points
+                val rodLinePoints = rodLinePointsPercentage(currentRodCode).map {
+                    Offset(
+                        x = rodLeftDp.toPx() + rodWidthDp.toPx() * it.x,
+                        y = rodTopDp.toPx() + rodHeightDp.toPx() * it.y,
+                    )
+                }
+
+                // Fishing line from last rod point to bobber with natural sag
+                val lineOrigin = rodLinePoints.lastOrNull() ?: rodTip
+                val dx = bobber.x - lineOrigin.x
+                val dy = bobber.y - lineOrigin.y
                 val dist = kotlin.math.hypot(dx, dy)
                 val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
                 val control = if (shouldShowSlack) {
                     // Slack line when idle
                     val sag = min(size.height * 0.22f, max(16f, dist * 0.55f))
                     Offset(
-                        x = rodTip.x + dx * 0.55f,
-                        y = rodTip.y + dy * 0.5f + sag,
+                        x = lineOrigin.x + dx * 0.55f,
+                        y = lineOrigin.y + dy * 0.5f + sag,
                     )
                 } else {
                     // Taut line when cast
                     val gentleSag = min(size.height * 0.08f, dist * 0.12f)
                     Offset(
-                        x = rodTip.x + dx * 0.5f,
-                        y = rodTip.y + dy * 0.5f + gentleSag,
+                        x = lineOrigin.x + dx * 0.5f,
+                        y = lineOrigin.y + dy * 0.5f + gentleSag,
                     )
                 }
                 val linePath = Path().apply {
-                    moveTo(rodTip.x, rodTip.y)
+                    if (rodLinePoints.isNotEmpty()) {
+                        moveTo(rodLinePoints.first().x, rodLinePoints.first().y)
+                        for (i in 1 until rodLinePoints.size) {
+                            lineTo(rodLinePoints[i].x, rodLinePoints[i].y)
+                        }
+                    } else {
+                        moveTo(lineOrigin.x, lineOrigin.y)
+                    }
                     quadraticTo(control.x, control.y, bobber.x, bobber.y)
                 }
                 drawPath(
                     path = linePath,
-                    color = Color(0xFFF0E8D6),
-                    style = Stroke(width = 3f, cap = StrokeCap.Round),
+                    color = Color.White.copy(alpha = 0.35f),
+                    style = Stroke(width = 2f, cap = StrokeCap.Round),
                 )
 
                 // Ripple circles around bobber
@@ -1442,29 +1454,32 @@ private fun FishingStageScene(
                 }
 
                 // Bobber (float)
-                val bobberRadius = size.width * 0.022f
-                drawCircle(color = Color(0xFFE8F0F4), radius = bobberRadius, center = bobber)
-                drawCircle(
-                    color = Color(0xFFE55B5B),
-                    radius = bobberRadius,
-                    center = bobber.copy(y = bobber.y - bobberRadius * 0.42f),
-                )
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.32f),
-                    radius = bobberRadius * 2.3f,
-                    center = bobber,
-                )
-
-                // Caught fish glow
-                if (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null) {
-                    val catchColor = rarityColor(state.fishing.lastCast.catch.rarity)
-                    drawOval(
-                        color = catchColor.copy(alpha = 0.24f),
-                        topLeft = Offset(
-                            x = bobber.x - size.width * 0.09f,
-                            y = bobber.y - size.height * 0.08f,
+                if (bobberBitmap != null) {
+                    val bobberRectSize = size.width * 0.08f
+                    val srcSize = IntSize(bobberBitmap.width, bobberBitmap.height)
+                    val dstSize = IntSize(bobberRectSize.toInt(), (bobberRectSize * bobberBitmap.height / bobberBitmap.width).toInt())
+                    drawImage(
+                        image = bobberBitmap,
+                        srcOffset = IntOffset.Zero,
+                        srcSize = srcSize,
+                        dstOffset = IntOffset(
+                            (bobber.x - dstSize.width / 2f).toInt(),
+                            (bobber.y - dstSize.height / 2f).toInt()
                         ),
-                        size = Size(size.width * 0.12f, size.height * 0.06f),
+                        dstSize = dstSize
+                    )
+                } else {
+                    val bobberRadius = size.width * 0.022f
+                    drawCircle(color = Color(0xFFE8F0F4), radius = bobberRadius, center = bobber)
+                    drawCircle(
+                        color = Color(0xFFE55B5B),
+                        radius = bobberRadius,
+                        center = bobber.copy(y = bobber.y - bobberRadius * 0.42f),
+                    )
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.32f),
+                        radius = bobberRadius * 2.3f,
+                        center = bobber,
                     )
                 }
             }
@@ -1763,12 +1778,12 @@ private fun DailyRewardSheet(
     onClaim: () -> Unit,
 ) {
     val rewards = me.dailyRewards
-    val currentIndex = when {
-        rewards.isEmpty() -> -1
-        me.dailyAvailable -> min(me.dailyStreak, rewards.lastIndex)
-        else -> min(max(me.dailyStreak - 1, 0), rewards.lastIndex)
-    }
-    val completedThreshold = if (me.dailyAvailable) me.dailyStreak else me.dailyStreak + 1
+    val todayOrdinal = if (me.dailyAvailable) me.dailyStreak else max(me.dailyStreak - 1, 0)
+    val tomorrowOrdinal = todayOrdinal + 1
+
+    val todayItemIndex = if (rewards.isNotEmpty()) min(todayOrdinal, rewards.lastIndex) else -1
+    val tomorrowItemIndex = if (rewards.isNotEmpty()) min(tomorrowOrdinal, rewards.lastIndex) else -1
+    
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -1776,6 +1791,7 @@ private fun DailyRewardSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -1784,23 +1800,29 @@ private fun DailyRewardSheet(
                 "${strings.dailyStreakLabel}: ${me.dailyStreak}",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            rewards.chunked(2).forEachIndexed { rowIndex, rowItems ->
+            if (todayItemIndex != -1) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    rowItems.forEachIndexed { columnIndex, items ->
-                        val absoluteIndex = rowIndex * 2 + columnIndex
+                    DailyRewardDayCard(
+                        strings = strings,
+                        dayIndex = todayOrdinal,
+                        rewards = rewards[todayItemIndex],
+                        isCurrent = me.dailyAvailable,
+                        isCompleted = !me.dailyAvailable,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (tomorrowItemIndex != -1) {
                         DailyRewardDayCard(
                             strings = strings,
-                            dayIndex = absoluteIndex,
-                            rewards = items,
-                            isCurrent = absoluteIndex == currentIndex,
-                            isCompleted = absoluteIndex < completedThreshold,
+                            dayIndex = tomorrowOrdinal,
+                            rewards = rewards[tomorrowItemIndex],
+                            isCurrent = false,
+                            isCompleted = false,
                             modifier = Modifier.weight(1f),
                         )
-                    }
-                    if (rowItems.size == 1) {
+                    } else {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -3528,6 +3550,59 @@ private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.
         "abyss" -> androidx.compose.ui.geometry.Offset(0.14844f, 0.04688f)
         "storm" -> androidx.compose.ui.geometry.Offset(0.125f, 0.07520f)
         else -> androidx.compose.ui.geometry.Offset(0.07878f, 0.04785f)
+    }
+}
+
+private fun rodLinePointsPercentage(code: String?): List<androidx.compose.ui.geometry.Offset> {
+    return when (code) {
+        "spark" -> listOf(
+            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
+            androidx.compose.ui.geometry.Offset(0.635f, 0.80f),
+            androidx.compose.ui.geometry.Offset(0.495f, 0.61f),
+            androidx.compose.ui.geometry.Offset(0.355f, 0.42f),
+            androidx.compose.ui.geometry.Offset(0.215f, 0.23f),
+            androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
+        )
+        "dew" -> listOf(
+            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
+            androidx.compose.ui.geometry.Offset(0.639f, 0.797f),
+            androidx.compose.ui.geometry.Offset(0.513f, 0.614f),
+            androidx.compose.ui.geometry.Offset(0.388f, 0.432f),
+            androidx.compose.ui.geometry.Offset(0.262f, 0.249f),
+            androidx.compose.ui.geometry.Offset(0.13607f, 0.06641f)
+        )
+        "stream" -> listOf(
+            androidx.compose.ui.geometry.Offset(0.72f, 1.1f),
+            androidx.compose.ui.geometry.Offset(0.609f, 0.895f),
+            androidx.compose.ui.geometry.Offset(0.497f, 0.690f),
+            androidx.compose.ui.geometry.Offset(0.386f, 0.485f),
+            androidx.compose.ui.geometry.Offset(0.274f, 0.279f),
+            androidx.compose.ui.geometry.Offset(0.155f, 0.07422f)
+        )
+        "abyss" -> listOf(
+            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
+            androidx.compose.ui.geometry.Offset(0.642f, 0.793f),
+            androidx.compose.ui.geometry.Offset(0.518f, 0.607f),
+            androidx.compose.ui.geometry.Offset(0.395f, 0.420f),
+            androidx.compose.ui.geometry.Offset(0.272f, 0.234f),
+            androidx.compose.ui.geometry.Offset(0.14844f, 0.04688f)
+        )
+        "storm" -> listOf(
+            androidx.compose.ui.geometry.Offset(0.72f, 1.1f),
+            androidx.compose.ui.geometry.Offset(0.603f, 0.895f),
+            androidx.compose.ui.geometry.Offset(0.486f, 0.690f),
+            androidx.compose.ui.geometry.Offset(0.369f, 0.485f),
+            androidx.compose.ui.geometry.Offset(0.251f, 0.280f),
+            androidx.compose.ui.geometry.Offset(0.125f, 0.07520f)
+        )
+        else -> listOf(
+            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
+            androidx.compose.ui.geometry.Offset(0.635f, 0.80f),
+            androidx.compose.ui.geometry.Offset(0.495f, 0.61f),
+            androidx.compose.ui.geometry.Offset(0.355f, 0.42f),
+            androidx.compose.ui.geometry.Offset(0.215f, 0.23f),
+            androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
+        )
     }
 }
 
