@@ -242,6 +242,9 @@ fun RiverKingApp(
                             playBillingManager?.launchPurchase(activity, packId)
                                 ?: viewModel.showError(strings.playPurchaseUnavailable)
                         },
+                        onUpdateNickname = viewModel::updateNickname,
+                        onSaveNickname = viewModel::saveNickname,
+                        onLoadCatchStats = viewModel::loadCatchStats,
                     )
                 }
             }

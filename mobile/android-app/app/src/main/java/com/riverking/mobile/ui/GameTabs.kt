@@ -116,6 +116,7 @@ import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.CatchDto
+import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.ClubDetailsDto
 import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
@@ -216,11 +217,16 @@ fun MainShell(
     onClaimReferralRewards: () -> Unit,
     onBuyShopWithCoins: (String) -> Unit,
     onPlayPurchase: (String) -> Unit,
+    onUpdateNickname: (String) -> Unit,
+    onSaveNickname: () -> Unit,
+    onLoadCatchStats: (String) -> Unit,
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
     val clipboard = LocalClipboardManager.current
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
+    var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
+    var showCatchStats by rememberSaveable { mutableStateOf(false) }
 
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val tabLabels = remember(strings) {
@@ -243,6 +249,14 @@ fun MainShell(
                 achievementBadge = achievementBadge,
                 onLogout = onLogout,
                 onChangeLanguage = onChangeLanguage,
+                onOpenNicknameChange = {
+                    onUpdateNickname(me.username ?: "")
+                    showNicknameDialog = true
+                },
+                onOpenCatchStats = {
+                    showCatchStats = true
+                    onLoadCatchStats("all")
+                },
             )
         },
         bottomBar = {
@@ -383,6 +397,173 @@ fun MainShell(
             onOpenCatch = onOpenCatch,
         )
     }
+    if (showNicknameDialog) {
+        NicknameChangeDialog(
+            strings = strings,
+            nickname = state.nickname,
+            busy = state.working,
+            onNicknameChange = onUpdateNickname,
+            onSave = {
+                onSaveNickname()
+                showNicknameDialog = false
+            },
+            onDismiss = { showNicknameDialog = false },
+        )
+    }
+
+    if (showCatchStats) {
+        CatchStatsSheet(
+            state = state.catchStats,
+            strings = strings,
+            onPeriodChange = onLoadCatchStats,
+            onDismiss = { showCatchStats = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatchStatsSheet(
+    state: CatchStatsUiState,
+    strings: RiverStrings,
+    onPeriodChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = strings.statistics,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+
+            // Period filter chips
+            val periods = listOf("day", "week", "month", "all")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            ) {
+                periods.forEach { period ->
+                    FilterChip(
+                        selected = state.period == period,
+                        onClick = { onPeriodChange(period) },
+                        label = { Text(strings.statsPeriodLabel(period)) },
+                    )
+                }
+            }
+
+            if (state.loading) {
+                Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                val stats = state.stats
+                if (stats != null) {
+                    // Total weight + count row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        StatPill(
+                            title = strings.totalWeight,
+                            value = String.format(Locale.US, "%.2f kg", stats.totalWeight),
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatPill(
+                            title = strings.totalCount,
+                            value = stats.totalCount.toString(),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    // Rarity breakdown
+                    if (stats.byRarity.isNotEmpty()) {
+                        HorizontalDivider()
+                        stats.byRarity.forEach { rarity ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(rarityColor(rarity.rarity), CircleShape)
+                                    )
+                                    Text(
+                                        text = strings.rarityLabel(rarity.rarity),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                }
+                                Text(
+                                    text = "${rarity.count} • ${String.format(Locale.US, "%.2f kg", rarity.weight)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    EmptyStatePanel(text = strings.noData)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NicknameChangeDialog(
+    strings: RiverStrings,
+    nickname: String,
+    busy: Boolean,
+    onNicknameChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.changeNickname) },
+        text = {
+            OutlinedTextField(
+                value = nickname,
+                onValueChange = onNicknameChange,
+                label = { Text(strings.chooseNickname) },
+                enabled = !busy,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            Button(onClick = onSave, enabled = !busy && nickname.isNotBlank()) {
+                Text(strings.continueLabel)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("✕")
+            }
+        },
+    )
+}
+
+private fun rarityColor(rarity: String): Color = when (rarity) {
+    "common" -> Color(0xFF90A4AE)
+    "uncommon" -> Color(0xFF66BB6A)
+    "rare" -> Color(0xFF42A5F5)
+    "epic" -> Color(0xFFAB47BC)
+    "mythic" -> Color(0xFFEF5350)
+    "legendary" -> Color(0xFFFFCA28)
+    else -> Color(0xFF90A4AE)
 }
 
 @Composable
@@ -403,7 +584,6 @@ private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HeaderBar(
     me: MeResponseDto,
@@ -411,49 +591,116 @@ private fun HeaderBar(
     achievementBadge: Boolean,
     onLogout: () -> Unit,
     onChangeLanguage: (String) -> Unit,
+    onOpenNicknameChange: () -> Unit,
+    onOpenCatchStats: () -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     val currentLocation = me.locations.firstOrNull { it.id == me.locationId }?.name.orEmpty()
+    val languageFlag = if (me.language == "ru") "\uD83C\uDDF7\uD83C\uDDFA" else "\uD83C\uDDEC\uD83C\uDDE7"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = me.username ?: strings.appTitle,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = currentLocation,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            // Clickable Nickname + Dropdown
+            Box {
+                Row(
+                    modifier = Modifier.clickable { menuExpanded = true },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = me.username ?: strings.appTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "▾",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("✏\uFE0F  ${strings.changeNickname}") },
+                        onClick = {
+                            menuExpanded = false
+                            onOpenNicknameChange()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("\uD83D\uDCCA  ${strings.statistics}") },
+                        onClick = {
+                            menuExpanded = false
+                            onOpenCatchStats()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("$languageFlag  ${strings.language}") },
+                        onClick = {
+                            menuExpanded = false
+                            val newLang = if (me.language == "ru") "en" else "ru"
+                            onChangeLanguage(newLang)
+                        },
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = strings.logout,
+                                color = Color(0xFFEF5350),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onLogout()
+                        },
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            OutlinedButton(onClick = onLogout) { Text(strings.logout) }
+
+            // Coin display
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(text = "\uD83E\uDE99", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = me.coins.toString(),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
         }
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            StatPill(title = "🪙", value = me.coins.toString())
-            StatPill(title = "kg", value = me.totalWeight.asKgCompact())
-            StatPill(title = "🔥", value = me.dailyStreak.toString())
-            LanguageToggle(currentLanguage = me.language, onChangeLanguage = onChangeLanguage)
-        }
+        // Location subtitle
+        Text(
+            text = currentLocation,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

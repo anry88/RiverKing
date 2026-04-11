@@ -98,6 +98,11 @@ data class RiverStrings(
     val chooseBait: String,
     val dailyQuestsLabel: String,
     val weeklyQuestsLabel: String,
+    val changeNickname: String,
+    val statistics: String,
+    val totalWeight: String,
+    val totalCount: String,
+    val language: String,
 )
 
 @Composable
@@ -198,6 +203,11 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Выбор наживки",
             dailyQuestsLabel = "Ежедневные",
             weeklyQuestsLabel = "Недельные",
+            changeNickname = "Изменить никнейм",
+            statistics = "Статистика",
+            totalWeight = "Общий вес",
+            totalCount = "Всего поймано",
+            language = "Язык",
         )
     } else {
         RiverStrings(
@@ -295,6 +305,11 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Choose bait",
             dailyQuestsLabel = "Daily",
             weeklyQuestsLabel = "Weekly",
+            changeNickname = "Change nickname",
+            statistics = "Statistics",
+            totalWeight = "Total weight",
+            totalCount = "Total caught",
+            language = "Language",
         )
     }
 }
@@ -306,6 +321,13 @@ fun RiverStrings.periodLabel(period: RatingsPeriod): String = when (period) {
     RatingsPeriod.MONTH -> if (login == "Логин") "Месяц" else "Month"
     RatingsPeriod.YEAR -> if (login == "Логин") "Год" else "Year"
     RatingsPeriod.ALL -> if (login == "Логин") "Всё время" else "All time"
+}
+
+fun RiverStrings.statsPeriodLabel(period: String): String = when (period) {
+    "day" -> if (login == "Логин") "День" else "Day"
+    "week" -> if (login == "Логин") "Неделя" else "Week"
+    "month" -> if (login == "Логин") "Месяц" else "Month"
+    else -> if (login == "Логин") "Всё время" else "All time"
 }
 
 fun RiverStrings.orderLabel(order: RatingsOrder): String = when (order) {
