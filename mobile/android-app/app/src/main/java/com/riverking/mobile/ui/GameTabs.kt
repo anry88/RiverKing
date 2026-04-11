@@ -556,16 +556,6 @@ private fun NicknameChangeDialog(
     )
 }
 
-private fun rarityColor(rarity: String): Color = when (rarity) {
-    "common" -> Color(0xFF90A4AE)
-    "uncommon" -> Color(0xFF66BB6A)
-    "rare" -> Color(0xFF42A5F5)
-    "epic" -> Color(0xFFAB47BC)
-    "mythic" -> Color(0xFFEF5350)
-    "legendary" -> Color(0xFFFFCA28)
-    else -> Color(0xFF90A4AE)
-}
-
 @Composable
 private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     Box(
