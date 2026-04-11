@@ -410,12 +410,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
     data class RarityCatchStats(val rarity: String, val count: Long, val weight: Double)
 
-    fun catchStatsByRarity(userId: Long): List<RarityCatchStats> = transaction {
+    fun catchStatsByRarity(userId: Long): List<RarityCatchStats> = catchStatsByRarity(userId, since = null)
+
+    fun catchStatsByRarity(userId: Long, since: Instant?): List<RarityCatchStats> = transaction {
         val countExpr = Catches.id.count()
         val weightExpr = Catches.weight.sum()
+        val baseCondition = Catches.userId eq userId
+        val condition = if (since != null) baseCondition and (Catches.createdAt greaterEq since) else baseCondition
         (Catches innerJoin Fish)
             .slice(Fish.rarity, countExpr, weightExpr)
-            .select { Catches.userId eq userId }
+            .select { condition }
             .groupBy(Fish.rarity)
             .map { row ->
                 val rarity = row[Fish.rarity]
@@ -424,6 +428,17 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 RarityCatchStats(rarity, count, weight)
             }
             .sortedByDescending { rarityRank(it.rarity) }
+    }
+
+    fun catchStatsTotal(userId: Long, since: Instant?): Pair<Double, Long> = transaction {
+        val weightExpr = Catches.weight.sum()
+        val countExpr = Catches.id.count()
+        val baseCondition = Catches.userId eq userId
+        val condition = if (since != null) baseCondition and (Catches.createdAt greaterEq since) else baseCondition
+        val row = Catches.slice(weightExpr, countExpr).select { condition }.single()
+        val weight = row[weightExpr] ?: 0.0
+        val count = row[countExpr] ?: 0L
+        weight to count
     }
 
     fun fishRarity(name: String): String? = transaction {

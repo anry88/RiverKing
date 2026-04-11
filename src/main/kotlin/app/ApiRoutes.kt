@@ -40,6 +40,8 @@ import service.PayService
 import service.StarsPaymentService
 import util.Metrics
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 fun Application.apiRoutes(
     env: Env,
@@ -1429,6 +1431,36 @@ fun Application.apiRoutes(
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val data = fishing.guide(language)
             call.respond(data)
+        }
+
+        get("/api/stats/catch") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val period = call.request.queryParameters["period"] ?: "all"
+            val zone = ZoneId.of("Europe/Belgrade")
+            val since: Instant? = when (period) {
+                "day" -> LocalDate.now(zone).atStartOfDay(zone).toInstant()
+                "week" -> LocalDate.now(zone).minusDays(6).atStartOfDay(zone).toInstant()
+                "month" -> LocalDate.now(zone).minusDays(29).atStartOfDay(zone).toInstant()
+                else -> null
+            }
+            val (totalWeight, totalCount) = fishing.catchStatsTotal(uid, since)
+            val byRarity = fishing.catchStatsByRarity(uid, since)
+
+            @Serializable
+            data class RarityStat(val rarity: String, val count: Long, val weight: Double)
+            @Serializable
+            data class CatchStatsResp(
+                val totalWeight: Double,
+                val totalCount: Long,
+                val byRarity: List<RarityStat>,
+            )
+            call.respond(
+                CatchStatsResp(
+                    totalWeight = totalWeight,
+                    totalCount = totalCount,
+                    byRarity = byRarity.map { RarityStat(it.rarity, it.count, it.weight) },
+                )
+            )
         }
 
         // Change location
