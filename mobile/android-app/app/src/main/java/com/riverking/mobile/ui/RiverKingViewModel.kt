@@ -6,6 +6,7 @@ import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AuthRepository
+import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.CastResultDto
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.ClubChatMessageDto
@@ -143,6 +144,12 @@ data class ShopUiState(
     val referralsLoading: Boolean = false,
 )
 
+data class CatchStatsUiState(
+    val loading: Boolean = false,
+    val period: String = "all",
+    val stats: CatchStatsDto? = null,
+)
+
 data class RiverKingUiState(
     val loading: Boolean = true,
     val me: MeResponseDto? = null,
@@ -166,6 +173,7 @@ data class RiverKingUiState(
     val guide: GuideUiState = GuideUiState(),
     val club: ClubUiState = ClubUiState(),
     val shop: ShopUiState = ShopUiState(),
+    val catchStats: CatchStatsUiState = CatchStatsUiState(),
 )
 
 class RiverKingViewModel(
@@ -781,6 +789,28 @@ class RiverKingViewModel(
 
     fun dismissAchievementReward() {
         _state.update { it.copy(lastAchievementReward = null) }
+    }
+
+    fun loadCatchStats(period: String) {
+        if (state.value.me == null) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(catchStats = it.catchStats.copy(loading = true, period = period))
+            }
+            try {
+                val stats = repository.loadCatchStats(period)
+                _state.update {
+                    it.copy(catchStats = CatchStatsUiState(loading = false, period = period, stats = stats))
+                }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        catchStats = it.catchStats.copy(loading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
     }
 
     fun loadClub(force: Boolean = false) {

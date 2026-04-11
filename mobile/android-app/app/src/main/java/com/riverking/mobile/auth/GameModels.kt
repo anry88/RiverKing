@@ -405,3 +405,17 @@ data class PlayPurchaseCompleteRequestDto(
     val orderId: String? = null,
     val purchaseTimeMillis: Long? = null,
 )
+
+@Serializable
+data class RarityStatDto(
+    val rarity: String,
+    val count: Long,
+    val weight: Double,
+)
+
+@Serializable
+data class CatchStatsDto(
+    val totalWeight: Double,
+    val totalCount: Long,
+    val byRarity: List<RarityStatDto> = emptyList(),
+)

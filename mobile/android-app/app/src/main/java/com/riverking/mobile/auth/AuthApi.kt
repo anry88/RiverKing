@@ -311,4 +311,10 @@ class AuthApi(
         client.post("$baseUrl/api/referrals/rewards/claim") {
             bearerAuth(accessToken)
         }.body()
+
+    suspend fun catchStats(accessToken: String, period: String): CatchStatsDto =
+        client.get("$baseUrl/api/stats/catch") {
+            bearerAuth(accessToken)
+            parameter("period", period)
+        }.body()
 }

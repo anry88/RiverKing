@@ -287,6 +287,9 @@ class AuthRepository(
         return refreshProfile()
     }
 
+    suspend fun loadCatchStats(period: String): CatchStatsDto =
+        withFreshAccessToken { accessToken -> api.catchStats(accessToken, period) }
+
     suspend fun logout() {
         val stored = sessionStore.read()
         if (stored != null) {
