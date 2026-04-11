@@ -417,21 +417,30 @@ fun Application.botRoutes(env: Env) {
                 val returnAndOpenMarkup = result.returnToAppUrl?.let { url ->
                     """{"inline_keyboard":[[{"text":"$returnButtonText","url":"$url"}],[{"text":"$openButtonText","url":"https://t.me/${env.botName}?startapp"}]]}"""
                 }
+                val accountLogin = result.accountLogin
                 return when (result.kind to result.code) {
                     "mobile_login" to "completed",
                     "mobile_login" to "already_completed" -> {
                         if (lang == "ru") {
-                            "Вход через Telegram подтверждён. Вернись в мобильное приложение RiverKing."
+                            accountLogin?.let {
+                                "Аккаунт \"$it\" успешно авторизован через Telegram. Вернись в мобильное приложение RiverKing."
+                            } ?: "Вход через Telegram подтверждён. Вернись в мобильное приложение RiverKing."
                         } else {
-                            "Telegram sign-in confirmed. Return to the RiverKing mobile app."
+                            accountLogin?.let {
+                                "Account \"$it\" is now signed in through Telegram. Return to the RiverKing mobile app."
+                            } ?: "Telegram sign-in confirmed. Return to the RiverKing mobile app."
                         } to returnToAppMarkup
                     }
                     "telegram_link" to "completed",
                     "telegram_link" to "already_completed" -> {
                         if (lang == "ru") {
-                            "Telegram-аккаунт привязан. Теперь этот профиль доступен и в Mini App, и в мобильном приложении."
+                            accountLogin?.let {
+                                "Telegram-аккаунт успешно привязан к логину \"$it\". Вернись в приложение или открой Mini App."
+                            } ?: "Telegram-аккаунт привязан. Теперь этот профиль доступен и в Mini App, и в мобильном приложении."
                         } else {
-                            "Your Telegram account is linked. This profile now works in both the Mini App and the mobile app."
+                            accountLogin?.let {
+                                "Your Telegram account is linked to login \"$it\". Return to the app or open the Mini App."
+                            } ?: "Your Telegram account is linked. This profile now works in both the Mini App and the mobile app."
                         } to (returnAndOpenMarkup ?: openGameMarkup)
                     }
                     "telegram_link" to "telegram_already_bound" -> {

@@ -2,6 +2,7 @@ package app
 
 import db.AccountLinkSessions
 import db.AuthIdentities
+import db.PasswordCredentials
 import db.Users
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
@@ -46,6 +47,7 @@ class TelegramLinkService(
         val code: String,
         val language: String,
         val returnToAppUrl: String? = null,
+        val accountLogin: String? = null,
     )
 
     private data class StoredSession(
@@ -211,7 +213,13 @@ class TelegramLinkService(
         if (current.status == "completed" || current.status == "consumed") {
             val linkedLanguage = current.resolvedUserId?.let { runCatching { fishing.userLanguage(it) }.getOrNull() }
                 ?: normalizeLanguage(tgUser.languageCode)
-            return TelegramStartCommandResult("mobile_login", "already_completed", linkedLanguage)
+            val accountLogin = current.resolvedUserId?.let { runCatching { currentPasswordLogin(it) }.getOrNull() }
+            return TelegramStartCommandResult(
+                kind = "mobile_login",
+                code = "already_completed",
+                language = linkedLanguage,
+                accountLogin = accountLogin,
+            )
         }
 
         val userId = fishing.ensureUserByTgId(
@@ -235,7 +243,12 @@ class TelegramLinkService(
                 it[AccountLinkSessions.completedAt] = now()
             }
         }
-        return TelegramStartCommandResult("mobile_login", "completed", language)
+        return TelegramStartCommandResult(
+            kind = "mobile_login",
+            code = "completed",
+            language = language,
+            accountLogin = currentPasswordLogin(userId),
+        )
     }
 
     private fun completeTelegramLink(
@@ -264,7 +277,12 @@ class TelegramLinkService(
                 )
             }
             if (session.status == "completed" || session.status == "consumed") {
-                return@transaction TelegramStartCommandResult("telegram_link", "already_completed", language)
+                return@transaction TelegramStartCommandResult(
+                    kind = "telegram_link",
+                    code = "already_completed",
+                    language = language,
+                    accountLogin = passwordLogin(userId = targetUserId),
+                )
             }
 
             val existingLinkedUserId = findUserByTelegramId(tgUser.id)
@@ -332,7 +350,12 @@ class TelegramLinkService(
                 it[AccountLinkSessions.errorCode] = null
                 it[AccountLinkSessions.completedAt] = now()
             }
-            TelegramStartCommandResult("telegram_link", "completed", language)
+            TelegramStartCommandResult(
+                kind = "telegram_link",
+                code = "completed",
+                language = language,
+                accountLogin = passwordLogin(userId = targetUserId),
+            )
         }
     }
 
@@ -352,6 +375,16 @@ class TelegramLinkService(
     private fun currentTelegramUsername(userId: Long): String? = transaction {
         Users.select { Users.id eq userId }.singleOrNull()?.get(Users.username)
     }
+
+    private fun currentPasswordLogin(userId: Long): String? = transaction {
+        passwordLogin(userId)
+    }
+
+    private fun passwordLogin(userId: Long): String? =
+        PasswordCredentials
+            .select { PasswordCredentials.userId eq userId }
+            .singleOrNull()
+            ?.get(PasswordCredentials.login)
 
     private fun findUserByTelegramId(telegramId: Long): Long? {
         val subject = telegramId.toString()
