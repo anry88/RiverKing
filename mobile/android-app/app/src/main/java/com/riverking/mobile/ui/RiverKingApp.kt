@@ -21,12 +21,14 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -317,7 +319,12 @@ private fun AuthScreen(
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = onTelegramSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onTelegramSignIn,
+                enabled = !authBusy,
+                modifier = Modifier.fillMaxWidth(),
+                colors = riverPrimaryButtonColors(),
+            ) {
                 Text(strings.signInTelegram)
             }
             if (state.telegramLoginPending) {
@@ -387,7 +394,12 @@ private fun AuthScreen(
                 colors = riverTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(18.dp))
-            Button(onClick = onSubmit, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onSubmit,
+                enabled = !authBusy,
+                modifier = Modifier.fillMaxWidth(),
+                colors = riverPrimaryButtonColors(),
+            ) {
                 Text(if (state.authMode == AuthMode.LOGIN) strings.signIn else strings.createAccount)
             }
             TextButton(onClick = onToggleMode, enabled = !authBusy, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -395,7 +407,12 @@ private fun AuthScreen(
             }
             if (googleEnabled) {
                 Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = onGoogleSignIn, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onGoogleSignIn,
+                    enabled = !authBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = riverSecondaryButtonColors(),
+                ) {
                     Text(strings.signInGoogle)
                 }
             }
@@ -439,7 +456,12 @@ private fun NicknameScreen(
                 colors = riverTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onSave,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+                colors = riverPrimaryButtonColors(),
+            ) {
                 Text(strings.continueLabel)
             }
         }
@@ -455,7 +477,7 @@ private fun AuthBackdrop(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(RiverBackdropBrush)
+            .riverBackdrop()
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -467,13 +489,14 @@ private fun AuthBackdrop(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 0.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                containerColor = RiverPanelRaised.copy(alpha = 0.96f),
             ),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 26.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
                 content()
@@ -487,14 +510,30 @@ private fun riverTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = MaterialTheme.colorScheme.onSurface,
     unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
     disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+    focusedContainerColor = RiverPanelSoft.copy(alpha = 0.70f),
+    unfocusedContainerColor = RiverPanelSoft.copy(alpha = 0.46f),
+    disabledContainerColor = RiverPanelSoft.copy(alpha = 0.26f),
     focusedBorderColor = MaterialTheme.colorScheme.primary,
-    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+    unfocusedBorderColor = RiverOutline.copy(alpha = 0.75f),
     focusedLabelColor = MaterialTheme.colorScheme.primary,
     unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
     cursorColor = MaterialTheme.colorScheme.primary,
+)
+
+@Composable
+private fun riverPrimaryButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.primary,
+    contentColor = MaterialTheme.colorScheme.onPrimary,
+    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+@Composable
+private fun riverSecondaryButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.secondary,
+    contentColor = MaterialTheme.colorScheme.onSecondary,
+    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 @OptIn(ExperimentalFoundationApi::class)

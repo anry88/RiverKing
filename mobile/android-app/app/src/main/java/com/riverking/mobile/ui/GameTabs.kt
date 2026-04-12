@@ -71,6 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -260,32 +261,49 @@ fun MainShell(
             )
         },
         bottomBar = {
-            NavigationBar(
-                tonalElevation = 0.dp,
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            Surface(
+                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                color = RiverPanelRaised.copy(alpha = 0.97f),
+                border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
+                shadowElevation = 16.dp,
                 modifier = Modifier.navigationBarsPadding(),
             ) {
-                MainTab.entries.forEach { tab ->
-                    val showBadge = when (tab) {
-                        MainTab.GUIDE -> achievementBadge
-                        else -> false
-                    }
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        icon = {
-                            BadgedBox(
-                                badge = {
-                                    if (showBadge) {
-                                        Badge()
+                NavigationBar(
+                    tonalElevation = 0.dp,
+                    containerColor = Color.Transparent,
+                ) {
+                    MainTab.entries.forEach { tab ->
+                        val showBadge = when (tab) {
+                            MainTab.GUIDE -> achievementBadge
+                            else -> false
+                        }
+                        NavigationBarItem(
+                            selected = selectedTab == tab,
+                            onClick = { selectedTab = tab },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        if (showBadge) {
+                                            Badge(
+                                                containerColor = RiverCoral,
+                                                contentColor = RiverMist,
+                                            )
+                                        }
                                     }
+                                ) {
+                                    Icon(tab.icon, contentDescription = tabLabels.getValue(tab))
                                 }
-                            ) {
-                                Icon(tab.icon, contentDescription = tabLabels.getValue(tab))
-                            }
-                        },
-                        label = { Text(tabLabels.getValue(tab), maxLines = 1) },
-                    )
+                            },
+                            label = { Text(tabLabels.getValue(tab), maxLines = 1) },
+                        )
+                    }
                 }
             }
         },
@@ -571,15 +589,7 @@ private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF0B1E26),
-                        Color(0xFF122A33),
-                        Color(0xFF08131A),
-                    )
-                )
-            ),
+            .riverBackdrop(),
         content = content,
     )
 }
@@ -700,10 +710,10 @@ private fun DailyStreakChip(
         Surface(
             modifier = Modifier.clickable(onClick = onClick),
             shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+            color = RiverPanelMuted.copy(alpha = 0.92f),
             border = BorderStroke(
                 1.dp,
-                if (me.dailyAvailable) Color(0xFFFF8A3D).copy(alpha = 0.55f) else Color.White.copy(alpha = 0.08f),
+                if (me.dailyAvailable) RiverAmber.copy(alpha = 0.72f) else RiverOutline.copy(alpha = 0.72f),
             ),
         ) {
             Row(
@@ -728,8 +738,9 @@ private fun HeaderCounterChip(
     value: String,
 ) {
     Surface(
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        color = RiverPanelMuted.copy(alpha = 0.92f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -1580,7 +1591,8 @@ private fun FishingStageScene(
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
+        colors = CardDefaults.cardColors(containerColor = RiverPanel.copy(alpha = 0.72f)),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.55f)),
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -1606,9 +1618,9 @@ private fun FishingStageScene(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                Color.Black.copy(alpha = 0.06f),
-                                Color.Black.copy(alpha = 0.18f),
-                                Color.Black.copy(alpha = 0.52f),
+                                RiverDeepNight.copy(alpha = 0.02f),
+                                RiverAbyss.copy(alpha = 0.12f),
+                                RiverDeepNight.copy(alpha = 0.46f),
                             )
                         )
                     )
@@ -1775,9 +1787,9 @@ private fun SceneBadge(
     accent: Color,
 ) {
     Surface(
-        color = Color.Black.copy(alpha = 0.30f),
+        color = RiverPanelSoft.copy(alpha = 0.88f),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.38f)),
     ) {
         Text(
             text = text,
@@ -1799,9 +1811,9 @@ private fun FishingActionCard(
     val phase = state.fishing.phase
     val timeLeft = (state.fishing.phaseTimeLeftMillis / 1000.0).coerceAtLeast(0.0)
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+        color = RiverPanelRaised.copy(alpha = 0.94f),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.65f)),
     ) {
         Column(
             modifier = Modifier
@@ -1817,10 +1829,12 @@ private fun FishingActionCard(
                     else -> ({})
                 },
                 enabled = phase == FishingPhase.READY || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = phaseAccentColor(phase),
-                    contentColor = if (phase == FishingPhase.TAP_CHALLENGE) Color(0xFF221400) else MaterialTheme.colorScheme.onPrimary,
+                    contentColor = RiverDeepNight,
                 ),
             ) {
                 Text(
@@ -1853,8 +1867,8 @@ private fun FishingSetupBar(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+        color = RiverPanelMuted.copy(alpha = 0.94f),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
     ) {
         Row(
             modifier = Modifier
@@ -1865,21 +1879,21 @@ private fun FishingSetupBar(
             FishingSetupCell(
                 label = strings.water,
                 value = currentLocation,
-                accent = Color(0xFF68D4FF),
+                accent = RiverTide,
                 onClick = onOpenLocations,
             )
             FishingSetupDivider()
             FishingSetupCell(
                 label = strings.bait,
                 value = currentLure,
-                accent = Color(0xFF8FE388),
+                accent = RiverMoss,
                 onClick = onOpenLures,
             )
             FishingSetupDivider()
             FishingSetupCell(
                 label = strings.rod,
                 value = currentRod,
-                accent = Color(0xFFC9A46E),
+                accent = RiverAmber,
                 onClick = onOpenRods,
             )
         }
@@ -1926,7 +1940,7 @@ private fun FishingSetupDivider() {
         modifier = Modifier
             .width(1.dp)
             .height(36.dp)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+            .background(RiverOutline.copy(alpha = 0.72f))
     )
 }
 
@@ -3383,9 +3397,9 @@ private fun CatchDetailsDialog(
 @Composable
 private fun CatchDetailChip(label: String) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+        color = RiverPanelSoft.copy(alpha = 0.92f),
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
     ) {
         Text(
             text = label,
@@ -3425,15 +3439,16 @@ private fun AchievementRewardDialog(
 private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)),
+        colors = CardDefaults.cardColors(containerColor = RiverPanel.copy(alpha = 0.90f)),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.60f)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             content()
         }
     }
@@ -3443,12 +3458,13 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
+        colors = CardDefaults.cardColors(containerColor = RiverPanelMuted.copy(alpha = 0.94f)),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.60f)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             content = content,
         )
@@ -3457,7 +3473,7 @@ private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun LoadingStatePanel(text: String, modifier: Modifier = Modifier) {
-    StatusPanel(text = text, modifier = modifier, accent = Color(0xFF68D4FF))
+    StatusPanel(text = text, modifier = modifier, accent = RiverTide)
 }
 
 @Composable
@@ -3474,8 +3490,8 @@ private fun StatusPanel(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.44f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.20f)),
+        color = RiverPanelSoft.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.30f)),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -3501,7 +3517,8 @@ private fun StatPill(title: String, value: String, modifier: Modifier = Modifier
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.84f),
+        color = RiverPanelRaised.copy(alpha = 0.94f),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.60f)),
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
@@ -3598,7 +3615,7 @@ private fun CatchRow(
 
 @Composable
 private fun chipColors(selected: Boolean) = AssistChipDefaults.assistChipColors(
-    containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+    containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else RiverPanelSoft.copy(alpha = 0.82f),
     labelColor = MaterialTheme.colorScheme.onSurface,
 )
 
@@ -3676,7 +3693,7 @@ private fun humanizePackId(packId: String): String = when {
 }
 
 private fun lureAccentColor(name: String): Color =
-    if (name.contains("+")) Color(0xFFFFD76A) else Color(0xFF8FE388)
+    if (name.contains("+")) RiverAmber else RiverMoss
 
 private fun rodImageAsset(code: String): String = localAsset(
     when (code) {
@@ -3732,12 +3749,12 @@ private fun hiddenLabel(strings: RiverStrings): String =
 private fun Double.asGuideKg(): String = String.format(Locale.US, "%.0f kg", this)
 
 private fun phaseAccentColor(phase: FishingPhase): Color = when (phase) {
-    FishingPhase.READY -> Color(0xFF4EA8DE)
-    FishingPhase.COOLDOWN -> Color(0xFF607D8B)
-    FishingPhase.WAITING_BITE -> Color(0xFF68D4FF)
-    FishingPhase.BITING -> Color(0xFFFF8A5B)
-    FishingPhase.TAP_CHALLENGE -> Color(0xFFFFD76A)
-    FishingPhase.RESOLVING -> Color(0xFF9B8CFF)
+    FishingPhase.READY -> RiverTide
+    FishingPhase.COOLDOWN -> RiverSlate
+    FishingPhase.WAITING_BITE -> RiverFoam
+    FishingPhase.BITING -> RiverCoral
+    FishingPhase.TAP_CHALLENGE -> RiverAmber
+    FishingPhase.RESOLVING -> RiverMoss
 }
 
 private fun stringsArrow(): String = "›"
