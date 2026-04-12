@@ -164,7 +164,6 @@ enum class GuideSection {
 }
 
 private enum class FishingSheetType {
-    DAILY,
     LOCATIONS,
     RODS,
     LURES,
@@ -228,6 +227,7 @@ fun MainShell(
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
     var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
+    var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
 
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val tabLabels = remember(strings) {
@@ -247,7 +247,7 @@ fun MainShell(
             HeaderBar(
                 me = me,
                 strings = strings,
-                achievementBadge = achievementBadge,
+                onOpenDaily = { showDailyRewardSheet = true },
                 onLogout = onLogout,
                 onChangeLanguage = onChangeLanguage,
                 onOpenNicknameChange = {
@@ -268,7 +268,6 @@ fun MainShell(
             ) {
                 MainTab.entries.forEach { tab ->
                     val showBadge = when (tab) {
-                        MainTab.SHOP -> me.dailyAvailable
                         MainTab.GUIDE -> achievementBadge
                         else -> false
                     }
@@ -299,7 +298,7 @@ fun MainShell(
                     strings = strings,
                     modifier = Modifier.padding(padding),
                     onRefreshProfile = onRefreshProfile,
-                    onClaimDaily = onClaimDaily,
+                    onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
                     onHookFish = onHookFish,
                     onTapChallenge = onTapChallenge,
@@ -418,6 +417,18 @@ fun MainShell(
             strings = strings,
             onPeriodChange = onLoadCatchStats,
             onDismiss = { showCatchStats = false },
+        )
+    }
+
+    if (showDailyRewardSheet) {
+        DailyRewardSheet(
+            strings = strings,
+            me = me,
+            onDismiss = { showDailyRewardSheet = false },
+            onClaim = {
+                showDailyRewardSheet = false
+                onClaimDaily()
+            },
         )
     }
 }
@@ -579,7 +590,7 @@ private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
 private fun HeaderBar(
     me: MeResponseDto,
     strings: RiverStrings,
-    achievementBadge: Boolean,
+    onOpenDaily: () -> Unit,
     onLogout: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onOpenNicknameChange: () -> Unit,
@@ -592,7 +603,7 @@ private fun HeaderBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -608,14 +619,14 @@ private fun HeaderBar(
                 ) {
                     Text(
                         text = me.username ?: strings.appTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = "▾",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -663,24 +674,76 @@ private fun HeaderBar(
                 }
             }
 
-            // Coin display
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(text = "\uD83E\uDE99", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = me.coins.toString(),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                DailyStreakChip(me = me, onClick = onOpenDaily)
+                HeaderCounterChip(icon = "\uD83E\uDE99", value = me.coins.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyStreakChip(
+    me: MeResponseDto,
+    onClick: () -> Unit,
+) {
+    BadgedBox(
+        badge = {
+            if (me.dailyAvailable) {
+                Badge(containerColor = Color(0xFFE04A4A), contentColor = Color.White) {
+                    Text("!")
                 }
             }
+        }
+    ) {
+        Surface(
+            modifier = Modifier.clickable(onClick = onClick),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+            border = BorderStroke(
+                1.dp,
+                if (me.dailyAvailable) Color(0xFFFF8A3D).copy(alpha = 0.55f) else Color.White.copy(alpha = 0.08f),
+            ),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(text = "\uD83D\uDD25", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = me.dailyStreak.toString(),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderCounterChip(
+    icon: String,
+    value: String,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = icon, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = value,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -691,7 +754,7 @@ private fun FishingScreen(
     strings: RiverStrings,
     modifier: Modifier = Modifier,
     onRefreshProfile: () -> Unit,
-    onClaimDaily: () -> Unit,
+    onOpenDaily: () -> Unit,
     onBeginCast: () -> Unit,
     onHookFish: () -> Unit,
     onTapChallenge: () -> Unit,
@@ -721,7 +784,7 @@ private fun FishingScreen(
     LaunchedEffect(dailyPromptToken) {
         if (dailyPromptToken != null && dailyPromptToken != lastDailyPromptToken) {
             lastDailyPromptToken = dailyPromptToken
-            activeSheet = FishingSheetType.DAILY
+            onOpenDaily()
         }
     }
 
@@ -762,7 +825,6 @@ private fun FishingScreen(
                 strings = strings,
                 me = me,
                 autoCastEnabled = state.fishing.autoCastEnabled,
-                onOpenDaily = { activeSheet = FishingSheetType.DAILY },
                 onRefreshProfile = onRefreshProfile,
                 onToggleAutoCast = onToggleAutoCast,
             )
@@ -815,15 +877,6 @@ private fun FishingScreen(
     }
 
     when (activeSheet) {
-        FishingSheetType.DAILY -> DailyRewardSheet(
-            strings = strings,
-            me = me,
-            onDismiss = { activeSheet = null },
-            onClaim = {
-                activeSheet = null
-                onClaimDaily()
-            },
-        )
         FishingSheetType.LOCATIONS -> LocationPickerSheet(
             strings = strings,
             me = me,
@@ -1884,44 +1937,10 @@ private fun FishingRewardsCard(
     strings: RiverStrings,
     me: MeResponseDto,
     autoCastEnabled: Boolean,
-    onOpenDaily: () -> Unit,
     onRefreshProfile: () -> Unit,
     onToggleAutoCast: () -> Unit,
 ) {
     InfoCard {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenDaily),
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
-            border = BorderStroke(
-                1.dp,
-                if (me.dailyAvailable) Color(0xFFFFD76A).copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
-            ),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(strings.dailyGift, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${strings.dailyStreakLabel}: ${me.dailyStreak} • " +
-                            if (me.dailyAvailable) strings.dailyRewardReady else strings.dailyReturnTomorrow,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Text(
-                    if (me.dailyAvailable) strings.claimDaily else strings.dailyClaimed,
-                    color = if (me.dailyAvailable) Color(0xFFFFD76A) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.End,
-                )
-            }
-        }
         OutlinedButton(onClick = onRefreshProfile, modifier = Modifier.fillMaxWidth()) {
             Text(strings.refresh)
         }
