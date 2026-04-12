@@ -96,6 +96,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -585,7 +586,6 @@ private fun HeaderBar(
     onOpenCatchStats: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val currentLocation = me.locations.firstOrNull { it.id == me.locationId }?.name.orEmpty()
     val languageFlag = if (me.language == "ru") "\uD83C\uDDF7\uD83C\uDDFA" else "\uD83C\uDDEC\uD83C\uDDE7"
 
     Column(
@@ -593,7 +593,6 @@ private fun HeaderBar(
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -683,14 +682,6 @@ private fun HeaderBar(
                 }
             }
         }
-        // Location subtitle
-        Text(
-            text = currentLocation,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -740,14 +731,21 @@ private fun FishingScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
+            FishingSetupBar(
+                strings = strings,
+                me = me,
+                onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
+                onOpenLures = { activeSheet = FishingSheetType.LURES },
+                onOpenRods = { activeSheet = FishingSheetType.RODS },
+            )
+        }
+        item {
             FishingStageScene(
                 state = state,
-                strings = strings,
-                title = currentLocation?.name ?: strings.water,
                 backgroundUrl = locationBackgroundAsset(currentLocation?.name),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(260.dp),
+                    .height(300.dp),
             )
         }
         item {
@@ -757,15 +755,6 @@ private fun FishingScreen(
                 onBeginCast = onBeginCast,
                 onHookFish = onHookFish,
                 onTapChallenge = onTapChallenge,
-            )
-        }
-        item {
-            FishingEquipmentCard(
-                strings = strings,
-                me = me,
-                onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
-                onOpenRods = { activeSheet = FishingSheetType.RODS },
-                onOpenLures = { activeSheet = FishingSheetType.LURES },
             )
         }
         item {
@@ -1479,8 +1468,6 @@ private fun TelegramAccountCard(
 @Composable
 private fun FishingStageScene(
     state: RiverKingUiState,
-    strings: RiverStrings,
-    title: String,
     backgroundUrl: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -1544,13 +1531,22 @@ private fun FishingStageScene(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .clipToBounds()
+        ) {
             if (backgroundUrl != null) {
                 coil.compose.AsyncImage(
                     model = backgroundUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = 1.22f,
+                            scaleY = 1.08f,
+                        ),
                 )
             }
             Box(
@@ -1558,15 +1554,13 @@ private fun FishingStageScene(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.6f))
+                            listOf(
+                                Color.Black.copy(alpha = 0.06f),
+                                Color.Black.copy(alpha = 0.18f),
+                                Color.Black.copy(alpha = 0.52f),
+                            )
                         )
                     )
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(20.dp)
             )
 
             val currentRodCode = state.me?.rods?.firstOrNull { it.id == state.me?.currentRodId }?.code
@@ -1794,75 +1788,95 @@ private fun FishingActionCard(
 }
 
 @Composable
-private fun FishingEquipmentCard(
+private fun FishingSetupBar(
     strings: RiverStrings,
     me: MeResponseDto,
     onOpenLocations: () -> Unit,
-    onOpenRods: () -> Unit,
     onOpenLures: () -> Unit,
+    onOpenRods: () -> Unit,
 ) {
-    val currentLocation = me.locations.firstOrNull { it.id == me.locationId }
-    val currentRod = me.rods.firstOrNull { it.id == me.currentRodId }
-    val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }
-    InfoCard {
-        FishingSelectionRow(
-            title = strings.water,
-            value = currentLocation?.name ?: "—",
-            subtitle = strings.chooseLocation,
-            accent = Color(0xFF68D4FF),
-            onClick = onOpenLocations,
+    val currentLocation = me.locations.firstOrNull { it.id == me.locationId }?.name ?: "—"
+    val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }?.displayName ?: "—"
+    val currentRod = me.rods.firstOrNull { it.id == me.currentRodId }?.name ?: "—"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FishingSetupCell(
+                label = strings.water,
+                value = currentLocation,
+                accent = Color(0xFF68D4FF),
+                onClick = onOpenLocations,
+            )
+            FishingSetupDivider()
+            FishingSetupCell(
+                label = strings.bait,
+                value = currentLure,
+                accent = Color(0xFF8FE388),
+                onClick = onOpenLures,
+            )
+            FishingSetupDivider()
+            FishingSetupCell(
+                label = strings.rod,
+                value = currentRod,
+                accent = Color(0xFFC9A46E),
+                onClick = onOpenRods,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.FishingSetupCell(
+    label: String,
+    value: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        FishingSelectionRow(
-            title = strings.rod,
-            value = currentRod?.name ?: "—",
-            subtitle = currentRod?.let { strings.rodBonusLabel(it.bonusWater, it.bonusPredator) } ?: strings.chooseRod,
-            accent = Color(0xFFC9A46E),
-            onClick = onOpenRods,
-        )
-        FishingSelectionRow(
-            title = strings.bait,
-            value = currentLure?.displayName ?: "—",
-            subtitle = currentLure?.let { "x${it.qty} • ${it.description.ifBlank { strings.chooseBait }}" } ?: strings.chooseBait,
-            accent = Color(0xFF8FE388),
-            onClick = onOpenLures,
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun FishingSelectionRow(
-    title: String,
-    value: String,
-    subtitle: String,
-    accent: Color,
-    onClick: () -> Unit,
-) {
-    Surface(
+private fun FishingSetupDivider() {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.52f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.26f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .background(accent, CircleShape)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(value, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-            }
-            Text(stringsArrow(), color = accent, style = MaterialTheme.typography.titleMedium)
-        }
-    }
+            .width(1.dp)
+            .height(36.dp)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+    )
 }
 
 @Composable
