@@ -817,13 +817,15 @@ private fun FishingScreen(
                 onTapChallenge = onTapChallenge,
             )
         }
-        item {
-            FishingRewardsCard(
-                strings = strings,
-                me = me,
-                autoCastEnabled = state.fishing.autoCastEnabled,
-                onToggleAutoCast = onToggleAutoCast,
-            )
+        if (me.autoFish) {
+            item {
+                FishingRewardsCard(
+                    strings = strings,
+                    me = me,
+                    autoCastEnabled = state.fishing.autoCastEnabled,
+                    onToggleAutoCast = onToggleAutoCast,
+                )
+            }
         }
         item {
             if (state.guide.quests != null) {
@@ -1935,26 +1937,26 @@ private fun FishingRewardsCard(
     autoCastEnabled: Boolean,
     onToggleAutoCast: () -> Unit,
 ) {
+    if (!me.autoFish) return
+
     InfoCard {
-        if (me.autoFish) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(strings.autoCast, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        if (strings.login == "Логин") "Автоловля сама запускает новый заброс" else "Auto-fishing restarts the next cast for you",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Switch(
-                    checked = autoCastEnabled,
-                    onCheckedChange = { onToggleAutoCast() },
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(strings.autoCast, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (strings.login == "Логин") "Автоловля сама запускает новый заброс" else "Auto-fishing restarts the next cast for you",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
+            Switch(
+                checked = autoCastEnabled,
+                onCheckedChange = { onToggleAutoCast() },
+            )
         }
     }
 }
