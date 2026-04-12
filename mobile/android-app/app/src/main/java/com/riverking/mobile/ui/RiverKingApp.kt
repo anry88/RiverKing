@@ -196,7 +196,6 @@ fun RiverKingApp(
                         state = state,
                         isPlayFlavor = viewModel.isPlayFlavor(),
                         onLogout = viewModel::logout,
-                        onRefreshProfile = viewModel::refreshProfile,
                         onChangeLanguage = viewModel::changeLanguage,
                         onClaimDaily = viewModel::claimDaily,
                         onBeginCast = { viewModel.beginCast() },

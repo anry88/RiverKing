@@ -175,7 +175,6 @@ fun MainShell(
     state: RiverKingUiState,
     isPlayFlavor: Boolean,
     onLogout: () -> Unit,
-    onRefreshProfile: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onClaimDaily: () -> Unit,
     onBeginCast: () -> Unit,
@@ -297,7 +296,6 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    onRefreshProfile = onRefreshProfile,
                     onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
                     onHookFish = onHookFish,
@@ -753,7 +751,6 @@ private fun FishingScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    onRefreshProfile: () -> Unit,
     onOpenDaily: () -> Unit,
     onBeginCast: () -> Unit,
     onHookFish: () -> Unit,
@@ -825,7 +822,6 @@ private fun FishingScreen(
                 strings = strings,
                 me = me,
                 autoCastEnabled = state.fishing.autoCastEnabled,
-                onRefreshProfile = onRefreshProfile,
                 onToggleAutoCast = onToggleAutoCast,
             )
         }
@@ -1937,13 +1933,9 @@ private fun FishingRewardsCard(
     strings: RiverStrings,
     me: MeResponseDto,
     autoCastEnabled: Boolean,
-    onRefreshProfile: () -> Unit,
     onToggleAutoCast: () -> Unit,
 ) {
     InfoCard {
-        OutlinedButton(onClick = onRefreshProfile, modifier = Modifier.fillMaxWidth()) {
-            Text(strings.refresh)
-        }
         if (me.autoFish) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
