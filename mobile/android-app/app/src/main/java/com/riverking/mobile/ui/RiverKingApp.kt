@@ -7,13 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -28,7 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,7 +35,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -159,6 +157,7 @@ fun RiverKingApp(
     RiverTheme {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { padding ->
             Box(
@@ -479,7 +478,6 @@ private fun AuthBackdrop(
             .fillMaxSize()
             .riverBackdrop()
             .statusBarsPadding()
-            .navigationBarsPadding()
             .imePadding()
             .verticalScroll(scrollState)
             .padding(horizontal = 20.dp, vertical = 28.dp),
@@ -504,37 +502,6 @@ private fun AuthBackdrop(
         }
     }
 }
-
-@Composable
-private fun riverTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-    focusedContainerColor = RiverPanelSoft.copy(alpha = 0.70f),
-    unfocusedContainerColor = RiverPanelSoft.copy(alpha = 0.46f),
-    disabledContainerColor = RiverPanelSoft.copy(alpha = 0.26f),
-    focusedBorderColor = MaterialTheme.colorScheme.primary,
-    unfocusedBorderColor = RiverOutline.copy(alpha = 0.75f),
-    focusedLabelColor = MaterialTheme.colorScheme.primary,
-    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    cursorColor = MaterialTheme.colorScheme.primary,
-)
-
-@Composable
-private fun riverPrimaryButtonColors() = ButtonDefaults.buttonColors(
-    containerColor = MaterialTheme.colorScheme.primary,
-    contentColor = MaterialTheme.colorScheme.onPrimary,
-    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
-    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-)
-
-@Composable
-private fun riverSecondaryButtonColors() = ButtonDefaults.buttonColors(
-    containerColor = MaterialTheme.colorScheme.secondary,
-    contentColor = MaterialTheme.colorScheme.onSecondary,
-    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
-    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-)
 
 @OptIn(ExperimentalFoundationApi::class)
 private fun Modifier.bringIntoViewOnFocus(

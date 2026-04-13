@@ -1,7 +1,10 @@
 package com.riverking.mobile.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -45,6 +48,9 @@ val RiverBackdropBrush = Brush.verticalGradient(
         RiverDeepNight,
     )
 )
+
+val RiverSheetShape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+val RiverDialogShape = RoundedCornerShape(30.dp)
 
 private val RiverDarkScheme = darkColorScheme(
     primary = RiverFoam,
@@ -186,3 +192,44 @@ fun RiverTheme(content: @Composable () -> Unit) {
         content = content,
     )
 }
+
+@Composable
+fun riverTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+    focusedContainerColor = RiverPanelSoft.copy(alpha = 0.70f),
+    unfocusedContainerColor = RiverPanelSoft.copy(alpha = 0.46f),
+    disabledContainerColor = RiverPanelSoft.copy(alpha = 0.26f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = RiverOutline.copy(alpha = 0.75f),
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    cursorColor = MaterialTheme.colorScheme.primary,
+)
+
+@Composable
+fun riverPrimaryButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.primary,
+    contentColor = MaterialTheme.colorScheme.onPrimary,
+    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+@Composable
+fun riverSecondaryButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.secondary,
+    contentColor = MaterialTheme.colorScheme.onSecondary,
+    disabledContainerColor = RiverSlate.copy(alpha = 0.42f),
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+@Composable
+fun riverOutlinedButtonColors() = ButtonDefaults.outlinedButtonColors(
+    containerColor = RiverPanelSoft.copy(alpha = 0.78f),
+    contentColor = MaterialTheme.colorScheme.onSurface,
+    disabledContainerColor = RiverPanelSoft.copy(alpha = 0.32f),
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
+
+fun riverOutlineBorder() = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f))

@@ -25,11 +25,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,6 +68,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -86,6 +87,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,6 +101,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -146,6 +150,7 @@ import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlinx.coroutines.isActive
 
 enum class MainTab(val icon: ImageVector) {
     FISHING(Icons.Rounded.SportsEsports),
@@ -170,6 +175,12 @@ private enum class FishingSheetType {
     LURES,
     QUESTS,
 }
+
+private data class BobberVisualState(
+    val offset: Float = 0f,
+    val tilt: Float = 0f,
+    val submerge: Float = 0f,
+)
 
 @Composable
 fun MainShell(
@@ -243,6 +254,7 @@ fun MainShell(
 
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             HeaderBar(
                 me = me,
@@ -266,11 +278,11 @@ fun MainShell(
                 color = RiverPanelRaised.copy(alpha = 0.97f),
                 border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
                 shadowElevation = 16.dp,
-                modifier = Modifier.navigationBarsPadding(),
             ) {
                 NavigationBar(
                     tonalElevation = 0.dp,
                     containerColor = Color.Transparent,
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                 ) {
                     MainTab.entries.forEach { tab ->
                         val showBadge = when (tab) {
@@ -457,7 +469,12 @@ private fun CatchStatsSheet(
     onPeriodChange: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -560,6 +577,11 @@ private fun NicknameChangeDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverDialogShape,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         title = { Text(strings.changeNickname) },
         text = {
             OutlinedTextField(
@@ -569,15 +591,23 @@ private fun NicknameChangeDialog(
                 enabled = !busy,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+                colors = riverTextFieldColors(),
             )
         },
         confirmButton = {
-            Button(onClick = onSave, enabled = !busy && nickname.isNotBlank()) {
+            Button(
+                onClick = onSave,
+                enabled = !busy && nickname.isNotBlank(),
+                colors = riverPrimaryButtonColors(),
+            ) {
                 Text(strings.continueLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+            ) {
                 Text("✕")
             }
         },
@@ -593,6 +623,25 @@ private fun AppBackdrop(content: @Composable BoxScope.() -> Unit) {
         content = content,
     )
 }
+
+@Composable
+private fun RiverSheetDragHandle() {
+    Surface(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .width(46.dp)
+            .height(6.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = RiverFog.copy(alpha = 0.32f),
+    ) {}
+}
+
+@Composable
+private fun riverMenuItemColors(destructive: Boolean = false) = MenuDefaults.itemColors(
+    textColor = if (destructive) RiverDanger else MaterialTheme.colorScheme.onSurface,
+    leadingIconColor = if (destructive) RiverDanger else MaterialTheme.colorScheme.onSurfaceVariant,
+    trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
 
 @Composable
 private fun HeaderBar(
@@ -642,9 +691,14 @@ private fun HeaderBar(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+                    border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+                    shadowElevation = 18.dp,
                 ) {
                     DropdownMenuItem(
                         text = { Text("✏\uFE0F  ${strings.changeNickname}") },
+                        colors = riverMenuItemColors(),
                         onClick = {
                             menuExpanded = false
                             onOpenNicknameChange()
@@ -652,6 +706,7 @@ private fun HeaderBar(
                     )
                     DropdownMenuItem(
                         text = { Text("\uD83D\uDCCA  ${strings.statistics}") },
+                        colors = riverMenuItemColors(),
                         onClick = {
                             menuExpanded = false
                             onOpenCatchStats()
@@ -659,6 +714,7 @@ private fun HeaderBar(
                     )
                     DropdownMenuItem(
                         text = { Text("$languageFlag  ${strings.language}") },
+                        colors = riverMenuItemColors(),
                         onClick = {
                             menuExpanded = false
                             val newLang = if (me.language == "ru") "en" else "ru"
@@ -667,13 +723,8 @@ private fun HeaderBar(
                     )
                     HorizontalDivider()
                     DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = strings.logout,
-                                color = Color(0xFFEF5350),
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        },
+                        text = { Text(text = strings.logout, fontWeight = FontWeight.SemiBold) },
+                        colors = riverMenuItemColors(destructive = true),
                         onClick = {
                             menuExpanded = false
                             onLogout()
@@ -1546,18 +1597,13 @@ private fun FishingStageScene(
     val phase = state.fishing.phase
     val inWater = phase == FishingPhase.WAITING_BITE || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE
     val infinite = rememberInfiniteTransition(label = "fishing-scene")
-    val waveShift by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(durationMillis = 2200, easing = LinearEasing)),
-        label = "wave-shift",
-    )
     val rippleProgress by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(durationMillis = 1400, easing = LinearEasing)),
         label = "ripple-progress",
     )
+    var bobberVisual by remember { mutableStateOf(BobberVisualState()) }
 
     // --- Bobber position (relative fractions matching the TG webapp) ---
     // In the TG webapp the bobber lands to the LEFT of the rod tip,
@@ -1587,6 +1633,68 @@ private fun FishingStageScene(
         animationSpec = tween(durationMillis = 850),
         label = "cast-y",
     )
+    // Wait until the float actually reaches the water zone before submerging it or showing ripples.
+    val hasSplashed = inWater && castY >= 0.56f
+    val shouldAnimateFloat = hasSplashed
+
+    LaunchedEffect(shouldAnimateFloat, phase) {
+        if (!shouldAnimateFloat) {
+            bobberVisual = BobberVisualState()
+            return@LaunchedEffect
+        }
+        var startNanos = 0L
+        while (isActive) {
+            val frameNanos = withFrameNanos { it }
+            if (startNanos == 0L) {
+                startNanos = frameNanos
+            }
+            val elapsedSeconds = (frameNanos - startNanos) / 1_000_000_000f
+            val stateMode = when (phase) {
+                FishingPhase.BITING -> "biting"
+                FishingPhase.TAP_CHALLENGE -> "tapping"
+                else -> "idle"
+            }
+            val basePeriod = when (stateMode) {
+                "biting" -> 0.8f
+                "tapping" -> 0.65f
+                else -> 3f
+            }
+            val mainWave = sin((elapsedSeconds * (2f * PI.toFloat())) / basePeriod)
+            val nextVisual = when (stateMode) {
+                "biting" -> {
+                    val extraWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.75f))
+                    val offset = mainWave * 6.5f + extraWave * 1.8f
+                    BobberVisualState(
+                        offset = offset,
+                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.9f)) * 6.5f,
+                        submerge = if (offset > 0f) min(1f, offset / 11f) else 0f,
+                    )
+                }
+                "tapping" -> {
+                    val quickWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.85f))
+                    val offset = mainWave * 4.2f + quickWave * 1.1f
+                    BobberVisualState(
+                        offset = offset,
+                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.95f)) * 5f,
+                        submerge = if (offset > 0f) min(1f, offset / 9f) else 0f,
+                    )
+                }
+                else -> {
+                    val offset = mainWave * 4f
+                    BobberVisualState(
+                        offset = offset,
+                        tilt = mainWave * 2.5f,
+                        submerge = if (offset > 0f) min(1f, offset / 6f) else 0f,
+                    )
+                }
+            }
+            bobberVisual = BobberVisualState(
+                offset = bobberVisual.offset + (nextVisual.offset - bobberVisual.offset) * 0.18f,
+                tilt = bobberVisual.tilt + (nextVisual.tilt - bobberVisual.tilt) * 0.18f,
+                submerge = bobberVisual.submerge + (nextVisual.submerge - bobberVisual.submerge) * 0.18f,
+            )
+        }
+    }
 
     Card(
         modifier = modifier,
@@ -1670,24 +1778,21 @@ private fun FishingStageScene(
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * 0.48f
+                val bobberBase = Offset(size.width * castX, size.height * castY)
+                val bobberRectSize = size.width * 0.08f
+                val bobberRadius = bobberRectSize / 2f
+                val visibleAboveWater = bobberRadius * 0.75f
+                val waterlineY = (bobberBase.y - bobberRadius + visibleAboveWater).coerceIn(0f, size.height)
+                val bobber = bobberBase.copy(y = bobberBase.y + bobberVisual.offset)
+                val bobberBottom = bobber.y + bobberRadius + bobberRadius * bobberVisual.submerge * 0.25f
+                val shouldClipBobber = hasSplashed && bobberBottom > waterlineY
+                val bobberClipBottom = if (shouldClipBobber) waterlineY else size.height
 
                 // Rod tip in pixel coordinates
                 val rodTip = Offset(
                     x = rodLeftDp.toPx() + rodWidthDp.toPx() * rodTipAnchor.x,
                     y = rodTopDp.toPx() + rodHeightDp.toPx() * rodTipAnchor.y,
                 )
-
-                // Bobber wave animation
-                val bobberOffset = if (inWater || phase == FishingPhase.RESOLVING) {
-                    sin(waveShift * (2f * PI).toFloat()) * size.height * when (phase) {
-                        FishingPhase.BITING -> 0.028f
-                        FishingPhase.TAP_CHALLENGE -> 0.022f
-                        else -> 0.015f
-                    }
-                } else {
-                    0f
-                }
-                val bobber = Offset(size.width * castX, size.height * castY + bobberOffset)
 
                 // Rod line points
                 val rodLinePoints = rodLinePointsPercentage(currentRodCode).map {
@@ -1729,52 +1834,74 @@ private fun FishingStageScene(
                     }
                     quadraticTo(control.x, control.y, bobber.x, bobber.y)
                 }
-                drawPath(
-                    path = linePath,
-                    color = Color.White.copy(alpha = 0.35f),
-                    style = Stroke(width = 2f, cap = StrokeCap.Round),
-                )
+                if (hasSplashed) {
+                    clipRect(left = 0f, top = 0f, right = size.width, bottom = waterlineY) {
+                        drawPath(
+                            path = linePath,
+                            color = Color.White.copy(alpha = 0.35f),
+                            style = Stroke(width = 2f, cap = StrokeCap.Round),
+                        )
+                    }
+                } else {
+                    drawPath(
+                        path = linePath,
+                        color = Color.White.copy(alpha = 0.35f),
+                        style = Stroke(width = 2f, cap = StrokeCap.Round),
+                    )
+                }
 
                 // Ripple circles around bobber
-                repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
-                    val progress = ((rippleProgress + index * 0.35f) % 1f)
-                    val radius = size.width * (0.04f + progress * 0.08f)
-                    drawCircle(
-                        color = Color.White.copy(alpha = (0.4f - progress * 0.25f).coerceAtLeast(0f)),
-                        radius = radius,
-                        center = Offset(bobber.x, max(waterTop + 8f, bobber.y + size.height * 0.02f)),
-                        style = Stroke(width = 3f),
-                    )
+                if (hasSplashed) {
+                    repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
+                        val progress = ((rippleProgress + index * 0.35f) % 1f)
+                        val radius = size.width * (0.04f + progress * 0.08f)
+                        drawCircle(
+                            color = Color.White.copy(alpha = (0.4f - progress * 0.25f).coerceAtLeast(0f)),
+                            radius = radius,
+                            center = Offset(bobber.x, max(waterTop + 8f, bobber.y + size.height * 0.02f)),
+                            style = Stroke(width = 3f),
+                        )
+                    }
                 }
 
                 // Bobber (float)
                 if (bobberBitmap != null) {
-                    val bobberRectSize = size.width * 0.08f
                     val srcSize = IntSize(bobberBitmap.width, bobberBitmap.height)
-                    val dstSize = IntSize(bobberRectSize.toInt(), (bobberRectSize * bobberBitmap.height / bobberBitmap.width).toInt())
-                    drawImage(
-                        image = bobberBitmap,
-                        srcOffset = IntOffset.Zero,
-                        srcSize = srcSize,
-                        dstOffset = IntOffset(
-                            (bobber.x - dstSize.width / 2f).toInt(),
-                            (bobber.y - dstSize.height / 2f).toInt()
-                        ),
-                        dstSize = dstSize
+                    val dstSize = IntSize(
+                        bobberRectSize.toInt().coerceAtLeast(1),
+                        (bobberRectSize * bobberBitmap.height / bobberBitmap.width).toInt().coerceAtLeast(1),
                     )
+                    rotate(degrees = bobberVisual.tilt, pivot = bobber) {
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = bobberClipBottom) {
+                            drawImage(
+                                image = bobberBitmap,
+                                srcOffset = IntOffset.Zero,
+                                srcSize = srcSize,
+                                dstOffset = IntOffset(
+                                    (bobber.x - dstSize.width / 2f).toInt(),
+                                    (bobber.y - dstSize.height / 2f).toInt(),
+                                ),
+                                dstSize = dstSize,
+                            )
+                        }
+                    }
                 } else {
-                    val bobberRadius = size.width * 0.022f
-                    drawCircle(color = Color(0xFFE8F0F4), radius = bobberRadius, center = bobber)
-                    drawCircle(
-                        color = Color(0xFFE55B5B),
-                        radius = bobberRadius,
-                        center = bobber.copy(y = bobber.y - bobberRadius * 0.42f),
-                    )
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.32f),
-                        radius = bobberRadius * 2.3f,
-                        center = bobber,
-                    )
+                    rotate(degrees = bobberVisual.tilt, pivot = bobber) {
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = bobberClipBottom) {
+                            val fallbackBobberRadius = size.width * 0.022f
+                            drawCircle(color = Color(0xFFE8F0F4), radius = fallbackBobberRadius, center = bobber)
+                            drawCircle(
+                                color = Color(0xFFE55B5B),
+                                radius = fallbackBobberRadius,
+                                center = bobber.copy(y = bobber.y - fallbackBobberRadius * 0.42f),
+                            )
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.32f),
+                                radius = fallbackBobberRadius * 2.3f,
+                                center = bobber,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2064,7 +2191,9 @@ private fun DailyRewardSheet(
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
     ) {
         Column(
             modifier = Modifier
@@ -2106,11 +2235,20 @@ private fun DailyRewardSheet(
                 }
             }
             if (me.dailyAvailable) {
-                Button(onClick = onClaim, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onClaim,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = riverPrimaryButtonColors(),
+                ) {
                     Text(strings.claimDaily)
                 }
             } else {
-                OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = riverOutlinedButtonColors(),
+                    border = riverOutlineBorder(),
+                ) {
                     Text(strings.dailyReturnTomorrow)
                 }
             }
@@ -2182,11 +2320,14 @@ private fun QuestSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -2195,7 +2336,12 @@ private fun QuestSheet(
                 LoadingStatePanel(strings.loading)
             } else if (quests == null) {
                 EmptyStatePanel(strings.noData)
-                OutlinedButton(onClick = onReload, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onReload,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = riverOutlinedButtonColors(),
+                    border = riverOutlineBorder(),
+                ) {
                     Text(strings.refresh)
                 }
             } else {
@@ -2221,7 +2367,8 @@ private fun QuestSection(
             items.forEach { quest ->
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)),
+                    colors = CardDefaults.cardColors(containerColor = RiverPanelSoft.copy(alpha = 0.92f)),
+                    border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -2321,7 +2468,9 @@ private fun FishingPickerSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
     ) {
         Column(
             modifier = Modifier
@@ -2353,10 +2502,10 @@ private fun PickerRow(
             .clip(RoundedCornerShape(20.dp))
             .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else RiverPanelSoft.copy(alpha = 0.88f),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.08f),
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.46f) else RiverOutline.copy(alpha = 0.72f),
         ),
     ) {
         Row(
@@ -2999,8 +3148,9 @@ private fun TournamentDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RiverDialogShape,
+            colors = CardDefaults.cardColors(containerColor = RiverPanelRaised.copy(alpha = 0.98f)),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
         ) {
             Column(
                 modifier = Modifier
@@ -3058,6 +3208,8 @@ private fun TournamentDialog(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth(),
+                    colors = riverOutlinedButtonColors(),
+                    border = riverOutlineBorder(),
                 ) {
                     Text(strings.continueLabel)
                 }
@@ -3250,8 +3402,9 @@ private fun CatchDetailsDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RiverDialogShape,
+            colors = CardDefaults.cardColors(containerColor = RiverPanelRaised.copy(alpha = 0.98f)),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
         ) {
             Column(
                 modifier = Modifier
@@ -3377,6 +3530,8 @@ private fun CatchDetailsDialog(
                         OutlinedButton(
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
+                            colors = riverOutlinedButtonColors(),
+                            border = riverOutlineBorder(),
                         ) {
                             Text(strings.continueLabel)
                         }
@@ -3384,6 +3539,7 @@ private fun CatchDetailsDialog(
                             onClick = onShare,
                             enabled = catch.id > 0L,
                             modifier = Modifier.weight(1f),
+                            colors = riverPrimaryButtonColors(),
                         ) {
                             Text(strings.shareCatch)
                         }
@@ -3417,6 +3573,11 @@ private fun AchievementRewardDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverDialogShape,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         title = { Text(strings.achievements) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -3431,7 +3592,14 @@ private fun AchievementRewardDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(strings.continueLabel) } },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+            ) {
+                Text(strings.continueLabel)
+            }
+        },
     )
 }
 
@@ -3535,9 +3703,16 @@ private fun LanguageToggle(currentLanguage: String, onChangeLanguage: (String) -
             onClick = { expanded = true },
             label = { Text(currentLanguage.uppercase(Locale.US)) },
         )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+        ) {
             DropdownMenuItem(
                 text = { Text("EN") },
+                colors = riverMenuItemColors(),
                 onClick = {
                     expanded = false
                     onChangeLanguage("en")
@@ -3545,6 +3720,7 @@ private fun LanguageToggle(currentLanguage: String, onChangeLanguage: (String) -
             )
             DropdownMenuItem(
                 text = { Text("RU") },
+                colors = riverMenuItemColors(),
                 onClick = {
                     expanded = false
                     onChangeLanguage("ru")
