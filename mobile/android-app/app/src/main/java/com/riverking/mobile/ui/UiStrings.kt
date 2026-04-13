@@ -268,7 +268,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             joinClub = "Join club",
             leaveClub = "Leave club",
             refresh = "Refresh",
-            fishEscaped = "The fish escaped",
+            fishEscaped = "The fish got away",
             noBait = "No bait available",
             shopDisabledDirect = "Paid packs are unavailable in the direct build",
             playPurchaseUnavailable = "Play purchase is unavailable in this configuration",
@@ -364,6 +364,40 @@ fun RiverStrings.dayLabel(day: Int): String =
 
 fun RiverStrings.questRewardLabel(coins: Int): String =
     if (login == "Логин") "Награда: $coins монет" else "Reward: $coins coins"
+
+fun RiverStrings.catchResultTitle(): String =
+    if (login == "Логин") "Улов" else "Catch"
+
+fun RiverStrings.newFishLabel(): String =
+    if (login == "Логин") "Новая рыба" else "New fish"
+
+fun RiverStrings.locationUnlockedLine(location: String): String =
+    if (login == "Логин") "Открыта локация: $location" else "Location unlocked: $location"
+
+fun RiverStrings.rodUnlockedLine(rod: String): String =
+    if (login == "Логин") "Открыта удочка: $rod" else "Rod unlocked: $rod"
+
+fun RiverStrings.achievementUnlockedLine(name: String, level: String): String =
+    if (login == "Логин") "Достижение: $name • $level" else "Achievement unlocked: $name • $level"
+
+fun RiverStrings.questCompletedLine(name: String, coins: Int): String =
+    if (login == "Логин") "Квест: $name • +$coins монет" else "Quest: $name • +$coins coins"
+
+fun RiverStrings.coinsEarnedLine(coins: Int): String =
+    if (login == "Логин") "+$coins монет" else "+$coins coins"
+
+fun RiverStrings.prizePlacesLabel(count: Int): String =
+    if (login == "Логин") "Призовые места: $count" else "Prize places: $count"
+
+fun RiverStrings.achievementLevelLabel(index: Int): String {
+    val labels = if (login == "Логин") {
+        listOf("Нет уровня", "Бронза", "Серебро", "Золото", "Платина")
+    } else {
+        listOf("No tier", "Bronze", "Silver", "Gold", "Platinum")
+    }
+    val safeIndex = index.coerceIn(0, labels.lastIndex)
+    return labels[safeIndex]
+}
 
 fun RiverStrings.rodBonusLabel(bonusWater: String?, bonusPredator: Boolean?): String {
     if (bonusWater == null) {

@@ -840,6 +840,7 @@ private fun FishingScreen(
     val currentLocation = me.locations.firstOrNull { it.id == me.locationId }
     var activeSheet by rememberSaveable { mutableStateOf<FishingSheetType?>(null) }
     var lastDailyPromptToken by rememberSaveable(me.id) { mutableStateOf<String?>(null) }
+    val setupEnabled = !isFishingCastActive(state.fishing.phase)
     val dailyPromptToken = remember(me.dailyAvailable, me.dailyStreak, me.dailyRewards) {
         if (!me.dailyAvailable) {
             null
@@ -868,6 +869,7 @@ private fun FishingScreen(
             FishingSetupBar(
                 strings = strings,
                 me = me,
+                enabled = setupEnabled,
                 onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
                 onOpenLures = { activeSheet = FishingSheetType.LURES },
                 onOpenRods = { activeSheet = FishingSheetType.RODS },
@@ -890,6 +892,17 @@ private fun FishingScreen(
                 onHookFish = onHookFish,
                 onTapChallenge = onTapChallenge,
             )
+        }
+        if (state.fishing.lastEscape || (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null)) {
+            item {
+                FishingOutcomeCard(
+                    strings = strings,
+                    me = me,
+                    fishing = state.fishing,
+                    achievements = state.guide.achievements,
+                    onOpenCatch = onOpenCatch,
+                )
+            }
         }
         if (me.autoFish) {
             item {
@@ -2019,9 +2032,151 @@ private fun FishingActionCard(
 }
 
 @Composable
+private fun FishingOutcomeCard(
+    strings: RiverStrings,
+    me: MeResponseDto,
+    fishing: FishingUiState,
+    achievements: List<AchievementDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    if (fishing.lastEscape) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = RiverPanelRaised.copy(alpha = 0.94f),
+            border = BorderStroke(1.dp, Color(0xFFE1A06C).copy(alpha = 0.55f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(Color(0xFFE1A06C), CircleShape)
+                )
+                Text(
+                    text = strings.fishEscaped,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        return
+    }
+
+    val cast = fishing.lastCast ?: return
+    val catch = cast.catch ?: return
+    Surface(
+        modifier = Modifier.clickable { onOpenCatch(catch) },
+        shape = RoundedCornerShape(24.dp),
+        color = RiverPanelRaised.copy(alpha = 0.94f),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.65f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    strings.catchResultTitle(),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (fishing.lastCatchWasNewFish) {
+                    GuideBadge(strings.newFishLabel(), RiverAmber)
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FishThumbnail(
+                    fishName = catch.fish,
+                    discovered = true,
+                    accent = rarityColor(catch.rarity),
+                    size = 64.dp,
+                    cornerRadius = 18.dp,
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        catch.fish,
+                        color = rarityColor(catch.rarity),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        catch.weight.asKgCompact(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    Text(
+                        catch.location,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (cast.coins > 0) {
+                    Text(
+                        strings.coinsEarnedLine(cast.coins),
+                        color = Color(0xFFFFD76A),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                cast.unlockedLocations.forEach { location ->
+                    Text(
+                        strings.locationUnlockedLine(location),
+                        color = Color(0xFF7CE38B),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                cast.unlockedRods.forEach { rod ->
+                    Text(
+                        strings.rodUnlockedLine(rod),
+                        color = Color(0xFF7CE38B),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                cast.achievements.forEach { unlock ->
+                    Text(
+                        strings.achievementUnlockedLine(
+                            name = achievementNameForCatch(strings, achievements, unlock.code),
+                            level = strings.achievementLevelLabel(unlock.newLevelIndex),
+                        ),
+                        color = Color(0xFFFFD76A),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                cast.questUpdates.forEach { quest ->
+                    Text(
+                        strings.questCompletedLine(
+                            name = quest.name.ifBlank { quest.code },
+                            coins = quest.rewardCoins,
+                        ),
+                        color = Color(0xFF8EF0BE),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FishingSetupBar(
     strings: RiverStrings,
     me: MeResponseDto,
+    enabled: Boolean,
     onOpenLocations: () -> Unit,
     onOpenLures: () -> Unit,
     onOpenRods: () -> Unit,
@@ -2046,6 +2201,7 @@ private fun FishingSetupBar(
                 label = strings.water,
                 value = currentLocation,
                 accent = RiverTide,
+                enabled = enabled,
                 onClick = onOpenLocations,
             )
             FishingSetupDivider()
@@ -2053,6 +2209,7 @@ private fun FishingSetupBar(
                 label = strings.bait,
                 value = currentLure,
                 accent = RiverMoss,
+                enabled = enabled,
                 onClick = onOpenLures,
             )
             FishingSetupDivider()
@@ -2060,6 +2217,7 @@ private fun FishingSetupBar(
                 label = strings.rod,
                 value = currentRod,
                 accent = RiverAmber,
+                enabled = enabled,
                 onClick = onOpenRods,
             )
         }
@@ -2071,13 +2229,15 @@ private fun RowScope.FishingSetupCell(
     label: String,
     value: String,
     accent: Color,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .weight(1f)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
+            .graphicsLayer(alpha = if (enabled) 1f else 0.48f)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -3152,14 +3312,14 @@ private fun TournamentCard(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CatchDetailChip(tournamentFishLabel(strings, tournament))
-                CatchDetailChip(tournament.location ?: anyLocationLabel(strings))
-                CatchDetailChip(tournamentMetricLabel(strings, tournament.metric))
-                CatchDetailChip("${tournament.prizePlaces} ${strings.prizes.lowercase(Locale.getDefault())}")
+                ) {
+                    CatchDetailChip(tournamentFishLabel(strings, tournament))
+                    CatchDetailChip(tournament.location ?: anyLocationLabel(strings))
+                    CatchDetailChip(tournamentMetricLabel(strings, tournament.metric))
+                    CatchDetailChip(strings.prizePlacesLabel(tournament.prizePlaces))
+                }
             }
         }
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -3195,7 +3355,7 @@ private fun TournamentDialog(
                     CatchDetailChip(tournamentFishLabel(strings, details.tournament))
                     CatchDetailChip(details.tournament.location ?: anyLocationLabel(strings))
                     CatchDetailChip(tournamentMetricLabel(strings, details.tournament.metric))
-                    CatchDetailChip("${details.tournament.prizePlaces} ${strings.prizes.lowercase(Locale.getDefault())}")
+                    CatchDetailChip(strings.prizePlacesLabel(details.tournament.prizePlaces))
                 }
                 Text(
                     "${formatEpoch(details.tournament.startTime)} → ${formatEpoch(details.tournament.endTime)}",
@@ -3550,19 +3710,25 @@ private fun CatchDetailsDialog(
                         )
                     }
                     if (!fishDiscovered) {
-                        Surface(
+                        Box(
                             modifier = Modifier.align(Alignment.Center),
-                            shape = RoundedCornerShape(999.dp),
-                            color = RiverDeepNight.copy(alpha = 0.82f),
-                            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = "?",
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                                color = RiverMist,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
+                            Surface(
+                                modifier = Modifier.size(42.dp),
+                                shape = CircleShape,
+                                color = RiverDeepNight.copy(alpha = 0.82f),
+                                border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "?",
+                                        color = RiverMist,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                    )
+                                }
+                            }
                         }
                     }
                     rarityKey?.let {
@@ -3975,17 +4141,22 @@ private fun FishThumbnail(
             if (!discovered) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = CircleShape,
                     color = RiverDeepNight.copy(alpha = 0.82f),
                     border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
                 ) {
-                    Text(
-                        text = "?",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        color = RiverMist,
-                        fontWeight = FontWeight.Bold,
-                        style = if (size < 64.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
-                    )
+                    Box(
+                        modifier = Modifier.size(if (size < 64.dp) 24.dp else 30.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "?",
+                            color = RiverMist,
+                            fontWeight = FontWeight.Bold,
+                            style = if (size < 64.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
@@ -4006,6 +4177,8 @@ private fun tournamentFishLabel(strings: RiverStrings, tournament: TournamentDto
 }
 
 private fun tournamentMetricLabel(strings: RiverStrings, metric: String): String = when (metric) {
+    "largest" -> if (strings.login == "Логин") "Самая большая" else "Largest"
+    "smallest" -> if (strings.login == "Логин") "Самая маленькая" else "Smallest"
     "max_weight" -> if (strings.login == "Логин") "Лучший вес" else "Best weight"
     "min_weight" -> if (strings.login == "Логин") "Минимальный вес" else "Smallest weight"
     "count" -> if (strings.login == "Логин") "Количество" else "Count"
@@ -4085,6 +4258,25 @@ private fun anyFishLabel(strings: RiverStrings): String =
 
 private fun unknownUserLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Неизвестно" else "Unknown"
+
+private fun achievementNameForCatch(
+    strings: RiverStrings,
+    achievements: List<AchievementDto>,
+    code: String,
+): String =
+    achievements.firstOrNull { it.code == code }?.name
+        ?: if (strings.login == "Логин") code.replace('_', ' ') else code.replace('_', ' ')
+
+private fun isFishingCastActive(phase: FishingPhase): Boolean = when (phase) {
+    FishingPhase.WAITING_BITE,
+    FishingPhase.BITING,
+    FishingPhase.TAP_CHALLENGE,
+    FishingPhase.RESOLVING,
+        -> true
+    FishingPhase.READY,
+    FishingPhase.COOLDOWN,
+        -> false
+}
 
 private fun isFishDiscovered(
     fishId: Long?,

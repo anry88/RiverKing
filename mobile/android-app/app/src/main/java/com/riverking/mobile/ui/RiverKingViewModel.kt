@@ -91,6 +91,8 @@ data class FishingUiState(
     val castWaitSeconds: Int = 0,
     val lastStart: StartCastResultDto? = null,
     val lastCast: CastResultDto? = null,
+    val lastCatchWasNewFish: Boolean = false,
+    val lastEscape: Boolean = false,
 )
 
 data class TournamentsUiState(
@@ -485,6 +487,8 @@ class RiverKingViewModel(
                             castWaitSeconds = waitSeconds,
                             lastStart = start,
                             lastCast = null,
+                            lastCatchWasNewFish = false,
+                            lastEscape = false,
                         ),
                     )
                 }
@@ -1457,11 +1461,22 @@ class RiverKingViewModel(
                 _state.update {
                     it.copy(
                         me = it.me?.copy(autoFish = result.autoFish),
-                        fishing = it.fishing.copy(autoCastEnabled = it.fishing.autoCastEnabled && result.autoFish),
+                        fishing = it.fishing.copy(
+                            autoCastEnabled = it.fishing.autoCastEnabled && result.autoFish,
+                            lastEscape = false,
+                        ),
                     )
                 }
                 if (!result.success) {
-                    _state.update { it.copy(error = "The fish escaped") }
+                    _state.update {
+                        it.copy(
+                            fishing = it.fishing.copy(
+                                lastCast = null,
+                                lastCatchWasNewFish = false,
+                                lastEscape = true,
+                            )
+                        )
+                    }
                     startCooldown(triggerAutoCast = false)
                     return@launch
                 }
@@ -1504,16 +1519,22 @@ class RiverKingViewModel(
         viewModelScope.launch {
             _state.update { it.copy(fishing = it.fishing.copy(phase = FishingPhase.RESOLVING)) }
             try {
+                val previousCaughtFishIds = state.value.me?.caughtFishIds.orEmpty()
                 val cast = repository.cast(
                     wait = state.value.fishing.castWaitSeconds,
                     reaction = hookReactionSeconds,
                     success = success,
                 )
+                val isNewFish = cast.catch?.fishId?.let { fishId -> fishId !in previousCaughtFishIds } == true
                 val me = repository.refreshProfile()
                 applyProfileUpdate(me)
                 _state.update {
                     it.copy(
-                        fishing = it.fishing.copy(lastCast = cast),
+                        fishing = it.fishing.copy(
+                            lastCast = cast,
+                            lastCatchWasNewFish = isNewFish,
+                            lastEscape = false,
+                        ),
                         selectedCatch = cast.catch ?: it.selectedCatch,
                     )
                 }
