@@ -525,18 +525,30 @@ class RiverKingViewModel(
             return
         }
         viewModelScope.launch {
+            val canShare = state.value.me?.id != null && catch.userId == state.value.me?.id
             _state.update { it.copy(catchLoading = true, selectedCatch = catch, selectedCatchCard = null) }
             val (detailed, cardBytes) = coroutineScope {
                 val detailsDeferred = async { runCatching { repository.catchDetails(catchId) }.getOrDefault(catch) }
-                val cardDeferred = async { runCatching { repository.catchCard(catchId) }.getOrNull() }
+                val cardDeferred = async {
+                    if (canShare) runCatching { repository.catchCard(catchId) }.getOrNull() else null
+                }
                 detailsDeferred.await() to cardDeferred.await()
             }
             _state.update { current ->
                 if (current.selectedCatch?.id != catchId) {
                     current
                 } else {
+                    val merged = detailed.copy(
+                        userId = detailed.userId ?: catch.userId,
+                        fishId = detailed.fishId ?: catch.fishId,
+                        user = detailed.user ?: catch.user,
+                        at = detailed.at ?: catch.at,
+                        rank = detailed.rank ?: catch.rank,
+                        prizeCoins = detailed.prizeCoins ?: catch.prizeCoins,
+                        rarity = detailed.rarity.ifBlank { catch.rarity },
+                    )
                     current.copy(
-                        selectedCatch = detailed,
+                        selectedCatch = merged,
                         selectedCatchCard = cardBytes,
                         catchLoading = false,
                     )

@@ -9,7 +9,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -92,10 +91,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -113,6 +115,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -341,7 +344,6 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    onRefresh = { onLoadTournaments(true) },
                     onOpenTournament = onOpenTournament,
                     onClaimPrize = onClaimPrize,
                     onOpenCatch = onOpenCatch,
@@ -355,21 +357,18 @@ fun MainShell(
                     onSetOrder = onSetRatingsOrder,
                     onSetLocation = onSetRatingsLocation,
                     onSetFish = onSetRatingsFish,
-                    onRefresh = { onLoadRatings(true) },
                     onOpenCatch = onOpenCatch,
                 )
                 MainTab.GUIDE -> GuideScreen(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    onRefresh = { onLoadGuide(true) },
                     onClaimAchievement = onClaimAchievement,
                 )
                 MainTab.CLUB -> ClubScreen(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    onRefresh = { onLoadClub(true) },
                     onLoadChat = onLoadClubChat,
                     onSearchClubs = onSearchClubs,
                     onCreateClub = onCreateClub,
@@ -387,7 +386,6 @@ fun MainShell(
                     clipboard = clipboard,
                     me = me,
                     onStartTelegramLink = onStartTelegramLink,
-                    onRefresh = { onLoadShop(true) },
                     onGenerateReferral = onGenerateReferral,
                     onShareReferral = onShareReferral,
                     onClaimReferralRewards = onClaimReferralRewards,
@@ -399,10 +397,13 @@ fun MainShell(
     }
 
     state.selectedCatch?.let { catch ->
+        val fishDiscovered = catch.fishId == null || me.caughtFishIds.contains(catch.fishId)
         CatchDetailsDialog(
             strings = strings,
             catch = catch,
-            cardBytes = state.selectedCatchCard,
+            resolvedRarity = if (fishDiscovered) resolveCatchRarity(catch, state.guide.guide?.fish) else null,
+            fishDiscovered = fishDiscovered,
+            allowShare = catch.userId != null && catch.userId == me.id,
             loading = state.catchLoading,
             onDismiss = onDismissCatch,
             onShare = { onShareCatch(catch) },
@@ -421,6 +422,7 @@ fun MainShell(
         TournamentDialog(
             strings = strings,
             details = tournament,
+            caughtFishIds = me.caughtFishIds,
             onDismiss = onCloseTournament,
             onOpenCatch = onOpenCatch,
         )
@@ -915,6 +917,8 @@ private fun FishingScreen(
                             title = recent.fish,
                             subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
                             value = recent.weight.asKgCompact(),
+                            fishName = recent.fish,
+                            fishAccent = rarityColor(recent.rarity),
                             onClick = {
                                 onOpenCatch(
                                     CatchDto(
@@ -980,12 +984,12 @@ private fun TournamentsScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    onRefresh: () -> Unit,
     onOpenTournament: (Long) -> Unit,
     onClaimPrize: (Long) -> Unit,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     val tournaments = state.tournaments
+    val me = state.me
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -995,11 +999,6 @@ private fun TournamentsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 StatPill(title = strings.prizes, value = tournaments.prizes.size.toString(), modifier = Modifier.weight(1f))
                 StatPill(title = strings.currentTournament, value = if (tournaments.current == null) "0" else "1", modifier = Modifier.weight(1f))
-            }
-        }
-        item {
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                Text(strings.refresh)
             }
         }
         item {
@@ -1021,6 +1020,9 @@ private fun TournamentsScreen(
                                 title = "#${entry.rank} ${entry.user ?: "Unknown"}",
                                 subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
                                 value = entry.value.asKgCompact(),
+                                fishName = entry.fish,
+                                fishDiscovered = entry.fishId == null || me?.caughtFishIds?.contains(entry.fishId) == true,
+                                fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
                                 onClick = {
                                     if (entry.catchId != null && entry.fish != null && entry.location != null) {
                                         onOpenCatch(
@@ -1095,7 +1097,6 @@ private fun RatingsScreen(
     onSetOrder: (RatingsOrder) -> Unit,
     onSetLocation: (String) -> Unit,
     onSetFish: (String) -> Unit,
-    onRefresh: () -> Unit,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     val me = state.me ?: return
@@ -1170,10 +1171,6 @@ private fun RatingsScreen(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                    Text(strings.refresh)
-                }
             }
         }
         item {
@@ -1194,6 +1191,7 @@ private fun RatingsScreen(
                         RatingsEntryCard(
                             strings = strings,
                             catch = catch,
+                            fishDiscovered = catch.fishId == null || me.caughtFishIds.contains(catch.fishId),
                             showPrizePreview = showPrizePreview,
                             onClick = { onOpenCatch(catch) },
                         )
@@ -1209,7 +1207,6 @@ private fun GuideScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    onRefresh: () -> Unit,
     onClaimAchievement: (String) -> Unit,
 ) {
     val me = state.me ?: return
@@ -1242,10 +1239,6 @@ private fun GuideScreen(
                             },
                         )
                     }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                    Text(strings.refresh)
                 }
             }
         }
@@ -1338,7 +1331,6 @@ private fun ClubScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    onRefresh: () -> Unit,
     onLoadChat: () -> Unit,
     onSearchClubs: (String?) -> Unit,
     onCreateClub: (String) -> Unit,
@@ -1354,41 +1346,52 @@ private fun ClubScreen(
     var minWeightDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(((state.club.club?.minJoinWeightKg ?: 0.0).toInt()).toString()) }
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
     val club = state.club.club
+    val canManageClub = club?.role == "president" || club?.role == "heir"
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(strings.refresh) }
-        }
         if (club != null) {
             item {
                 SectionCard(strings.club) {
                     ClubOverview(strings, club)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = infoDraft,
-                        onValueChange = { infoDraft = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(if (club.role == "president" || club.role == "heir") strings.club else strings.guide) },
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(onClick = { onUpdateClubInfo(infoDraft) }, modifier = Modifier.weight(1f)) {
-                            Text(strings.refresh)
-                        }
-                        OutlinedButton(onClick = onLeaveClub, modifier = Modifier.weight(1f)) {
-                            Text(strings.leaveClub)
-                        }
+                    if (canManageClub) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = infoDraft,
+                            onValueChange = { infoDraft = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (!focusState.isFocused && infoDraft != club.info) {
+                                        onUpdateClubInfo(infoDraft)
+                                    }
+                                },
+                            label = { Text(strings.club) },
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-                    if (club.role == "president" || club.role == "heir") {
+                    OutlinedButton(onClick = onLeaveClub, modifier = Modifier.fillMaxWidth()) {
+                        Text(strings.leaveClub)
+                    }
+                    if (canManageClub) {
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = minWeightDraft,
                             onValueChange = { minWeightDraft = it },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (!focusState.isFocused) {
+                                        val currentWeight = club.minJoinWeightKg
+                                        val nextWeight = minWeightDraft.toDoubleOrNull()
+                                        if (nextWeight != null && kotlin.math.round(currentWeight) != kotlin.math.round(nextWeight)) {
+                                            onUpdateClubSettings(nextWeight, recruitingDraft)
+                                        }
+                                    }
+                                },
                             label = { Text(if (strings.login == "Логин") "Мин. вес для входа" else "Min join weight") },
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1398,13 +1401,14 @@ private fun ClubScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(if (strings.login == "Логин") "Открыт для набора" else "Recruiting open")
-                            Switch(checked = recruitingDraft, onCheckedChange = { recruitingDraft = it })
+                            Switch(
+                                checked = recruitingDraft,
+                                onCheckedChange = {
+                                    recruitingDraft = it
+                                    onUpdateClubSettings(minWeightDraft.toDoubleOrNull() ?: club.minJoinWeightKg, it)
+                                },
+                            )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = { onUpdateClubSettings(minWeightDraft.toDoubleOrNull() ?: 0.0, recruitingDraft) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(strings.refresh) }
                     }
                 }
             }
@@ -1494,7 +1498,6 @@ private fun ShopScreen(
     clipboard: ClipboardManager,
     me: MeResponseDto,
     onStartTelegramLink: () -> Unit,
-    onRefresh: () -> Unit,
     onGenerateReferral: () -> Unit,
     onShareReferral: (ReferralInfoDto) -> Unit,
     onClaimReferralRewards: () -> Unit,
@@ -1506,9 +1509,6 @@ private fun ShopScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) { Text(strings.refresh) }
-        }
         item {
             TelegramAccountCard(
                 strings = strings,
@@ -2659,28 +2659,14 @@ private fun GuideFishRow(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(92.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                accent.copy(alpha = 0.42f),
-                                accent.copy(alpha = 0.12f),
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = if (discovered) fish.name.take(1) else "?",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = if (discovered) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-            }
+            FishThumbnail(
+                fishName = fish.name,
+                discovered = discovered,
+                accent = accent,
+                modifier = Modifier.size(92.dp),
+                size = 92.dp,
+                cornerRadius = 24.dp,
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -3142,6 +3128,7 @@ private fun TournamentCard(
 private fun TournamentDialog(
     strings: RiverStrings,
     details: CurrentTournamentDto,
+    caughtFishIds: List<Long>,
     onDismiss: () -> Unit,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
@@ -3184,6 +3171,7 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = mine,
+                            fishDiscovered = mine.fishId == null || caughtFishIds.contains(mine.fishId),
                             highlighted = true,
                             onOpenCatch = onOpenCatch,
                         )
@@ -3200,6 +3188,7 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = entry,
+                            fishDiscovered = entry.fishId == null || caughtFishIds.contains(entry.fishId),
                             highlighted = details.mine?.rank == entry.rank,
                             onOpenCatch = onOpenCatch,
                         )
@@ -3222,6 +3211,7 @@ private fun TournamentDialog(
 private fun RatingsEntryCard(
     strings: RiverStrings,
     catch: CatchDto,
+    fishDiscovered: Boolean,
     showPrizePreview: Boolean,
     onClick: () -> Unit,
 ) {
@@ -3255,6 +3245,13 @@ private fun RatingsEntryCard(
                     )
                 }
             }
+            FishThumbnail(
+                fishName = catch.fish,
+                discovered = fishDiscovered,
+                accent = rarityColor(catch.rarity),
+                size = 48.dp,
+                cornerRadius = 16.dp,
+            )
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -3295,6 +3292,7 @@ private fun TournamentLeaderboardRow(
     strings: RiverStrings,
     tournament: TournamentDto,
     entry: LeaderboardEntryDto,
+    fishDiscovered: Boolean,
     highlighted: Boolean,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
@@ -3310,47 +3308,78 @@ private fun TournamentLeaderboardRow(
             if (highlighted) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.08f),
         ),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = Color.White.copy(alpha = 0.06f),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
             ) {
-                Text(
-                    "#${entry.rank}",
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color.White.copy(alpha = 0.06f),
+                    ) {
+                        Text(
+                            "#${entry.rank}",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        entry.user ?: unknownUserLabel(strings),
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        tournamentMetricValueLabel(tournament.metric, entry.value),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (highlighted) {
+                        Text(
+                            if (strings.login == "Логин") "Ваш результат" else "Your result",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(entry.user ?: unknownUserLabel(strings), fontWeight = FontWeight.SemiBold)
+                entry.fish?.let { fishName ->
+                    FishThumbnail(
+                        fishName = fishName,
+                        discovered = fishDiscovered,
+                        accent = rarityColor(tournament.fishRarity),
+                        size = 46.dp,
+                        cornerRadius = 14.dp,
+                    )
+                }
                 Text(
                     tournamentEntrySubtitle(strings, tournament, entry),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                entry.prize?.let { prize ->
-                    PrizeChip(prize = prize)
-                }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    tournamentMetricValueLabel(tournament.metric, entry.value),
-                    fontWeight = FontWeight.Bold,
-                )
-                if (highlighted) {
-                    Text(
-                        if (strings.login == "Логин") "Ваш результат" else "Your result",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
+            entry.prize?.let { prize ->
+                PrizeChip(prize = prize)
             }
         }
     }
@@ -3380,6 +3409,8 @@ private fun PrizeChip(prize: PrizeSpecDto) {
                 color = Color(0xFFFFD76A),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -3390,15 +3421,15 @@ private fun PrizeChip(prize: PrizeSpecDto) {
 private fun CatchDetailsDialog(
     strings: RiverStrings,
     catch: CatchDto,
-    cardBytes: ByteArray?,
+    resolvedRarity: String?,
+    fishDiscovered: Boolean,
+    allowShare: Boolean,
     loading: Boolean,
     onDismiss: () -> Unit,
     onShare: () -> Unit,
 ) {
-    val cardBitmap = remember(cardBytes) {
-        cardBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }?.asImageBitmap()
-    }
-    val accent = rarityColor(catch.rarity)
+    val rarityKey = resolvedRarity?.takeIf { it.isNotBlank() }
+    val accent = rarityColor(rarityKey)
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -3437,46 +3468,64 @@ private fun CatchDetailsDialog(
                                 )
                             )
                     )
-                    if (cardBitmap != null) {
-                        Image(
-                            bitmap = cardBitmap,
-                            contentDescription = catch.fish,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
+                    val fishAsset = fishAssetModel(catch.fish)
+                    if (fishAsset != null) {
+                        AsyncImage(
+                            model = fishAsset,
+                            contentDescription = if (fishDiscovered) catch.fish else null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .padding(bottom = 50.dp)
+                                .size(160.dp)
+                                .align(Alignment.Center),
+                            alpha = if (fishDiscovered) 1f else 0.86f,
+                            colorFilter = if (fishDiscovered) {
+                                null
+                            } else {
+                                ColorFilter.tint(
+                                    Color.White.copy(alpha = 0.82f),
+                                    BlendMode.SrcIn,
+                                )
+                            },
                         )
-                    } else {
-                        val fishAsset = FISH_ASSET_MAP[catch.fish]?.let { localAsset(it) }
-                        if (fishAsset != null) {
-                            AsyncImage(
-                                model = fishAsset,
-                                contentDescription = catch.fish,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier
-                                    .padding(bottom = 50.dp)
-                                    .size(160.dp)
-                                    .align(Alignment.Center)
-                            )
-                        } else if (loading) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                modifier = Modifier.align(Alignment.Center)
+                    } else if (loading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                    if (!fishDiscovered) {
+                        Surface(
+                            modifier = Modifier.align(Alignment.Center),
+                            shape = RoundedCornerShape(999.dp),
+                            color = RiverDeepNight.copy(alpha = 0.82f),
+                            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+                        ) {
+                            Text(
+                                text = "?",
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                color = RiverMist,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.headlineSmall,
                             )
                         }
                     }
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(16.dp),
-                        color = accent.copy(alpha = 0.22f),
-                        shape = RoundedCornerShape(999.dp),
-                        border = BorderStroke(1.dp, accent.copy(alpha = 0.55f)),
-                    ) {
-                        Text(
-                            strings.rarityLabel(catch.rarity),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    rarityKey?.let {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp),
+                            color = accent.copy(alpha = 0.22f),
+                            shape = RoundedCornerShape(999.dp),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.55f)),
+                        ) {
+                            Text(
+                                strings.rarityLabel(it),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                     Column(
                         modifier = Modifier
@@ -3485,7 +3534,7 @@ private fun CatchDetailsDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            catch.fish,
+                            if (fishDiscovered) catch.fish else "???",
                             color = Color.White,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
@@ -3520,7 +3569,11 @@ private fun CatchDetailsDialog(
                         catch.prizeCoins?.let { CatchDetailChip("$it coins") }
                     }
                     Text(
-                        "${strings.rarityLabel(catch.rarity)} • ${catch.weight.asKgCompact()} • ${catch.location}",
+                        listOfNotNull(
+                            rarityKey?.let(strings::rarityLabel),
+                            catch.weight.asKgCompact(),
+                            catch.location,
+                        ).joinToString(" • "),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(
@@ -3535,13 +3588,15 @@ private fun CatchDetailsDialog(
                         ) {
                             Text(strings.continueLabel)
                         }
-                        Button(
-                            onClick = onShare,
-                            enabled = catch.id > 0L,
-                            modifier = Modifier.weight(1f),
-                            colors = riverPrimaryButtonColors(),
-                        ) {
-                            Text(strings.shareCatch)
+                        if (allowShare) {
+                            Button(
+                                onClick = onShare,
+                                enabled = catch.id > 0L,
+                                modifier = Modifier.weight(1f),
+                                colors = riverPrimaryButtonColors(),
+                            ) {
+                                Text(strings.shareCatch)
+                            }
                         }
                     }
                 }
@@ -3769,6 +3824,9 @@ private fun CatchRow(
     title: String,
     subtitle: String,
     value: String,
+    fishName: String? = null,
+    fishDiscovered: Boolean = true,
+    fishAccent: Color = MaterialTheme.colorScheme.primary,
     accent: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
@@ -3777,15 +3835,111 @@ private fun CatchRow(
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        fishName?.let { name ->
+            FishThumbnail(
+                fishName = name,
+                discovered = fishDiscovered,
+                accent = fishAccent,
+                modifier = Modifier.size(46.dp),
+                size = 46.dp,
+                cornerRadius = 16.dp,
+            )
+        }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold, color = accent)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(modifier = Modifier.width(12.dp))
         Text(value, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun FishThumbnail(
+    fishName: String?,
+    discovered: Boolean,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp,
+    cornerRadius: Dp = 16.dp,
+) {
+    val fishAsset = fishAssetModel(fishName)
+    val shape = RoundedCornerShape(cornerRadius)
+    val imagePadding = if (size < 64.dp) 6.dp else 10.dp
+    Surface(
+        modifier = modifier.size(size),
+        shape = shape,
+        color = RiverPanelSoft.copy(alpha = 0.94f),
+        border = BorderStroke(
+            1.dp,
+            if (discovered) accent.copy(alpha = 0.34f) else RiverOutline.copy(alpha = 0.82f),
+        ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = if (discovered) {
+                            listOf(
+                                accent.copy(alpha = 0.24f),
+                                accent.copy(alpha = 0.08f),
+                                RiverPanelSoft.copy(alpha = 0.96f),
+                            )
+                        } else {
+                            listOf(
+                                Color.White.copy(alpha = 0.05f),
+                                RiverPanelSoft.copy(alpha = 0.98f),
+                            )
+                        }
+                    )
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (fishAsset != null) {
+                AsyncImage(
+                    model = fishAsset,
+                    contentDescription = if (discovered) fishName else null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(imagePadding),
+                    alpha = if (discovered) 1f else 0.84f,
+                    colorFilter = if (discovered) {
+                        null
+                    } else {
+                        ColorFilter.tint(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                            BlendMode.SrcIn,
+                        )
+                    },
+                )
+            } else {
+                Text(
+                    text = "🐟",
+                    style = if (size < 64.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.30f),
+                )
+            }
+            if (!discovered) {
+                Surface(
+                    modifier = Modifier.align(Alignment.Center),
+                    shape = RoundedCornerShape(999.dp),
+                    color = RiverDeepNight.copy(alpha = 0.82f),
+                    border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+                ) {
+                    Text(
+                        text = "?",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        color = RiverMist,
+                        fontWeight = FontWeight.Bold,
+                        style = if (size < 64.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -4093,6 +4247,13 @@ private fun localAsset(relativePath: String): String = "file:///android_asset/$r
 
 /** Load an asset from the server (used for achievements that are not bundled). */
 private fun serverAssetUrl(path: String): String = BuildConfig.API_BASE_URL.trimEnd('/') + path
+
+private fun fishAssetModel(name: String?): String? =
+    name?.let(FISH_ASSET_MAP::get)?.let(::localAsset)
+
+private fun resolveCatchRarity(catch: CatchDto, fishGuide: List<GuideFishDto>?): String? =
+    catch.rarity.takeIf { it.isNotBlank() }
+        ?: fishGuide?.firstOrNull { it.name == catch.fish }?.rarity
 
 private val FISH_ASSET_MAP = mapOf(
     "Плотва" to "fish/plotva.webp",
