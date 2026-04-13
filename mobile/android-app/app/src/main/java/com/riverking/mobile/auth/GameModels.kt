@@ -272,8 +272,8 @@ data class QuestListDto(
 
 @Serializable
 data class AchievementRewardDto(
-    val packageId: String = "",
-    val qty: Int = 0,
+    val pack: String = "",
+    val qty: Int = 1,
     val coins: Int? = null,
 )
 

@@ -124,6 +124,7 @@ import coil.compose.AsyncImage
 import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
+import com.riverking.mobile.auth.AchievementRewardDto
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.ClubDetailsDto
@@ -397,7 +398,14 @@ fun MainShell(
     }
 
     state.selectedCatch?.let { catch ->
-        val fishDiscovered = catch.fishId == null || me.caughtFishIds.contains(catch.fishId)
+        val fishDiscovered = isFishDiscovered(
+            fishId = catch.fishId,
+            fishName = catch.fish,
+            ownerUserId = catch.userId,
+            currentUserId = me.id,
+            caughtFishIds = me.caughtFishIds,
+            fishGuide = state.guide.guide?.fish,
+        )
         CatchDetailsDialog(
             strings = strings,
             catch = catch,
@@ -423,6 +431,8 @@ fun MainShell(
             strings = strings,
             details = tournament,
             caughtFishIds = me.caughtFishIds,
+            fishGuide = state.guide.guide?.fish,
+            currentUserId = me.id,
             onDismiss = onCloseTournament,
             onOpenCatch = onOpenCatch,
         )
@@ -1021,7 +1031,16 @@ private fun TournamentsScreen(
                                 subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
                                 value = entry.value.asKgCompact(),
                                 fishName = entry.fish,
-                                fishDiscovered = entry.fishId == null || me?.caughtFishIds?.contains(entry.fishId) == true,
+                                fishDiscovered = me?.let {
+                                    isFishDiscovered(
+                                        fishId = entry.fishId,
+                                        fishName = entry.fish,
+                                        ownerUserId = entry.userId,
+                                        currentUserId = it.id,
+                                        caughtFishIds = it.caughtFishIds,
+                                        fishGuide = state.guide.guide?.fish,
+                                    )
+                                } == true,
                                 fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
                                 onClick = {
                                     if (entry.catchId != null && entry.fish != null && entry.location != null) {
@@ -1034,6 +1053,7 @@ private fun TournamentsScreen(
                                                 rarity = tournaments.current.tournament.fishRarity.orEmpty(),
                                                 user = entry.user,
                                                 userId = entry.userId,
+                                                fishId = entry.fishId,
                                             )
                                         )
                                     }
@@ -1191,7 +1211,14 @@ private fun RatingsScreen(
                         RatingsEntryCard(
                             strings = strings,
                             catch = catch,
-                            fishDiscovered = catch.fishId == null || me.caughtFishIds.contains(catch.fishId),
+                            fishDiscovered = isFishDiscovered(
+                                fishId = catch.fishId,
+                                fishName = catch.fish,
+                                ownerUserId = catch.userId,
+                                currentUserId = me.id,
+                                caughtFishIds = me.caughtFishIds,
+                                fishGuide = state.guide.guide?.fish,
+                            ),
                             showPrizePreview = showPrizePreview,
                             onClick = { onOpenCatch(catch) },
                         )
@@ -1808,43 +1835,55 @@ private fun FishingStageScene(
                 val dy = bobber.y - lineOrigin.y
                 val dist = kotlin.math.hypot(dx, dy)
                 val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
-                val control = if (shouldShowSlack) {
-                    // Slack line when idle
-                    val sag = min(size.height * 0.22f, max(16f, dist * 0.55f))
-                    Offset(
-                        x = lineOrigin.x + dx * 0.55f,
-                        y = lineOrigin.y + dy * 0.5f + sag,
-                    )
-                } else {
-                    // Taut line when cast
-                    val gentleSag = min(size.height * 0.08f, dist * 0.12f)
-                    Offset(
-                        x = lineOrigin.x + dx * 0.5f,
-                        y = lineOrigin.y + dy * 0.5f + gentleSag,
-                    )
-                }
-                val linePath = Path().apply {
+                val rodLinePath = Path().apply {
                     if (rodLinePoints.isNotEmpty()) {
                         moveTo(rodLinePoints.first().x, rodLinePoints.first().y)
                         for (i in 1 until rodLinePoints.size) {
                             lineTo(rodLinePoints[i].x, rodLinePoints[i].y)
                         }
-                    } else {
-                        moveTo(lineOrigin.x, lineOrigin.y)
                     }
-                    quadraticTo(control.x, control.y, bobber.x, bobber.y)
+                }
+                val waterLinePath = Path().apply {
+                    moveTo(lineOrigin.x, lineOrigin.y)
+                    if (shouldShowSlack) {
+                        val sag = min(size.height * 0.22f, max(16f, dist * 0.55f))
+                        val baseMidY = lineOrigin.y + dy * 0.5f
+                        val control1 = Offset(
+                            x = lineOrigin.x + dx * 0.35f,
+                            y = baseMidY + sag * 0.45f,
+                        )
+                        val control2 = Offset(
+                            x = lineOrigin.x + dx * 0.75f,
+                            y = baseMidY + sag,
+                        )
+                        cubicTo(control1.x, control1.y, control2.x, control2.y, bobber.x, bobber.y)
+                    } else {
+                        val gentleSag = min(size.height * 0.08f, dist * 0.12f)
+                        val control = Offset(
+                            x = lineOrigin.x + dx * 0.5f,
+                            y = lineOrigin.y + dy * 0.5f + gentleSag,
+                        )
+                        quadraticTo(control.x, control.y, bobber.x, bobber.y)
+                    }
+                }
+                if (rodLinePoints.isNotEmpty()) {
+                    drawPath(
+                        path = rodLinePath,
+                        color = Color.White.copy(alpha = 0.35f),
+                        style = Stroke(width = 2f, cap = StrokeCap.Round),
+                    )
                 }
                 if (hasSplashed) {
                     clipRect(left = 0f, top = 0f, right = size.width, bottom = waterlineY) {
                         drawPath(
-                            path = linePath,
+                            path = waterLinePath,
                             color = Color.White.copy(alpha = 0.35f),
                             style = Stroke(width = 2f, cap = StrokeCap.Round),
                         )
                     }
                 } else {
                     drawPath(
-                        path = linePath,
+                        path = waterLinePath,
                         color = Color.White.copy(alpha = 0.35f),
                         style = Stroke(width = 2f, cap = StrokeCap.Round),
                     )
@@ -3129,6 +3168,8 @@ private fun TournamentDialog(
     strings: RiverStrings,
     details: CurrentTournamentDto,
     caughtFishIds: List<Long>,
+    fishGuide: List<GuideFishDto>?,
+    currentUserId: Long,
     onDismiss: () -> Unit,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
@@ -3171,7 +3212,14 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = mine,
-                            fishDiscovered = mine.fishId == null || caughtFishIds.contains(mine.fishId),
+                            fishDiscovered = isFishDiscovered(
+                                fishId = mine.fishId,
+                                fishName = mine.fish,
+                                ownerUserId = mine.userId,
+                                currentUserId = currentUserId,
+                                caughtFishIds = caughtFishIds,
+                                fishGuide = fishGuide,
+                            ),
                             highlighted = true,
                             onOpenCatch = onOpenCatch,
                         )
@@ -3188,7 +3236,14 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = entry,
-                            fishDiscovered = entry.fishId == null || caughtFishIds.contains(entry.fishId),
+                            fishDiscovered = isFishDiscovered(
+                                fishId = entry.fishId,
+                                fishName = entry.fish,
+                                ownerUserId = entry.userId,
+                                currentUserId = currentUserId,
+                                caughtFishIds = caughtFishIds,
+                                fishGuide = fishGuide,
+                            ),
                             highlighted = details.mine?.rank == entry.rank,
                             onOpenCatch = onOpenCatch,
                         )
@@ -3637,13 +3692,7 @@ private fun AchievementRewardDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 reward.rewards.forEach { item ->
-                    Text(
-                        when {
-                            item.coins != null -> "${item.coins} coins"
-                            item.packageId.isBlank() -> "×${item.qty}"
-                            else -> "${item.packageId} ×${item.qty}"
-                        }
-                    )
+                    Text(achievementRewardLabel(strings, item))
                 }
             }
         },
@@ -3982,6 +4031,7 @@ private fun tournamentEntryCatch(tournament: TournamentDto, entry: LeaderboardEn
         rarity = tournament.fishRarity.orEmpty(),
         user = entry.user,
         userId = entry.userId,
+        fishId = entry.fishId,
         at = entry.at?.let { Instant.ofEpochSecond(it).toString() },
     )
 }
@@ -4003,6 +4053,25 @@ private fun tournamentPrizeLabel(prize: PrizeSpecDto): String = when {
     else -> humanizePackId(prize.packageId)
 }
 
+private fun achievementRewardLabel(strings: RiverStrings, reward: AchievementRewardDto): String = when {
+    reward.coins != null || reward.pack.equals("coins", ignoreCase = true) ->
+        if (strings.login == "Логин") "${reward.coins ?: reward.qty} монет" else "${reward.coins ?: reward.qty} coins"
+    reward.pack.isBlank() ->
+        if (strings.login == "Логин") "Награда получена" else "Reward claimed"
+    reward.qty > 1 -> "${achievementRewardPackName(strings, reward.pack)} ×${reward.qty}"
+    else -> achievementRewardPackName(strings, reward.pack)
+}
+
+private fun achievementRewardPackName(strings: RiverStrings, packId: String): String = when (packId) {
+    "fresh_topup_s" -> if (strings.login == "Логин") "Пресное пополнение S" else "Fresh Top-up S"
+    "fresh_stock_m" -> if (strings.login == "Логин") "Пресный запас M" else "Fresh Stock M"
+    "fresh_crate_l" -> if (strings.login == "Логин") "Пресный ящик L" else "Fresh Crate L"
+    "salt_crate_l" -> if (strings.login == "Логин") "Морской ящик L" else "Saltwater Crate L"
+    "autofish" -> if (strings.login == "Логин") "Автоловля" else "Autofish"
+    "autofish_week" -> if (strings.login == "Логин") "Автоловля (неделя)" else "Autofish (week)"
+    else -> humanizePackId(packId)
+}
+
 private fun tournamentPrizeIconModel(prize: PrizeSpecDto): String? = when {
     prize.packageId == "coins" || prize.coins != null -> null
     else -> shopIconAsset(prize.packageId)
@@ -4016,6 +4085,20 @@ private fun anyFishLabel(strings: RiverStrings): String =
 
 private fun unknownUserLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Неизвестно" else "Unknown"
+
+private fun isFishDiscovered(
+    fishId: Long?,
+    fishName: String?,
+    ownerUserId: Long?,
+    currentUserId: Long,
+    caughtFishIds: Collection<Long>,
+    fishGuide: List<GuideFishDto>?,
+): Boolean {
+    if (ownerUserId != null && ownerUserId == currentUserId) return true
+    if (fishId != null) return caughtFishIds.contains(fishId)
+    val resolvedFishId = fishGuide?.firstOrNull { it.name == fishName }?.id
+    return resolvedFishId != null && caughtFishIds.contains(resolvedFishId)
+}
 
 private fun humanizePackId(packId: String): String = when {
     packId.startsWith("autofish") -> "Autofish"
