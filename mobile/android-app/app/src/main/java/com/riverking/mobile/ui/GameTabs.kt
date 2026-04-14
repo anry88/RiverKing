@@ -131,6 +131,7 @@ import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.ClubDetailsDto
 import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
+import com.riverking.mobile.auth.FishBriefDto
 import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.GuideLocationDto
 import com.riverking.mobile.auth.GuideLureDto
@@ -199,6 +200,7 @@ private data class BobberVisualState(
 fun MainShell(
     state: RiverKingUiState,
     isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onClaimDaily: () -> Unit,
@@ -383,6 +385,8 @@ fun MainShell(
                 MainTab.CATALOG -> CatalogScreen(
                     state = state,
                     strings = strings,
+                    isPlayFlavor = isPlayFlavor,
+                    requestPlayPrice = requestPlayPrice,
                     modifier = Modifier.padding(padding),
                 )
                 MainTab.CLUB -> ClubScreen(
@@ -1418,6 +1422,8 @@ private fun RatingsScreen(
 private fun CatalogScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
+    isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val me = state.me ?: return
@@ -1512,6 +1518,8 @@ private fun CatalogScreen(
                 guide = guide,
                 me = me,
                 strings = strings,
+                isPlayFlavor = isPlayFlavor,
+                requestPlayPrice = requestPlayPrice,
                 section = gearSection,
                 modifier = Modifier.weight(1f),
             )
@@ -1587,6 +1595,8 @@ private fun CatalogGearScreen(
     guide: GuideUiState,
     me: MeResponseDto,
     strings: RiverStrings,
+    isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     section: GearSection,
     modifier: Modifier = Modifier,
 ) {
@@ -1604,13 +1614,22 @@ private fun CatalogGearScreen(
                             strings = strings,
                             rod = rod,
                             ownedRod = me.rods.firstOrNull { it.code == rod.code },
+                            isPlayFlavor = isPlayFlavor,
+                            requestPlayPrice = requestPlayPrice,
                         )
                     } ?: EmptyStatePanel(strings.noData)
                 }
                 GearSection.LURES -> SectionCard(strings.guideLures) {
                     guide.guide?.lures?.forEachIndexed { index, lure ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLureRow(strings = strings, lure = lure)
+                        GuideLureRow(
+                            strings = strings,
+                            lure = lure,
+                            locationDetails = buildGuideLureLocationDetails(
+                                lure = lure,
+                                guideLocations = guide.guide?.locations.orEmpty(),
+                            ),
+                        )
                     } ?: EmptyStatePanel(strings.noData)
                 }
             }
@@ -3494,10 +3513,43 @@ private fun GuideFishRow(
     }
 }
 
+private data class GuideLureLocationDetails(
+    val name: String,
+    val fish: List<FishBriefDto>,
+)
+
+private fun buildGuideLureLocationDetails(
+    lure: GuideLureDto,
+    guideLocations: List<GuideLocationDto>,
+): List<GuideLureLocationDetails> {
+    val fishByName = lure.fish.associateBy { it.name }
+    return guideLocations.mapNotNull { location ->
+        if (!location.lures.contains(lure.name)) return@mapNotNull null
+        val fish = location.fish
+            .mapNotNull { fishByName[it.name] }
+            .sortedBy { guideRaritySortRank(it.rarity) }
+        GuideLureLocationDetails(location.name, fish)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GuideLureRow(strings: RiverStrings, lure: GuideLureDto) {
+private fun GuideLureRow(
+    strings: RiverStrings,
+    lure: GuideLureDto,
+    locationDetails: List<GuideLureLocationDetails>,
+) {
     val accent = lureAccentColor(lure.name)
+    val locationNames = locationDetails.map { it.name }
+    var expandedLocation by rememberSaveable(lure.name) {
+        mutableStateOf(locationNames.firstOrNull())
+    }
+    LaunchedEffect(locationNames) {
+        if (expandedLocation !in locationNames) {
+            expandedLocation = locationNames.firstOrNull()
+        }
+    }
+    val selectedLocation = locationDetails.firstOrNull { it.name == expandedLocation }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -3516,26 +3568,105 @@ private fun GuideLureRow(strings: RiverStrings, lure: GuideLureDto) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(lure.name, fontWeight = FontWeight.Bold)
                     Text(
-                        "${guideFishCountLabel(strings, lure.fish.size)} • ${guideLocationCountLabel(strings, lure.locations.size)}",
+                        "${guideFishCountLabel(strings, lure.fish.size)} • ${guideLocationCountLabel(strings, locationDetails.size)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 GuideBadge(label = strings.bait, accent = accent)
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                lure.fish.forEach { fish ->
-                    GuideBadge(label = fish.name, accent = rarityColor(fish.rarity))
+            if (locationDetails.isEmpty()) {
+                Text(
+                    strings.noData,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(locationDetails) { location ->
+                        val selected = location.name == expandedLocation
+                        Surface(
+                            modifier = Modifier
+                                .width(184.dp)
+                                .height(110.dp)
+                                .clip(RoundedCornerShape(22.dp))
+                                .clickable { expandedLocation = location.name },
+                            shape = RoundedCornerShape(22.dp),
+                            color = if (selected) accent.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.04f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (selected) accent.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.10f),
+                            ),
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                AsyncImage(
+                                    model = locationBackgroundAsset(location.name),
+                                    contentDescription = location.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Black.copy(alpha = 0.10f),
+                                                    Color.Black.copy(alpha = 0.22f),
+                                                    Color.Black.copy(alpha = 0.74f),
+                                                )
+                                            )
+                                        )
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        location.name,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    GuideBadge(
+                                        label = guideFishCountLabel(strings, location.fish.size),
+                                        accent = if (selected) accent else RiverTide,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                selectedLocation?.let { location ->
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.34f),
+                        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f)),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                location.name,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                location.fish.forEach { fish ->
+                                    GuideBadge(label = fish.name, accent = rarityColor(fish.rarity))
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            Text(
-                lure.locations.joinToString(" • "),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
@@ -3545,7 +3676,19 @@ private fun GuideRodRow(
     strings: RiverStrings,
     rod: GuideRodDto,
     ownedRod: RodDto?,
+    isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
 ) {
+    var playPrice by remember(ownedRod?.packId, isPlayFlavor) { mutableStateOf<String?>(null) }
+    LaunchedEffect(ownedRod?.packId, isPlayFlavor) {
+        playPrice = null
+        val packId = ownedRod?.packId ?: return@LaunchedEffect
+        if (isPlayFlavor) {
+            requestPlayPrice(packId) { resolved ->
+                playPrice = resolved
+            }
+        }
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -3572,8 +3715,12 @@ private fun GuideRodRow(
                 GuideBadge(
                     label = when {
                         ownedRod?.unlocked == true -> unlockedLabel(strings)
-                        ownedRod?.priceStars != null ->
-                            if (strings.login == "Логин") "Откроется на ${rod.unlockKg.asGuideKg(strings)} • ${ownedRod.priceStars}★" else "Unlocks at ${rod.unlockKg.asGuideKg(strings)} • ${ownedRod.priceStars}★"
+                        isPlayFlavor && !playPrice.isNullOrBlank() ->
+                            if (strings.login == "Логин") {
+                                "Откроется на ${rod.unlockKg.asGuideKg(strings)} • $playPrice"
+                            } else {
+                                "Unlocks at ${rod.unlockKg.asGuideKg(strings)} • $playPrice"
+                            }
                         else -> requiresKgLabel(strings, rod.unlockKg)
                     },
                     accent = if (ownedRod?.unlocked == true) Color(0xFF7CE38B) else Color(0xFFC9A46E),
@@ -5118,6 +5265,16 @@ private fun Double.asKgCompact(strings: RiverStrings): String =
     String.format(Locale.US, "%.2f %s", this, if (strings.login == "Логин") "кг" else "kg")
 
 private fun String?.rarityLabel(strings: RiverStrings): String = strings.rarityLabel(this)
+
+private fun guideRaritySortRank(rarity: String?): Int = when (rarity) {
+    "common" -> 0
+    "uncommon" -> 1
+    "rare" -> 2
+    "epic" -> 3
+    "mythic" -> 4
+    "legendary" -> 5
+    else -> Int.MAX_VALUE
+}
 
 private fun pendingPrizeLabel(strings: RiverStrings, prize: PrizeDto): String = when {
     prize.coins != null -> pendingPrizeCoinsLabel(strings, prize.coins)

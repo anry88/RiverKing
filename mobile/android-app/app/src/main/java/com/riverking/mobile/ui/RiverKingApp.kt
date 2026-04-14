@@ -196,6 +196,10 @@ fun RiverKingApp(
                     else -> MainShell(
                         state = state,
                         isPlayFlavor = viewModel.isPlayFlavor(),
+                        requestPlayPrice = { productId, onResolved ->
+                            playBillingManager?.requestFormattedPrice(productId, onResolved)
+                                ?: onResolved(null)
+                        },
                         onLogout = viewModel::logout,
                         onChangeLanguage = viewModel::changeLanguage,
                         onClaimDaily = viewModel::claimDaily,

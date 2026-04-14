@@ -407,18 +407,18 @@ fun RiverStrings.achievementLevelLabel(index: Int): String {
 
 fun RiverStrings.rodBonusLabel(bonusWater: String?, bonusPredator: Boolean?): String {
     if (bonusWater == null) {
-        return if (login == "Логин") "Без бонуса к типу воды" else "No water bonus"
+        return if (login == "Логин") "Бонусов нет." else "No bonus."
     }
     return when {
         bonusWater == "fresh" && bonusPredator == true ->
-            if (login == "Логин") "Бонус к пресным хищникам" else "Bonus for freshwater predators"
+            if (login == "Логин") "−50% шанс побега пресноводных хищных рыб." else "50% less escape chance for freshwater predator fish."
         bonusWater == "fresh" && bonusPredator == false ->
-            if (login == "Логин") "Бонус к пресной мирной рыбе" else "Bonus for freshwater peaceful fish"
+            if (login == "Логин") "−50% шанс побега пресноводных мирных рыб." else "50% less escape chance for freshwater peaceful fish."
         bonusWater == "salt" && bonusPredator == true ->
-            if (login == "Логин") "Бонус к морским хищникам" else "Bonus for saltwater predators"
+            if (login == "Логин") "−50% шанс побега морских хищных рыб." else "50% less escape chance for saltwater predator fish."
         bonusWater == "salt" && bonusPredator == false ->
-            if (login == "Логин") "Бонус к морской мирной рыбе" else "Bonus for saltwater peaceful fish"
-        else -> if (login == "Логин") "Особый бонус удилища" else "Special rod bonus"
+            if (login == "Логин") "−50% шанс побега морских мирных рыб." else "50% less escape chance for saltwater peaceful fish."
+        else -> if (login == "Логин") "Бонусов нет." else "No bonus."
     }
 }
 

@@ -39,6 +39,7 @@ class PlayBillingManager(
         .build()
     private val productDetailsCache = linkedMapOf<String, ProductDetails>()
     private val processingTokens = linkedSetOf<String>()
+    private val pendingConnectedActions = mutableListOf<() -> Unit>()
     private var connecting = false
 
     fun start() {
@@ -52,8 +53,20 @@ class PlayBillingManager(
             billingClient.endConnection()
         }
         connecting = false
+        pendingConnectedActions.clear()
         productDetailsCache.clear()
         processingTokens.clear()
+    }
+
+    fun requestFormattedPrice(productId: String, onResolved: (String?) -> Unit) {
+        ensureConnected {
+            scope.launch {
+                val price = getProductDetails(productId)
+                    ?.oneTimePurchaseOfferDetails
+                    ?.formattedPrice
+                onResolved(price)
+            }
+        }
     }
 
     fun syncPurchases() {
@@ -166,6 +179,7 @@ class PlayBillingManager(
             onConnected()
             return
         }
+        pendingConnectedActions += onConnected
         if (connecting) return
         connecting = true
         billingClient.startConnection(
@@ -173,8 +187,11 @@ class PlayBillingManager(
                 override fun onBillingSetupFinished(billingResult: BillingResult) {
                     connecting = false
                     if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                        onConnected()
+                        val actions = pendingConnectedActions.toList()
+                        pendingConnectedActions.clear()
+                        actions.forEach { it() }
                     } else {
+                        pendingConnectedActions.clear()
                         onNotice("play_purchase_unavailable")
                     }
                 }
