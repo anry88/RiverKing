@@ -6,9 +6,28 @@ plugins {
 }
 
 val ktorVersion = "2.3.11"
+val canonicalApplicationId = "com.riverking.mobile"
 val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?)
     ?: "https://v759468.hosted-by-vdsina.com"
+val publicWebUrl = ((findProperty("RIVERKING_PUBLIC_WEB_URL") as String?) ?: apiBaseUrl).trimEnd('/')
 val googleClientId = (findProperty("RIVERKING_GOOGLE_AUTH_CLIENT_ID") as String?) ?: ""
+val versionCodeValue = (findProperty("RIVERKING_VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+val versionNameValue = (findProperty("RIVERKING_VERSION_NAME") as String?) ?: "0.1.0"
+val itchProjectUrl = (findProperty("RIVERKING_ITCH_PROJECT_URL") as String?)
+    ?.takeIf { it.isNotBlank() }
+    ?: "$publicWebUrl/support"
+val playStoreUrl = (findProperty("RIVERKING_PLAY_STORE_URL") as String?)
+    ?.takeIf { it.isNotBlank() }
+    ?: "https://play.google.com/store/apps/details?id=$canonicalApplicationId"
+val supportUrl = (findProperty("RIVERKING_SUPPORT_URL") as String?)
+    ?.takeIf { it.isNotBlank() }
+    ?: "$publicWebUrl/support"
+val privacyPolicyUrl = (findProperty("RIVERKING_PRIVACY_POLICY_URL") as String?)
+    ?.takeIf { it.isNotBlank() }
+    ?: "$publicWebUrl/privacy"
+val accountDeletionUrl = (findProperty("RIVERKING_ACCOUNT_DELETION_URL") as String?)
+    ?.takeIf { it.isNotBlank() }
+    ?: "$publicWebUrl/account/delete"
 val signingStoreFile = findProperty("RIVERKING_SIGNING_STORE_FILE") as String?
 val signingStorePassword = findProperty("RIVERKING_SIGNING_STORE_PASSWORD") as String?
 val signingKeyAlias = findProperty("RIVERKING_SIGNING_KEY_ALIAS") as String?
@@ -21,32 +40,35 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrBlank() }
 
 android {
-    namespace = "com.riverking.mobile"
+    namespace = canonicalApplicationId
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.riverking.mobile"
+        applicationId = canonicalApplicationId
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodeValue
+        versionName = versionNameValue
 
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "GOOGLE_AUTH_CLIENT_ID", "\"$googleClientId\"")
         buildConfigField("boolean", "GOOGLE_AUTH_ENABLED", googleClientId.isNotBlank().toString())
+        buildConfigField("String", "ITCH_PROJECT_URL", "\"$itchProjectUrl\"")
+        buildConfigField("String", "PLAY_STORE_URL", "\"$playStoreUrl\"")
+        buildConfigField("String", "SUPPORT_URL", "\"$supportUrl\"")
+        buildConfigField("String", "PRIVACY_POLICY_URL", "\"$privacyPolicyUrl\"")
+        buildConfigField("String", "ACCOUNT_DELETION_URL", "\"$accountDeletionUrl\"")
     }
 
     flavorDimensions += "distribution"
     productFlavors {
         create("play") {
             dimension = "distribution"
-            applicationIdSuffix = ".play"
             versionNameSuffix = "-play"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
         }
         create("direct") {
             dimension = "distribution"
-            applicationIdSuffix = ".direct"
             versionNameSuffix = "-direct"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"direct\"")
         }

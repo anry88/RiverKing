@@ -10,6 +10,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
 ## Routes and integrations
 - **`ApiRoutes.kt`** — `Application.apiRoutes(env)` registers all REST endpoints for the mini‑app. Notable groups:
   - Authentication: `POST /api/auth/telegram` accepts `initData`, verifies the signature with `TgWebAppAuth.verifyAndExtractUser`, and stores `AppSession(userId)`. Mobile auth is handled by `POST /api/auth/google`, `POST /api/auth/password/register`, `POST /api/auth/password/login`, `POST /api/auth/refresh`, and `POST /api/auth/logout`.
+  - Account lifecycle: `POST /api/account/delete` deletes the authenticated shared RiverKing profile together with linked sessions and user-owned progression data.
   - Telegram/mobile account linking: `POST /api/auth/telegram/mobile/start` plus `GET /api/auth/telegram/mobile/status/{token}` drive Telegram sign-in from Android, while `POST /api/auth/telegram/link/start` plus `GET /api/auth/telegram/link/status/{token}` let an authenticated mobile player link a Telegram account to the same `Users.id`.
   - Profile and progress: `GET /api/me` collects player state (lures, rods, locations, recent catches) via `FishingService` and `I18n`, and now serves both mini‑app sessions and bearer-token mobile clients.
   - Fishing: `POST /api/cast`, `POST /api/hook`, `POST /api/catch` drive the cast→hook→catch lifecycle using `FishingService.startCast`, `hook`, and `catch`.
@@ -23,6 +24,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
 - **`BotRoutes.kt`** — registers the Telegram bot webhook. Processes updates, sends responses through `TelegramBot`, and calls game services to handle bot commands.
 - **`TelegramBot.kt`** — thin client over the Telegram Bot API for sending messages, invoices, and alerts; used by the webhook and by the redirect from `/`.
 - **`TelegramModels.kt`** — DTOs for Telegram WebApp/bot (keyboards, invoices, updates).
+- **`PublicPages.kt`** — serves public support/legal/account-deletion pages used by Android release surfaces and Google Play policy links.
 - **`AuthService.kt`** — provider-neutral account service for password auth, Google sign-in, refresh-session rotation, and bearer token resolution.
 - **`TelegramLinkService.kt`** — issues short-lived Telegram confirmation sessions for Android sign-in/linking, resolves `/start login_*` and `/start link_*` confirmations, and prevents accidental account duplication when Telegram/mobile identities are attached.
 - **`AuthTokenCodec.kt`** — issues and validates signed access tokens plus opaque refresh tokens.

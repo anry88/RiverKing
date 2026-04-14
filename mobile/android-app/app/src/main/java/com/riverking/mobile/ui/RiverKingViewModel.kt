@@ -1215,6 +1215,31 @@ class RiverKingViewModel(
         }
     }
 
+    fun deleteAccount() {
+        cancelFishingJobs()
+        cancelTelegramJobs()
+        val deletedMessage = if (state.value.me?.language == "ru") "Аккаунт удалён" else "Account deleted"
+        viewModelScope.launch {
+            _state.update { it.copy(working = true, error = null) }
+            try {
+                repository.deleteAccount()
+                _state.value = RiverKingUiState(
+                    loading = false,
+                    login = repository.lastLoginDraft(),
+                    error = deletedMessage,
+                )
+            } catch (error: Throwable) {
+                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+            }
+        }
+    }
+
+    fun openSupport() = queueExternalUrl(BuildConfig.SUPPORT_URL)
+
+    fun openPrivacyPolicy() = queueExternalUrl(BuildConfig.PRIVACY_POLICY_URL)
+
+    fun openAccountDeletionHelp() = queueExternalUrl(BuildConfig.ACCOUNT_DELETION_URL)
+
     fun consumeError() {
         _state.update { it.copy(error = null) }
     }
@@ -1238,6 +1263,11 @@ class RiverKingViewModel(
     fun currentAccessToken(): String? = repository.currentAccessToken()
 
     suspend fun downloadCatchCard(catchId: Long): ByteArray = repository.catchCard(catchId)
+
+    private fun queueExternalUrl(url: String) {
+        val target = url.trim().takeIf { it.isNotEmpty() } ?: return
+        _state.update { it.copy(pendingExternalUrl = target) }
+    }
 
     private fun bootstrap() {
         viewModelScope.launch {

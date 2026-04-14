@@ -200,6 +200,10 @@ fun RiverKingApp(
                                 ?: onResolved(null)
                         },
                         onLogout = viewModel::logout,
+                        onDeleteAccount = viewModel::deleteAccount,
+                        onOpenSupport = viewModel::openSupport,
+                        onOpenPrivacyPolicy = viewModel::openPrivacyPolicy,
+                        onOpenAccountDeletionHelp = viewModel::openAccountDeletionHelp,
                         onChangeLanguage = viewModel::changeLanguage,
                         onClaimDaily = viewModel::claimDaily,
                         onBeginCast = { viewModel.beginCast() },

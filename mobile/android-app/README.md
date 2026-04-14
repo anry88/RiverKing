@@ -11,6 +11,7 @@ Nested Android project for the RiverKing mobile client.
 ## Current scope
 
 - Shared auth with `Telegram sign-in`, `Google sign-in`, and `login/password`.
+- `direct` and `play` now share the same canonical Android package name and should be signed with the same release key so users can move from itch.io/direct APK installs to Google Play without uninstalling.
 - Existing Android profiles can link a Telegram account and continue on the same backend player profile inside the Mini App/bot.
 - Android shell now mirrors the TG client much more closely:
   - five-tab layout: fishing, leaders, catalog, club, shop
@@ -24,7 +25,8 @@ Nested Android project for the RiverKing mobile client.
 - Android Telegram account linking and referral actions live in the profile menu opened from the nickname, not inside the shop tab.
 - Android referrals now expose auth-aware invite variants:
   - Telegram-auth users get the Telegram Mini App invite flow.
-  - Google-auth users get a Google Play invite flow backed by Play Install Referrer plus an in-app deep link fallback.
+  - Password/Google-auth users get a store-aware Android invite flow that targets itch.io for `direct` and Google Play for `play`, with an in-app deep link fallback.
+- The profile menu also exposes support, privacy policy, in-app account deletion, and the public web account-deletion page used for Play policy compliance.
 - **Asset Bundling & Optimization**:
   - Core gameplay assets (rods, fish, locations, shop icons, achievement badges) are bundled locally in the APK to reduce network traffic and enable offline-ready UI.
   - All PNG assets from the webapp are converted to **WebP** format for the Android build to minimize APK size (e.g., 60MB PNG -> ~22MB WebP).
@@ -38,6 +40,14 @@ Use [gradle.example.properties](gradle.example.properties) as the full template 
 Set these Gradle properties when building locally:
 
 - `RIVERKING_API_BASE_URL`
+- `RIVERKING_PUBLIC_WEB_URL`
+- `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_SUPPORT_URL`
+- `RIVERKING_PRIVACY_POLICY_URL`
+- `RIVERKING_ACCOUNT_DELETION_URL`
+- `RIVERKING_VERSION_CODE`
+- `RIVERKING_VERSION_NAME`
 - `RIVERKING_GOOGLE_AUTH_CLIENT_ID`
 - `RIVERKING_SIGNING_STORE_FILE`
 - `RIVERKING_SIGNING_STORE_PASSWORD`
@@ -95,6 +105,14 @@ Release outputs:
 ```
 
 Without signing properties the `release` build type falls back to the debug signing config, which is acceptable only for local verification and not for distribution.
+
+## Distribution notes
+
+- `directRelease` is the APK intended for itch.io and other manual APK installs.
+- `playRelease` is the AAB intended for Google Play.
+- Both release channels must use the same signing key and a single monotonic `versionCode` sequence.
+- Do not let the itch.io/direct release overtake the Google Play version code once Play becomes the canonical upgrade path.
+- Release builds default to HTTPS-only networking. Cleartext is enabled only from the debug manifest for local emulator work.
 ## Asset Management
 
 To minimize APK size while supporting local asset loading, we use WebP conversion.

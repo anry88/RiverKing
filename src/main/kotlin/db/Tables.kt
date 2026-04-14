@@ -62,6 +62,7 @@ object DB {
                 LocationFishWeights,
                 Payments,
                 PaySupportRequests,
+                AccountDeletionRequests,
                 Tournaments,
                 UserPrizes,
                 RatingPrizes,
@@ -1632,6 +1633,16 @@ object PaySupportRequests : LongIdTable() {
     val reason = text("reason")
     val status = varchar("status", 20)
     val adminMessage = text("admin_message").nullable()
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object AccountDeletionRequests : LongIdTable() {
+    val userId = reference("user_id", Users).nullable()
+    val requestedLogin = varchar("requested_login", 100).nullable()
+    val authProvider = varchar("auth_provider", 50).nullable()
+    val contact = varchar("contact", 255)
+    val note = text("note").nullable()
+    val status = varchar("status", 20).default("pending")
     val createdAt = timestamp("created_at").clientDefault { Instant.now() }
 }
 

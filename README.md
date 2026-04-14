@@ -27,6 +27,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 - Mini App: [t.me/river_king_bot/app](https://t.me/river_king_bot/app)
 - Bot: [t.me/river_king_bot](https://t.me/river_king_bot)
 - Product overview: [docs/product-overview.md](docs/product-overview.md)
+- Android release guide: [docs/android-release.md](docs/android-release.md)
 - Architecture: [DOCUMENTATION.md](DOCUMENTATION.md)
 - Agent guide: [AGENTS.md](AGENTS.md)
 
@@ -47,6 +48,7 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
 - A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
+- Public Android-compliance surfaces for privacy, support, terms, and account deletion, plus an authenticated account deletion endpoint for mobile users.
 
 ## Architecture
 

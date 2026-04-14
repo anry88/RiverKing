@@ -64,6 +64,12 @@ class AuthApi(
         }
     }
 
+    suspend fun deleteAccount(accessToken: String) {
+        client.post("$baseUrl/api/account/delete") {
+            bearerAuth(accessToken)
+        }
+    }
+
     suspend fun me(accessToken: String): MeResponseDto =
         client.get("$baseUrl/api/me") {
             bearerAuth(accessToken)

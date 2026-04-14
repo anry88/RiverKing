@@ -11,6 +11,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -122,6 +123,57 @@ class AuthRoutesTest {
             setBody("""{"refreshToken":"${loggedIn.refreshToken}"}""")
         }
         assertEquals(HttpStatusCode.Unauthorized, refreshAfterLogout.status)
+    }
+
+    @Test
+    fun `account deletion removes auth access and public deletion page accepts requests`() = testApplication {
+        val env = testEnv("account-delete").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            publicBaseUrl = "https://riverking.example",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val registered = registerPasswordUser(client, "angler.delete", "password123")
+
+        val delete = client.post("/api/account/delete") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.NoContent, delete.status)
+
+        val meAfterDelete = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.Unauthorized, meAfterDelete.status)
+
+        val loginAfterDelete = client.post("/api/auth/password/login") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"login":"angler.delete","password":"password123"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, loginAfterDelete.status)
+
+        val refreshAfterDelete = client.post("/api/auth/refresh") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"refreshToken":"${registered.refreshToken}"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, refreshAfterDelete.status)
+
+        val deletionPage = client.get("/account/delete")
+        assertEquals(HttpStatusCode.OK, deletionPage.status)
+        assertEquals(true, deletionPage.bodyAsText().contains("Delete a RiverKing account"))
+
+        val request = client.post("/account/delete/request") {
+            header(HttpHeaders.ContentType, ContentType.Application.FormUrlEncoded.toString())
+            setBody(
+                "login=${"angler.external".encodeURLParameter()}&" +
+                    "provider=password&" +
+                    "contact=${"angler@example.com".encodeURLParameter()}&" +
+                    "note=${"Please remove my test profile".encodeURLParameter()}"
+            )
+        }
+        assertEquals(HttpStatusCode.OK, request.status)
+        assertEquals(true, request.bodyAsText().contains("Deletion request submitted"))
     }
 
     @Test
@@ -327,6 +379,7 @@ class AuthRoutesTest {
         installSessions(env)
         DB.init(env)
         apiRoutes(env, playPurchaseVerifier)
+        publicPagesRoutes(env)
     }
 
     private suspend fun registerPasswordUser(

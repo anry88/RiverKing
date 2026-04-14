@@ -7,6 +7,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `README.md` is the human-facing product overview for clients, operators, and technical reviewers.
 - `docs/product-overview.md` is the deeper product note covering game loops, engagement systems, and operating model.
 - `docs/github-about.md` is the source of truth for GitHub About description, topics, and website.
+- `docs/android-release.md` is the Android distribution and compliance checklist for the itch.io-first / Google Play-second rollout.
 - `DOCUMENTATION.md` is the engineering architecture overview.
 - `src/main/kotlin/**/README.md` files are the low-level code navigation layer for agents working inside a package.
 
@@ -27,8 +28,10 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Persistence: Exposed over SQLite by default, with PostgreSQL-style connection config fields also supported.
 - Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session.
 - Mobile auth: password, Google, and Telegram sign-in can create bearer tokens plus refresh sessions for the Android client, and an authenticated Android profile can link a Telegram account for shared progression across mobile and Telegram surfaces.
+- Account deletion: `POST /api/account/delete` deletes the authenticated profile, and the backend also serves public compliance pages at `/privacy`, `/terms`, `/support`, and `/account/delete`.
 - Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
 - Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, and a nested Android client project.
+- Android distribution contract: `direct` and `play` share one canonical `applicationId`, one monotonic `versionCode` line, and should be signed with the same release key so users can move from itch.io APK installs to Google Play without reinstalling.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
@@ -44,8 +47,9 @@ AI-oriented repository guide for coding assistants and code-review tools.
    - [src/main/kotlin/db/README.md](src/main/kotlin/db/README.md)
    - [src/main/kotlin/util/README.md](src/main/kotlin/util/README.md)
 4. If the task touches Android, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
-4. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
-5. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
+5. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
+6. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
+7. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
 
 ## Common Change Paths
 

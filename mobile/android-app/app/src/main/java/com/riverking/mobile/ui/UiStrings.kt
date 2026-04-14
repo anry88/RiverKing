@@ -11,6 +11,7 @@ data class RiverStrings(
     val password: String,
     val showPassword: String,
     val hidePassword: String,
+    val cancel: String,
     val signIn: String,
     val createAccount: String,
     val needAccount: String,
@@ -107,6 +108,14 @@ data class RiverStrings(
     val totalWeight: String,
     val totalCount: String,
     val language: String,
+    val support: String,
+    val privacyPolicy: String,
+    val deleteAccount: String,
+    val deleteAccountTitle: String,
+    val deleteAccountMessage: String,
+    val deleteAccountConfirm: String,
+    val deleteAccountWeb: String,
+    val deleteAccountDone: String,
 )
 
 @Composable
@@ -120,6 +129,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             password = "Пароль",
             showPassword = "Показать пароль",
             hidePassword = "Скрыть пароль",
+            cancel = "Отмена",
             signIn = "Войти",
             createAccount = "Создать аккаунт",
             needAccount = "Нужен аккаунт?",
@@ -216,6 +226,14 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             totalWeight = "Общий вес",
             totalCount = "Всего поймано",
             language = "Язык",
+            support = "Поддержка",
+            privacyPolicy = "Политика конфиденциальности",
+            deleteAccount = "Удалить аккаунт",
+            deleteAccountTitle = "Удалить аккаунт RiverKing?",
+            deleteAccountMessage = "Профиль, прогресс, уловы, квесты, клуб и связанные сессии будут удалены без возможности восстановления.",
+            deleteAccountConfirm = "Удалить навсегда",
+            deleteAccountWeb = "Открыть веб-инструкции",
+            deleteAccountDone = "Аккаунт удалён",
         )
     } else {
         RiverStrings(
@@ -226,6 +244,7 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             password = "Password",
             showPassword = "Show password",
             hidePassword = "Hide password",
+            cancel = "Cancel",
             signIn = "Sign in",
             createAccount = "Create account",
             needAccount = "Need an account?",
@@ -322,6 +341,14 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             totalWeight = "Total weight",
             totalCount = "Total caught",
             language = "Language",
+            support = "Support",
+            privacyPolicy = "Privacy policy",
+            deleteAccount = "Delete account",
+            deleteAccountTitle = "Delete your RiverKing account?",
+            deleteAccountMessage = "This permanently removes the profile, progression, catches, quests, club data, and linked sessions.",
+            deleteAccountConfirm = "Delete forever",
+            deleteAccountWeb = "Open web instructions",
+            deleteAccountDone = "Account deleted",
         )
     }
 }

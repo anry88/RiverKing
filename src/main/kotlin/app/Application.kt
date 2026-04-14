@@ -36,6 +36,9 @@ fun main() {
         // API for Mini App
         apiRoutes(env)
 
+        // Public support and policy pages
+        publicPagesRoutes(env)
+
         // Telegram bot webhook
         botRoutes(env)
 

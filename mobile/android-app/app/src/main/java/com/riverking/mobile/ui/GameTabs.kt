@@ -130,6 +130,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AchievementRewardDto
@@ -214,6 +215,10 @@ fun MainShell(
     isPlayFlavor: Boolean,
     requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    onOpenSupport: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
+    onOpenAccountDeletionHelp: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onClaimDaily: () -> Unit,
     onBeginCast: () -> Unit,
@@ -269,13 +274,14 @@ fun MainShell(
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
     var showTelegramAccountSheet by rememberSaveable { mutableStateOf(false) }
     var showReferralSheet by rememberSaveable { mutableStateOf(false) }
+    var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
 
     val tournamentBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
     val showReferralMenuItem =
-        canShowTelegramReferral(state.authProvider, me) || canShowGooglePlayReferral(state.authProvider, me)
+        canShowTelegramReferral(state.authProvider, me) || canShowStoreReferral(state.authProvider, me)
     val tabLabels = remember(strings) {
         mapOf(
             MainTab.FISHING to strings.fishing,
@@ -295,6 +301,9 @@ fun MainShell(
                 strings = strings,
                 onOpenDaily = { showDailyRewardSheet = true },
                 onLogout = onLogout,
+                onDeleteAccount = { showDeleteAccountDialog = true },
+                onOpenSupport = onOpenSupport,
+                onOpenPrivacyPolicy = onOpenPrivacyPolicy,
                 onChangeLanguage = onChangeLanguage,
                 onOpenNicknameChange = {
                     onUpdateNickname(me.username ?: "")
@@ -537,6 +546,39 @@ fun MainShell(
             onShareReferral = onShareReferral,
             onClaimReferralRewards = onClaimReferralRewards,
             onDismiss = { showReferralSheet = false },
+        )
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = { Text(strings.deleteAccountTitle) },
+            text = { Text(strings.deleteAccountMessage) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        onDeleteAccount()
+                    },
+                ) {
+                    Text(strings.deleteAccountConfirm)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            showDeleteAccountDialog = false
+                            onOpenAccountDeletionHelp()
+                        },
+                    ) {
+                        Text(strings.deleteAccountWeb)
+                    }
+                    TextButton(onClick = { showDeleteAccountDialog = false }) {
+                        Text(strings.cancel)
+                    }
+                }
+            },
         )
     }
 }
@@ -853,6 +895,9 @@ private fun HeaderBar(
     strings: RiverStrings,
     onOpenDaily: () -> Unit,
     onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    onOpenSupport: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onOpenNicknameChange: () -> Unit,
     onOpenTelegramAccount: () -> Unit,
@@ -946,6 +991,22 @@ private fun HeaderBar(
                             onChangeLanguage(newLang)
                         },
                     )
+                    DropdownMenuItem(
+                        text = { Text("\uD83D\uDEE0\uFE0F  ${strings.support}") },
+                        colors = riverMenuItemColors(),
+                        onClick = {
+                            menuExpanded = false
+                            onOpenSupport()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("\uD83D\uDD12  ${strings.privacyPolicy}") },
+                        colors = riverMenuItemColors(),
+                        onClick = {
+                            menuExpanded = false
+                            onOpenPrivacyPolicy()
+                        },
+                    )
                     HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text(text = strings.logout, fontWeight = FontWeight.SemiBold) },
@@ -953,6 +1014,14 @@ private fun HeaderBar(
                         onClick = {
                             menuExpanded = false
                             onLogout()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(text = strings.deleteAccount, fontWeight = FontWeight.SemiBold) },
+                        colors = riverMenuItemColors(destructive = true),
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteAccount()
                         },
                     )
                 }
@@ -4104,7 +4173,7 @@ private fun ReferralSheet(
     onDismiss: () -> Unit,
 ) {
     val showTelegramVariant = canShowTelegramReferral(sessionAuthProvider, me)
-    val showGoogleVariant = canShowGooglePlayReferral(sessionAuthProvider, me)
+    val showGoogleVariant = canShowStoreReferral(sessionAuthProvider, me)
     val referral = state.referrals
 
     ModalBottomSheet(
@@ -4158,9 +4227,9 @@ private fun ReferralSheet(
                         }
                         if (showGoogleVariant) {
                             ReferralVariantCard(
-                                title = "Google Play",
-                                link = googlePlayReferralLink(referral.token),
-                                shareBody = googlePlayReferralShareText(strings, referral.token),
+                                title = if (BuildConfig.DISTRIBUTION_CHANNEL == "play") "Google Play" else "itch.io",
+                                link = storeReferralLink(referral.token, referral.webFallbackLink),
+                                shareBody = storeReferralShareText(strings, referral.token, referral.webFallbackLink),
                                 clipboard = clipboard,
                                 strings = strings,
                                 onShareReferral = onShareReferral,
@@ -4252,28 +4321,46 @@ private fun canShowTelegramReferral(
     else -> false
 }
 
-private fun canShowGooglePlayReferral(
+private fun canShowStoreReferral(
     sessionAuthProvider: String?,
     me: MeResponseDto,
 ): Boolean = when (sessionAuthProvider) {
-    AuthRepository.AUTH_PROVIDER_GOOGLE -> true
-    AuthRepository.AUTH_PROVIDER_TELEGRAM,
+    AuthRepository.AUTH_PROVIDER_TELEGRAM -> false
+    AuthRepository.AUTH_PROVIDER_GOOGLE,
     AuthRepository.AUTH_PROVIDER_PASSWORD,
-    -> false
-    null -> me.authProviders.contains(AuthRepository.AUTH_PROVIDER_GOOGLE)
+    -> true
+    null -> me.authProviders.any {
+        it == AuthRepository.AUTH_PROVIDER_GOOGLE || it == AuthRepository.AUTH_PROVIDER_PASSWORD
+    }
     else -> false
 }
 
-private fun googlePlayReferralLink(token: String): String =
-    "https://play.google.com/store/apps/details?id=com.riverking.mobile.play&referrer=${Uri.encode("ref=$token")}"
-
-private fun googlePlayReferralShareText(strings: RiverStrings, token: String): String {
-    val playLink = googlePlayReferralLink(token)
-    val deepLink = "riverking://referral?token=$token"
-    return if (strings.login == "Логин") {
-        "Играй в RiverKing на Android: $playLink\nЕсли игра уже установлена, открой: $deepLink"
+private fun storeReferralLink(token: String, webFallbackLink: String): String {
+    return if (BuildConfig.DISTRIBUTION_CHANNEL == "play") {
+        val separator = if (BuildConfig.PLAY_STORE_URL.contains("?")) "&" else "?"
+        "${BuildConfig.PLAY_STORE_URL}$separator" +
+            "referrer=${Uri.encode("ref=$token")}"
     } else {
-        "Play RiverKing on Android: $playLink\nIf the game is already installed, open: $deepLink"
+        BuildConfig.ITCH_PROJECT_URL.takeIf { it.isNotBlank() }
+            ?: webFallbackLink.ifBlank { BuildConfig.SUPPORT_URL }
+    }
+}
+
+private fun storeReferralShareText(strings: RiverStrings, token: String, webFallbackLink: String): String {
+    val storeLink = storeReferralLink(token, webFallbackLink)
+    val deepLink = "riverking://referral?token=$token"
+    return if (BuildConfig.DISTRIBUTION_CHANNEL == "play") {
+        if (strings.login == "Логин") {
+            "Играй в RiverKing на Android: $storeLink\nЕсли игра уже установлена, открой: $deepLink"
+        } else {
+            "Play RiverKing on Android: $storeLink\nIf the game is already installed, open: $deepLink"
+        }
+    } else {
+        if (strings.login == "Логин") {
+            "Скачай RiverKing для Android: $storeLink\nЕсли игра уже установлена, открой: $deepLink"
+        } else {
+            "Download RiverKing for Android: $storeLink\nIf the game is already installed, open: $deepLink"
+        }
     }
 }
 

@@ -304,6 +304,11 @@ class AuthRepository(
         sessionStore.clear()
     }
 
+    suspend fun deleteAccount() {
+        withFreshAccessToken { accessToken -> api.deleteAccount(accessToken) }
+        sessionStore.clear()
+    }
+
     suspend fun describeError(error: Throwable): String = when (error) {
         is ClientRequestException -> error.response.readErrorMessage() ?: "Request failed"
         is ServerResponseException -> error.response.readErrorMessage() ?: "Server error"

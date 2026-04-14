@@ -34,6 +34,7 @@ import service.PrizeSource
 import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
+import service.AccountDeletionService
 import db.AuthIdentities
 import db.Payments
 import db.Users
@@ -62,6 +63,7 @@ fun Application.apiRoutes(
     val clubs = ClubService()
     val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val bot = TelegramBot(env.botToken)
+    val accountDeletion = AccountDeletionService(clubs)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
 
     // Use the Plugins phase so that sessions are already available
@@ -549,6 +551,13 @@ fun Application.apiRoutes(
                 return@post call.respond(HttpStatusCode.BadRequest)
             }
             auth.logout(req.refreshToken)
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        post("/api/account/delete") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            accountDeletion.deleteAccount(uid)
+            call.sessions.clear<AppSession>()
             call.respond(HttpStatusCode.NoContent)
         }
 
