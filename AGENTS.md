@@ -116,6 +116,6 @@ Seed data and schema compatibility matter because the Mini App and bot both depe
 - If you change the product scope or operating model, update `docs/product-overview.md`.
 - If you change package structure or runtime surfaces, update `AGENTS.md` and the nearest package README.
 - If you change a server API contract, verify compatibility across Telegram bot flows, the Telegram Mini App, and the Android client before closing the task. Prefer additive response changes over breaking field changes.
-- Commit important implementation milestones as separate commits so the history clearly shows the progression of the work. Avoid batching multiple major steps into one opaque commit.
+- After each completed block of work, create a separate commit if there are changes to save so the history remains complete and incremental. Do not batch multiple finished tasks into one opaque commit.
 - Keep public claims honest: do not describe flows, admin tooling, or analytics that the code does not actually support.
 - Treat `docs/screenshots/` as showcase assets. Refresh them when the visible product surface changes in a meaningful way.
