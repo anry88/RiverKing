@@ -4309,7 +4309,7 @@ private fun ShopPackageRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AsyncImage(
-                model = shopIconAsset(pack.id),
+                model = pack.rodCode?.let(::rodImageAsset) ?: shopIconAsset(pack.id),
                 contentDescription = pack.name,
                 modifier = Modifier
                     .size(56.dp)
