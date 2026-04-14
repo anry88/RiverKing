@@ -156,6 +156,7 @@ import com.riverking.mobile.auth.RodDto
 import com.riverking.mobile.auth.ShopPackageDto
 import com.riverking.mobile.auth.TournamentDto
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -1669,13 +1670,21 @@ private fun ClubScreen(
     onLeaveClub: () -> Unit,
     onMemberAction: (Long, String) -> Unit,
 ) {
+    val me = state.me
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var createName by rememberSaveable { mutableStateOf("") }
     var infoDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.info.orEmpty()) }
     var minWeightDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(((state.club.club?.minJoinWeightKg ?: 0.0).toInt()).toString()) }
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
+    var selectedWeek by rememberSaveable(state.club.club?.id) { mutableStateOf("current") }
     val club = state.club.club
     val canManageClub = club?.role == "president" || club?.role == "heir"
+    val weekData = if (selectedWeek == "previous") club?.previousWeek else club?.currentWeek
+    val createCostCoins = 1_000L
+    val minCreateWeightKg = 1_000.0
+    val hasCreateWeight = (me?.totalWeight ?: 0.0) >= minCreateWeightKg
+    val hasCreateCoins = (me?.coins ?: 0L) >= createCostCoins
+    val canCreateClub = hasCreateWeight && hasCreateCoins
     var chatOpen by rememberSaveable(club?.id) { mutableStateOf(false) }
     val chatListState = rememberLazyListState()
 
@@ -1751,7 +1760,67 @@ private fun ClubScreen(
                 }
                 item {
                     SectionCard(strings.prizes) {
-                        ClubWeekSection(strings, club.currentWeek, club.role, onMemberAction)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { selectedWeek = "current" },
+                                modifier = Modifier.weight(1f),
+                                colors = if (selectedWeek == "current") {
+                                    ButtonDefaults.outlinedButtonColors(
+                                        containerColor = RiverMoss.copy(alpha = 0.24f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                } else {
+                                    riverOutlinedButtonColors()
+                                },
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(if (strings.login == "Логин") "Текущая неделя" else "This week")
+                            }
+                            OutlinedButton(
+                                onClick = { selectedWeek = "previous" },
+                                modifier = Modifier.weight(1f),
+                                colors = if (selectedWeek == "previous") {
+                                    ButtonDefaults.outlinedButtonColors(
+                                        containerColor = RiverMoss.copy(alpha = 0.24f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                } else {
+                                    riverOutlinedButtonColors()
+                                },
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(if (strings.login == "Логин") "Прошлая неделя" else "Last week")
+                            }
+                        }
+                        Text(
+                            weekData?.weekStart?.let { formatWeekRange(it, strings) }.orEmpty(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (weekData == null || weekData.members.isEmpty()) {
+                            EmptyStatePanel(
+                                if (strings.login == "Логин") "Пока нет взносов." else "No contributions yet.",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            ClubWeekSection(
+                                strings = strings,
+                                week = weekData,
+                                role = club.role,
+                                allowActions = selectedWeek == "current",
+                                onMemberAction = onMemberAction,
+                            )
+                        }
+                        Text(
+                            if (strings.login == "Логин") {
+                                "Итого за неделю: ${weekData?.totalCoins ?: 0} монет"
+                            } else {
+                                "Weekly total: ${weekData?.totalCoins ?: 0} coins"
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 item {
@@ -1805,15 +1874,60 @@ private fun ClubScreen(
                 }
                 item {
                     SectionCard(strings.createClub) {
-                        OutlinedTextField(
-                            value = createName,
-                            onValueChange = { createName = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(strings.createClub) },
+                        Text(
+                            if (strings.login == "Логин") "До 20 символов, без ругательств." else "Up to 20 characters, no profanity.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { onCreateClub(createName) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(strings.createClub)
+                        InfoCard {
+                            Text(
+                                if (strings.login == "Логин") "Требования для создания" else "Creation requirements",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                if (strings.login == "Логин") {
+                                    "${if (hasCreateWeight) "✓" else "•"} Минимум ${minCreateWeightKg.toInt()} кг общего улова. Сейчас: ${String.format(Locale.US, "%.0f кг", me?.totalWeight ?: 0.0)}"
+                                } else {
+                                    "${if (hasCreateWeight) "✓" else "•"} At least ${minCreateWeightKg.toInt()} kg total catch. Now: ${String.format(Locale.US, "%.0f kg", me?.totalWeight ?: 0.0)}"
+                                },
+                                color = if (hasCreateWeight) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                if (strings.login == "Логин") {
+                                    "${if (hasCreateCoins) "✓" else "•"} Стоимость создания: $createCostCoins монет. Сейчас: ${me?.coins ?: 0}"
+                                } else {
+                                    "${if (hasCreateCoins) "✓" else "•"} Creation cost: $createCostCoins coins. Now: ${me?.coins ?: 0}"
+                                },
+                                color = if (hasCreateCoins) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (!hasCreateWeight) {
+                            Text(
+                                if (strings.login == "Логин") "Нужно наловить минимум 1000 кг рыбы." else "Catch at least 1000 kg of fish.",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        } else {
+                            if (!hasCreateCoins) {
+                                Text(
+                                    if (strings.login == "Логин") "Недостаточно монет для создания клуба." else "Not enough coins to create a club.",
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                            OutlinedTextField(
+                                value = createName,
+                                onValueChange = { createName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(strings.createClub) },
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { onCreateClub(createName) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = canCreateClub,
+                            ) {
+                                Text(
+                                    if (strings.login == "Логин") "Создать за $createCostCoins монет" else "Create for $createCostCoins coins"
+                                )
+                            }
                         }
                     }
                 }
@@ -4106,6 +4220,7 @@ private fun ClubChatWindow(
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 18.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 items(messages, key = { it.id }) { item ->
@@ -4159,13 +4274,12 @@ private fun ClubWeekSection(
     strings: RiverStrings,
     week: com.riverking.mobile.auth.ClubWeekDto,
     role: String,
+    allowActions: Boolean,
     onMemberAction: (Long, String) -> Unit,
 ) {
-    Text(formatWeek(week.weekStart), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(modifier = Modifier.height(8.dp))
     week.members.forEachIndexed { index, member ->
         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-        ClubMemberRow(strings, member, role, onMemberAction)
+        ClubMemberRow(strings, member, role, allowActions, onMemberAction)
     }
 }
 
@@ -4174,6 +4288,7 @@ private fun ClubMemberRow(
     strings: RiverStrings,
     member: ClubMemberDto,
     actorRole: String,
+    allowActions: Boolean,
     onMemberAction: (Long, String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -4188,7 +4303,7 @@ private fun ClubMemberRow(
             }
             Text(member.coins.toString(), color = MaterialTheme.colorScheme.secondary)
         }
-        if (actorRole == "president" || actorRole == "heir") {
+        if (allowActions && (actorRole == "president" || actorRole == "heir")) {
             HorizontalChipRow {
                 if (member.role == "novice" || member.role == "veteran") {
                     AssistChip(onClick = { onMemberAction(member.userId, "promote") }, label = { Text("+") })
@@ -5598,11 +5713,15 @@ private fun formatTimestamp(value: String): String =
             .format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm"))
     }.getOrElse { value }
 
-private fun formatWeek(value: String): String =
+private fun formatWeekRange(value: String, strings: RiverStrings): String =
     runCatching {
-        Instant.parse("${value}T00:00:00Z")
-            .atZone(ZoneId.of("Europe/Belgrade"))
-            .format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+        val start = LocalDate.parse(value)
+        val end = start.plusDays(6)
+        val formatter = DateTimeFormatter.ofPattern(
+            "dd MMM",
+            if (strings.login == "Логин") Locale("ru", "RU") else Locale.US,
+        )
+        "${start.format(formatter)} – ${end.format(formatter)}"
     }.getOrElse { value }
 
 private val clubChatJson = Json { ignoreUnknownKeys = true }

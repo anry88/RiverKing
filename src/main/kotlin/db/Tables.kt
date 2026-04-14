@@ -74,6 +74,7 @@ object DB {
                 Clubs,
                 ClubMembers,
                 ClubWeeklyContributions,
+                ClubWeeklySnapshots,
                 ClubWeeklyRewards,
                 ClubChatMessages,
                 SubscriptionNotifications,
@@ -1742,6 +1743,16 @@ object ClubWeeklyContributions : Table() {
     val clubId = reference("club_id", Clubs)
     val userId = reference("user_id", Users)
     val weekStart = date("week_start")
+    val coins = integer("coins").default(0)
+    override val primaryKey = PrimaryKey(clubId, userId, weekStart)
+}
+
+object ClubWeeklySnapshots : Table() {
+    val clubId = reference("club_id", Clubs)
+    val userId = reference("user_id", Users)
+    val weekStart = date("week_start")
+    val name = varchar("name", 100).nullable()
+    val role = varchar("role", 20)
     val coins = integer("coins").default(0)
     override val primaryKey = PrimaryKey(clubId, userId, weekStart)
 }

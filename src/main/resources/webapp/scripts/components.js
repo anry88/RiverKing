@@ -842,6 +842,16 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   if(!active) return null;
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
+  const viewingPreviousWeek = clubTab === 'previous';
+  const formatWeekRange = (weekStartValue) => {
+    if(!weekStartValue) return '';
+    const start = new Date(`${weekStartValue}T00:00:00`);
+    if(Number.isNaN(start.getTime())) return weekStartValue;
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const formatter = new Intl.DateTimeFormat(coinLocale, { day:'2-digit', month:'2-digit' });
+    return `${formatter.format(start)}–${formatter.format(end)}`;
+  };
 
   const handleLeave = async () => {
     if(!window.confirm(t('clubConfirmLeave'))) return;
@@ -1120,6 +1130,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             >{t('clubPreviousWeek')}</button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            <div className="text-xs opacity-70">{formatWeekRange(weekData?.weekStart)}</div>
             {(weekData?.members || []).length === 0 ? (
               <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
             ) : (
@@ -1134,7 +1145,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                     </div>
                     <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
                   </div>
-                  {canManageMembers && canActOnMember(member) && (
+                  {!viewingPreviousWeek && canManageMembers && canActOnMember(member) && (
                     <div className="flex flex-wrap gap-2 text-xs">
                       {member.role !== 'heir' && member.role !== 'president' && (
                         <button
