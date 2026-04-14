@@ -674,7 +674,7 @@ private fun CatchStatsSheet(
                     ) {
                         StatPill(
                             title = strings.totalWeight,
-                            value = String.format(Locale.US, "%.2f kg", stats.totalWeight),
+                            value = stats.totalWeight.asKgCompact(strings),
                             modifier = Modifier.weight(1f),
                         )
                         StatPill(
@@ -708,7 +708,7 @@ private fun CatchStatsSheet(
                                     )
                                 }
                                 Text(
-                                    text = "${rarity.count} • ${String.format(Locale.US, "%.2f kg", rarity.weight)}",
+                                    text = "${rarity.count} • ${rarity.weight.asKgCompact(strings)}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1084,7 +1084,7 @@ private fun FishingScreen(
                         CatchRow(
                             title = recent.fish,
                             subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
-                            value = recent.weight.asKgCompact(),
+                            value = recent.weight.asKgCompact(strings),
                             fishName = recent.fish,
                             fishAccent = rarityColor(recent.rarity),
                             onClick = {
@@ -1204,7 +1204,7 @@ private fun TournamentsScreen(
                             CatchRow(
                                 title = "#${entry.rank} ${entry.user ?: "Unknown"}",
                                 subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
-                                value = entry.value.asKgCompact(),
+                                value = entry.value.asKgCompact(strings),
                                 fishName = entry.fish,
                                 fishDiscovered = me?.let {
                                     isFishDiscovered(
@@ -1278,6 +1278,9 @@ private fun RatingsScreen(
     val me = state.me ?: return
     val ratings = state.ratings
     val ratingPrizes = state.tournaments.prizes.filter(::isRatingPrize)
+    val sortedFishOptions = remember(ratings.fishOptions) {
+        ratings.fishOptions.sortedBy { it.name.lowercase(Locale.ROOT) }
+    }
     val showPrizePreview = ratings.mode == RatingsMode.GLOBAL &&
         ratings.fishId == "all" &&
         ratings.locationId != "all" &&
@@ -1312,65 +1315,64 @@ private fun RatingsScreen(
         }
         item {
             SectionCard(strings.ratings) {
-                HorizontalChipRow {
-                    RatingsMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = ratings.mode == mode,
-                            onClick = { onSetMode(mode) },
-                            label = { Text(if (mode == RatingsMode.PERSONAL) strings.personal else strings.global) },
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalChipRow {
-                    RatingsPeriod.entries.forEach { period ->
-                        AssistChip(
-                            onClick = { onSetPeriod(period) },
-                            label = { Text(strings.periodLabel(period)) },
-                            colors = chipColors(selected = ratings.period == period),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalChipRow {
-                    RatingsOrder.entries.forEach { order ->
-                        AssistChip(
-                            onClick = { onSetOrder(order) },
-                            label = { Text(strings.orderLabel(order)) },
-                            colors = chipColors(selected = ratings.order == order),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalChipRow {
-                    AssistChip(
-                        onClick = { onSetLocation("all") },
-                        label = { Text(strings.allLocations) },
-                        colors = chipColors(selected = ratings.locationId == "all"),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SegmentedSelectionBar(
+                        modifier = Modifier.weight(1f),
+                        items = RatingsMode.entries.toList(),
+                        selected = ratings.mode,
+                        onSelect = onSetMode,
+                        accentFor = { RiverTide },
+                        labelFor = {
+                            if (it == RatingsMode.PERSONAL) strings.personal else strings.global
+                        },
                     )
-                    me.locations.forEach { location ->
-                        AssistChip(
-                            onClick = { onSetLocation(location.id.toString()) },
-                            label = { Text(location.name) },
-                            colors = chipColors(selected = ratings.locationId == location.id.toString()),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalChipRow {
-                    AssistChip(
-                        onClick = { onSetFish("all") },
-                        label = { Text(strings.allFish) },
-                        colors = chipColors(selected = ratings.fishId == "all"),
+                    SegmentedSelectionBar(
+                        modifier = Modifier.weight(1f),
+                        items = RatingsOrder.entries.toList(),
+                        selected = ratings.order,
+                        onSelect = onSetOrder,
+                        accentFor = { RiverAmber },
+                        labelFor = strings::orderLabel,
                     )
-                    ratings.fishOptions.forEach { fish ->
-                        AssistChip(
-                            onClick = { onSetFish(fish.id.toString()) },
-                            label = { Text(fish.name) },
-                            colors = chipColors(selected = ratings.fishId == fish.id.toString()),
-                        )
-                    }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                SelectionDropdown(
+                    title = if (strings.login == "Логин") "Период" else "Period",
+                    selectedLabel = strings.periodLabel(ratings.period),
+                    options = RatingsPeriod.entries.map { it.apiValue to strings.periodLabel(it) },
+                    selectedKey = ratings.period.apiValue,
+                    onSelect = { key ->
+                        RatingsPeriod.entries.firstOrNull { it.apiValue == key }?.let(onSetPeriod)
+                    },
+                    accent = RiverAmber,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                SelectionDropdown(
+                    title = if (strings.login == "Логин") "Локация" else "Location",
+                    selectedLabel = me.locations.firstOrNull { it.id.toString() == ratings.locationId }?.name ?: strings.allLocations,
+                    options = buildList {
+                        add("all" to strings.allLocations)
+                        addAll(me.locations.map { it.id.toString() to it.name })
+                    },
+                    selectedKey = ratings.locationId,
+                    onSelect = onSetLocation,
+                    accent = RiverTide,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                SelectionDropdown(
+                    title = if (strings.login == "Логин") "Рыба" else "Fish",
+                    selectedLabel = sortedFishOptions.firstOrNull { it.id.toString() == ratings.fishId }?.name ?: strings.allFish,
+                    options = buildList {
+                        add("all" to strings.allFish)
+                        addAll(sortedFishOptions.map { it.id.toString() to it.name })
+                    },
+                    selectedKey = ratings.fishId,
+                    onSelect = onSetFish,
+                    accent = RiverMoss,
+                )
             }
         }
         item {
@@ -1749,7 +1751,7 @@ private fun ClubScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(summary.name, fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    "${summary.memberCount}/${summary.capacity} • ${summary.minJoinWeightKg.asKgCompact()}",
+                                    "${summary.memberCount}/${summary.capacity} • ${summary.minJoinWeightKg.asKgCompact(strings)}",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -2360,7 +2362,7 @@ private fun FishingOutcomeCard(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        catch.weight.asKgCompact(),
+                        catch.weight.asKgCompact(strings),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                     )
@@ -2519,6 +2521,7 @@ private fun FishingSetupDivider() {
 
 @Composable
 private fun <T> SegmentedSelectionBar(
+    modifier: Modifier = Modifier,
     items: List<T>,
     selected: T,
     onSelect: (T) -> Unit,
@@ -2527,7 +2530,7 @@ private fun <T> SegmentedSelectionBar(
     badgeFor: ((T) -> Boolean)? = null,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         color = RiverPanelMuted.copy(alpha = 0.94f),
         border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
@@ -2609,7 +2612,7 @@ private fun RarityDropdown(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
+                .height(56.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .clickable { expanded = true },
             shape = RoundedCornerShape(18.dp),
@@ -2697,6 +2700,92 @@ private fun RarityDropdown(
 }
 
 @Composable
+private fun SelectionDropdown(
+    title: String,
+    selectedLabel: String,
+    options: List<Pair<String, String>>,
+    selectedKey: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color = RiverTide,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .clickable { expanded = true },
+            shape = RoundedCornerShape(18.dp),
+            color = RiverPanelSoft.copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = selectedLabel,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = "▾",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.92f),
+            shape = RoundedCornerShape(22.dp),
+            containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+        ) {
+            options.forEach { (key, label) ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = label,
+                            color = if (selectedKey == key) accent else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (selectedKey == key) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = riverMenuItemColors(),
+                    onClick = {
+                        expanded = false
+                        onSelect(key)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun CaughtOnlyToggleCard(
     strings: RiverStrings,
     checked: Boolean,
@@ -2706,7 +2795,7 @@ private fun CaughtOnlyToggleCard(
     val accent = if (checked) RiverMoss else RiverOutline
     Surface(
         modifier = modifier
-            .heightIn(min = 56.dp)
+            .height(56.dp)
             .clip(RoundedCornerShape(18.dp))
             .clickable { onCheckedChange(!checked) },
         shape = RoundedCornerShape(18.dp),
@@ -2716,10 +2805,28 @@ private fun CaughtOnlyToggleCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = if (strings.login == "Логин") "Улов" else "Catch",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = if (strings.login == "Логин") "Пойманные" else "Caught",
+                    color = if (checked) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Checkbox(
                 checked = checked,
                 onCheckedChange = null,
@@ -2728,14 +2835,6 @@ private fun CaughtOnlyToggleCard(
                     uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     checkmarkColor = RiverDeepNight,
                 ),
-            )
-            Text(
-                text = if (strings.login == "Логин") "Пойманные" else "Caught",
-                color = if (checked) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -3068,9 +3167,9 @@ private fun LocationPickerSheet(
                 title = location.name,
                 subtitle = if (location.unlocked) {
                     strings.currentLabel.takeIf { me.locationId == location.id }
-                        ?: location.unlockKg.asKgCompact()
+                        ?: location.unlockKg.asKgCompact(strings)
                 } else {
-                    location.unlockKg.asKgCompact()
+                    location.unlockKg.asKgCompact(strings)
                 },
                 enabled = location.unlocked,
                 selected = me.locationId == location.id,
@@ -3096,8 +3195,8 @@ private fun RodPickerSheet(
                     append(strings.rodBonusLabel(rod.bonusWater, rod.bonusPredator))
                     append(" • ")
                     append(
-                        if (rod.unlocked) rod.unlockKg.asKgCompact()
-                        else rod.unlockKg.asKgCompact()
+                        if (rod.unlocked) rod.unlockKg.asKgCompact(strings)
+                        else rod.unlockKg.asKgCompact(strings)
                     )
                 },
                 enabled = rod.unlocked,
@@ -3465,7 +3564,7 @@ private fun GuideRodRow(
                     label = when {
                         ownedRod?.unlocked == true -> unlockedLabel(strings)
                         ownedRod?.priceStars != null ->
-                            if (strings.login == "Логин") "Откроется на ${rod.unlockKg.asGuideKg()} • ${ownedRod.priceStars}★" else "Unlocks at ${rod.unlockKg.asGuideKg()} • ${ownedRod.priceStars}★"
+                            if (strings.login == "Логин") "Откроется на ${rod.unlockKg.asGuideKg(strings)} • ${ownedRod.priceStars}★" else "Unlocks at ${rod.unlockKg.asGuideKg(strings)} • ${ownedRod.priceStars}★"
                         else -> requiresKgLabel(strings, rod.unlockKg)
                     },
                     accent = if (ownedRod?.unlocked == true) Color(0xFF7CE38B) else Color(0xFFC9A46E),
@@ -3775,7 +3874,7 @@ private fun TournamentCard(
                 }
                 mine?.let {
                     SceneBadge(
-                        text = "#${it.rank} • ${tournamentMetricValueLabel(tournament.metric, it.value)}",
+                        text = "#${it.rank} • ${tournamentMetricValueLabel(strings, tournament.metric, it.value)}",
                         accent = Color(0xFF6FE7B7),
                     )
                 }
@@ -3962,7 +4061,7 @@ private fun RatingsEntryCard(
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(catch.weight.asKgCompact(), fontWeight = FontWeight.Bold)
+                Text(catch.weight.asKgCompact(strings), fontWeight = FontWeight.Bold)
                 Text(
                     strings.rarityLabel(catch.rarity),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -4028,7 +4127,7 @@ private fun TournamentLeaderboardRow(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        tournamentMetricValueLabel(tournament.metric, entry.value),
+                        tournamentMetricValueLabel(strings, tournament.metric, entry.value),
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
                     )
@@ -4232,7 +4331,7 @@ private fun CatchDetailsDialog(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            catch.weight.asKgCompact(),
+                            catch.weight.asKgCompact(strings),
                             color = accent,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
@@ -4263,7 +4362,7 @@ private fun CatchDetailsDialog(
                     Text(
                         listOfNotNull(
                             rarityKey?.let(strings::rarityLabel),
-                            catch.weight.asKgCompact(),
+                            catch.weight.asKgCompact(strings),
                             catch.location,
                         ).joinToString(" • "),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -4835,9 +4934,9 @@ private fun tournamentMetricLabel(strings: RiverStrings, metric: String): String
     else -> metric
 }
 
-private fun tournamentMetricValueLabel(metric: String, value: Double): String = when (metric) {
+private fun tournamentMetricValueLabel(strings: RiverStrings, metric: String, value: Double): String = when (metric) {
     "count" -> value.toInt().toString()
-    else -> value.asKgCompact()
+    else -> value.asKgCompact(strings)
 }
 
 private fun tournamentEntryCatch(tournament: TournamentDto, entry: LeaderboardEntryDto): CatchDto? {
@@ -4980,7 +5079,7 @@ private fun unlockedLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Открыто" else "Unlocked"
 
 private fun requiresKgLabel(strings: RiverStrings, unlockKg: Double): String =
-    if (strings.login == "Логин") "Откроется на ${unlockKg.asGuideKg()}" else "Unlock at ${unlockKg.asGuideKg()}"
+    if (strings.login == "Логин") "Откроется на ${unlockKg.asGuideKg(strings)}" else "Unlock at ${unlockKg.asGuideKg(strings)}"
 
 private fun catchToLearnLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Поймайте, чтобы открыть" else "Catch it to reveal details"
@@ -4991,7 +5090,8 @@ private fun discoveredLabel(strings: RiverStrings): String =
 private fun hiddenLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Скрыто" else "Hidden"
 
-private fun Double.asGuideKg(): String = String.format(Locale.US, "%.0f kg", this)
+private fun Double.asGuideKg(strings: RiverStrings): String =
+    String.format(Locale.US, "%.0f %s", this, if (strings.login == "Логин") "кг" else "kg")
 
 private fun phaseAccentColor(phase: FishingPhase): Color = when (phase) {
     FishingPhase.READY -> RiverTide
@@ -5004,7 +5104,8 @@ private fun phaseAccentColor(phase: FishingPhase): Color = when (phase) {
 
 private fun stringsArrow(): String = "›"
 
-private fun Double.asKgCompact(): String = String.format(Locale.US, "%.2f kg", this)
+private fun Double.asKgCompact(strings: RiverStrings): String =
+    String.format(Locale.US, "%.2f %s", this, if (strings.login == "Логин") "кг" else "kg")
 
 private fun String?.rarityLabel(strings: RiverStrings): String = strings.rarityLabel(this)
 
