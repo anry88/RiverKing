@@ -1620,17 +1620,24 @@ private fun CatalogGearScreen(
                     } ?: EmptyStatePanel(strings.noData)
                 }
                 GearSection.LURES -> SectionCard(strings.guideLures) {
-                    guide.guide?.lures?.forEachIndexed { index, lure ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLureRow(
-                            strings = strings,
-                            lure = lure,
-                            locationDetails = buildGuideLureLocationDetails(
-                                lure = lure,
-                                guideLocations = guide.guide?.locations.orEmpty(),
-                            ),
-                        )
-                    } ?: EmptyStatePanel(strings.noData)
+                    val lureGroups = buildGuideLureGroups(
+                        strings = strings,
+                        lures = guide.guide?.lures.orEmpty(),
+                        guideLocations = guide.guide?.locations.orEmpty(),
+                    )
+                    if (lureGroups.isEmpty()) {
+                        EmptyStatePanel(strings.noData)
+                    } else {
+                        lureGroups.forEachIndexed { index, lureGroup ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            GuideLureRow(
+                                strings = strings,
+                                title = lureGroup.title,
+                                fishCount = lureGroup.fish.size,
+                                locationDetails = lureGroup.locationDetails,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -3518,17 +3525,57 @@ private data class GuideLureLocationDetails(
     val fish: List<FishBriefDto>,
 )
 
+private data class GuideLureGroup(
+    val title: String,
+    val fish: List<FishBriefDto>,
+    val locationDetails: List<GuideLureLocationDetails>,
+)
+
+private fun buildGuideLureGroups(
+    strings: RiverStrings,
+    lures: List<GuideLureDto>,
+    guideLocations: List<GuideLocationDto>,
+): List<GuideLureGroup> {
+    val grouped = lures.groupBy { lureGuideGroupKey(it.name) }
+    val desiredOrder = listOf("fresh_peace", "fresh_predator", "salt_peace", "salt_predator")
+    return grouped.entries
+        .sortedWith(
+            compareBy<Map.Entry<String, List<GuideLureDto>>>(
+                { desiredOrder.indexOf(it.key).let { index -> if (index >= 0) index else Int.MAX_VALUE } },
+                { it.value.firstOrNull()?.name.orEmpty() },
+            )
+        )
+        .map { (groupKey, members) ->
+            val fish = members
+                .flatMap { it.fish }
+                .distinctBy { it.name }
+                .sortedBy { guideRaritySortRank(it.rarity) }
+            val memberNames = members.map { it.name }.toSet()
+            GuideLureGroup(
+                title = lureGuideGroupTitle(strings, groupKey, members.map { it.name }),
+                fish = fish,
+                locationDetails = buildGuideLureLocationDetails(
+                    lureNames = memberNames,
+                    fish = fish,
+                    guideLocations = guideLocations,
+                ),
+            )
+        }
+}
+
 private fun buildGuideLureLocationDetails(
-    lure: GuideLureDto,
+    lureNames: Set<String>,
+    fish: List<FishBriefDto>,
     guideLocations: List<GuideLocationDto>,
 ): List<GuideLureLocationDetails> {
-    val fishByName = lure.fish.associateBy { it.name }
+    val fishByName = fish.associateBy { it.name }
     return guideLocations.mapNotNull { location ->
-        if (!location.lures.contains(lure.name)) return@mapNotNull null
-        val fish = location.fish
+        if (location.lures.none(lureNames::contains)) return@mapNotNull null
+        val filteredFish = location.fish
             .mapNotNull { fishByName[it.name] }
+            .distinctBy { it.name }
             .sortedBy { guideRaritySortRank(it.rarity) }
-        GuideLureLocationDetails(location.name, fish)
+        GuideLureLocationDetails(location.name, filteredFish)
     }
 }
 
@@ -3536,12 +3583,13 @@ private fun buildGuideLureLocationDetails(
 @Composable
 private fun GuideLureRow(
     strings: RiverStrings,
-    lure: GuideLureDto,
+    title: String,
+    fishCount: Int,
     locationDetails: List<GuideLureLocationDetails>,
 ) {
-    val accent = lureAccentColor(lure.name)
+    val accent = RiverMoss
     val locationNames = locationDetails.map { it.name }
-    var expandedLocation by rememberSaveable(lure.name) {
+    var expandedLocation by rememberSaveable(title) {
         mutableStateOf(locationNames.firstOrNull())
     }
     LaunchedEffect(locationNames) {
@@ -3566,9 +3614,9 @@ private fun GuideLureRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(lure.name, fontWeight = FontWeight.Bold)
+                    Text(title, fontWeight = FontWeight.Bold)
                     Text(
-                        "${guideFishCountLabel(strings, lure.fish.size)} • ${guideLocationCountLabel(strings, locationDetails.size)}",
+                        "${guideFishCountLabel(strings, fishCount)} • ${guideLocationCountLabel(strings, locationDetails.size)}",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -5274,6 +5322,30 @@ private fun guideRaritySortRank(rarity: String?): Int = when (rarity) {
     "mythic" -> 4
     "legendary" -> 5
     else -> Int.MAX_VALUE
+}
+
+private fun lureGuideGroupKey(name: String): String = when (name) {
+    "Зерновая крошка", "Grain Crumble", "Луговой червь", "Meadow Worm" -> "fresh_peace"
+    "Ручейный малек", "Brook Minnow", "Серебряный живец", "Silver Shiner" -> "fresh_predator"
+    "Морская водоросль", "Seaweed Strand", "Неоновый планктон", "Neon Plankton" -> "salt_peace"
+    "Кольца кальмара", "Squid Rings", "Королевская креветка", "Royal Shrimp" -> "salt_predator"
+    else -> "single:$name"
+}
+
+private fun lureGuideGroupTitle(
+    strings: RiverStrings,
+    groupKey: String,
+    memberNames: List<String>,
+): String = when (groupKey) {
+    "fresh_peace" ->
+        if (strings.login == "Логин") "Зерновая крошка / Луговой червь" else "Grain Crumble / Meadow Worm"
+    "fresh_predator" ->
+        if (strings.login == "Логин") "Ручейный малек / Серебряный живец" else "Brook Minnow / Silver Shiner"
+    "salt_peace" ->
+        if (strings.login == "Логин") "Морская водоросль / Неоновый планктон" else "Seaweed Strand / Neon Plankton"
+    "salt_predator" ->
+        if (strings.login == "Логин") "Кольца кальмара / Королевская креветка" else "Squid Rings / Royal Shrimp"
+    else -> memberNames.distinct().joinToString(" / ")
 }
 
 private fun pendingPrizeLabel(strings: RiverStrings, prize: PrizeDto): String = when {
