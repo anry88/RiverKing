@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -114,20 +116,25 @@ import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AchievementRewardDto
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.CatchStatsDto
+import com.riverking.mobile.auth.ClubChatMessageDto
 import com.riverking.mobile.auth.ClubDetailsDto
 import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
@@ -157,6 +164,10 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlinx.coroutines.isActive
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 enum class MainTab(val icon: ImageVector) {
     FISHING(Icons.Rounded.SportsEsports),
@@ -1665,145 +1676,179 @@ private fun ClubScreen(
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
     val club = state.club.club
     val canManageClub = club?.role == "president" || club?.role == "heir"
+    var chatOpen by rememberSaveable(club?.id) { mutableStateOf(false) }
+    val chatListState = rememberLazyListState()
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (club != null) {
-            item {
-                SectionCard(strings.club) {
-                    ClubOverview(strings, club)
-                    if (canManageClub) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = infoDraft,
-                            onValueChange = { infoDraft = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusChanged { focusState ->
-                                    if (!focusState.isFocused && infoDraft != club.info) {
-                                        onUpdateClubInfo(infoDraft)
-                                    }
-                                },
-                            label = { Text(strings.club) },
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    OutlinedButton(onClick = onLeaveClub, modifier = Modifier.fillMaxWidth()) {
-                        Text(strings.leaveClub)
-                    }
-                    if (canManageClub) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = minWeightDraft,
-                            onValueChange = { minWeightDraft = it },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusChanged { focusState ->
-                                    if (!focusState.isFocused) {
-                                        val currentWeight = club.minJoinWeightKg
-                                        val nextWeight = minWeightDraft.toDoubleOrNull()
-                                        if (nextWeight != null && kotlin.math.round(currentWeight) != kotlin.math.round(nextWeight)) {
-                                            onUpdateClubSettings(nextWeight, recruitingDraft)
-                                        }
-                                    }
-                                },
-                            label = { Text(if (strings.login == "Логин") "Мин. вес для входа" else "Min join weight") },
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(if (strings.login == "Логин") "Открыт для набора" else "Recruiting open")
-                            Switch(
-                                checked = recruitingDraft,
-                                onCheckedChange = {
-                                    recruitingDraft = it
-                                    onUpdateClubSettings(minWeightDraft.toDoubleOrNull() ?: club.minJoinWeightKg, it)
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                SectionCard(strings.chat) {
-                    OutlinedButton(onClick = onLoadChat, modifier = Modifier.fillMaxWidth()) {
-                        Text(strings.chat)
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    if (state.club.chat.isEmpty()) {
-                        EmptyStatePanel(strings.noData)
-                    } else {
-                        state.club.chat.forEachIndexed { index, item ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            Text(localizeClubChatMessage(item.message, strings))
-                            Text(
-                                formatTimestamp(item.createdAt),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                SectionCard(strings.prizes) {
-                    ClubWeekSection(strings, club.currentWeek, club.role, onMemberAction)
-                }
-            }
+    LaunchedEffect(chatOpen, state.club.chat.size, state.club.chatLoading) {
+        if (chatOpen && !state.club.chatLoading && state.club.chat.isNotEmpty()) {
+            chatListState.scrollToItem(state.club.chat.lastIndex)
         }
-        item {
-            SectionCard(strings.searchClub) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.searchClub) },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { onSearchClubs(searchQuery) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(strings.searchClub)
-                }
-                if (state.club.searchResults.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    state.club.searchResults.forEachIndexed { index, summary ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(summary.name, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "${summary.memberCount}/${summary.capacity} • ${summary.minJoinWeightKg.asKgCompact(strings)}",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = if (club != null) 112.dp else 16.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (club != null) {
+                item {
+                    SectionCard(strings.club) {
+                        ClubOverview(strings, club)
+                        if (canManageClub) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = infoDraft,
+                                onValueChange = { infoDraft = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focusState ->
+                                        if (!focusState.isFocused && infoDraft != club.info) {
+                                            onUpdateClubInfo(infoDraft)
+                                        }
+                                    },
+                                label = { Text(strings.club) },
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = minWeightDraft,
+                                onValueChange = { minWeightDraft = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focusState ->
+                                        if (!focusState.isFocused) {
+                                            val currentWeight = club.minJoinWeightKg
+                                            val nextWeight = minWeightDraft.toDoubleOrNull()
+                                            if (nextWeight != null && kotlin.math.round(currentWeight) != kotlin.math.round(nextWeight)) {
+                                                onUpdateClubSettings(nextWeight, recruitingDraft)
+                                            }
+                                        }
+                                    },
+                                label = { Text(if (strings.login == "Логин") "Мин. вес для входа" else "Min join weight") },
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(if (strings.login == "Логин") "Открыт для набора" else "Recruiting open")
+                                Switch(
+                                    checked = recruitingDraft,
+                                    onCheckedChange = {
+                                        recruitingDraft = it
+                                        onUpdateClubSettings(minWeightDraft.toDoubleOrNull() ?: club.minJoinWeightKg, it)
+                                    },
                                 )
                             }
-                            Button(onClick = { onJoinClub(summary.id) }) { Text(strings.joinClub) }
+                        }
+                    }
+                }
+                item {
+                    SectionCard(strings.prizes) {
+                        ClubWeekSection(strings, club.currentWeek, club.role, onMemberAction)
+                    }
+                }
+                item {
+                    Button(
+                        onClick = onLeaveClub,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RiverDanger.copy(alpha = 0.92f),
+                            contentColor = RiverDeepNight,
+                            disabledContainerColor = RiverDanger.copy(alpha = 0.44f),
+                            disabledContentColor = RiverMist.copy(alpha = 0.7f),
+                        ),
+                    ) {
+                        Text(strings.leaveClub)
+                    }
+                }
+            } else {
+                item {
+                    SectionCard(strings.searchClub) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(strings.searchClub) },
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { onSearchClubs(searchQuery) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(strings.searchClub)
+                        }
+                        if (state.club.searchResults.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            state.club.searchResults.forEachIndexed { index, summary ->
+                                if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(summary.name, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "${summary.memberCount}/${summary.capacity} • ${summary.minJoinWeightKg.asKgCompact(strings)}",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Button(onClick = { onJoinClub(summary.id) }) { Text(strings.joinClub) }
+                                }
+                            }
+                        }
+                    }
+                }
+                item {
+                    SectionCard(strings.createClub) {
+                        OutlinedTextField(
+                            value = createName,
+                            onValueChange = { createName = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(strings.createClub) },
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { onCreateClub(createName) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(strings.createClub)
                         }
                     }
                 }
             }
         }
-        item {
-            SectionCard(strings.createClub) {
-                OutlinedTextField(
-                    value = createName,
-                    onValueChange = { createName = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.createClub) },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { onCreateClub(createName) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(strings.createClub)
-                }
+
+        if (club != null) {
+            Button(
+                onClick = {
+                    chatOpen = true
+                    onLoadChat()
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = RiverFoam.copy(alpha = 0.96f),
+                    contentColor = RiverDeepNight,
+                ),
+            ) {
+                Text(strings.chat, fontWeight = FontWeight.SemiBold)
             }
         }
+    }
+
+    if (club != null && chatOpen) {
+        ClubChatWindow(
+            strings = strings,
+            messages = state.club.chat,
+            loading = state.club.chatLoading,
+            listState = chatListState,
+            onRefresh = onLoadChat,
+            onDismiss = { chatOpen = false },
+        )
     }
 }
 
@@ -3976,6 +4021,127 @@ private fun ShopPackageRow(
 }
 
 @Composable
+private fun ClubChatWindow(
+    strings: RiverStrings,
+    messages: List<ClubChatMessageDto>,
+    loading: Boolean,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.58f))
+                    .clickable(onClick = onDismiss),
+            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.76f)
+                    .padding(16.dp),
+                shape = RiverDialogShape,
+                colors = CardDefaults.cardColors(containerColor = RiverPanelRaised.copy(alpha = 0.98f)),
+                border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (strings.login == "Логин") "Чат клуба" else "Club chat",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedButton(
+                                onClick = onRefresh,
+                                enabled = !loading,
+                                colors = riverOutlinedButtonColors(),
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(strings.refresh)
+                            }
+                            OutlinedButton(
+                                onClick = onDismiss,
+                                colors = riverOutlinedButtonColors(),
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(if (strings.login == "Логин") "Закрыть" else "Close")
+                            }
+                        }
+                    }
+
+                    when {
+                        loading && messages.isEmpty() -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        messages.isEmpty() -> {
+                            EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
+                        }
+                        else -> {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                items(messages, key = { it.id }) { item ->
+                                    Card(
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = RiverPanelSoft.copy(alpha = 0.82f)),
+                                        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.6f)),
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Text(
+                                                formatTimestamp(item.createdAt),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            Text(
+                                                text = buildClubChatMessage(item.message, strings),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ClubOverview(strings: RiverStrings, club: ClubDetailsDto) {
     Text(club.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
     Text(strings.roleLabel(club.role), color = MaterialTheme.colorScheme.secondary)
@@ -5439,17 +5605,163 @@ private fun formatWeek(value: String): String =
             .format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
     }.getOrElse { value }
 
-private fun localizeClubChatMessage(raw: String, strings: RiverStrings): String {
-    if (!raw.trim().startsWith("{")) return raw
-    return when {
-        raw.contains("clubChatMemberJoined") -> if (strings.login == "Логин") "Новый участник присоединился" else "A new member joined"
-        raw.contains("clubChatMemberLeft") -> if (strings.login == "Логин") "Участник покинул клуб" else "A member left the club"
-        raw.contains("clubChatMemberKicked") -> if (strings.login == "Логин") "Участник исключён" else "A member was removed"
-        raw.contains("clubChatRareCatch") -> if (strings.login == "Логин") "Редкий улов клуба" else "Rare club catch"
-        raw.contains("clubChatRatingReward") -> if (strings.login == "Логин") "Награда за рейтинг" else "Ranking reward"
-        raw.contains("clubChatPresidentAppointed") -> if (strings.login == "Логин") "Назначен новый президент" else "A new president was appointed"
-        else -> raw
+private val clubChatJson = Json { ignoreUnknownKeys = true }
+
+private fun buildClubChatMessage(raw: String, strings: RiverStrings): AnnotatedString {
+    val trimmed = raw.trim()
+    if (trimmed.startsWith("{")) {
+        val payload = runCatching { clubChatJson.parseToJsonElement(trimmed).jsonObject }.getOrNull()
+        val key = payload?.get("key")?.jsonPrimitive?.contentOrNull
+        val params = payload?.get("params")
+            ?.let { runCatching { it.jsonObject }.getOrNull() }
+            ?.mapNotNull { (name, value) -> value.jsonPrimitive.contentOrNull?.let { name to it } }
+            ?.toMap()
+            .orEmpty()
+        if (key != null) {
+            buildClubChatPayloadMessage(key, params, strings)?.let { return it }
+        }
     }
+    return highlightPlainClubChatMessage(raw, strings)
+}
+
+private fun buildClubChatPayloadMessage(
+    key: String,
+    params: Map<String, String>,
+    strings: RiverStrings,
+): AnnotatedString? {
+    val isRussian = strings.login == "Логин"
+
+    fun playerName(paramKey: String): String =
+        params[paramKey].orEmpty().ifBlank { if (isRussian) "Игрок" else "Player" }
+
+    fun AnnotatedString.Builder.appendCoins(value: String) {
+        appendHighlighted(value, RiverAmber)
+    }
+
+    fun AnnotatedString.Builder.appendFishName(value: String, rarity: String?) {
+        appendHighlighted(value, rarityColor(rarity))
+    }
+
+    return when (key) {
+        "clubChatMemberJoined" -> buildAnnotatedString {
+            appendPlayerName(playerName("name"))
+            append(if (isRussian) " вступил в клуб." else " joined the club.")
+        }
+        "clubChatMemberLeft" -> buildAnnotatedString {
+            appendPlayerName(playerName("name"))
+            append(if (isRussian) " покинул клуб." else " left the club.")
+        }
+        "clubChatMemberKicked" -> buildAnnotatedString {
+            appendPlayerName(playerName("actor"))
+            append(if (isRussian) " исключил " else " kicked ")
+            appendPlayerName(playerName("target"))
+            append(if (isRussian) " из клуба." else " from the club.")
+        }
+        "clubChatPresidentAppointed" -> buildAnnotatedString {
+            appendPlayerName(playerName("actor"))
+            append(if (isRussian) " назначил " else " appointed ")
+            appendPlayerName(playerName("target"))
+            append(if (isRussian) " президентом клуба." else " as club president.")
+        }
+        "clubChatRolePromoted" -> buildAnnotatedString {
+            appendPlayerName(playerName("actor"))
+            append(if (isRussian) " повысил " else " promoted ")
+            appendPlayerName(playerName("target"))
+            append(".")
+        }
+        "clubChatRoleDemoted" -> buildAnnotatedString {
+            appendPlayerName(playerName("actor"))
+            append(if (isRussian) " понизил " else " demoted ")
+            appendPlayerName(playerName("target"))
+            append(".")
+        }
+        "clubChatRatingReward" -> buildAnnotatedString {
+            appendPlayerName(playerName("name"))
+            append(if (isRussian) " получил " else " received ")
+            appendCoins(params["coins"].orEmpty().ifBlank { "0" })
+            append(if (isRussian) " монет за рейтинг." else " coins for rating.")
+        }
+        "clubChatRareCatch" -> buildAnnotatedString {
+            val rarity = params["rarity"]
+            appendPlayerName(playerName("name"))
+            append(if (isRussian) " поймал " else " caught a ")
+            append(clubChatRarityPhrase(rarity, strings))
+            append(if (isRussian) " рыбу: " else " fish: ")
+            appendFishName(params["fish"].orEmpty(), rarity)
+            params["location"]?.takeIf { it.isNotBlank() }?.let { location ->
+                append(if (isRussian) " на локации " else " at location ")
+                append(location)
+                params["weight"]?.takeIf { it.isNotBlank() }?.let { weight ->
+                    append(if (isRussian) ", $weight кг" else ", $weight kg")
+                }
+            }
+            append(".")
+        }
+        else -> null
+    }
+}
+
+private fun highlightPlainClubChatMessage(raw: String, strings: RiverStrings): AnnotatedString {
+    val ruMatch = Regex(
+        pattern = "^(.+?)( поймал )(мифическую|легендарную) рыбу: (.+?)(\\.?| на.*)$",
+        option = RegexOption.IGNORE_CASE,
+    ).matchEntire(raw)
+    if (ruMatch != null) {
+        val (name, action, rarityLabel, fishName, suffix) = ruMatch.destructured
+        val rarity = if (rarityLabel.equals("мифическую", ignoreCase = true)) "mythic" else "legendary"
+        return buildAnnotatedString {
+            appendPlayerName(name)
+            append(action)
+            append(rarityLabel)
+            append(" рыбу: ")
+            appendHighlighted(fishName, rarityColor(rarity))
+            append(suffix)
+        }
+    }
+
+    val enMatch = Regex(
+        pattern = "^(.+?)( caught a )(mythic|legendary) fish: (.+?)(\\.?| at.*)$",
+        option = RegexOption.IGNORE_CASE,
+    ).matchEntire(raw)
+    if (enMatch != null) {
+        val (name, action, rarityLabel, fishName, suffix) = enMatch.destructured
+        return buildAnnotatedString {
+            appendPlayerName(name)
+            append(action)
+            append(rarityLabel)
+            append(" fish: ")
+            appendHighlighted(fishName, rarityColor(rarityLabel.lowercase(Locale.ROOT)))
+            append(suffix)
+        }
+    }
+
+    return AnnotatedString(raw)
+}
+
+private fun AnnotatedString.Builder.appendPlayerName(name: String) {
+    appendHighlighted(name, RiverFoam)
+}
+
+private fun AnnotatedString.Builder.appendHighlighted(value: String, color: Color) {
+    withStyle(
+        SpanStyle(
+            color = color,
+            fontWeight = FontWeight.SemiBold,
+        )
+    ) {
+        append(value)
+    }
+}
+
+private fun clubChatRarityPhrase(rarity: String?, strings: RiverStrings): String {
+    if (strings.login == "Логин") {
+        return when (rarity) {
+            "mythic" -> "мифическую"
+            "legendary" -> "легендарную"
+            else -> rarity.orEmpty()
+        }
+    }
+    return strings.rarityLabel(rarity).lowercase(Locale.ROOT)
 }
 
 private fun rodAsset(code: String?): String {
