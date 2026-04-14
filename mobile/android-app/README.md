@@ -23,9 +23,9 @@ Nested Android project for the RiverKing mobile client.
 - `play` uses real `BillingClient` / `ProductDetails` purchase flow and hands the purchase token to the backend for Google Play verification before entitlement delivery.
 - Android referrals now support both copy-link and native Android share sheet flows.
 - **Asset Bundling & Optimization**:
-  - Core gameplay assets (rods, fish, locations, shop icons) are bundled locally in the APK to reduce network traffic and enable offline-ready UI.
+  - Core gameplay assets (rods, fish, locations, shop icons, achievement badges) are bundled locally in the APK to reduce network traffic and enable offline-ready UI.
   - All PNG assets from the webapp are converted to **WebP** format for the Android build to minimize APK size (e.g., 60MB PNG -> ~22MB WebP).
-  - Achievements remain server-side to balance APK size and frequent content updates.
+  - Achievement badges are synced from the shared webapp assets into `android_asset/achievements`, so the Achievements tab no longer depends on per-open network fetches.
 - Debug builds currently verified for both `direct` and `play` flavors.
 
 ## Local setup
@@ -100,7 +100,7 @@ To minimize APK size while supporting local asset loading, we use WebP conversio
 - Target assets: `mobile/android-app/app/src/main/assets/`
 - Conversion tool: `mobile/android-app/convert_assets.py` (requires `Pillow`)
 
-If you add or update gameplay assets in the webapp project, re-run the conversion:
+If you add or update gameplay assets or achievement badges in the webapp project, re-run the conversion:
 
 ```bash
 python3 mobile/android-app/convert_assets.py

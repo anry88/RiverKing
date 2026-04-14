@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert webapp PNG assets to WebP for Android bundling."""
+"""Convert webapp PNG assets to Android-ready WebP bundles."""
 import os
 import sys
 from pathlib import Path
@@ -9,15 +9,14 @@ WEBAPP_ASSETS = Path(__file__).resolve().parent.parent.parent / "src" / "main" /
 ANDROID_ASSETS = Path(__file__).resolve().parent / "app" / "src" / "main" / "assets"
 
 # Directories to convert (relative to webapp assets dir)
-DIRS = ["rods", "backgrounds", "fish", "shop", "baits"]
-
-# Quality settings per directory (backgrounds can be lower, rods need high quality)
-QUALITY = {
-    "rods": 85,
-    "backgrounds": 75,
-    "fish": 80,
-    "shop": 80,
-    "baits": 80,
+CONVERSION_CONFIG = {
+    "rods": {"quality": 85},
+    "backgrounds": {"quality": 75},
+    "fish": {"quality": 80},
+    "shop": {"quality": 80},
+    "baits": {"quality": 80},
+    # Achievement badges are UI-sized icons with hard edges and transparency.
+    "achievements": {"lossless": True},
 }
 
 def convert_dir(name: str):
@@ -27,7 +26,9 @@ def convert_dir(name: str):
         print(f"  SKIP {name}/ (not found)")
         return 0, 0, 0
     dst_dir.mkdir(parents=True, exist_ok=True)
-    quality = QUALITY.get(name, 80)
+    config = CONVERSION_CONFIG.get(name, {"quality": 80})
+    quality = config.get("quality", 80)
+    lossless = config.get("lossless", False)
     count = 0
     total_src = 0
     total_dst = 0
@@ -36,7 +37,12 @@ def convert_dir(name: str):
         src_size = src_file.stat().st_size
         try:
             img = Image.open(src_file)
-            img.save(dst_file, "WEBP", quality=quality, method=4)
+            save_kwargs = {"method": 6 if lossless else 4}
+            if lossless:
+                save_kwargs["lossless"] = True
+            else:
+                save_kwargs["quality"] = quality
+            img.save(dst_file, "WEBP", **save_kwargs)
             dst_size = dst_file.stat().st_size
             ratio = dst_size / src_size * 100 if src_size > 0 else 0
             count += 1
@@ -69,7 +75,7 @@ def main():
     grand_src = 0
     grand_dst = 0
     grand_count = 0
-    for d in DIRS:
+    for d in CONVERSION_CONFIG:
         c, s, ds = convert_dir(d)
         grand_count += c
         grand_src += s

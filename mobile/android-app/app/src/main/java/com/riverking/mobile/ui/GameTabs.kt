@@ -123,7 +123,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AchievementRewardDto
@@ -5068,12 +5067,13 @@ private fun achievementArtAsset(code: String, levelIndex: Int): String {
         3 -> "gold"
         else -> "platinum"
     }
-    val base = if (code.endsWith("_all_fish")) {
-        "explorer_${code.removeSuffix("_all_fish")}"
-    } else {
-        code
+    val normalizedCode = code.lowercase(Locale.US)
+    val base = when {
+        normalizedCode == "river_delta_all_fish" -> "explorer_delta_river"
+        normalizedCode.endsWith("_all_fish") -> "explorer_${normalizedCode.removeSuffix("_all_fish")}"
+        else -> normalizedCode
     }
-    return serverAssetUrl("/app/assets/achievements/${base}_$suffix.png")
+    return localAsset("achievements/${base}_$suffix.webp")
 }
 
 private fun guideFishCountLabel(strings: RiverStrings, count: Int): String =
@@ -5326,9 +5326,6 @@ private fun shopIconAsset(packId: String): String = localAsset(
 
 /** Load a bundled asset from android_asset via file URI (Coil supports this). */
 private fun localAsset(relativePath: String): String = "file:///android_asset/$relativePath"
-
-/** Load an asset from the server (used for achievements that are not bundled). */
-private fun serverAssetUrl(path: String): String = BuildConfig.API_BASE_URL.trimEnd('/') + path
 
 private fun fishAssetModel(name: String?): String? =
     name?.let(FISH_ASSET_MAP::get)?.let(::localAsset)
