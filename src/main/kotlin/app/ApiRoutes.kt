@@ -102,6 +102,12 @@ fun Application.apiRoutes(
     data class HookReq(val wait: Int, val reaction: Double)
 
     @Serializable
+    data class ShopPackageItemDTO(
+        val name: String,
+        val qty: Int,
+    )
+
+    @Serializable
     data class ShopPackageDTO(
         val id: String,
         val name: String,
@@ -113,6 +119,7 @@ fun Application.apiRoutes(
         val discountEnd: String? = null,
         val coinPrice: Int? = null,
         val rodCode: String? = null,
+        val items: List<ShopPackageItemDTO> = emptyList(),
     )
 
     @Serializable
@@ -150,6 +157,7 @@ fun Application.apiRoutes(
         val rank: Int,
         val coins: Int? = null,
         val source: String = PrizeSource.TOURNAMENT.name.lowercase(),
+        val sourceLabel: String? = null,
     )
 
     @Serializable
@@ -857,7 +865,8 @@ fun Application.apiRoutes(
 
         get("/api/prizes") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-            val pending = prizeService.pendingPrizes(uid).map {
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val pending = prizeService.pendingPrizes(uid, language).map {
                 PrizeDTO(
                     it.id,
                     it.packageId,
@@ -865,6 +874,7 @@ fun Application.apiRoutes(
                     it.rank,
                     it.coins,
                     it.source.name.lowercase(),
+                    it.sourceLabel,
                 )
             }
             call.respond(pending)
@@ -1154,6 +1164,12 @@ fun Application.apiRoutes(
                                 discountEnd = p.discountEnd?.toString(),
                                 coinPrice = p.coinPrice,
                                 rodCode = p.rodCode,
+                                items = p.items.map { (lureName, qty) ->
+                                    ShopPackageItemDTO(
+                                        name = I18n.lure(lureName, language),
+                                        qty = qty,
+                                    )
+                                },
                             )
                         }
                     )

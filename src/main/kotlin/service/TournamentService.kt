@@ -41,6 +41,7 @@ data class UserPrize(
     val rank: Int,
     val coins: Int? = null,
     val source: PrizeSource = PrizeSource.TOURNAMENT,
+    val sourceLabel: String? = null,
 )
 
 class TournamentService {
@@ -286,7 +287,7 @@ class TournamentService {
         Pair(top, mine)
     }
 
-    fun pendingPrizes(userId: Long): List<UserPrize> {
+    fun pendingPrizes(userId: Long, language: String = "ru"): List<UserPrize> {
         data class PrizeRow(val id: Long, val packageId: String, val qty: Int, val tournamentId: Long)
         val rows = transaction {
             UserPrizes.select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
@@ -303,7 +304,15 @@ class TournamentService {
             val t = getTournament(row.tournamentId)
             val rank = t?.let { leaderboard(it, userId).second?.rank } ?: 0
             val coins = if (row.packageId == COIN_PRIZE_ID) row.qty else null
-            UserPrize(row.id, row.packageId, row.qty, rank, coins)
+            UserPrize(
+                id = row.id,
+                packageId = row.packageId,
+                qty = row.qty,
+                rank = rank,
+                coins = coins,
+                source = PrizeSource.TOURNAMENT,
+                sourceLabel = t?.let { if (language == "en") it.nameEn else it.nameRu },
+            )
         }
     }
 

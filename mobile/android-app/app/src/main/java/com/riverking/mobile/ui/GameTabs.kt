@@ -58,6 +58,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.DropdownMenu
@@ -437,6 +439,7 @@ fun MainShell(
         AchievementRewardDialog(
             strings = strings,
             reward = reward,
+            shopPacks = state.shop.categories.flatMap { it.packs },
             onDismiss = onDismissAchievementReward,
         )
     }
@@ -515,9 +518,9 @@ private fun LeadersScreen(
                     onSelect = { section = it },
                     accentFor = {
                         when (it) {
-                            LeaderSection.TOURNAMENTS -> Color(0xFFFFD76A)
-                            LeaderSection.RATINGS -> RiverTide
-                            LeaderSection.ACHIEVEMENTS -> RiverCoral
+                            LeaderSection.TOURNAMENTS -> RiverTide
+                            LeaderSection.RATINGS -> RiverMoss
+                            LeaderSection.ACHIEVEMENTS -> RiverAmber
                         }
                     },
                     labelFor = {
@@ -543,6 +546,7 @@ private fun LeadersScreen(
                 state = state,
                 strings = strings,
                 modifier = Modifier.weight(1f),
+                onClaimPrize = onClaimPrize,
                 onSetMode = onSetMode,
                 onSetPeriod = onSetPeriod,
                 onSetOrder = onSetOrder,
@@ -1141,6 +1145,7 @@ private fun TournamentsScreen(
 ) {
     val tournaments = state.tournaments
     val me = state.me
+    val visiblePrizes = tournaments.prizes.filterNot(::isRatingPrize)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -1199,10 +1204,10 @@ private fun TournamentsScreen(
                 }
             }
         }
-        if (tournaments.prizes.isNotEmpty()) {
+        if (visiblePrizes.isNotEmpty()) {
             item {
                 SectionCard(strings.prizes) {
-                    tournaments.prizes.forEachIndexed { index, prize ->
+                    visiblePrizes.forEachIndexed { index, prize ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1210,8 +1215,10 @@ private fun TournamentsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(prizeLabel(prize), fontWeight = FontWeight.SemiBold)
-                                Text("#${prize.rank} • ${prize.source}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(pendingPrizeLabel(strings, prize), fontWeight = FontWeight.SemiBold)
+                                tournamentPrizeDetailsLabel(strings, prize)?.let { details ->
+                                    Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                             Button(onClick = { onClaimPrize(prize.id) }) { Text(strings.claim) }
                         }
@@ -1247,6 +1254,7 @@ private fun RatingsScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
+    onClaimPrize: (Long) -> Unit,
     onSetMode: (RatingsMode) -> Unit,
     onSetPeriod: (RatingsPeriod) -> Unit,
     onSetOrder: (RatingsOrder) -> Unit,
@@ -1256,6 +1264,7 @@ private fun RatingsScreen(
 ) {
     val me = state.me ?: return
     val ratings = state.ratings
+    val ratingPrizes = state.tournaments.prizes.filter(::isRatingPrize)
     val showPrizePreview = ratings.mode == RatingsMode.GLOBAL &&
         ratings.fishId == "all" &&
         ratings.locationId != "all" &&
@@ -1328,6 +1337,29 @@ private fun RatingsScreen(
                 }
             }
         }
+        if (ratingPrizes.isNotEmpty()) {
+            item {
+                SectionCard(strings.prizes) {
+                    ratingPrizes.forEachIndexed { index, prize ->
+                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                pendingPrizeLabel(strings, prize),
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(onClick = { onClaimPrize(prize.id) }) {
+                                Text(strings.claim)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         item {
             SectionCard(strings.ratings) {
                 if (ratings.entries.isEmpty()) {
@@ -1387,7 +1419,7 @@ private fun CatalogScreen(
                     accentFor = {
                         when (it) {
                             CatalogSection.LOCATIONS -> RiverTide
-                            CatalogSection.FISH -> Color(0xFF7EA8FF)
+                            CatalogSection.FISH -> RiverMoss
                             CatalogSection.GEAR -> RiverAmber
                         }
                     },
@@ -1401,19 +1433,23 @@ private fun CatalogScreen(
                 )
                 if (section == CatalogSection.FISH) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    RarityDropdown(
-                        strings = strings,
-                        selected = rarityFilter,
-                        onSelect = { rarityFilter = it },
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (me.language == "ru") "Только пойманные" else "Caught only")
-                        Switch(checked = showCaughtOnly, onCheckedChange = { showCaughtOnly = it })
+                        RarityDropdown(
+                            strings = strings,
+                            selected = rarityFilter,
+                            onSelect = { rarityFilter = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                        CaughtOnlyToggleCard(
+                            strings = strings,
+                            checked = showCaughtOnly,
+                            onCheckedChange = { showCaughtOnly = it },
+                            modifier = Modifier.weight(0.78f),
+                        )
                     }
                 }
                 if (section == CatalogSection.GEAR) {
@@ -2536,12 +2572,13 @@ private fun RarityDropdown(
     strings: RiverStrings,
     selected: String,
     onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val accent = if (selected == "all") RiverTide else rarityColor(selected)
     val label = if (selected == "all") strings.allFish else strings.rarityLabel(selected)
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = modifier) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2627,6 +2664,50 @@ private fun RarityDropdown(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CaughtOnlyToggleCard(
+    strings: RiverStrings,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = if (checked) RiverMoss else RiverOutline
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onCheckedChange(!checked) },
+        shape = RoundedCornerShape(18.dp),
+        color = RiverPanelSoft.copy(alpha = 0.9f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = null,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = RiverMoss,
+                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    checkmarkColor = RiverDeepNight,
+                ),
+            )
+            Text(
+                text = if (strings.login == "Логин") "Пойманные" else "Caught",
+                color = if (checked) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -4206,32 +4287,210 @@ private fun CatchDetailChip(label: String) {
 private fun AchievementRewardDialog(
     strings: RiverStrings,
     reward: AchievementClaimDto,
+    shopPacks: List<ShopPackageDto>,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
-        shape = RiverDialogShape,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        title = { Text(strings.achievements) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                reward.rewards.forEach { item ->
-                    Text(achievementRewardLabel(strings, item))
+    val packIndex = remember(shopPacks) { shopPacks.associateBy { it.id } }
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RiverDialogShape,
+            colors = CardDefaults.cardColors(containerColor = RiverPanelRaised.copy(alpha = 0.98f)),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = strings.achievements,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (reward.rewards.isEmpty()) {
+                    EmptyStatePanel(strings.noData)
+                } else {
+                    reward.rewards.forEachIndexed { index, item ->
+                        if (index > 0) {
+                            HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                        }
+                        AchievementRewardCard(
+                            strings = strings,
+                            reward = item,
+                            pack = packIndex[item.pack],
+                        )
+                    }
+                }
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = riverPrimaryButtonColors(),
+                ) {
+                    Text(strings.continueLabel)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        }
+    }
+}
+
+@Composable
+private fun AchievementRewardCard(
+    strings: RiverStrings,
+    reward: AchievementRewardDto,
+    pack: ShopPackageDto?,
+) {
+    val isCoinsReward = reward.coins != null || reward.pack.equals("coins", ignoreCase = true)
+    val accent = if (isCoinsReward) RiverAmber else RiverMoss
+    val contentItems = pack?.items.orEmpty().map { it.copy(qty = it.qty * reward.qty.coerceAtLeast(1)) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RewardIconCard(
+                packId = reward.pack,
+                isCoinsReward = isCoinsReward,
+                accent = accent,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(strings.continueLabel)
+                Text(
+                    text = achievementRewardTitle(strings, reward, pack),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (!isCoinsReward) {
+                    RewardMetaChip(
+                        text = achievementRewardQuantityLabel(strings, reward.qty),
+                        accent = accent,
+                    )
+                }
             }
-        },
-    )
+        }
+
+        if (isCoinsReward) {
+            RewardMetaChip(
+                text = pendingPrizeCoinsLabel(strings, reward.coins ?: reward.qty),
+                accent = RiverAmber,
+            )
+        } else if (contentItems.isNotEmpty()) {
+            Text(
+                text = if (strings.login == "Логин") "Содержимое" else "Contents",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            contentItems.forEach { item ->
+                RewardContentRow(name = item.name, qty = item.qty)
+            }
+        } else {
+            pack?.desc?.takeIf { it.isNotBlank() }?.let { desc ->
+                Text(
+                    text = desc,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardIconCard(
+    packId: String,
+    isCoinsReward: Boolean,
+    accent: Color,
+) {
+    Surface(
+        modifier = Modifier.size(60.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = accent.copy(alpha = 0.18f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.4f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (isCoinsReward) {
+                Text(
+                    text = "🪙",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            } else if (packId.isBlank()) {
+                Text(
+                    text = "🎁",
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            } else {
+                AsyncImage(
+                    model = shopIconAsset(packId),
+                    contentDescription = null,
+                    modifier = Modifier.size(42.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RewardMetaChip(
+    text: String,
+    accent: Color,
+) {
+    Surface(
+        color = accent.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = accent,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun RewardContentRow(
+    name: String,
+    qty: Int,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(lureAccentColor(name), CircleShape)
+            )
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        Text(
+            text = "×$qty",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
 
 @Composable
@@ -4587,15 +4846,6 @@ private fun tournamentPrizeLabel(prize: PrizeSpecDto): String = when {
     else -> humanizePackId(prize.packageId)
 }
 
-private fun achievementRewardLabel(strings: RiverStrings, reward: AchievementRewardDto): String = when {
-    reward.coins != null || reward.pack.equals("coins", ignoreCase = true) ->
-        if (strings.login == "Логин") "${reward.coins ?: reward.qty} монет" else "${reward.coins ?: reward.qty} coins"
-    reward.pack.isBlank() ->
-        if (strings.login == "Логин") "Награда получена" else "Reward claimed"
-    reward.qty > 1 -> "${achievementRewardPackName(strings, reward.pack)} ×${reward.qty}"
-    else -> achievementRewardPackName(strings, reward.pack)
-}
-
 private fun achievementRewardPackName(strings: RiverStrings, packId: String): String = when (packId) {
     "fresh_topup_s" -> if (strings.login == "Логин") "Пресное пополнение S" else "Fresh Top-up S"
     "fresh_stock_m" -> if (strings.login == "Логин") "Пресный запас M" else "Fresh Stock M"
@@ -4729,11 +4979,67 @@ private fun Double.asKgCompact(): String = String.format(Locale.US, "%.2f kg", t
 
 private fun String?.rarityLabel(strings: RiverStrings): String = strings.rarityLabel(this)
 
-private fun prizeLabel(prize: PrizeDto): String = when {
-    prize.coins != null -> "${prize.coins} coins"
-    prize.packageId.equals("coins", ignoreCase = true) -> "${prize.qty} coins"
-    else -> "${prize.packageId} ×${prize.qty}"
+private fun pendingPrizeLabel(strings: RiverStrings, prize: PrizeDto): String = when {
+    prize.coins != null -> pendingPrizeCoinsLabel(strings, prize.coins)
+    prize.packageId.equals("coins", ignoreCase = true) -> pendingPrizeCoinsLabel(strings, prize.qty)
+    prize.qty > 1 -> "${achievementRewardPackName(strings, prize.packageId)} ×${prize.qty}"
+    else -> achievementRewardPackName(strings, prize.packageId)
 }
+
+private fun pendingPrizeCoinsLabel(strings: RiverStrings, amount: Int): String =
+    if (strings.login == "Логин") "$amount монет" else "$amount coins"
+
+private fun tournamentPrizeDetailsLabel(strings: RiverStrings, prize: PrizeDto): String? = when {
+    prize.source == "tournament" -> listOfNotNull(
+        prize.rank.takeIf { it > 0 }?.let { tournamentPlaceLabel(strings, it) },
+        prize.sourceLabel?.takeIf { it.isNotBlank() },
+    ).joinToString(" • ").ifBlank { null }
+    prize.source == "club" -> if (strings.login == "Логин") "Награда клуба" else "Club reward"
+    else -> prize.sourceLabel?.takeIf { it.isNotBlank() }
+}
+
+private fun tournamentPlaceLabel(strings: RiverStrings, rank: Int): String =
+    if (strings.login == "Логин") "$rank место" else "${englishOrdinal(rank)} place"
+
+private fun englishOrdinal(value: Int): String {
+    val mod100 = value % 100
+    val suffix = if (mod100 in 11..13) {
+        "th"
+    } else {
+        when (value % 10) {
+            1 -> "st"
+            2 -> "nd"
+            3 -> "rd"
+            else -> "th"
+        }
+    }
+    return "$value$suffix"
+}
+
+private fun isRatingPrize(prize: PrizeDto): Boolean = prize.source == "rating"
+
+private fun achievementRewardTitle(
+    strings: RiverStrings,
+    reward: AchievementRewardDto,
+    pack: ShopPackageDto?,
+): String = when {
+    reward.coins != null || reward.pack.equals("coins", ignoreCase = true) ->
+        if (strings.login == "Логин") "Монеты" else "Coins"
+    reward.pack.isBlank() ->
+        if (strings.login == "Логин") "Награда" else "Reward"
+    else -> pack?.name ?: achievementRewardPackName(strings, reward.pack)
+}
+
+private fun achievementRewardQuantityLabel(strings: RiverStrings, qty: Int): String =
+    if (strings.login == "Логин") {
+        when {
+            qty % 10 == 1 && qty % 100 != 11 -> "$qty пак"
+            qty % 10 in 2..4 && qty % 100 !in 12..14 -> "$qty пака"
+            else -> "$qty паков"
+        }
+    } else {
+        "$qty pack${if (qty == 1) "" else "s"}"
+    }
 
 private fun rarityColor(rarity: String?): Color = when (rarity) {
     "common" -> Color(0xFFE8EEF2)

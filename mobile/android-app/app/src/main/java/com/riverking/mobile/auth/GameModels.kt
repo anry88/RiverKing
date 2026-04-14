@@ -188,6 +188,7 @@ data class PrizeDto(
     val rank: Int,
     val coins: Int? = null,
     val source: String,
+    val sourceLabel: String? = null,
 )
 
 @Serializable
@@ -284,6 +285,12 @@ data class AchievementClaimDto(
 )
 
 @Serializable
+data class ShopPackageItemDto(
+    val name: String,
+    val qty: Int,
+)
+
+@Serializable
 data class ShopPackageDto(
     val id: String,
     val name: String,
@@ -295,6 +302,7 @@ data class ShopPackageDto(
     val discountEnd: String? = null,
     val coinPrice: Int? = null,
     val rodCode: String? = null,
+    val items: List<ShopPackageItemDto> = emptyList(),
 )
 
 @Serializable

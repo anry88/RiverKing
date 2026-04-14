@@ -13,8 +13,8 @@ class PrizeService(
         clubs.distributeWeeklyRewards(now)
     }
 
-    fun pendingPrizes(userId: Long): List<UserPrize> {
-        val tournamentPrizes = tournaments.pendingPrizes(userId)
+    fun pendingPrizes(userId: Long, language: String = "ru"): List<UserPrize> {
+        val tournamentPrizes = tournaments.pendingPrizes(userId, language)
         val rating = ratingPrizes.pendingPrizes(userId)
         val clubRewards = clubs.pendingRewards(userId)
         return (tournamentPrizes + rating + clubRewards)
