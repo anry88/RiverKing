@@ -13,7 +13,7 @@ Nested Android project for the RiverKing mobile client.
 - Shared auth with `Telegram sign-in`, `Google sign-in`, and `login/password`.
 - Existing Android profiles can link a Telegram account and continue on the same backend player profile inside the Mini App/bot.
 - Android shell now mirrors the TG client much more closely:
-  - six-tab layout: fishing, tournaments, ratings, guide, club, shop
+  - five-tab layout: fishing, leaders, catalog, club, shop
   - custom dark game-theme with header stats, language toggle, and badgeable bottom navigation
   - full staged fishing flow over shared `/api/start-cast`, `/api/hook`, `/api/cast`
   - quick-cast removed from the public Android UX

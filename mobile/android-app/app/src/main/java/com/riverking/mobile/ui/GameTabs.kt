@@ -158,19 +158,27 @@ import kotlinx.coroutines.isActive
 
 enum class MainTab(val icon: ImageVector) {
     FISHING(Icons.Rounded.SportsEsports),
-    TOURNAMENTS(Icons.Rounded.EmojiEvents),
-    RATINGS(Icons.Rounded.Leaderboard),
-    GUIDE(Icons.AutoMirrored.Rounded.MenuBook),
+    LEADERS(Icons.Rounded.EmojiEvents),
+    CATALOG(Icons.AutoMirrored.Rounded.MenuBook),
     CLUB(Icons.Rounded.Groups),
     SHOP(Icons.Rounded.ShoppingBag),
 }
 
-enum class GuideSection {
+private enum class LeaderSection {
+    TOURNAMENTS,
+    RATINGS,
+    ACHIEVEMENTS,
+}
+
+private enum class CatalogSection {
     LOCATIONS,
     FISH,
-    LURES,
+    GEAR,
+}
+
+private enum class GearSection {
     RODS,
-    ACHIEVEMENTS,
+    LURES,
 }
 
 private enum class FishingSheetType {
@@ -248,9 +256,8 @@ fun MainShell(
     val tabLabels = remember(strings) {
         mapOf(
             MainTab.FISHING to strings.fishing,
-            MainTab.TOURNAMENTS to strings.tournaments,
-            MainTab.RATINGS to strings.ratings,
-            MainTab.GUIDE to strings.guide,
+            MainTab.LEADERS to strings.leaders,
+            MainTab.CATALOG to strings.catalog,
             MainTab.CLUB to strings.club,
             MainTab.SHOP to strings.shop,
         )
@@ -290,12 +297,13 @@ fun MainShell(
                 ) {
                     MainTab.entries.forEach { tab ->
                         val showBadge = when (tab) {
-                            MainTab.GUIDE -> achievementBadge
+                            MainTab.LEADERS -> achievementBadge
                             else -> false
                         }
                         NavigationBarItem(
                             selected = selectedTab == tab,
                             onClick = { selectedTab = tab },
+                            alwaysShowLabel = true,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onPrimary,
                                 selectedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -314,10 +322,22 @@ fun MainShell(
                                         }
                                     }
                                 ) {
-                                    Icon(tab.icon, contentDescription = tabLabels.getValue(tab))
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tabLabels.getValue(tab),
+                                        modifier = Modifier.size(22.dp),
+                                    )
                                 }
                             },
-                            label = { Text(tabLabels.getValue(tab), maxLines = 1) },
+                            label = {
+                                Text(
+                                    text = tabLabels.getValue(tab),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
                         )
                     }
                 }
@@ -341,30 +361,25 @@ fun MainShell(
                     onOpenCatch = onOpenCatch,
                     onLoadGuide = onLoadGuide,
                 )
-                MainTab.TOURNAMENTS -> TournamentsScreen(
+                MainTab.LEADERS -> LeadersScreen(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
                     onOpenTournament = onOpenTournament,
                     onClaimPrize = onClaimPrize,
-                    onOpenCatch = onOpenCatch,
-                )
-                MainTab.RATINGS -> RatingsScreen(
-                    state = state,
-                    strings = strings,
-                    modifier = Modifier.padding(padding),
                     onSetMode = onSetRatingsMode,
                     onSetPeriod = onSetRatingsPeriod,
                     onSetOrder = onSetRatingsOrder,
                     onSetLocation = onSetRatingsLocation,
                     onSetFish = onSetRatingsFish,
+                    onClaimAchievement = onClaimAchievement,
+                    onReloadGuide = onLoadGuide,
                     onOpenCatch = onOpenCatch,
                 )
-                MainTab.GUIDE -> GuideScreen(
+                MainTab.CATALOG -> CatalogScreen(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    onClaimAchievement = onClaimAchievement,
                 )
                 MainTab.CLUB -> ClubScreen(
                     state = state,
@@ -470,6 +485,119 @@ fun MainShell(
                 onClaimDaily()
             },
         )
+    }
+}
+
+@Composable
+private fun LeadersScreen(
+    state: RiverKingUiState,
+    strings: RiverStrings,
+    modifier: Modifier = Modifier,
+    onOpenTournament: (Long) -> Unit,
+    onClaimPrize: (Long) -> Unit,
+    onSetMode: (RatingsMode) -> Unit,
+    onSetPeriod: (RatingsPeriod) -> Unit,
+    onSetOrder: (RatingsOrder) -> Unit,
+    onSetLocation: (String) -> Unit,
+    onSetFish: (String) -> Unit,
+    onClaimAchievement: (String) -> Unit,
+    onReloadGuide: (Boolean) -> Unit,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    var section by rememberSaveable { mutableStateOf(LeaderSection.TOURNAMENTS) }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            SectionCard(strings.leaders) {
+                SegmentedSelectionBar(
+                    items = LeaderSection.entries.toList(),
+                    selected = section,
+                    onSelect = { section = it },
+                    accentFor = {
+                        when (it) {
+                            LeaderSection.TOURNAMENTS -> Color(0xFFFFD76A)
+                            LeaderSection.RATINGS -> RiverTide
+                            LeaderSection.ACHIEVEMENTS -> RiverCoral
+                        }
+                    },
+                    labelFor = {
+                        when (it) {
+                            LeaderSection.TOURNAMENTS -> strings.tournaments
+                            LeaderSection.RATINGS -> strings.ratings
+                            LeaderSection.ACHIEVEMENTS -> strings.achievements
+                        }
+                    },
+                )
+            }
+        }
+        when (section) {
+            LeaderSection.TOURNAMENTS -> TournamentsScreen(
+                state = state,
+                strings = strings,
+                modifier = Modifier.weight(1f),
+                onOpenTournament = onOpenTournament,
+                onClaimPrize = onClaimPrize,
+                onOpenCatch = onOpenCatch,
+            )
+            LeaderSection.RATINGS -> RatingsScreen(
+                state = state,
+                strings = strings,
+                modifier = Modifier.weight(1f),
+                onSetMode = onSetMode,
+                onSetPeriod = onSetPeriod,
+                onSetOrder = onSetOrder,
+                onSetLocation = onSetLocation,
+                onSetFish = onSetFish,
+                onOpenCatch = onOpenCatch,
+            )
+            LeaderSection.ACHIEVEMENTS -> AchievementsScreen(
+                state = state,
+                strings = strings,
+                modifier = Modifier.weight(1f),
+                onClaimAchievement = onClaimAchievement,
+                onReloadGuide = onReloadGuide,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementsScreen(
+    state: RiverKingUiState,
+    strings: RiverStrings,
+    modifier: Modifier = Modifier,
+    onClaimAchievement: (String) -> Unit,
+    onReloadGuide: (Boolean) -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            SectionCard(strings.achievements) {
+                when {
+                    state.guide.loading && state.guide.achievements.isEmpty() -> LoadingStatePanel(strings.loading)
+                    state.guide.achievements.isEmpty() -> {
+                        EmptyStatePanel(strings.noData)
+                        OutlinedButton(
+                            onClick = { onReloadGuide(true) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(strings.refresh)
+                        }
+                    }
+                    else -> {
+                        state.guide.achievements.forEachIndexed { index, achievement ->
+                            if (index > 0) {
+                                HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            }
+                            AchievementRow(strings, achievement, onClaimAchievement)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1019,12 +1147,6 @@ private fun TournamentsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                StatPill(title = strings.prizes, value = tournaments.prizes.size.toString(), modifier = Modifier.weight(1f))
-                StatPill(title = strings.currentTournament, value = if (tournaments.current == null) "0" else "1", modifier = Modifier.weight(1f))
-            }
-        }
-        item {
             SectionCard(strings.currentTournament) {
                 if (tournaments.current == null) {
                     EmptyStatePanel(strings.noData)
@@ -1243,57 +1365,47 @@ private fun RatingsScreen(
 }
 
 @Composable
-private fun GuideScreen(
+private fun CatalogScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    onClaimAchievement: (String) -> Unit,
 ) {
     val me = state.me ?: return
     val guide = state.guide
-    var section by rememberSaveable { mutableStateOf(GuideSection.LOCATIONS) }
+    var section by rememberSaveable { mutableStateOf(CatalogSection.LOCATIONS) }
+    var gearSection by rememberSaveable { mutableStateOf(GearSection.RODS) }
     var rarityFilter by rememberSaveable { mutableStateOf("all") }
     var showCaughtOnly by rememberSaveable { mutableStateOf(false) }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            SectionCard(strings.guide) {
-                HorizontalChipRow {
-                    GuideSection.entries.forEach { tab ->
-                        FilterChip(
-                            selected = section == tab,
-                            onClick = { section = tab },
-                            label = {
-                                Text(
-                                    when (tab) {
-                                        GuideSection.LOCATIONS -> strings.guideWaters
-                                        GuideSection.FISH -> strings.guideFish
-                                        GuideSection.LURES -> strings.guideLures
-                                        GuideSection.RODS -> strings.guideRods
-                                        GuideSection.ACHIEVEMENTS -> strings.achievements
-                                    }
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-        }
-        if (section == GuideSection.FISH) {
-            item {
-                SectionCard(strings.guideFish) {
-                    HorizontalChipRow {
-                        listOf("all", "common", "uncommon", "rare", "epic", "mythic", "legendary").forEach { rarity ->
-                            AssistChip(
-                                onClick = { rarityFilter = rarity },
-                                label = { Text(if (rarity == "all") strings.allFish else strings.rarityLabel(rarity)) },
-                                colors = chipColors(selected = rarityFilter == rarity),
-                            )
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            SectionCard(strings.catalog) {
+                SegmentedSelectionBar(
+                    items = CatalogSection.entries.toList(),
+                    selected = section,
+                    onSelect = { section = it },
+                    accentFor = {
+                        when (it) {
+                            CatalogSection.LOCATIONS -> RiverTide
+                            CatalogSection.FISH -> Color(0xFF7EA8FF)
+                            CatalogSection.GEAR -> RiverAmber
                         }
-                    }
+                    },
+                    labelFor = {
+                        when (it) {
+                            CatalogSection.LOCATIONS -> strings.guideWaters
+                            CatalogSection.FISH -> strings.guideFish
+                            CatalogSection.GEAR -> strings.gear
+                        }
+                    },
+                )
+                if (section == CatalogSection.FISH) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    RarityDropdown(
+                        strings = strings,
+                        selected = rarityFilter,
+                        onSelect = { rarityFilter = it },
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1304,44 +1416,134 @@ private fun GuideScreen(
                         Switch(checked = showCaughtOnly, onCheckedChange = { showCaughtOnly = it })
                     }
                 }
+                if (section == CatalogSection.GEAR) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SegmentedSelectionBar(
+                        items = GearSection.entries.toList(),
+                        selected = gearSection,
+                        onSelect = { gearSection = it },
+                        accentFor = {
+                            when (it) {
+                                GearSection.RODS -> RiverAmber
+                                GearSection.LURES -> RiverMoss
+                            }
+                        },
+                        labelFor = {
+                            when (it) {
+                                GearSection.RODS -> strings.guideRods
+                                GearSection.LURES -> strings.guideLures
+                            }
+                        },
+                    )
+                }
             }
         }
+
+        when (section) {
+            CatalogSection.FISH -> CatalogFishScreen(
+                guide = guide,
+                me = me,
+                strings = strings,
+                rarityFilter = rarityFilter,
+                showCaughtOnly = showCaughtOnly,
+                modifier = Modifier.weight(1f),
+            )
+            CatalogSection.LOCATIONS -> CatalogLocationsScreen(
+                guide = guide,
+                me = me,
+                strings = strings,
+                modifier = Modifier.weight(1f),
+            )
+            CatalogSection.GEAR -> CatalogGearScreen(
+                guide = guide,
+                me = me,
+                strings = strings,
+                section = gearSection,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CatalogLocationsScreen(
+    guide: GuideUiState,
+    me: MeResponseDto,
+    strings: RiverStrings,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         item {
-            when (section) {
-                GuideSection.LOCATIONS -> SectionCard(strings.guideWaters) {
-                    guide.guide?.locations?.forEachIndexed { index, location ->
+            SectionCard(strings.guideWaters) {
+                guide.guide?.locations?.forEachIndexed { index, location ->
+                    if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                    GuideLocationRow(
+                        strings = strings,
+                        location = location,
+                        ownedLocation = me.locations.firstOrNull { it.id == location.id },
+                    )
+                } ?: EmptyStatePanel(strings.noData)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogFishScreen(
+    guide: GuideUiState,
+    me: MeResponseDto,
+    strings: RiverStrings,
+    rarityFilter: String,
+    showCaughtOnly: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            SectionCard(strings.guideFish) {
+                val fishList = guide.guide?.fish.orEmpty()
+                    .filter { rarityFilter == "all" || it.rarity == rarityFilter }
+                    .filter { !showCaughtOnly || me.caughtFishIds.contains(it.id) }
+                if (fishList.isEmpty()) {
+                    EmptyStatePanel(strings.noData)
+                } else {
+                    fishList.forEachIndexed { index, fish ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLocationRow(
+                        GuideFishRow(
                             strings = strings,
-                            location = location,
-                            ownedLocation = me.locations.firstOrNull { it.id == location.id },
+                            fish = fish,
+                            discovered = me.caughtFishIds.contains(fish.id),
                         )
-                    } ?: EmptyStatePanel(strings.noData)
-                }
-                GuideSection.FISH -> SectionCard(strings.guideFish) {
-                    val fishList = guide.guide?.fish.orEmpty()
-                        .filter { rarityFilter == "all" || it.rarity == rarityFilter }
-                        .filter { !showCaughtOnly || me.caughtFishIds.contains(it.id) }
-                    if (fishList.isEmpty()) {
-                        EmptyStatePanel(strings.noData)
-                    } else {
-                        fishList.forEachIndexed { index, fish ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            GuideFishRow(
-                                strings = strings,
-                                fish = fish,
-                                discovered = me.caughtFishIds.contains(fish.id),
-                            )
-                        }
                     }
                 }
-                GuideSection.LURES -> SectionCard(strings.guideLures) {
-                    guide.guide?.lures?.forEachIndexed { index, lure ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        GuideLureRow(strings = strings, lure = lure)
-                    } ?: EmptyStatePanel(strings.noData)
-                }
-                GuideSection.RODS -> SectionCard(strings.guideRods) {
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogGearScreen(
+    guide: GuideUiState,
+    me: MeResponseDto,
+    strings: RiverStrings,
+    section: GearSection,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            when (section) {
+                GearSection.RODS -> SectionCard(strings.guideRods) {
                     guide.guide?.rods?.forEachIndexed { index, rod ->
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                         GuideRodRow(
@@ -1351,15 +1553,11 @@ private fun GuideScreen(
                         )
                     } ?: EmptyStatePanel(strings.noData)
                 }
-                GuideSection.ACHIEVEMENTS -> SectionCard(strings.achievements) {
-                    if (guide.achievements.isEmpty()) {
-                        EmptyStatePanel(strings.noData)
-                    } else {
-                        guide.achievements.forEachIndexed { index, achievement ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            AchievementRow(strings, achievement, onClaimAchievement)
-                        }
-                    }
+                GearSection.LURES -> SectionCard(strings.guideLures) {
+                    guide.guide?.lures?.forEachIndexed { index, lure ->
+                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                        GuideLureRow(strings = strings, lure = lure)
+                    } ?: EmptyStatePanel(strings.noData)
                 }
             }
         }
@@ -2268,6 +2466,169 @@ private fun FishingSetupDivider() {
             .height(36.dp)
             .background(RiverOutline.copy(alpha = 0.72f))
     )
+}
+
+@Composable
+private fun <T> SegmentedSelectionBar(
+    items: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    accentFor: (T) -> Color,
+    labelFor: (T) -> String,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = RiverPanelMuted.copy(alpha = 0.94f),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items.forEachIndexed { index, item ->
+                SegmentedSelectionCell(
+                    label = labelFor(item),
+                    accent = accentFor(item),
+                    selected = selected == item,
+                    onClick = { onSelect(item) },
+                )
+                if (index < items.lastIndex) {
+                    FishingSetupDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.SegmentedSelectionCell(
+    label: String,
+    accent: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) accent.copy(alpha = 0.18f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun RarityDropdown(
+    strings: RiverStrings,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val accent = if (selected == "all") RiverTide else rarityColor(selected)
+    val label = if (selected == "all") strings.allFish else strings.rarityLabel(selected)
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .clickable { expanded = true },
+            shape = RoundedCornerShape(18.dp),
+            color = RiverPanelSoft.copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(accent, CircleShape)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (strings.login == "Логин") "Редкость" else "Rarity",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Text(
+                    text = "▾",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.92f),
+            shape = RoundedCornerShape(22.dp),
+            containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+            border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
+        ) {
+            listOf("all", "common", "uncommon", "rare", "epic", "mythic", "legendary").forEach { rarity ->
+                val itemAccent = if (rarity == "all") RiverTide else rarityColor(rarity)
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(itemAccent, CircleShape)
+                            )
+                            Text(
+                                text = if (rarity == "all") strings.allFish else strings.rarityLabel(rarity),
+                                color = if (selected == rarity) itemAccent else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (selected == rarity) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        }
+                    },
+                    colors = riverMenuItemColors(),
+                    onClick = {
+                        expanded = false
+                        onSelect(rarity)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -4379,7 +4740,7 @@ private fun rarityColor(rarity: String?): Color = when (rarity) {
     "uncommon" -> Color(0xFF74D77C)
     "rare" -> Color(0xFF58A9FF)
     "epic" -> Color(0xFFC576FF)
-    "mythic" -> Color(0xFFFF9E5E)
+    "mythic" -> Color(0xFFFF6B76)
     "legendary" -> Color(0xFFFFD54F)
     else -> Color.White
 }
