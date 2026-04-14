@@ -17,10 +17,10 @@ class AuthApi(
     private val client: HttpClient,
     private val baseUrl: String = BuildConfig.API_BASE_URL,
 ) {
-    suspend fun registerPassword(login: String, password: String): AuthResponseDto =
+    suspend fun registerPassword(login: String, password: String, refToken: String? = null): AuthResponseDto =
         client.post("$baseUrl/api/auth/password/register") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(PasswordRegisterRequest(login = login, password = password))
+            setBody(PasswordRegisterRequest(login = login, password = password, ref = refToken))
         }.body()
 
     suspend fun loginPassword(login: String, password: String): AuthResponseDto =
@@ -29,10 +29,10 @@ class AuthApi(
             setBody(PasswordLoginRequest(login = login, password = password))
         }.body()
 
-    suspend fun loginGoogle(idToken: String): AuthResponseDto =
+    suspend fun loginGoogle(idToken: String, refToken: String? = null): AuthResponseDto =
         client.post("$baseUrl/api/auth/google") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(GoogleAuthRequest(idToken = idToken))
+            setBody(GoogleAuthRequest(idToken = idToken, ref = refToken))
         }.body()
 
     suspend fun startTelegramLogin(): TelegramLinkStartDto =

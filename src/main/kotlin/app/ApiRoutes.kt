@@ -34,6 +34,7 @@ import service.PrizeSource
 import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
+import db.AuthIdentities
 import db.Payments
 import db.Users
 import service.PayService
@@ -605,6 +606,13 @@ fun Application.apiRoutes(
                 Users.select { Users.id eq uid }.single()[Users.username]
                     ?.takeIf { telegramLinked && it.isNotBlank() }
             }
+            val authProviders = transaction {
+                AuthIdentities
+                    .slice(AuthIdentities.provider)
+                    .select { AuthIdentities.userId eq uid }
+                    .map { it[AuthIdentities.provider] }
+                    .distinct()
+            }
             val totalCoins = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
             val todayCoins = fishing.todayCoins(uid)
 
@@ -632,6 +640,7 @@ fun Application.apiRoutes(
                 val todayCoins: Long,
                 val telegramLinked: Boolean,
                 val telegramUsername: String? = null,
+                val authProviders: List<String> = emptyList(),
             )
             call.respond(
                 MeResp(
@@ -657,6 +666,7 @@ fun Application.apiRoutes(
                     todayCoins,
                     telegramLinked,
                     telegramUsername,
+                    authProviders,
                 )
             )
         }

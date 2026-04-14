@@ -76,21 +76,26 @@ class AuthRepository(
 
     suspend fun registerPassword(login: String, password: String): MeResponseDto {
         sessionStore.writeLastLogin(login)
-        val response = api.registerPassword(login, password)
-        persist(response)
+        val referralToken = pendingReferralToken()
+        val response = api.registerPassword(login, password, referralToken)
+        persist(response, AUTH_PROVIDER_PASSWORD)
+        clearPendingReferralToken()
         return api.me(response.accessToken)
     }
 
     suspend fun loginPassword(login: String, password: String): MeResponseDto {
         sessionStore.writeLastLogin(login)
         val response = api.loginPassword(login, password)
-        persist(response)
+        persist(response, AUTH_PROVIDER_PASSWORD)
+        clearPendingReferralToken()
         return api.me(response.accessToken)
     }
 
     suspend fun loginGoogle(idToken: String): MeResponseDto {
-        val response = api.loginGoogle(idToken)
-        persist(response)
+        val referralToken = pendingReferralToken()
+        val response = api.loginGoogle(idToken, referralToken)
+        persist(response, AUTH_PROVIDER_GOOGLE)
+        clearPendingReferralToken()
         return api.me(response.accessToken)
     }
 
@@ -105,7 +110,8 @@ class AuthRepository(
             "authorized" -> {
                 val authResponse = response.toAuthResponse()
                     ?: return TelegramLoginPollResult.Failed(humanizeError(response.error ?: "telegram_login_invalid"))
-                persist(authResponse)
+                persist(authResponse, AUTH_PROVIDER_TELEGRAM)
+                clearPendingReferralToken()
                 TelegramLoginPollResult.Authorized(api.me(authResponse.accessToken))
             }
             else -> TelegramLoginPollResult.Failed(humanizeError(response.error ?: "telegram_login_failed"))
@@ -331,12 +337,13 @@ class AuthRepository(
         return current
     }
 
-    private fun persist(response: AuthResponseDto) {
+    private fun persist(response: AuthResponseDto, authProvider: String?) {
         sessionStore.write(
             StoredSession(
                 accessToken = response.accessToken,
                 refreshToken = response.refreshToken,
                 accessTokenExpiresAt = response.accessTokenExpiresAt,
+                authProvider = authProvider,
             )
         )
     }
@@ -355,6 +362,8 @@ class AuthRepository(
     }
 
     fun currentAccessToken(): String? = sessionStore.read()?.accessToken
+
+    fun currentAuthProvider(): String? = sessionStore.read()?.authProvider
 
     fun rememberLoginDraft(login: String) {
         if (login.isBlank()) return
@@ -386,6 +395,24 @@ class AuthRepository(
         sessionStore.clearPendingTelegramLink()
     }
 
+    fun rememberPendingReferralToken(token: String) {
+        sessionStore.writePendingReferralToken(token)
+    }
+
+    fun pendingReferralToken(): String? =
+        sessionStore.readPendingReferralToken()
+
+    fun clearPendingReferralToken() {
+        sessionStore.clearPendingReferralToken()
+    }
+
+    fun seenInstallReferrerToken(): String? =
+        sessionStore.readSeenInstallReferrerToken()
+
+    fun rememberSeenInstallReferrerToken(token: String) {
+        sessionStore.writeSeenInstallReferrerToken(token)
+    }
+
     private suspend fun <T> withFreshAccessToken(block: suspend (String) -> T): T {
         val stored = sessionStore.read() ?: error("Missing session")
         return try {
@@ -393,7 +420,7 @@ class AuthRepository(
         } catch (error: ClientRequestException) {
             if (error.response.status != HttpStatusCode.Unauthorized) throw error
             val refreshed = api.refresh(stored.refreshToken)
-            persist(refreshed)
+            persist(refreshed, stored.authProvider)
             block(refreshed.accessToken)
         }
     }
@@ -428,4 +455,10 @@ class AuthRepository(
 
     private fun JsonObject.stringValue(key: String): String? =
         this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    companion object {
+        const val AUTH_PROVIDER_TELEGRAM = "telegram"
+        const val AUTH_PROVIDER_GOOGLE = "google"
+        const val AUTH_PROVIDER_PASSWORD = "password"
+    }
 }

@@ -141,9 +141,13 @@ data class ShopUiState(
     val loaded: Boolean = false,
     val loading: Boolean = false,
     val categories: List<ShopCategoryDto> = emptyList(),
+)
+
+data class ReferralUiState(
+    val loaded: Boolean = false,
+    val loading: Boolean = false,
     val referrals: ReferralInfoDto? = null,
-    val referralRewards: List<ReferralRewardDto> = emptyList(),
-    val referralsLoading: Boolean = false,
+    val rewards: List<ReferralRewardDto> = emptyList(),
 )
 
 data class CatchStatsUiState(
@@ -155,6 +159,7 @@ data class CatchStatsUiState(
 data class RiverKingUiState(
     val loading: Boolean = true,
     val me: MeResponseDto? = null,
+    val authProvider: String? = null,
     val login: String = "",
     val password: String = "",
     val nickname: String = "",
@@ -175,6 +180,7 @@ data class RiverKingUiState(
     val guide: GuideUiState = GuideUiState(),
     val club: ClubUiState = ClubUiState(),
     val shop: ShopUiState = ShopUiState(),
+    val referrals: ReferralUiState = ReferralUiState(),
     val catchStats: CatchStatsUiState = CatchStatsUiState(),
 )
 
@@ -1031,18 +1037,11 @@ class RiverKingViewModel(
         viewModelScope.launch {
             _state.update { it.copy(shop = it.shop.copy(loading = true), error = null) }
             try {
-                val data = coroutineScope {
-                    val categories = async { repository.loadShop() }
-                    val referrals = async { repository.loadReferrals() }
-                    val rewards = async { repository.loadReferralRewards() }
-                    ShopUiState(
-                        loaded = true,
-                        loading = false,
-                        categories = categories.await(),
-                        referrals = referrals.await(),
-                        referralRewards = rewards.await(),
-                    )
-                }
+                val data = ShopUiState(
+                    loaded = true,
+                    loading = false,
+                    categories = repository.loadShop(),
+                )
                 _state.update { it.copy(shop = data) }
             } catch (error: Throwable) {
                 _state.update {
@@ -1055,16 +1054,46 @@ class RiverKingViewModel(
         }
     }
 
+    fun loadReferrals(force: Boolean = false) {
+        if (state.value.me == null) return
+        if (state.value.referrals.loading) return
+        if (!force && state.value.referrals.loaded) return
+        viewModelScope.launch {
+            _state.update { it.copy(referrals = it.referrals.copy(loading = true), error = null) }
+            try {
+                val data = coroutineScope {
+                    val referrals = async { repository.loadReferrals() }
+                    val rewards = async { repository.loadReferralRewards() }
+                    ReferralUiState(
+                        loaded = true,
+                        loading = false,
+                        referrals = referrals.await(),
+                        rewards = rewards.await(),
+                    )
+                }
+                _state.update { it.copy(referrals = data) }
+            } catch (error: Throwable) {
+                _state.update {
+                    it.copy(
+                        referrals = it.referrals.copy(loading = false),
+                        error = repository.describeError(error),
+                    )
+                }
+            }
+        }
+    }
+
     fun generateReferral() {
         viewModelScope.launch {
-            _state.update { it.copy(shop = it.shop.copy(referralsLoading = true), error = null) }
+            _state.update { it.copy(referrals = it.referrals.copy(loading = true), error = null) }
             try {
                 val link = repository.generateReferral()
                 _state.update {
-                    val current = it.shop.referrals
+                    val current = it.referrals.referrals
                     it.copy(
-                        shop = it.shop.copy(
-                            referralsLoading = false,
+                        referrals = it.referrals.copy(
+                            loaded = true,
+                            loading = false,
                             referrals = ReferralInfoDto(
                                 token = link.token,
                                 invited = current?.invited ?: emptyList(),
@@ -1079,7 +1108,7 @@ class RiverKingViewModel(
             } catch (error: Throwable) {
                 _state.update {
                     it.copy(
-                        shop = it.shop.copy(referralsLoading = false),
+                        referrals = it.referrals.copy(loading = false),
                         error = repository.describeError(error),
                     )
                 }
@@ -1096,10 +1125,10 @@ class RiverKingViewModel(
                 _state.update {
                     it.copy(
                         working = false,
-                        shop = it.shop.copy(loaded = false),
+                        referrals = it.referrals.copy(loaded = false),
                     )
                 }
-                loadShop(force = true)
+                loadReferrals(force = true)
             } catch (error: Throwable) {
                 _state.update { it.copy(working = false, error = repository.describeError(error)) }
             }
@@ -1229,6 +1258,7 @@ class RiverKingViewModel(
             _state.value = RiverKingUiState(
                 loading = false,
                 me = me,
+                authProvider = repository.currentAuthProvider(),
                 login = rememberedLogin,
                 nickname = me?.username.orEmpty(),
                 telegramLoginPending = pendingTelegramLogin != null,
@@ -1250,6 +1280,7 @@ class RiverKingViewModel(
             RiverKingUiState(
                 loading = false,
                 me = me,
+                authProvider = repository.currentAuthProvider(),
                 nickname = me.username.orEmpty(),
                 ratings = RatingsUiState(locationId = me.locationId.toString()),
                 fishing = FishingUiState(autoCastEnabled = false),
@@ -1404,6 +1435,7 @@ class RiverKingViewModel(
         _state.update { current ->
             current.copy(
                 me = me,
+                authProvider = current.authProvider ?: repository.currentAuthProvider(),
                 nickname = if (current.me == null || current.nickname == current.me.username.orEmpty()) {
                     me.username.orEmpty()
                 } else {
@@ -1427,9 +1459,24 @@ class RiverKingViewModel(
     private fun warmupPlayerSurfaces() {
         loadGuide(force = true)
         loadShop(force = true)
+        if (shouldExposeReferralPanel(state.value)) {
+            loadReferrals(force = true)
+        }
         loadClub(force = true)
         loadTournaments(force = true)
         loadRatings(force = true)
+    }
+
+    private fun shouldExposeReferralPanel(state: RiverKingUiState): Boolean {
+        val me = state.me ?: return false
+        val authProvider = state.authProvider
+        return when (authProvider) {
+            AuthRepository.AUTH_PROVIDER_TELEGRAM -> true
+            AuthRepository.AUTH_PROVIDER_GOOGLE -> true
+            AuthRepository.AUTH_PROVIDER_PASSWORD -> false
+            null -> me.telegramLinked || me.authProviders.contains(AuthRepository.AUTH_PROVIDER_GOOGLE)
+            else -> false
+        }
     }
 
     private fun launchWaitCountdown(waitSeconds: Int) {

@@ -25,6 +25,7 @@ class SecureSessionStore(context: Context) {
             accessToken = accessToken,
             refreshToken = refreshToken,
             accessTokenExpiresAt = expiresAt,
+            authProvider = prefs.getString(KEY_AUTH_PROVIDER, null),
         )
     }
 
@@ -33,6 +34,7 @@ class SecureSessionStore(context: Context) {
             .putString(KEY_ACCESS_TOKEN, session.accessToken)
             .putString(KEY_REFRESH_TOKEN, session.refreshToken)
             .putLong(KEY_ACCESS_EXPIRES_AT, session.accessTokenExpiresAt)
+            .putString(KEY_AUTH_PROVIDER, session.authProvider)
             .apply()
     }
 
@@ -75,13 +77,39 @@ class SecureSessionStore(context: Context) {
             .apply()
     }
 
+    fun readPendingReferralToken(): String? =
+        prefs.getString(KEY_PENDING_REFERRAL_TOKEN, null)?.takeIf { it.isNotBlank() }
+
+    fun writePendingReferralToken(token: String) {
+        prefs.edit()
+            .putString(KEY_PENDING_REFERRAL_TOKEN, token)
+            .apply()
+    }
+
+    fun clearPendingReferralToken() {
+        prefs.edit()
+            .remove(KEY_PENDING_REFERRAL_TOKEN)
+            .apply()
+    }
+
+    fun readSeenInstallReferrerToken(): String? =
+        prefs.getString(KEY_SEEN_INSTALL_REFERRER_TOKEN, null)?.takeIf { it.isNotBlank() }
+
+    fun writeSeenInstallReferrerToken(token: String) {
+        prefs.edit()
+            .putString(KEY_SEEN_INSTALL_REFERRER_TOKEN, token)
+            .apply()
+    }
+
     fun clear() {
         prefs.edit()
             .remove(KEY_ACCESS_TOKEN)
             .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_ACCESS_EXPIRES_AT)
+            .remove(KEY_AUTH_PROVIDER)
             .remove(KEY_PENDING_TELEGRAM_LOGIN)
             .remove(KEY_PENDING_TELEGRAM_LINK)
+            .remove(KEY_PENDING_REFERRAL_TOKEN)
             .apply()
     }
 
@@ -89,8 +117,11 @@ class SecureSessionStore(context: Context) {
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_ACCESS_EXPIRES_AT = "access_expires_at"
+        private const val KEY_AUTH_PROVIDER = "auth_provider"
         private const val KEY_LAST_LOGIN = "last_login"
         private const val KEY_PENDING_TELEGRAM_LOGIN = "pending_telegram_login"
         private const val KEY_PENDING_TELEGRAM_LINK = "pending_telegram_link"
+        private const val KEY_PENDING_REFERRAL_TOKEN = "pending_referral_token"
+        private const val KEY_SEEN_INSTALL_REFERRER_TOKEN = "seen_install_referrer_token"
     }
 }

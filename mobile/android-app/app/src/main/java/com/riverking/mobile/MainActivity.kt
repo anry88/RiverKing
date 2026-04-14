@@ -12,9 +12,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.riverking.mobile.auth.AuthRepository
 import com.riverking.mobile.auth.GoogleSignInManager
+import com.riverking.mobile.auth.PlayReferralManager
 import com.riverking.mobile.auth.SecureSessionStore
 import com.riverking.mobile.ui.RiverKingApp
 import com.riverking.mobile.ui.RiverKingViewModel
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var repository: AuthRepository
@@ -28,6 +31,8 @@ class MainActivity : ComponentActivity() {
         )
         googleSignInManager = GoogleSignInManager()
         applyTelegramReturnIntent(intent, resumeImmediately = false)
+        applyReferralIntent(intent)
+        hydrateInstallReferrerToken()
         viewModel = RiverKingViewModel(repository)
         enableEdgeToEdge()
         enterImmersiveMode()
@@ -44,6 +49,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyTelegramReturnIntent(intent, resumeImmediately = true)
+        applyReferralIntent(intent)
     }
 
     override fun onResume() {
@@ -77,6 +83,30 @@ class MainActivity : ComponentActivity() {
                 if (resumeImmediately && ::viewModel.isInitialized) {
                     viewModel.resumeTelegramLink(token)
                 }
+            }
+        }
+    }
+
+    private fun applyReferralIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "riverking" || data.host != "referral") return
+        val token = data.getQueryParameter("token")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: data.getQueryParameter("ref")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+            ?: return
+        repository.rememberPendingReferralToken(token)
+    }
+
+    private fun hydrateInstallReferrerToken() {
+        lifecycleScope.launch {
+            val token = PlayReferralManager(applicationContext).fetchInstallReferrerToken() ?: return@launch
+            if (repository.seenInstallReferrerToken() == token) return@launch
+            repository.rememberSeenInstallReferrerToken(token)
+            if (repository.currentAccessToken() == null) {
+                repository.rememberPendingReferralToken(token)
             }
         }
     }

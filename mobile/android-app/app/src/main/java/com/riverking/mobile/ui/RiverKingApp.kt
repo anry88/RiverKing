@@ -67,7 +67,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.GoogleSignInManager
-import com.riverking.mobile.auth.ReferralInfoDto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -247,11 +246,12 @@ fun RiverKingApp(
                         onClubMemberAction = viewModel::clubMemberAction,
                         onStartTelegramLink = viewModel::startTelegramLink,
                         onLoadShop = viewModel::loadShop,
+                        onLoadReferrals = viewModel::loadReferrals,
                         onGenerateReferral = viewModel::generateReferral,
-                        onShareReferral = { referral ->
-                            shareReferralInvite(
+                        onShareReferral = { body ->
+                            shareText(
                                 activity = activity,
-                                referral = referral,
+                                body = body,
                             )
                         },
                         onClaimReferralRewards = viewModel::claimReferralRewards,
@@ -562,11 +562,10 @@ private suspend fun shareCatchCard(
     }
 }
 
-private fun shareReferralInvite(
+private fun shareText(
     activity: ComponentActivity,
-    referral: ReferralInfoDto,
+    body: String,
 ) {
-    val body = referral.androidShareText.ifBlank { referral.link }
     val sendIntent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, body)

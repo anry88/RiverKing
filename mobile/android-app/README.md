@@ -21,7 +21,10 @@ Nested Android project for the RiverKing mobile client.
   - tournaments, ratings, guide, achievements, quests, club, referrals, and shop surfaces running on shared backend contracts
 - `direct` keeps the shop visible but disables real-money packs.
 - `play` uses real `BillingClient` / `ProductDetails` purchase flow and hands the purchase token to the backend for Google Play verification before entitlement delivery.
-- Android referrals now support both copy-link and native Android share sheet flows.
+- Android Telegram account linking and referral actions live in the profile menu opened from the nickname, not inside the shop tab.
+- Android referrals now expose auth-aware invite variants:
+  - Telegram-auth users get the Telegram Mini App invite flow.
+  - Google-auth users get a Google Play invite flow backed by Play Install Referrer plus an in-app deep link fallback.
 - **Asset Bundling & Optimization**:
   - Core gameplay assets (rods, fish, locations, shop icons, achievement badges) are bundled locally in the APK to reduce network traffic and enable offline-ready UI.
   - All PNG assets from the webapp are converted to **WebP** format for the Android build to minimize APK size (e.g., 60MB PNG -> ~22MB WebP).

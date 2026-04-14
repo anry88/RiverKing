@@ -1,6 +1,7 @@
 package com.riverking.mobile.ui
 
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -132,6 +133,7 @@ import coil.compose.AsyncImage
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AchievementRewardDto
+import com.riverking.mobile.auth.AuthRepository
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.ClubChatMessageDto
@@ -150,8 +152,6 @@ import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.PrizeSpecDto
 import com.riverking.mobile.auth.QuestDto
 import com.riverking.mobile.auth.QuestListDto
-import com.riverking.mobile.auth.ReferralInfoDto
-import com.riverking.mobile.auth.ReferralRewardDto
 import com.riverking.mobile.auth.RodDto
 import com.riverking.mobile.auth.ShopPackageDto
 import com.riverking.mobile.auth.TournamentDto
@@ -250,8 +250,9 @@ fun MainShell(
     onClubMemberAction: (Long, String) -> Unit,
     onStartTelegramLink: () -> Unit,
     onLoadShop: (Boolean) -> Unit,
+    onLoadReferrals: (Boolean) -> Unit,
     onGenerateReferral: () -> Unit,
-    onShareReferral: (ReferralInfoDto) -> Unit,
+    onShareReferral: (String) -> Unit,
     onClaimReferralRewards: () -> Unit,
     onBuyShopWithCoins: (String) -> Unit,
     onPlayPurchase: (String) -> Unit,
@@ -266,11 +267,15 @@ fun MainShell(
     var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
+    var showTelegramAccountSheet by rememberSaveable { mutableStateOf(false) }
+    var showReferralSheet by rememberSaveable { mutableStateOf(false) }
 
     val tournamentBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
+    val showReferralMenuItem =
+        canShowTelegramReferral(state.authProvider, me) || canShowGooglePlayReferral(state.authProvider, me)
     val tabLabels = remember(strings) {
         mapOf(
             MainTab.FISHING to strings.fishing,
@@ -294,6 +299,14 @@ fun MainShell(
                 onOpenNicknameChange = {
                     onUpdateNickname(me.username ?: "")
                     showNicknameDialog = true
+                },
+                onOpenTelegramAccount = {
+                    showTelegramAccountSheet = true
+                },
+                showReferralEntry = showReferralMenuItem,
+                onOpenReferrals = {
+                    showReferralSheet = true
+                    onLoadReferrals(false)
                 },
                 onOpenCatchStats = {
                     showCatchStats = true
@@ -418,13 +431,8 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     isPlayFlavor = isPlayFlavor,
+                    requestPlayPrice = requestPlayPrice,
                     modifier = Modifier.padding(padding),
-                    clipboard = clipboard,
-                    me = me,
-                    onStartTelegramLink = onStartTelegramLink,
-                    onGenerateReferral = onGenerateReferral,
-                    onShareReferral = onShareReferral,
-                    onClaimReferralRewards = onClaimReferralRewards,
                     onBuyShopWithCoins = onBuyShopWithCoins,
                     onPlayPurchase = onPlayPurchase,
                 )
@@ -505,6 +513,30 @@ fun MainShell(
                 showDailyRewardSheet = false
                 onClaimDaily()
             },
+        )
+    }
+
+    if (showTelegramAccountSheet) {
+        TelegramAccountSheet(
+            strings = strings,
+            me = me,
+            pending = state.telegramLinkPending,
+            onStartTelegramLink = onStartTelegramLink,
+            onDismiss = { showTelegramAccountSheet = false },
+        )
+    }
+
+    if (showReferralSheet) {
+        ReferralSheet(
+            strings = strings,
+            me = me,
+            state = state.referrals,
+            sessionAuthProvider = state.authProvider,
+            clipboard = clipboard,
+            onGenerateReferral = onGenerateReferral,
+            onShareReferral = onShareReferral,
+            onClaimReferralRewards = onClaimReferralRewards,
+            onDismiss = { showReferralSheet = false },
         )
     }
 }
@@ -823,6 +855,9 @@ private fun HeaderBar(
     onLogout: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onOpenNicknameChange: () -> Unit,
+    onOpenTelegramAccount: () -> Unit,
+    showReferralEntry: Boolean,
+    onOpenReferrals: () -> Unit,
     onOpenCatchStats: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -884,6 +919,24 @@ private fun HeaderBar(
                             onOpenCatchStats()
                         },
                     )
+                    DropdownMenuItem(
+                        text = { Text("\uD83D\uDCF1  ${strings.telegramAccount}") },
+                        colors = riverMenuItemColors(),
+                        onClick = {
+                            menuExpanded = false
+                            onOpenTelegramAccount()
+                        },
+                    )
+                    if (showReferralEntry) {
+                        DropdownMenuItem(
+                            text = { Text("\uD83D\uDC65  ${strings.inviteFriends}") },
+                            colors = riverMenuItemColors(),
+                            onClick = {
+                                menuExpanded = false
+                                onOpenReferrals()
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("$languageFlag  ${strings.language}") },
                         colors = riverMenuItemColors(),
@@ -1971,13 +2024,8 @@ private fun ShopScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
-    clipboard: ClipboardManager,
-    me: MeResponseDto,
-    onStartTelegramLink: () -> Unit,
-    onGenerateReferral: () -> Unit,
-    onShareReferral: (ReferralInfoDto) -> Unit,
-    onClaimReferralRewards: () -> Unit,
     onBuyShopWithCoins: (String) -> Unit,
     onPlayPurchase: (String) -> Unit,
 ) {
@@ -1986,25 +2034,6 @@ private fun ShopScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            TelegramAccountCard(
-                strings = strings,
-                me = me,
-                pending = state.telegramLinkPending,
-                onStartTelegramLink = onStartTelegramLink,
-            )
-        }
-        item {
-            ReferralCard(
-                strings = strings,
-                referrals = state.shop.referrals,
-                rewards = state.shop.referralRewards,
-                clipboard = clipboard,
-                onGenerateReferral = onGenerateReferral,
-                onShareReferral = onShareReferral,
-                onClaimReferralRewards = onClaimReferralRewards,
-            )
-        }
         items(state.shop.categories, key = { it.id }) { category ->
             SectionCard(category.name) {
                 category.packs.forEachIndexed { index, pack ->
@@ -2013,6 +2042,7 @@ private fun ShopScreen(
                         strings = strings,
                         pack = pack,
                         isPlayFlavor = isPlayFlavor,
+                        requestPlayPrice = requestPlayPrice,
                         onBuyWithCoins = { onBuyShopWithCoins(pack.id) },
                         onPlayPurchase = { onPlayPurchase(pack.id) },
                     )
@@ -2051,6 +2081,43 @@ private fun TelegramAccountCard(
             ) {
                 Text(strings.linkTelegram)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TelegramAccountSheet(
+    strings: RiverStrings,
+    me: MeResponseDto,
+    pending: Boolean,
+    onStartTelegramLink: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = strings.telegramAccount,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            TelegramAccountCard(
+                strings = strings,
+                me = me,
+                pending = pending,
+                onStartTelegramLink = onStartTelegramLink,
+            )
         }
     }
 }
@@ -4023,56 +4090,190 @@ private fun GuideBadge(label: String, accent: Color) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReferralCard(
+private fun ReferralSheet(
     strings: RiverStrings,
-    referrals: ReferralInfoDto?,
-    rewards: List<ReferralRewardDto>,
+    me: MeResponseDto,
+    state: ReferralUiState,
+    sessionAuthProvider: String?,
     clipboard: ClipboardManager,
     onGenerateReferral: () -> Unit,
-    onShareReferral: (ReferralInfoDto) -> Unit,
+    onShareReferral: (String) -> Unit,
     onClaimReferralRewards: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    SectionCard(strings.inviteFriends) {
-        Text(referrals?.androidShareText ?: strings.inviteFriends, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Button(onClick = onGenerateReferral, modifier = Modifier.weight(1f)) {
-                Text(strings.generateLink)
+    val showTelegramVariant = canShowTelegramReferral(sessionAuthProvider, me)
+    val showGoogleVariant = canShowGooglePlayReferral(sessionAuthProvider, me)
+    val referral = state.referrals
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = RiverPanelRaised.copy(alpha = 0.98f),
+        shape = RiverSheetShape,
+        dragHandle = { RiverSheetDragHandle() },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = strings.inviteFriends,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+
+            when {
+                state.loading && referral == null -> LoadingStatePanel(strings.loading)
+                !showTelegramVariant && !showGoogleVariant -> EmptyStatePanel(strings.noData)
+                else -> {
+                    if (referral == null) {
+                        SectionCard(strings.inviteFriends) {
+                            Text(
+                                strings.inviteFriends,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onGenerateReferral,
+                                enabled = !state.loading,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(strings.generateLink)
+                            }
+                        }
+                    } else {
+                        if (showTelegramVariant) {
+                            ReferralVariantCard(
+                                title = "Telegram",
+                                link = referral.telegramLink,
+                                shareBody = referral.androidShareText.ifBlank { referral.telegramLink },
+                                clipboard = clipboard,
+                                strings = strings,
+                                onShareReferral = onShareReferral,
+                            )
+                        }
+                        if (showGoogleVariant) {
+                            ReferralVariantCard(
+                                title = "Google Play",
+                                link = googlePlayReferralLink(referral.token),
+                                shareBody = googlePlayReferralShareText(strings, referral.token),
+                                clipboard = clipboard,
+                                strings = strings,
+                                onShareReferral = onShareReferral,
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = onGenerateReferral,
+                            enabled = !state.loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(strings.generateLink)
+                        }
+                    }
+
+                    referral?.invited?.takeIf { it.isNotEmpty() }?.let { invited ->
+                        SectionCard(strings.inviteFriends) {
+                            Text(
+                                invited.joinToString(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    if (state.rewards.isNotEmpty()) {
+                        SectionCard(strings.claimRewards) {
+                            Text(
+                                state.rewards.joinToString { "${it.name} ×${it.qty}" },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onClaimReferralRewards,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(strings.claimRewards)
+                            }
+                        }
+                    }
+                }
             }
-            OutlinedButton(
-                onClick = { referrals?.let(onShareReferral) },
+        }
+    }
+}
+
+@Composable
+private fun ReferralVariantCard(
+    title: String,
+    link: String,
+    shareBody: String,
+    clipboard: ClipboardManager,
+    strings: RiverStrings,
+    onShareReferral: (String) -> Unit,
+) {
+    SectionCard(title) {
+        Text(
+            text = link,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { onShareReferral(shareBody) },
                 modifier = Modifier.weight(1f),
-                enabled = referrals != null,
             ) {
                 Text(strings.shareLink)
             }
-        }
-        OutlinedButton(
-            onClick = {
-                referrals?.link?.let { clipboard.setText(AnnotatedString(it)) }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = referrals != null,
-        ) {
-            Text(strings.copyLink)
-        }
-        if (referrals != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(referrals.link, color = MaterialTheme.colorScheme.secondary)
-        }
-        if (referrals?.invited?.isNotEmpty() == true) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(referrals.invited.joinToString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (rewards.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(rewards.joinToString { "${it.name} ×${it.qty}" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onClaimReferralRewards, modifier = Modifier.fillMaxWidth()) {
-                Text(strings.claimRewards)
+            OutlinedButton(
+                onClick = { clipboard.setText(AnnotatedString(link)) },
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(strings.copyLink)
             }
         }
+    }
+}
+
+private fun canShowTelegramReferral(
+    sessionAuthProvider: String?,
+    me: MeResponseDto,
+): Boolean = when (sessionAuthProvider) {
+    AuthRepository.AUTH_PROVIDER_TELEGRAM -> true
+    AuthRepository.AUTH_PROVIDER_GOOGLE,
+    AuthRepository.AUTH_PROVIDER_PASSWORD,
+    -> false
+    null -> me.telegramLinked
+    else -> false
+}
+
+private fun canShowGooglePlayReferral(
+    sessionAuthProvider: String?,
+    me: MeResponseDto,
+): Boolean = when (sessionAuthProvider) {
+    AuthRepository.AUTH_PROVIDER_GOOGLE -> true
+    AuthRepository.AUTH_PROVIDER_TELEGRAM,
+    AuthRepository.AUTH_PROVIDER_PASSWORD,
+    -> false
+    null -> me.authProviders.contains(AuthRepository.AUTH_PROVIDER_GOOGLE)
+    else -> false
+}
+
+private fun googlePlayReferralLink(token: String): String =
+    "https://play.google.com/store/apps/details?id=com.riverking.mobile.play&referrer=${Uri.encode("ref=$token")}"
+
+private fun googlePlayReferralShareText(strings: RiverStrings, token: String): String {
+    val playLink = googlePlayReferralLink(token)
+    val deepLink = "riverking://referral?token=$token"
+    return if (strings.login == "Логин") {
+        "Играй в RiverKing на Android: $playLink\nЕсли игра уже установлена, открой: $deepLink"
+    } else {
+        "Play RiverKing on Android: $playLink\nIf the game is already installed, open: $deepLink"
     }
 }
 
@@ -4081,55 +4282,121 @@ private fun ShopPackageRow(
     strings: RiverStrings,
     pack: ShopPackageDto,
     isPlayFlavor: Boolean,
+    requestPlayPrice: (String, (String?) -> Unit) -> Unit,
     onBuyWithCoins: () -> Unit,
     onPlayPurchase: () -> Unit,
 ) {
     val canBuyCoins = pack.coinPrice != null
     val paidUnavailableInDirect = !isPlayFlavor && pack.coinPrice == null
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = shopIconAsset(pack.id),
-            contentDescription = pack.name,
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp)),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(pack.name, fontWeight = FontWeight.SemiBold)
-            Text(pack.desc, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (pack.until != null) {
-                Text(pack.until, color = MaterialTheme.colorScheme.secondary)
+    var playPrice by remember(pack.id, isPlayFlavor) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(pack.id, isPlayFlavor, canBuyCoins) {
+        playPrice = null
+        if (!canBuyCoins && isPlayFlavor) {
+            requestPlayPrice(pack.id) { resolved ->
+                playPrice = resolved
             }
         }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (pack.originalPrice != null) {
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AsyncImage(
+                model = shopIconAsset(pack.id),
+                contentDescription = pack.name,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
-                    "${pack.originalPrice}★",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall,
+                    text = pack.name,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
                 )
-            }
-            if (canBuyCoins) {
-                Button(onClick = onBuyWithCoins) {
-                    Text("${pack.coinPrice} 🪙")
+                Text(
+                    text = pack.desc,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (pack.until != null) {
+                    Text(
+                        text = pack.until,
+                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
                 }
             }
-            if (pack.coinPrice == null) {
-                if (paidUnavailableInDirect) {
-                    OutlinedButton(onClick = {}, enabled = false) {
-                        Text(strings.unavailable)
+            Column(
+                modifier = Modifier.width(124.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (pack.originalPrice != null) {
+                    Text(
+                        text = "${pack.originalPrice}★",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                when {
+                    canBuyCoins -> {
+                        Button(
+                            onClick = onBuyWithCoins,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = "${pack.coinPrice} 🪙",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
-                    Text(strings.shopDisabledDirect, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End)
-                } else {
-                    Button(onClick = onPlayPurchase) {
-                        Text(strings.payWithGoogle)
+                    paidUnavailableInDirect -> {
+                        OutlinedButton(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = strings.unavailable,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                    else -> {
+                        Button(
+                            onClick = onPlayPurchase,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                text = playPrice ?: "Google Play",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
+        }
+        if (paidUnavailableInDirect) {
+            Text(
+                text = strings.shopDisabledDirect,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 68.dp),
+            )
         }
     }
 }

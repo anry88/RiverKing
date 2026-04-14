@@ -49,6 +49,7 @@ data class PasswordRegisterRequest(
     val login: String,
     val password: String,
     val language: String? = null,
+    val ref: String? = null,
 )
 
 @Serializable
@@ -60,6 +61,7 @@ data class PasswordLoginRequest(
 @Serializable
 data class GoogleAuthRequest(
     val idToken: String,
+    val ref: String? = null,
 )
 
 @Serializable
@@ -79,6 +81,7 @@ data class MeResponseDto(
     val needsNickname: Boolean,
     val telegramLinked: Boolean = false,
     val telegramUsername: String? = null,
+    val authProviders: List<String> = emptyList(),
     val lures: List<LureDto> = emptyList(),
     val currentLureId: Long? = null,
     val rods: List<RodDto> = emptyList(),
@@ -102,4 +105,5 @@ data class StoredSession(
     val accessToken: String,
     val refreshToken: String,
     val accessTokenExpiresAt: Long,
+    val authProvider: String? = null,
 )
