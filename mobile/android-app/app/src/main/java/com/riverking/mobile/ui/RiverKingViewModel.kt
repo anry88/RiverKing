@@ -683,7 +683,15 @@ class RiverKingViewModel(
     }
 
     fun setRatingsLocation(locationId: String) {
-        _state.update { it.copy(ratings = it.ratings.copy(locationId = locationId)) }
+        _state.update {
+            val currentRatings = it.ratings
+            val nextFishId = if (isFishFilterValidForLocation(currentRatings.fishOptions, currentRatings.fishId, locationId)) {
+                currentRatings.fishId
+            } else {
+                "all"
+            }
+            it.copy(ratings = currentRatings.copy(locationId = locationId, fishId = nextFishId))
+        }
         loadRatings(force = true)
     }
 
@@ -701,9 +709,15 @@ class RiverKingViewModel(
             try {
                 val guide = if (state.value.ratings.fishOptions.isEmpty()) repository.loadGuide() else null
                 val ratingsState = state.value.ratings
-                val usingSpecies = ratingsState.fishId != "all"
+                val fishOptions = guide?.fish ?: ratingsState.fishOptions
+                val normalizedFishId = if (isFishFilterValidForLocation(fishOptions, ratingsState.fishId, ratingsState.locationId)) {
+                    ratingsState.fishId
+                } else {
+                    "all"
+                }
+                val usingSpecies = normalizedFishId != "all"
                 val filter = if (usingSpecies) "species" else "location"
-                val id = if (usingSpecies) ratingsState.fishId else ratingsState.locationId
+                val id = if (usingSpecies) normalizedFishId else ratingsState.locationId
                 val raw = repository.loadRatings(
                     mode = ratingsState.mode.apiValue,
                     filter = filter,
@@ -722,8 +736,9 @@ class RiverKingViewModel(
                         ratings = it.ratings.copy(
                             loaded = true,
                             loading = false,
+                            fishId = normalizedFishId,
                             entries = filtered,
-                            fishOptions = guide?.fish ?: it.ratings.fishOptions,
+                            fishOptions = fishOptions,
                         ),
                     )
                 }
@@ -736,6 +751,17 @@ class RiverKingViewModel(
                 }
             }
         }
+    }
+
+    private fun isFishFilterValidForLocation(
+        fishOptions: List<GuideFishDto>,
+        fishId: String,
+        locationId: String,
+    ): Boolean {
+        if (fishId == "all" || locationId == "all") return true
+        val locationLong = locationId.toLongOrNull() ?: return true
+        val fish = fishOptions.firstOrNull { it.id.toString() == fishId } ?: return true
+        return fish.locationIds.contains(locationLong)
     }
 
     fun loadGuide(force: Boolean = false) {

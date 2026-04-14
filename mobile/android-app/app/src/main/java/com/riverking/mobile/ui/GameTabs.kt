@@ -1278,8 +1278,12 @@ private fun RatingsScreen(
     val me = state.me ?: return
     val ratings = state.ratings
     val ratingPrizes = state.tournaments.prizes.filter(::isRatingPrize)
-    val sortedFishOptions = remember(ratings.fishOptions) {
-        ratings.fishOptions.sortedBy { it.name.lowercase(Locale.ROOT) }
+    val filteredFishOptions = remember(ratings.fishOptions, ratings.locationId) {
+        ratings.fishOptions
+            .filter { fish ->
+                ratings.locationId == "all" || fish.locationIds.contains(ratings.locationId.toLongOrNull())
+            }
+            .sortedBy { it.name.lowercase(Locale.ROOT) }
     }
     val showPrizePreview = ratings.mode == RatingsMode.GLOBAL &&
         ratings.fishId == "all" &&
@@ -1364,10 +1368,10 @@ private fun RatingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 SelectionDropdown(
                     title = if (strings.login == "Логин") "Рыба" else "Fish",
-                    selectedLabel = sortedFishOptions.firstOrNull { it.id.toString() == ratings.fishId }?.name ?: strings.allFish,
+                    selectedLabel = filteredFishOptions.firstOrNull { it.id.toString() == ratings.fishId }?.name ?: strings.allFish,
                     options = buildList {
                         add("all" to strings.allFish)
-                        addAll(sortedFishOptions.map { it.id.toString() to it.name })
+                        addAll(filteredFishOptions.map { it.id.toString() to it.name })
                     },
                     selectedKey = ratings.fishId,
                     onSelect = onSetFish,
@@ -2763,23 +2767,29 @@ private fun SelectionDropdown(
             containerColor = RiverPanelRaised.copy(alpha = 0.98f),
             border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
         ) {
-            options.forEach { (key, label) ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = label,
-                            color = if (selectedKey == key) accent else MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (selectedKey == key) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    colors = riverMenuItemColors(),
-                    onClick = {
-                        expanded = false
-                        onSelect(key)
-                    },
-                )
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                options.forEach { (key, label) ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = label,
+                                color = if (selectedKey == key) accent else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (selectedKey == key) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        colors = riverMenuItemColors(),
+                        onClick = {
+                            expanded = false
+                            onSelect(key)
+                        },
+                    )
+                }
             }
         }
     }
