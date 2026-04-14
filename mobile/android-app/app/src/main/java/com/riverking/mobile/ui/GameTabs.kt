@@ -254,7 +254,10 @@ fun MainShell(
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
 
+    val tournamentBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
+    val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
+    val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
     val tabLabels = remember(strings) {
         mapOf(
             MainTab.FISHING to strings.fishing,
@@ -299,7 +302,7 @@ fun MainShell(
                 ) {
                     MainTab.entries.forEach { tab ->
                         val showBadge = when (tab) {
-                            MainTab.LEADERS -> achievementBadge
+                            MainTab.LEADERS -> leadersBadge
                             else -> false
                         }
                         NavigationBarItem(
@@ -508,6 +511,9 @@ private fun LeadersScreen(
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     var section by rememberSaveable { mutableStateOf(LeaderSection.TOURNAMENTS) }
+    val tournamentsBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
+    val ratingsBadge = state.tournaments.prizes.any(::isRatingPrize)
+    val achievementsBadge = state.guide.achievements.any { it.claimable }
 
     Column(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
@@ -528,6 +534,13 @@ private fun LeadersScreen(
                             LeaderSection.TOURNAMENTS -> strings.tournaments
                             LeaderSection.RATINGS -> strings.ratings
                             LeaderSection.ACHIEVEMENTS -> strings.achievements
+                        }
+                    },
+                    badgeFor = {
+                        when (it) {
+                            LeaderSection.TOURNAMENTS -> tournamentsBadge
+                            LeaderSection.RATINGS -> ratingsBadge
+                            LeaderSection.ACHIEVEMENTS -> achievementsBadge
                         }
                     },
                 )
@@ -1151,6 +1164,28 @@ private fun TournamentsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (visiblePrizes.isNotEmpty()) {
+            item {
+                SectionCard(strings.prizes) {
+                    visiblePrizes.forEachIndexed { index, prize ->
+                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(pendingPrizeLabel(strings, prize), fontWeight = FontWeight.SemiBold)
+                                tournamentPrizeDetailsLabel(strings, prize)?.let { details ->
+                                    Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Button(onClick = { onClaimPrize(prize.id) }) { Text(strings.claim) }
+                        }
+                    }
+                }
+            }
+        }
         item {
             SectionCard(strings.currentTournament) {
                 if (tournaments.current == null) {
@@ -1204,28 +1239,6 @@ private fun TournamentsScreen(
                 }
             }
         }
-        if (visiblePrizes.isNotEmpty()) {
-            item {
-                SectionCard(strings.prizes) {
-                    visiblePrizes.forEachIndexed { index, prize ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(pendingPrizeLabel(strings, prize), fontWeight = FontWeight.SemiBold)
-                                tournamentPrizeDetailsLabel(strings, prize)?.let { details ->
-                                    Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            Button(onClick = { onClaimPrize(prize.id) }) { Text(strings.claim) }
-                        }
-                    }
-                }
-            }
-        }
         if (tournaments.upcoming.isNotEmpty()) {
             item {
                 SectionCard(strings.upcomingTournaments) {
@@ -1274,6 +1287,29 @@ private fun RatingsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (ratingPrizes.isNotEmpty()) {
+            item {
+                SectionCard(strings.prizes) {
+                    ratingPrizes.forEachIndexed { index, prize ->
+                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                pendingPrizeLabel(strings, prize),
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(onClick = { onClaimPrize(prize.id) }) {
+                                Text(strings.claim)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         item {
             SectionCard(strings.ratings) {
                 HorizontalChipRow {
@@ -1333,29 +1369,6 @@ private fun RatingsScreen(
                             label = { Text(fish.name) },
                             colors = chipColors(selected = ratings.fishId == fish.id.toString()),
                         )
-                    }
-                }
-            }
-        }
-        if (ratingPrizes.isNotEmpty()) {
-            item {
-                SectionCard(strings.prizes) {
-                    ratingPrizes.forEachIndexed { index, prize ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                pendingPrizeLabel(strings, prize),
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Button(onClick = { onClaimPrize(prize.id) }) {
-                                Text(strings.claim)
-                            }
-                        }
                     }
                 }
             }
@@ -1448,7 +1461,7 @@ private fun CatalogScreen(
                             strings = strings,
                             checked = showCaughtOnly,
                             onCheckedChange = { showCaughtOnly = it },
-                            modifier = Modifier.weight(0.78f),
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -2511,6 +2524,7 @@ private fun <T> SegmentedSelectionBar(
     onSelect: (T) -> Unit,
     accentFor: (T) -> Color,
     labelFor: (T) -> String,
+    badgeFor: ((T) -> Boolean)? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -2529,6 +2543,7 @@ private fun <T> SegmentedSelectionBar(
                     label = labelFor(item),
                     accent = accentFor(item),
                     selected = selected == item,
+                    showBadge = badgeFor?.invoke(item) == true,
                     onClick = { onSelect(item) },
                 )
                 if (index < items.lastIndex) {
@@ -2544,6 +2559,7 @@ private fun RowScope.SegmentedSelectionCell(
     label: String,
     accent: Color,
     selected: Boolean,
+    showBadge: Boolean,
     onClick: () -> Unit,
 ) {
     Box(
@@ -2555,15 +2571,26 @@ private fun RowScope.SegmentedSelectionCell(
             .padding(horizontal = 8.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        BadgedBox(
+            badge = {
+                if (showBadge) {
+                    Badge(
+                        containerColor = RiverCoral,
+                        contentColor = RiverMist,
+                    )
+                }
+            }
+        ) {
+            Text(
+                text = label,
+                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -2582,6 +2609,7 @@ private fun RarityDropdown(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .clickable { expanded = true },
             shape = RoundedCornerShape(18.dp),
@@ -2678,6 +2706,7 @@ private fun CaughtOnlyToggleCard(
     val accent = if (checked) RiverMoss else RiverOutline
     Surface(
         modifier = modifier
+            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(18.dp))
             .clickable { onCheckedChange(!checked) },
         shape = RoundedCornerShape(18.dp),
