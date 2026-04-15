@@ -129,6 +129,17 @@ Use or adapt the shipped screenshots under [docs/screenshots](/Users/hq-k14lcdcq
 - [android-05-club.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-05-club.png)
 - [android-06-shop.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-06-shop.png)
 
+For itch.io, use the downscaled copies under [docs/screenshots/itch](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch):
+
+- [android-01-daily-reward.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-01-daily-reward.png)
+- [android-02-fishing-home.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-02-fishing-home.png)
+- [android-03-leaders.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-03-leaders.png)
+- [android-04-catalog.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-04-catalog.png)
+- [android-05-club.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-05-club.png)
+- [android-06-shop.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/itch/android-06-shop.png)
+
+These itch copies preserve the same portrait images but fit under itch.io's `3840x2160` limit. Keep the original taller screenshots for Google Play.
+
 Branding assets for the listing already exist under [docs/branding](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding):
 
 - [android-icon-1024.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/android-icon-1024.png)

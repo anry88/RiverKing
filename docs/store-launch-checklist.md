@@ -24,7 +24,16 @@ Verified against the current repository state on `2026-04-15`.
 - `docs/screenshots/android-05-club.png`
 - `docs/screenshots/android-06-shop.png`
 
-All current Android screenshots were re-exported as regular RGB PNG files so they are safer to upload to store consoles.
+itch.io upload set:
+
+- `docs/screenshots/itch/android-01-daily-reward.png`
+- `docs/screenshots/itch/android-02-fishing-home.png`
+- `docs/screenshots/itch/android-03-leaders.png`
+- `docs/screenshots/itch/android-04-catalog.png`
+- `docs/screenshots/itch/android-05-club.png`
+- `docs/screenshots/itch/android-06-shop.png`
+
+All current Android screenshots were re-exported as regular RGB PNG files so they are safer to upload to store consoles. Use the original `1280x2856` files for Google Play. Use the downscaled `968x2160` `docs/screenshots/itch/` copies for itch.io, because itch rejects screenshots taller than `2160`.
 
 ### Release build validation
 
