@@ -136,21 +136,17 @@ Without signing properties the `release` build type falls back to the debug sign
 
 ## Store Assets
 
-- Launcher icon resources are generated into `app/src/main/res/drawable-nodpi/` and wired through `mipmap-anydpi-v26/`.
+- Launcher icons are committed directly as:
+  - `app/src/main/res/drawable-nodpi/ic_launcher.png`
+  - `app/src/main/res/drawable-nodpi/ic_launcher_round.png`
 - Listing assets live under `docs/branding/`.
 - Emulator-captured Android screenshots live under `docs/screenshots/`.
-
-Regenerate the icon and listing graphics:
-
-```bash
-python3 mobile/android-app/scripts/generate_brand_assets.py
-```
-
-Current generated outputs:
 
 - `docs/branding/android-icon-1024.png`
 - `docs/branding/itch-cover-1280x720.png`
 - `docs/branding/play-feature-1024x500.png`
+
+Current store assets are managed manually from the approved design exports. When the icon changes, update `docs/branding/android-icon-1024.png` and sync that image into the two launcher icon files above.
 
 ## Asset Management
 
