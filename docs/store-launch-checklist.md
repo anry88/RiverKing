@@ -48,10 +48,11 @@ The repository also now protects the store release path:
 
 These store-targeted commands now fail fast unless the canonical package ID and the release signing variables are configured.
 
-Current local blocker:
+The release scripts accept signing values from either:
 
-- the project owner confirmed that the real release keystore already exists
-- this machine still needs the local `RIVERKING_SIGNING_*` values wired in before final signed store artifacts can be produced
+- environment variables
+- `mobile/android-app/gradle.properties`
+- `~/.gradle/gradle.properties`
 
 ## You Need To Do
 
@@ -103,6 +104,7 @@ Important:
 - do not create a second production keystore for the same app
 - do not rotate the signing key casually after the first public Android release
 - without the same signing lineage, users cannot upgrade cleanly from itch.io to Google Play
+- if the current machine already has these values in `mobile/android-app/gradle.properties` or `~/.gradle/gradle.properties`, this step is already done
 
 ### 3. Provide the signing and release values
 
@@ -117,7 +119,7 @@ Before the final production build, these values need to exist:
 - `RIVERKING_ITCH_PROJECT_URL`
 - `RIVERKING_PLAY_STORE_URL`
 
-For this repository, the missing local step is specifically the signing block above. The rest of the variables can be finalized once the store pages exist.
+If signing is already configured locally, the remaining values can be finalized once the store pages exist.
 
 ### 4. Fill the public policy URLs
 

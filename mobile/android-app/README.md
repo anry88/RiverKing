@@ -143,7 +143,7 @@ mobile/android-app/scripts/build-release-artifacts.sh
 The release scripts now fail fast unless:
 
 - `RIVERKING_CANONICAL_APPLICATION_ID=true`
-- all `RIVERKING_SIGNING_*` values are present
+- all `RIVERKING_SIGNING_*` values are present in env or standard Gradle property files
 
 Raw Gradle `release` tasks without the canonical package flag remain acceptable for local packaging verification only, not for distribution.
 

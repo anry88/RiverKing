@@ -64,6 +64,7 @@ Set these Gradle properties before producing release artifacts:
 - `RIVERKING_SIGNING_KEY_PASSWORD`
 
 Use [mobile/android-app/gradle.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/gradle.example.properties) as the template.
+The store release scripts accept signing values from environment variables, `mobile/android-app/gradle.properties`, or `~/.gradle/gradle.properties`.
 
 ## Build Commands
 

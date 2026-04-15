@@ -64,6 +64,24 @@ die() {
     exit 1
 }
 
+has_gradle_property() {
+    local property_name="$1"
+    if [[ -n "${!property_name:-}" ]]; then
+        return 0
+    fi
+
+    local property_file
+    for property_file in \
+        "$ANDROID_PROJECT_DIR/gradle.properties" \
+        "$HOME/.gradle/gradle.properties"; do
+        if [[ -f "$property_file" ]] && grep -Eq "^[[:space:]]*${property_name}[[:space:]]*=" "$property_file"; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 if [[ ! -x "$GRADLEW" ]]; then
     die "gradle wrapper not found at $GRADLEW"
 fi
@@ -257,13 +275,13 @@ if [[ "$release_build" == true ]]; then
         RIVERKING_SIGNING_STORE_PASSWORD \
         RIVERKING_SIGNING_KEY_ALIAS \
         RIVERKING_SIGNING_KEY_PASSWORD; do
-        if [[ -z "${!property_name:-}" ]]; then
+        if ! has_gradle_property "$property_name"; then
             missing_signing=1
             break
         fi
     done
     if [[ "$missing_signing" -eq 1 ]]; then
-        die "release targets require RIVERKING_SIGNING_STORE_FILE, RIVERKING_SIGNING_STORE_PASSWORD, RIVERKING_SIGNING_KEY_ALIAS, and RIVERKING_SIGNING_KEY_PASSWORD"
+        die "release targets require RIVERKING_SIGNING_STORE_FILE, RIVERKING_SIGNING_STORE_PASSWORD, RIVERKING_SIGNING_KEY_ALIAS, and RIVERKING_SIGNING_KEY_PASSWORD in env or standard Gradle property files"
     fi
 fi
 
