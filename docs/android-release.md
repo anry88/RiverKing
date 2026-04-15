@@ -107,14 +107,18 @@ Publish the `directRelease` APK on itch.io as the primary public Android downloa
 
 Use or adapt the shipped screenshots under [docs/screenshots](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots):
 
-- fishing home
-- achievements / guide
-- tournaments
-- club overview
-- shop / daily reward
-- ratings
+- [android-01-daily-reward.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-01-daily-reward.png)
+- [android-02-fishing-home.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-02-fishing-home.png)
+- [android-03-leaders.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-03-leaders.png)
+- [android-04-catalog.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-04-catalog.png)
+- [android-05-club.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-05-club.png)
+- [android-06-shop.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/screenshots/android-06-shop.png)
 
-Prepare one additional cover image sized for the itch.io project page.
+Branding assets for the listing already exist under [docs/branding](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding):
+
+- [android-icon-1024.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/android-icon-1024.png)
+- [itch-cover-1280x720.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/itch-cover-1280x720.png)
+- [play-feature-1024x500.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/play-feature-1024x500.png)
 
 ## Google Play Follow-Up
 
@@ -140,7 +144,7 @@ Once the itch.io build is stable, ship the `playRelease` bundle.
 - Support URL
 - Account deletion URL
 - 4–8 phone screenshots
-- feature graphic
+- [play-feature-1024x500.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/play-feature-1024x500.png)
 - short description
 - full description
 

@@ -113,6 +113,25 @@ Without signing properties the `release` build type falls back to the debug sign
 - Both release channels must use the same signing key and a single monotonic `versionCode` sequence.
 - Do not let the itch.io/direct release overtake the Google Play version code once Play becomes the canonical upgrade path.
 - Release builds default to HTTPS-only networking. Cleartext is enabled only from the debug manifest for local emulator work.
+
+## Store Assets
+
+- Launcher icon resources are generated into `app/src/main/res/drawable-nodpi/` and wired through `mipmap-anydpi-v26/`.
+- Listing assets live under `docs/branding/`.
+- Emulator-captured Android screenshots live under `docs/screenshots/`.
+
+Regenerate the icon and listing graphics:
+
+```bash
+python3 mobile/android-app/scripts/generate_brand_assets.py
+```
+
+Current generated outputs:
+
+- `docs/branding/android-icon-1024.png`
+- `docs/branding/itch-cover-1280x720.png`
+- `docs/branding/play-feature-1024x500.png`
+
 ## Asset Management
 
 To minimize APK size while supporting local asset loading, we use WebP conversion.

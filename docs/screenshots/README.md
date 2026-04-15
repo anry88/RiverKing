@@ -14,6 +14,17 @@ Current target set:
 - `06-ratings.png`
 - `07-bot-flow.png`
 
+Android store capture set:
+
+- `android-01-daily-reward.png`
+- `android-02-fishing-home.png`
+- `android-03-leaders.png`
+- `android-04-catalog.png`
+- `android-05-club.png`
+- `android-06-shop.png`
+
+These Android screenshots were captured from the running emulator after installing the current `directDebug` build. Keep them as the baseline store/gallery set until a newer visual refresh or feature change makes them stale.
+
 Public repository note:
 
 - Admin-side flows are intentionally excluded from the public screenshot set.
