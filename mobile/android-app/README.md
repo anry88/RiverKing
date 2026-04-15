@@ -83,6 +83,8 @@ mobile/android-app/scripts/build-play-release-apk.sh
 mobile/android-app/scripts/build-play-release-aab.sh
 mobile/android-app/scripts/build-debug-apks.sh
 mobile/android-app/scripts/build-release-artifacts.sh
+mobile/android-app/scripts/install-direct-debug.sh
+mobile/android-app/scripts/install-play-debug.sh
 ```
 
 Generic entrypoint:
@@ -90,9 +92,27 @@ Generic entrypoint:
 ```bash
 mobile/android-app/scripts/build-android.sh release-artifacts
 mobile/android-app/scripts/build-android.sh play-release-aab --stacktrace
+mobile/android-app/scripts/build-android.sh direct-debug-install
 ```
 
 The scripts read the same environment variables as Gradle properties and print the final artifact paths after a successful build.
+
+For debug installs, the script resolves the target device in this order:
+
+- `RIVERKING_ANDROID_SERIAL`
+- `ANDROID_SERIAL`
+- `ADB_SERIAL`
+- the only connected emulator, if exactly one emulator is attached
+- the only connected device, if exactly one device is attached
+
+If more than one Android device is connected and no serial is provided, the install step fails fast instead of silently targeting the wrong device. Debug installs also use `adb install -r -d`, which lets local emulator builds replace a higher-version local build without uninstalling first.
+
+Examples:
+
+```bash
+mobile/android-app/scripts/install-direct-debug.sh
+ANDROID_SERIAL=emulator-5554 mobile/android-app/scripts/install-play-debug.sh
+```
 
 Release outputs:
 

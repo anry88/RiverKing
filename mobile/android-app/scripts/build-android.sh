@@ -14,8 +14,10 @@ Usage:
 
 Targets:
   direct-debug-apk     Build direct debug APK
+  direct-debug-install Build and install direct debug APK on a chosen Android device
   direct-release-apk   Build direct release APK
   play-debug-apk       Build play debug APK
+  play-debug-install   Build and install play debug APK on a chosen Android device
   play-release-apk     Build play release APK
   play-release-aab     Build play release AAB
   debug-apks           Build both debug APKs
@@ -23,14 +25,17 @@ Targets:
 
 Aliases:
   direct-debug         -> direct-debug-apk
+  install-direct-debug -> direct-debug-install
   direct-release       -> direct-release-apk
   play-debug           -> play-debug-apk
+  install-play-debug   -> play-debug-install
   play-release         -> play-release-apk
   play-bundle          -> play-release-aab
   debug-all            -> debug-apks
   release-all          -> release-artifacts
 
 Environment:
+  ANDROID_SERIAL / ADB_SERIAL / RIVERKING_ANDROID_SERIAL
   RIVERKING_API_BASE_URL
   RIVERKING_PUBLIC_WEB_URL
   RIVERKING_ITCH_PROJECT_URL
@@ -48,6 +53,7 @@ Environment:
 
 Examples:
   mobile/android-app/scripts/build-android.sh direct-debug-apk
+  mobile/android-app/scripts/build-android.sh direct-debug-install
   RIVERKING_API_BASE_URL=http://10.0.2.2:8080 mobile/android-app/scripts/build-android.sh release-artifacts --stacktrace
 EOF
 }
@@ -61,6 +67,65 @@ if [[ ! -x "$GRADLEW" ]]; then
     die "gradle wrapper not found at $GRADLEW"
 fi
 
+resolve_adb() {
+    if [[ -n "${ANDROID_ADB:-}" ]]; then
+        echo "$ANDROID_ADB"
+        return
+    fi
+    if command -v adb >/dev/null 2>&1; then
+        command -v adb
+        return
+    fi
+    if [[ -x "$HOME/Library/Android/sdk/platform-tools/adb" ]]; then
+        echo "$HOME/Library/Android/sdk/platform-tools/adb"
+        return
+    fi
+    die "adb not found; set ANDROID_ADB or install Android platform-tools"
+}
+
+pick_install_serial() {
+    if [[ -n "${RIVERKING_ANDROID_SERIAL:-}" ]]; then
+        echo "$RIVERKING_ANDROID_SERIAL"
+        return
+    fi
+    if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+        echo "$ANDROID_SERIAL"
+        return
+    fi
+    if [[ -n "${ADB_SERIAL:-}" ]]; then
+        echo "$ADB_SERIAL"
+        return
+    fi
+
+    local adb_bin="$1"
+    local connected_devices=()
+    local emulator_devices=()
+    local line
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && connected_devices+=( "$line" )
+    done < <("$adb_bin" devices | awk 'NR > 1 && $2 == "device" { print $1 }')
+
+    if [[ "${#connected_devices[@]}" -eq 0 ]]; then
+        die "no Android devices connected"
+    fi
+
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && emulator_devices+=( "$line" )
+    done < <(printf '%s\n' "${connected_devices[@]}" | awk '/^emulator-/ { print }')
+
+    if [[ "${#emulator_devices[@]}" -eq 1 ]]; then
+        echo "${emulator_devices[0]}"
+        return
+    fi
+
+    if [[ "${#connected_devices[@]}" -eq 1 ]]; then
+        echo "${connected_devices[0]}"
+        return
+    fi
+
+    die "multiple Android devices are connected (${connected_devices[*]}); set ANDROID_SERIAL to choose the install target"
+}
+
 target="${1:-help}"
 if [[ $# -gt 0 ]]; then
     shift
@@ -69,6 +134,8 @@ fi
 declare -a tasks=()
 declare -a artifacts=()
 release_build=false
+install_build=false
+install_allow_downgrade=false
 
 case "$target" in
     help|-h|--help)
@@ -79,6 +146,12 @@ case "$target" in
         tasks=( ":app:assembleDirectDebug" )
         artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/direct/debug/app-direct-debug.apk" )
         ;;
+    direct-debug-install|install-direct-debug)
+        tasks=( ":app:assembleDirectDebug" )
+        artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/direct/debug/app-direct-debug.apk" )
+        install_build=true
+        install_allow_downgrade=true
+        ;;
     direct-release|direct-release-apk)
         tasks=( ":app:assembleDirectRelease" )
         artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/direct/release/app-direct-release.apk" )
@@ -87,6 +160,12 @@ case "$target" in
     play-debug|play-debug-apk)
         tasks=( ":app:assemblePlayDebug" )
         artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/play/debug/app-play-debug.apk" )
+        ;;
+    play-debug-install|install-play-debug)
+        tasks=( ":app:assemblePlayDebug" )
+        artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/play/debug/app-play-debug.apk" )
+        install_build=true
+        install_allow_downgrade=true
         ;;
     play-release|play-release-apk)
         tasks=( ":app:assemblePlayRelease" )
@@ -192,6 +271,31 @@ fi
 echo "tasks: ${tasks[*]}"
 
 "$GRADLEW" "${gradle_args[@]}"
+
+if [[ "$install_build" == true ]]; then
+    if [[ "${#artifacts[@]}" -ne 1 ]]; then
+        die "install targets expect exactly one APK artifact"
+    fi
+
+    artifact="${artifacts[0]}"
+    if [[ ! -f "$artifact" ]]; then
+        die "missing APK artifact for install: $artifact"
+    fi
+
+    adb_bin="$(resolve_adb)"
+    install_serial="$(pick_install_serial "$adb_bin")"
+
+    declare -a install_args=( -s "$install_serial" install -r )
+    if [[ "$install_allow_downgrade" == true ]]; then
+        install_args+=( -d )
+    fi
+    install_args+=( "$artifact" )
+
+    echo "install target: $install_serial"
+    echo "adb: $adb_bin"
+    echo "apk: $artifact"
+    "$adb_bin" "${install_args[@]}"
+fi
 
 echo
 echo "Artifacts:"
