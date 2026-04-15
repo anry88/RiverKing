@@ -7,6 +7,13 @@ RiverKing ships Android in two channels:
 
 The rollout order is deliberate: publish and validate the itch.io APK first, then ship the Google Play bundle on the same product identity.
 
+For local Android Studio work, the project deliberately keeps flavor-specific package IDs so debug and ad-hoc release installs do not collide with the canonical store package on the same device:
+
+- `directDebug` / local `directRelease` -> `com.riverking.mobile.direct`
+- `playDebug` / local `playRelease` -> `com.riverking.mobile.play`
+
+Only release packaging flows that explicitly enable `RIVERKING_CANONICAL_APPLICATION_ID=true` produce the store package `com.riverking.mobile`.
+
 ## Release Contract
 
 - Use one canonical Android package name: `com.riverking.mobile`
@@ -120,6 +127,18 @@ Branding assets for the listing already exist under [docs/branding](/Users/hq-k1
 - [itch-cover-1280x720.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/itch-cover-1280x720.png)
 - [play-feature-1024x500.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/play-feature-1024x500.png)
 
+Android launcher and startup visuals are sourced separately from the listing assets:
+
+- adaptive icon XML:
+  - `mobile/android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+  - `mobile/android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
+- foreground artwork:
+  - `mobile/android-app/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png`
+- splash theme:
+  - `mobile/android-app/app/src/main/res/values/themes.xml`
+- splash background color:
+  - `mobile/android-app/app/src/main/res/values/colors.xml`
+
 ## Google Play Follow-Up
 
 Once the itch.io build is stable, ship the `playRelease` bundle.
@@ -155,6 +174,8 @@ Do not let the itch.io channel outpace Google Play in `versionCode` once Play be
 ## QA Checklist
 
 - Fresh install from itch.io APK
+- Fresh local Android Studio run on emulator with `directDebug`
+- Fresh local Android Studio run on physical device with `directDebug`
 - Password login
 - Telegram deeplink login/link flow
 - Referral/share opens itch.io URL in `direct`
@@ -162,6 +183,8 @@ Do not let the itch.io channel outpace Google Play in `versionCode` once Play be
 - In-app delete account removes access token and refresh token usability
 - Play Billing works only in `play`
 - `playRelease` installs over the same package/signing lineage without uninstall when testing cross-channel upgrade
+
+If a physical device still has an older local package such as `com.riverking.mobile.direct.local`, remove it before testing the current IDE target. Otherwise Android Studio can attempt to launch `com.riverking.mobile.direct` while only the stale old package is installed.
 
 ## Official References
 

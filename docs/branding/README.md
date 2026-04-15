@@ -8,9 +8,10 @@ Current release files:
 - `itch-cover-1280x720.png` — primary wide artwork for the itch.io page
 - `play-feature-1024x500.png` — Google Play feature graphic
 
-Android launcher icons are synced separately from the chosen store icon into:
+Android launcher/splash assets are synced separately from the chosen store icon into:
 
-- `mobile/android-app/app/src/main/res/drawable-nodpi/ic_launcher.png`
-- `mobile/android-app/app/src/main/res/drawable-nodpi/ic_launcher_round.png`
+- `mobile/android-app/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png`
+- `mobile/android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
+- `mobile/android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
 
-When branding changes, replace the files in this directory first, then refresh the launcher copies from `android-icon-1024.png`.
+When branding changes, replace the files in this directory first, then refresh the Android foreground asset sourced from `android-icon-1024.png`.
