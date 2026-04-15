@@ -67,6 +67,16 @@ Use [mobile/android-app/gradle.example.properties](/Users/hq-k14lcdcq7d/Document
 The store release scripts accept signing values from environment variables, `mobile/android-app/gradle.properties`, or `~/.gradle/gradle.properties`.
 If `RIVERKING_ITCH_PROJECT_URL` is not set, the Android build falls back to `$publicWebUrl/support`, which is acceptable for an internal pre-release APK but not ideal for the public itch.io build.
 
+For environment separation, keep production and test/staging server URLs in local Android profile files:
+
+- `mobile/android-app/profiles/prod.properties`
+- `mobile/android-app/profiles/test.properties`
+
+Tracked starter templates live at:
+
+- [prod.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/prod.example.properties)
+- [test.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/test.example.properties)
+
 ## Build Commands
 
 From the repository root:
@@ -75,6 +85,8 @@ From the repository root:
 ./gradlew test
 ./gradlew -p mobile/android-app :app:assembleDirectRelease :app:bundlePlayRelease
 mobile/android-app/scripts/build-release-artifacts.sh
+mobile/android-app/scripts/build-release-artifacts-prod.sh
+mobile/android-app/scripts/build-android.sh --profile test debug-apks
 ```
 
 Expected outputs:
@@ -86,6 +98,8 @@ Command intent:
 
 - raw Gradle `assembleDirectRelease` / `bundlePlayRelease` without `RIVERKING_CANONICAL_APPLICATION_ID=true` stays useful for local packaging validation
 - `mobile/android-app/scripts/build-release-artifacts.sh` is the store-targeted path and now fails fast unless the canonical package ID and all `RIVERKING_SIGNING_*` values are configured
+- `mobile/android-app/scripts/build-release-artifacts-prod.sh` is the explicit production release path when you want the store build to use the `prod` backend profile
+- profile builds also copy artifacts into `mobile/android-app/dist/<profile>/` so production and test outputs stay separate
 
 ## itch.io First Release
 

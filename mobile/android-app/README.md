@@ -41,6 +41,16 @@ Nested Android project for the RiverKing mobile client.
 
 Use [gradle.example.properties](gradle.example.properties) as the full template for Android build properties. Copy it to `~/.gradle/gradle.properties` or take the `RIVERKING_*` entries from it and pass them through `-P...` flags. Keep `sdk.dir` in `mobile/android-app/local.properties` on each machine.
 
+For environment separation, keep shared signing and machine-level settings in `mobile/android-app/gradle.properties` or `~/.gradle/gradle.properties`, and keep server-specific values in local profile files:
+
+- `mobile/android-app/profiles/prod.properties`
+- `mobile/android-app/profiles/test.properties`
+
+Tracked templates live at:
+
+- [profiles/prod.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/prod.example.properties)
+- [profiles/test.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/test.example.properties)
+
 Set these Gradle properties when building locally:
 
 - `RIVERKING_API_BASE_URL`
@@ -87,19 +97,26 @@ mobile/android-app/scripts/build-play-release-apk.sh
 mobile/android-app/scripts/build-play-release-aab.sh
 mobile/android-app/scripts/build-debug-apks.sh
 mobile/android-app/scripts/build-release-artifacts.sh
+mobile/android-app/scripts/build-release-artifacts-prod.sh
+mobile/android-app/scripts/build-debug-apks-test.sh
 mobile/android-app/scripts/install-direct-debug.sh
 mobile/android-app/scripts/install-play-debug.sh
+mobile/android-app/scripts/install-direct-debug-test.sh
 ```
 
 Generic entrypoint:
 
 ```bash
 mobile/android-app/scripts/build-android.sh release-artifacts
+mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
+mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
 mobile/android-app/scripts/build-android.sh play-release-aab --stacktrace
 mobile/android-app/scripts/build-android.sh direct-debug-install
 ```
 
-The scripts read the same environment variables as Gradle properties and print the final artifact paths after a successful build.
+The scripts read the same environment variables as Gradle properties, can load additional values from a named profile file, and print the final artifact paths after a successful build.
+
+When you build with `--profile <name>`, the script also copies the final artifacts into `mobile/android-app/dist/<name>/` with the profile suffix in the filename, so `prod` and `test` outputs do not get mixed together.
 
 Release targets automatically force `RIVERKING_CANONICAL_APPLICATION_ID=true`, so the shipped itch.io APK and Google Play bundle still use `com.riverking.mobile` with the configured release signing. Android Studio and ad-hoc local Gradle runs default to flavor-specific package IDs and debug signing unless you explicitly pass `-PRIVERKING_CANONICAL_APPLICATION_ID=true`.
 
@@ -138,6 +155,7 @@ For store-targeted builds, prefer:
 
 ```bash
 mobile/android-app/scripts/build-release-artifacts.sh
+mobile/android-app/scripts/build-release-artifacts-prod.sh
 ```
 
 The release scripts now fail fast unless:

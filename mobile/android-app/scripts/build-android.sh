@@ -5,12 +5,13 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 ANDROID_PROJECT_DIR="$REPO_ROOT/mobile/android-app"
 GRADLEW="$REPO_ROOT/gradlew"
-API_BASE_URL="${RIVERKING_API_BASE_URL:-}"
+BUILD_PROFILE="${RIVERKING_BUILD_PROFILE:-}"
+PROFILE_FILE=""
 
 usage() {
     cat <<'EOF'
 Usage:
-  mobile/android-app/scripts/build-android.sh <target> [extra gradle args...]
+  mobile/android-app/scripts/build-android.sh [--profile <name>] <target> [extra gradle args...]
 
 Targets:
   direct-debug-apk     Build direct debug APK
@@ -35,6 +36,7 @@ Aliases:
   release-all          -> release-artifacts
 
 Environment:
+  RIVERKING_BUILD_PROFILE
   ANDROID_SERIAL / ADB_SERIAL / RIVERKING_ANDROID_SERIAL
   RIVERKING_API_BASE_URL
   RIVERKING_PUBLIC_WEB_URL
@@ -54,6 +56,8 @@ Environment:
 
 Examples:
   mobile/android-app/scripts/build-android.sh direct-debug-apk
+  mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
+  mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
   mobile/android-app/scripts/build-android.sh direct-debug-install
   RIVERKING_API_BASE_URL=http://10.0.2.2:8080 mobile/android-app/scripts/build-android.sh release-artifacts --stacktrace
 EOF
@@ -70,6 +74,10 @@ has_gradle_property() {
         return 0
     fi
 
+    if [[ -n "$PROFILE_FILE" ]] && [[ -f "$PROFILE_FILE" ]] && grep -Eq "^[[:space:]]*${property_name}[[:space:]]*=" "$PROFILE_FILE"; then
+        return 0
+    fi
+
     local property_file
     for property_file in \
         "$ANDROID_PROJECT_DIR/gradle.properties" \
@@ -78,6 +86,45 @@ has_gradle_property() {
             return 0
         fi
     done
+
+    return 1
+}
+
+read_property_file_value() {
+    local property_file="$1"
+    local property_name="$2"
+    awk -v target="$property_name" '
+        /^[[:space:]]*#/ { next }
+        {
+            split($0, parts, "=")
+            key = parts[1]
+            sub(/^[[:space:]]+/, "", key)
+            sub(/[[:space:]]+$/, "", key)
+            if (key == target) {
+                value = substr($0, index($0, "=") + 1)
+                sub(/\r$/, "", value)
+                print value
+                exit
+            }
+        }
+    ' "$property_file"
+}
+
+resolved_property_value() {
+    local property_name="$1"
+    if [[ -n "${!property_name:-}" ]]; then
+        printf '%s' "${!property_name}"
+        return 0
+    fi
+
+    if [[ -n "$PROFILE_FILE" ]] && [[ -f "$PROFILE_FILE" ]]; then
+        local profile_value=""
+        profile_value="$(read_property_file_value "$PROFILE_FILE" "$property_name")"
+        if [[ -n "$profile_value" ]]; then
+            printf '%s' "$profile_value"
+            return 0
+        fi
+    fi
 
     return 1
 }
@@ -144,6 +191,28 @@ pick_install_serial() {
 
     die "multiple Android devices are connected (${connected_devices[*]}); set ANDROID_SERIAL to choose the install target"
 }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --profile)
+            [[ $# -ge 2 ]] || die "--profile requires a value"
+            BUILD_PROFILE="$2"
+            shift 2
+            ;;
+        --profile=*)
+            BUILD_PROFILE="${1#*=}"
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ -n "$BUILD_PROFILE" ]]; then
+    PROFILE_FILE="$ANDROID_PROJECT_DIR/profiles/$BUILD_PROFILE.properties"
+    [[ -f "$PROFILE_FILE" ]] || die "build profile '$BUILD_PROFILE' not found at $PROFILE_FILE"
+fi
 
 target="${1:-help}"
 if [[ $# -gt 0 ]]; then
@@ -225,15 +294,9 @@ for task in "${tasks[@]}"; do
     gradle_args+=( "$task" )
 done
 
-if [[ -n "$API_BASE_URL" ]]; then
-    gradle_args+=( "-PRIVERKING_API_BASE_URL=$API_BASE_URL" )
-fi
-
-if [[ -n "${RIVERKING_GOOGLE_AUTH_CLIENT_ID:-}" ]]; then
-    gradle_args+=( "-PRIVERKING_GOOGLE_AUTH_CLIENT_ID=$RIVERKING_GOOGLE_AUTH_CLIENT_ID" )
-fi
-
 for property_name in \
+    RIVERKING_API_BASE_URL \
+    RIVERKING_GOOGLE_AUTH_CLIENT_ID \
     RIVERKING_PUBLIC_WEB_URL \
     RIVERKING_ITCH_PROJECT_URL \
     RIVERKING_PLAY_STORE_URL \
@@ -243,7 +306,7 @@ for property_name in \
     RIVERKING_CANONICAL_APPLICATION_ID \
     RIVERKING_VERSION_CODE \
     RIVERKING_VERSION_NAME; do
-    property_value="${!property_name:-}"
+    property_value="$(resolved_property_value "$property_name" || true)"
     if [[ -n "$property_value" ]]; then
         gradle_args+=( "-P${property_name}=$property_value" )
     fi
@@ -254,7 +317,7 @@ for property_name in \
     RIVERKING_SIGNING_STORE_PASSWORD \
     RIVERKING_SIGNING_KEY_ALIAS \
     RIVERKING_SIGNING_KEY_PASSWORD; do
-    property_value="${!property_name:-}"
+    property_value="$(resolved_property_value "$property_name" || true)"
     if [[ -n "$property_value" ]]; then
         gradle_args+=( "-P${property_name}=$property_value" )
     fi
@@ -291,8 +354,13 @@ fi
 
 echo "==> RiverKing Android build"
 echo "target: $target"
-if [[ -n "$API_BASE_URL" ]]; then
-    echo "api base url: $API_BASE_URL"
+if [[ -n "$BUILD_PROFILE" ]]; then
+    echo "profile: $BUILD_PROFILE"
+    echo "profile file: $PROFILE_FILE"
+fi
+api_base_url="$(resolved_property_value RIVERKING_API_BASE_URL || true)"
+if [[ -n "$api_base_url" ]]; then
+    echo "api base url: $api_base_url"
 else
     echo "api base url: <from Gradle properties or module default>"
 fi
@@ -334,3 +402,21 @@ for artifact in "${artifacts[@]}"; do
         echo "  missing: $artifact" >&2
     fi
 done
+
+if [[ -n "$BUILD_PROFILE" ]]; then
+    dist_dir="$ANDROID_PROJECT_DIR/dist/$BUILD_PROFILE"
+    mkdir -p "$dist_dir"
+
+    echo
+    echo "Profile artifacts:"
+    for artifact in "${artifacts[@]}"; do
+        if [[ -f "$artifact" ]]; then
+            artifact_name="$(basename "$artifact")"
+            artifact_stem="${artifact_name%.*}"
+            artifact_ext="${artifact_name##*.}"
+            profile_artifact="$dist_dir/${artifact_stem}-${BUILD_PROFILE}.${artifact_ext}"
+            cp "$artifact" "$profile_artifact"
+            echo "  $profile_artifact"
+        fi
+    done
+fi

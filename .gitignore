@@ -41,6 +41,8 @@ build/
 *.properties
 !config.example.properties
 !mobile/android-app/gradle.example.properties
+!mobile/android-app/profiles/*.example.properties
+/mobile/android-app/dist/
 docs/raw-screens/
 
 /.gradle-home/wrapper/
