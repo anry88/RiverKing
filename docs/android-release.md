@@ -65,6 +65,7 @@ Set these Gradle properties before producing release artifacts:
 
 Use [mobile/android-app/gradle.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/gradle.example.properties) as the template.
 The store release scripts accept signing values from environment variables, `mobile/android-app/gradle.properties`, or `~/.gradle/gradle.properties`.
+If `RIVERKING_ITCH_PROJECT_URL` is not set, the Android build falls back to `$publicWebUrl/support`, which is acceptable for an internal pre-release APK but not ideal for the public itch.io build.
 
 ## Build Commands
 
@@ -90,6 +91,14 @@ Command intent:
 
 Publish the `directRelease` APK on itch.io as the primary public Android download.
 
+Recommended order:
+
+1. Create the itch.io project page as a private draft.
+2. Copy the generated itch.io page URL.
+3. Set `RIVERKING_ITCH_PROJECT_URL` to that draft URL.
+4. Build the final signed `directRelease` APK.
+5. Upload that APK to the existing draft page and only then publish the page.
+
 ### Page Requirements
 
 - Price: free
@@ -104,6 +113,8 @@ Publish the `directRelease` APK on itch.io as the primary public Android downloa
 
 - Short description:
   - `RiverKing is a Telegram-connected fishing RPG for Android with progression, quests, tournaments, clubs, and shared account progress between Telegram and mobile.`
+- Full page description:
+  - see the ready-to-paste itch.io draft in [docs/store-launch-checklist.md](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/store-launch-checklist.md)
 - Feature bullets:
   - real catch-and-collect fishing loop
   - rods, lures, locations, and fish discovery

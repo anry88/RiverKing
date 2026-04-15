@@ -73,6 +73,12 @@ The release scripts accept signing values from either:
 - Create a new project page for RiverKing.
 - Mark the project as an Android downloadable game.
 
+Important:
+
+- itch.io generates the project URL from the title as soon as you create the page
+- newly created pages are private by default, so you can save the draft, copy the URL/slug, and only publish later
+- for RiverKing, the correct flow is: create the draft page first, copy the draft URL, set `RIVERKING_ITCH_PROJECT_URL`, then build the final `directRelease` APK that will point to the real itch page
+
 #### Google Play
 
 - Create a Google Play Console developer account.
@@ -129,6 +135,12 @@ Before the final production build, these values need to exist:
 - `RIVERKING_PLAY_STORE_URL`
 
 If signing is already configured locally, the remaining values can be finalized once the store pages exist.
+
+Practical note for the first itch build:
+
+- `RIVERKING_ITCH_PROJECT_URL` is not technically required to produce an APK
+- if it is missing, the Android build falls back to the public support URL
+- the better release flow is still to create the itch draft page first and then rebuild `directRelease` with the real itch URL before uploading the public APK
 
 ### 4. Fill the public policy URLs
 
@@ -215,6 +227,29 @@ The Android client is connected to the same RiverKing progression systems used b
 ### itch.io short description draft
 
 `RiverKing is a Telegram-connected fishing RPG for Android with quests, tournaments, clubs, and shared progression.`
+
+### itch.io detailed description draft
+
+```text
+RiverKing is a fishing progression RPG for Android with shared account progress across mobile and Telegram.
+
+Build your collection across locations, rods, bait, and fish species while growing your profile through quests, achievements, leaderboards, tournaments, and club progression.
+
+This Android build connects to the same RiverKing backend used by the Telegram experience, so your account, rewards, and long-term progression stay aligned across both surfaces.
+
+In RiverKing you can:
+
+- fish across multiple locations with different gear setups
+- unlock rods, bait, and new fish discoveries
+- complete daily and weekly quests
+- compete in leaderboards and tournaments
+- join clubs and contribute to shared progression
+- continue on the same backend account between Android and Telegram
+
+Install note:
+
+Download the APK, allow installs from your browser or file manager, and install updates over the same package and signature when a new build is released.
+```
 
 ### itch.io feature bullets draft
 
