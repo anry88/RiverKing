@@ -17,6 +17,12 @@ data class Env(
     val tgAnalyticsToken: String,
     val tgAnalyticsScriptUrl: String,
     val tgAnalyticsAppName: String,
+    val authTokenSecret: String,
+    val authAccessTokenTtlMinutes: Long,
+    val authRefreshTokenTtlDays: Long,
+    val googleAuthClientId: String,
+    val googlePlayPackageName: String,
+    val googlePlayServiceAccountFile: String,
 ) {
     companion object {
         fun fromConfig(path: String = "config.properties"): Env {
@@ -41,6 +47,14 @@ data class Env(
                 tgAnalyticsToken = props.getProperty("TG_ANALYTICS_TOKEN") ?: "",
                 tgAnalyticsScriptUrl = props.getProperty("TG_ANALYTICS_SCRIPT_URL") ?: "",
                 tgAnalyticsAppName = props.getProperty("TG_ANALYTICS_APP_NAME") ?: "",
+                authTokenSecret = props.getProperty("AUTH_TOKEN_SECRET")
+                    ?: props.getProperty("BOT_TOKEN")
+                    ?: error("AUTH_TOKEN_SECRET required"),
+                authAccessTokenTtlMinutes = props.getProperty("AUTH_ACCESS_TOKEN_TTL_MINUTES")?.toLongOrNull() ?: 60L,
+                authRefreshTokenTtlDays = props.getProperty("AUTH_REFRESH_TOKEN_TTL_DAYS")?.toLongOrNull() ?: 30L,
+                googleAuthClientId = props.getProperty("GOOGLE_AUTH_CLIENT_ID") ?: "",
+                googlePlayPackageName = props.getProperty("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
+                googlePlayServiceAccountFile = props.getProperty("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
             )
         }
     }

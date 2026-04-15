@@ -36,6 +36,9 @@ fun main() {
         // API for Mini App
         apiRoutes(env)
 
+        // Public support and policy pages
+        publicPagesRoutes(env)
+
         // Telegram bot webhook
         botRoutes(env)
 
@@ -90,6 +93,8 @@ fun main() {
             get("/app/config.js") {
                 val js = """
                     window.APP_CONFIG = {
+                        devMode: ${env.devMode},
+                        botName: "${env.botName}",
                         tgAnalytics: {
                             token: "${env.tgAnalyticsToken}",
                             scriptUrl: "${env.tgAnalyticsScriptUrl}",

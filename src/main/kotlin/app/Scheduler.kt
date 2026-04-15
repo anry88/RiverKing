@@ -86,12 +86,13 @@ object Scheduler {
                     (Users.autoFishUntil.isNotNull()) and
                     (Users.autoFishUntil greater now) and
                     (Users.autoFishUntil lessEq threeDays) and
+                    (Users.tgId.isNotNull()) and
                     (Users.canReceiveNotifications eq true)
                 }
                 .map {
                     Triple(
                         it[Users.id].value,
-                        it[Users.tgId],
+                        it[Users.tgId]!!,
                         it[Users.autoFishUntil]!! to it[Users.language]
                     )
                 }
@@ -151,11 +152,11 @@ object Scheduler {
         for (uid in userIds) {
             val user = transaction {
                 Users.slice(Users.tgId, Users.language)
-                    .select { (Users.id eq uid) and (Users.canReceiveNotifications eq true) }
+                    .select { (Users.id eq uid) and (Users.canReceiveNotifications eq true) and Users.tgId.isNotNull() }
                     .singleOrNull()
             } ?: continue
 
-            val tgId = user[Users.tgId]
+            val tgId = user[Users.tgId]!!
             val lang = user[Users.language]
 
             val text = service.I18n.text("🎁 У тебя есть неполученные призы! Давай скорее их заберем.", lang)

@@ -1,5 +1,8 @@
 const tg = window.Telegram?.WebApp;
 console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.platform);
+const APP_CONFIG = window.APP_CONFIG || {};
+const APP_DEV_MODE = APP_CONFIG.devMode === true;
+const TELEGRAM_BOT_NAME = APP_CONFIG.botName || 'river_king_bot';
 
 const params = new URLSearchParams(window.location.search);
 const refToken = tg?.initDataUnsafe?.start_param
@@ -25,6 +28,8 @@ const tgParam = (()=>{
     return m ? decodeURIComponent(m[1]) : null;
   }catch{ return null; }
 })();
+const hasTelegramContext = Boolean(tg?.initData || tgParam);
+const openInTelegramUrl = `https://t.me/${TELEGRAM_BOT_NAME}/app`;
 
 const MAIN_TAB_IDS = new Set(['fish', 'tournaments', 'ratings', 'guide', 'shop']);
 
@@ -404,6 +409,14 @@ function App(){
     let cancelled = false;
     (async()=>{
       setLoading(true);
+      if(!hasTelegramContext && !APP_DEV_MODE){
+        if(!cancelled){
+          setError(t('authRequired'));
+          setMe(null);
+          setLoading(false);
+        }
+        return;
+      }
       try{
         const initData = tg?.initData || tgParam;
         if(initData){
@@ -1175,11 +1188,22 @@ function App(){
   }
 
   if(!me){
+    const showTelegramBlocker = !hasTelegramContext && !APP_DEV_MODE && error === t('authRequired');
     return (
       <div className="app-content flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-sm px-6">
           <div className="text-2xl font-semibold">RiverKing</div>
-          <div className="opacity-70 mt-2">{error || t('loadFailed')}</div>
+          <div className="opacity-70 mt-2">
+            {showTelegramBlocker ? t('browserBlockedBody') : (error || t('loadFailed'))}
+          </div>
+          {showTelegramBlocker && (
+            <a
+              href={openInTelegramUrl}
+              className="inline-flex mt-5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+            >
+              {t('openViaTelegram')}
+            </a>
+          )}
         </div>
       </div>
     );

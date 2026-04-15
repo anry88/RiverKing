@@ -5,6 +5,7 @@ import db.Clubs
 import db.ClubChatMessages
 import db.ClubMembers
 import db.ClubWeeklyContributions
+import db.ClubWeeklySnapshots
 import db.ClubWeeklyRewards
 import db.Users
 import kotlinx.serialization.Serializable
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -81,11 +83,12 @@ class ClubService {
         val clubId = membership[ClubMembers.clubId].value
         val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: return@transaction null
         val role = membership[ClubMembers.role]
-        val members = loadMembers(clubId)
         val currentWeekStart = weekStart(LocalDate.now(CLUB_ZONE))
         val previousWeekStart = currentWeekStart.minusWeeks(1)
+        finalizeCompletedWeekSnapshotTx(clubId, currentWeekStart)
+        val members = loadMembers(clubId)
         val currentWeek = buildWeekView(clubId, members, currentWeekStart)
-        val previousWeek = buildWeekView(clubId, members, previousWeekStart)
+        val previousWeek = buildHistoricalWeekView(clubId, previousWeekStart)
         ClubDetails(
             id = clubId,
             name = club[Clubs.name],
@@ -173,6 +176,7 @@ class ClubService {
                 throw ClubException("already_in_club")
             }
             val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: throw ClubException("not_found")
+            finalizeCompletedWeekSnapshotTx(club[Clubs.id].value)
             if (!club[Clubs.recruitingOpen]) {
                 throw ClubException("recruitment_closed")
             }
@@ -207,6 +211,7 @@ class ClubService {
             val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
                 ?: throw ClubException("not_in_club")
             val clubId = membership[ClubMembers.clubId].value
+            finalizeCompletedWeekSnapshotTx(clubId)
             val role = membership[ClubMembers.role]
             val memberName = displayNameByUserId(userId)
             ClubMembers.deleteWhere { ClubMembers.userId eq userId }
@@ -214,6 +219,7 @@ class ClubService {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
                     ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
+                    ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.clubId eq clubId }
                     ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
                     ClubChatMessages.deleteWhere { ClubChatMessages.clubId eq clubId }
                     Clubs.deleteWhere { Clubs.id eq clubId }
@@ -244,8 +250,9 @@ class ClubService {
     }
 
     fun kickMember(actorId: Long, targetId: Long): ClubDetails {
-        val clubId = transaction {
+        transaction {
             val (actor, target) = loadActorAndTarget(actorId, targetId)
+            finalizeCompletedWeekSnapshotTx(actor.clubId)
             ensureCanManage(actor.role, target.role)
             ClubMembers.deleteWhere {
                 (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
@@ -262,7 +269,6 @@ class ClubService {
                     ),
                 ),
             )
-            actor.clubId
         }
         Metrics.counter("club_kick_total")
         return clubDetails(actorId) ?: throw ClubException("update_failed")
@@ -271,6 +277,7 @@ class ClubService {
     fun appointPresident(actorId: Long, targetId: Long): ClubDetails {
         transaction {
             val (actor, target) = loadActorAndTarget(actorId, targetId)
+            finalizeCompletedWeekSnapshotTx(actor.clubId)
             if (actor.role != ROLE_PRESIDENT) throw ClubException("forbidden")
             if (target.role != ROLE_HEIR) throw ClubException("invalid_role")
             Clubs.update({ Clubs.id eq actor.clubId }) { it[presidentId] = target.userId }
@@ -301,6 +308,7 @@ class ClubService {
         transaction {
             val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull() ?: return@transaction
             val clubId = membership[ClubMembers.clubId].value
+            finalizeCompletedWeekSnapshotTx(clubId, weekStart(ZonedDateTime.ofInstant(at, CLUB_ZONE).toLocalDate()))
             val weekStart = weekStart(ZonedDateTime.ofInstant(at, CLUB_ZONE).toLocalDate())
             val existing = ClubWeeklyContributions.select {
                 (ClubWeeklyContributions.clubId eq clubId) and
@@ -426,28 +434,21 @@ class ClubService {
         transaction {
             Clubs.selectAll().forEach { clubRow ->
                 val clubId = clubRow[Clubs.id].value
+                finalizeCompletedWeekSnapshotTx(clubId, weekStart.plusWeeks(1))
                 val alreadyAwarded = !ClubWeeklyRewards.select {
                     (ClubWeeklyRewards.clubId eq clubId) and (ClubWeeklyRewards.weekStart eq weekStart)
                 }.empty()
                 if (alreadyAwarded) return@forEach
-                val sumExpr = ClubWeeklyContributions.coins.sum()
-                val total = ClubWeeklyContributions
-                    .slice(sumExpr)
-                    .select {
-                        (ClubWeeklyContributions.clubId eq clubId) and
-                            (ClubWeeklyContributions.weekStart eq weekStart)
-                    }
-                    .singleOrNull()
-                    ?.get(sumExpr) ?: 0
+                val snapshotMembers = loadSnapshotMembers(clubId, weekStart)
+                val total = snapshotMembers.sumOf { it.coins }
                 if (total <= 0) return@forEach
-                val members = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
-                if (members.isEmpty()) return@forEach
-                val perMember = total / members.size
+                if (snapshotMembers.isEmpty()) return@forEach
+                val perMember = total / snapshotMembers.size
                 if (perMember <= 0) return@forEach
-                members.forEach { member ->
+                snapshotMembers.forEach { member ->
                     ClubWeeklyRewards.insert {
                         it[ClubWeeklyRewards.clubId] = clubId
-                        it[ClubWeeklyRewards.userId] = member[ClubMembers.userId].value
+                        it[ClubWeeklyRewards.userId] = member.userId
                         it[ClubWeeklyRewards.weekStart] = weekStart
                         it[ClubWeeklyRewards.coins] = perMember
                         it[ClubWeeklyRewards.claimed] = false
@@ -524,6 +525,18 @@ class ClubService {
         )
     }
 
+    private fun buildHistoricalWeekView(
+        clubId: Long,
+        weekStart: LocalDate,
+    ): ClubWeekView {
+        val members = loadSnapshotMembers(clubId, weekStart)
+        return ClubWeekView(
+            weekStart = weekStart,
+            totalCoins = members.sumOf { it.coins },
+            members = members,
+        )
+    }
+
     private fun loadMembers(clubId: Long): List<ClubMemberContribution> {
         val rows = (ClubMembers innerJoin Users)
             .select { ClubMembers.clubId eq clubId }
@@ -542,9 +555,91 @@ class ClubService {
         )
     }
 
+    private fun loadSnapshotMembers(clubId: Long, weekStart: LocalDate): List<ClubMemberContribution> {
+        return ClubWeeklySnapshots
+            .select {
+                (ClubWeeklySnapshots.clubId eq clubId) and
+                    (ClubWeeklySnapshots.weekStart eq weekStart)
+            }
+            .map { row ->
+                ClubMemberContribution(
+                    userId = row[ClubWeeklySnapshots.userId].value,
+                    name = row[ClubWeeklySnapshots.name],
+                    role = row[ClubWeeklySnapshots.role],
+                    coins = row[ClubWeeklySnapshots.coins],
+                )
+            }
+            .sortedWith(
+                compareByDescending<ClubMemberContribution> { it.coins }
+                    .thenBy { roleRank(it.role) }
+                    .thenBy { it.name ?: "" }
+                    .thenBy { it.userId }
+            )
+    }
+
+    private fun finalizeCompletedWeekSnapshotTx(
+        clubId: Long,
+        currentWeekStart: LocalDate = weekStart(LocalDate.now(CLUB_ZONE)),
+    ) {
+        val previousWeekStart = currentWeekStart.minusWeeks(1)
+        val existingSnapshot = !ClubWeeklySnapshots.select {
+            (ClubWeeklySnapshots.clubId eq clubId) and
+                (ClubWeeklySnapshots.weekStart eq previousWeekStart)
+        }.empty()
+        if (existingSnapshot) return
+
+        val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: return
+        val previousWeekEnd = previousWeekStart.plusDays(6)
+        val createdDate = club[Clubs.createdAt].atZone(CLUB_ZONE).toLocalDate()
+        if (createdDate > previousWeekEnd) return
+
+        val contributionByUser = ClubWeeklyContributions
+            .select {
+                (ClubWeeklyContributions.clubId eq clubId) and
+                    (ClubWeeklyContributions.weekStart eq previousWeekStart)
+            }
+            .associate { row ->
+                row[ClubWeeklyContributions.userId].value to row[ClubWeeklyContributions.coins]
+            }
+
+        val members = (ClubMembers innerJoin Users)
+            .select {
+                (ClubMembers.clubId eq clubId) and
+                    (ClubMembers.joinedAt lessEq previousWeekEnd.plusDays(1).atStartOfDay(CLUB_ZONE).toInstant().minusSeconds(1))
+            }
+            .map { row ->
+                ClubMemberContribution(
+                    userId = row[ClubMembers.userId].value,
+                    name = displayName(row),
+                    role = row[ClubMembers.role],
+                    coins = contributionByUser[row[ClubMembers.userId].value] ?: 0,
+                )
+            }
+            .sortedWith(
+                compareByDescending<ClubMemberContribution> { it.coins }
+                    .thenBy { roleRank(it.role) }
+                    .thenBy { it.name ?: "" }
+                    .thenBy { it.userId }
+            )
+
+        if (members.isEmpty() && contributionByUser.isEmpty()) return
+
+        members.forEach { member ->
+            ClubWeeklySnapshots.insert {
+                it[ClubWeeklySnapshots.clubId] = clubId
+                it[ClubWeeklySnapshots.userId] = member.userId
+                it[ClubWeeklySnapshots.weekStart] = previousWeekStart
+                it[ClubWeeklySnapshots.name] = member.name
+                it[ClubWeeklySnapshots.role] = member.role
+                it[ClubWeeklySnapshots.coins] = member.coins
+            }
+        }
+    }
+
     private fun updateMemberRole(actorId: Long, targetId: Long, action: RoleAction): ClubDetails {
         transaction {
             val (actor, target) = loadActorAndTarget(actorId, targetId)
+            finalizeCompletedWeekSnapshotTx(actor.clubId)
             ensureCanManage(actor.role, target.role)
             val nextRole = when (action) {
                 RoleAction.PROMOTE -> nextRole(target.role)

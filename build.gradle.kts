@@ -43,8 +43,13 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("de.mkammerer:argon2-jvm:2.12")
+    implementation("com.google.api-client:google-api-client:2.7.0")
+    implementation("com.google.http-client:google-http-client-gson:1.45.0")
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.30.1")
 
     testImplementation(kotlin("test"))
+    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
 }
 
 application {

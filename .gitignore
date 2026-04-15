@@ -30,6 +30,8 @@ replay_pid*
 
 /.idea
 /shelf/
+/.vscode/
+/mobile/android-app/.idea/
 
 # Gradle
 .gradle/
@@ -38,6 +40,9 @@ build/
 # Конфиг файл
 *.properties
 !config.example.properties
+!mobile/android-app/gradle.example.properties
+!mobile/android-app/profiles/*.example.properties
+/mobile/android-app/dist/
 docs/raw-screens/
 
 /.gradle-home/wrapper/
