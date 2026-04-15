@@ -72,12 +72,15 @@ The release scripts accept signing values from either:
 - Create an itch.io creator account.
 - Create a new project page for RiverKing.
 - Mark the project as an Android downloadable game.
+- For the first public RiverKing launch, set the project pricing to `No payments` or a free download configuration. Do not set a minimum price above `0` unless seller payments are configured.
 
 Important:
 
 - itch.io generates the project URL from the title as soon as you create the page
 - newly created pages are private by default, so you can save the draft, copy the URL/slug, and only publish later
 - for RiverKing, the correct flow is: create the draft page first, copy the draft URL, set `RIVERKING_ITCH_PROJECT_URL`, then build the final `directRelease` APK that will point to the real itch page
+- if you want optional donations later, the simplest seller mode is `Collected by itch.io, paid later`
+- `Direct to you` only makes sense if you specifically want every payment to go straight to your own PayPal/Stripe setup and you are ready to handle that configuration yourself
 
 #### Google Play
 

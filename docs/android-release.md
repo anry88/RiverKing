@@ -109,6 +109,8 @@ Recommended order:
   - support
   - account deletion
 
+For the first RiverKing launch on itch.io, keep the page free. If seller settings are not configured yet, do not set a minimum price above `0`, otherwise itch.io will block downloads. If you later add optional donations, `Collected by itch.io, paid later` is the simpler default path.
+
 ### Minimum Page Content
 
 - Short description:
