@@ -7,6 +7,11 @@ plugins {
 
 val ktorVersion = "2.3.11"
 val canonicalApplicationId = "com.riverking.mobile"
+// Android Studio local runs keep flavor/build-type suffixes so debug and ad-hoc release
+// installs do not collide with the signed store package on the same device.
+val useCanonicalApplicationId = (findProperty("RIVERKING_CANONICAL_APPLICATION_ID") as String?)
+    ?.toBooleanStrictOrNull()
+    ?: false
 val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?)
     ?: "https://v759468.hosted-by-vdsina.com"
 val publicWebUrl = ((findProperty("RIVERKING_PUBLIC_WEB_URL") as String?) ?: apiBaseUrl).trimEnd('/')
@@ -64,11 +69,17 @@ android {
     productFlavors {
         create("play") {
             dimension = "distribution"
+            if (!useCanonicalApplicationId) {
+                applicationIdSuffix = ".play"
+            }
             versionNameSuffix = "-play"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
         }
         create("direct") {
             dimension = "distribution"
+            if (!useCanonicalApplicationId) {
+                applicationIdSuffix = ".direct"
+            }
             versionNameSuffix = "-direct"
             buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"direct\"")
         }
@@ -91,6 +102,9 @@ android {
         }
         release {
             isMinifyEnabled = false
+            if (!useCanonicalApplicationId) {
+                applicationIdSuffix = ".local"
+            }
             signingConfig = if (hasReleaseSigning) {
                 signingConfigs.getByName("release")
             } else {

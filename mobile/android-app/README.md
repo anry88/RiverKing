@@ -11,7 +11,11 @@ Nested Android project for the RiverKing mobile client.
 ## Current scope
 
 - Shared auth with `Telegram sign-in`, `Google sign-in`, and `login/password`.
-- `direct` and `play` now share the same canonical Android package name and should be signed with the same release key so users can move from itch.io/direct APK installs to Google Play without uninstalling.
+- Store release artifacts use the canonical Android package name `com.riverking.mobile` and should be signed with the same release key so users can move from itch.io/direct APK installs to Google Play without uninstalling.
+- Local Android Studio installs intentionally use flavor-specific package IDs to avoid signature collisions and stale IDE launch metadata:
+  - `directDebug` -> `com.riverking.mobile.direct`
+  - `playDebug` -> `com.riverking.mobile.play`
+  - local unsigned `release` installs add `.local`
 - Existing Android profiles can link a Telegram account and continue on the same backend player profile inside the Mini App/bot.
 - Android shell now mirrors the TG client much more closely:
   - five-tab layout: fishing, leaders, catalog, club, shop
@@ -96,6 +100,10 @@ mobile/android-app/scripts/build-android.sh direct-debug-install
 ```
 
 The scripts read the same environment variables as Gradle properties and print the final artifact paths after a successful build.
+
+Release targets automatically force `RIVERKING_CANONICAL_APPLICATION_ID=true`, so the shipped itch.io APK and Google Play bundle still use `com.riverking.mobile`. Android Studio and ad-hoc local Gradle runs default to flavor-specific package IDs unless you explicitly pass `-PRIVERKING_CANONICAL_APPLICATION_ID=true`.
+
+For Android Studio, keep the active Build Variant on `directDebug` or `playDebug` when using the regular `Run` action. The `release` variants are for packaging/distribution validation and intentionally install under separate local package IDs to avoid colliding with already-installed signed store builds.
 
 For debug installs, the script resolves the target device in this order:
 

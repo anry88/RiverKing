@@ -43,6 +43,7 @@ Environment:
   RIVERKING_SUPPORT_URL
   RIVERKING_PRIVACY_POLICY_URL
   RIVERKING_ACCOUNT_DELETION_URL
+  RIVERKING_CANONICAL_APPLICATION_ID
   RIVERKING_VERSION_CODE
   RIVERKING_VERSION_NAME
   RIVERKING_GOOGLE_AUTH_CLIENT_ID
@@ -221,6 +222,7 @@ for property_name in \
     RIVERKING_SUPPORT_URL \
     RIVERKING_PRIVACY_POLICY_URL \
     RIVERKING_ACCOUNT_DELETION_URL \
+    RIVERKING_CANONICAL_APPLICATION_ID \
     RIVERKING_VERSION_CODE \
     RIVERKING_VERSION_NAME; do
     property_value="${!property_name:-}"
@@ -241,6 +243,9 @@ for property_name in \
 done
 
 if [[ "$release_build" == true ]]; then
+    if [[ -z "${RIVERKING_CANONICAL_APPLICATION_ID:-}" ]]; then
+        gradle_args+=( "-PRIVERKING_CANONICAL_APPLICATION_ID=true" )
+    fi
     missing_signing=0
     for property_name in \
         RIVERKING_SIGNING_STORE_FILE \
