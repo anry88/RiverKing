@@ -243,8 +243,13 @@ for property_name in \
 done
 
 if [[ "$release_build" == true ]]; then
-    if [[ -z "${RIVERKING_CANONICAL_APPLICATION_ID:-}" ]]; then
+    effective_canonical_application_id="${RIVERKING_CANONICAL_APPLICATION_ID:-}"
+    if [[ -z "$effective_canonical_application_id" ]]; then
         gradle_args+=( "-PRIVERKING_CANONICAL_APPLICATION_ID=true" )
+        effective_canonical_application_id=true
+    fi
+    if [[ "$effective_canonical_application_id" != "true" ]]; then
+        die "release targets require RIVERKING_CANONICAL_APPLICATION_ID=true so the artifacts use the canonical store package name"
     fi
     missing_signing=0
     for property_name in \
@@ -258,7 +263,7 @@ if [[ "$release_build" == true ]]; then
         fi
     done
     if [[ "$missing_signing" -eq 1 ]]; then
-        echo "warning: release build will fall back to debug signing because release signing env vars are not fully set" >&2
+        die "release targets require RIVERKING_SIGNING_STORE_FILE, RIVERKING_SIGNING_STORE_PASSWORD, RIVERKING_SIGNING_KEY_ALIAS, and RIVERKING_SIGNING_KEY_PASSWORD"
     fi
 fi
 

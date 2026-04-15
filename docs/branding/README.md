@@ -6,8 +6,11 @@ The current asset set is based on the approved Canva icon export and matching ra
 Current release files:
 
 - `android-icon-1024.png` — canonical square app icon for store listings
+- `google-play-icon-512.png` — Google Play listing icon
 - `itch-cover-1280x720.png` — primary wide artwork for the itch.io page
+- `itch-cover-630x500.png` — itch.io cover slot variant
 - `play-feature-1024x500.png` — Google Play feature graphic
+- `google-play-developer-header-4096x2304.png` — optional Google Play developer page header
 
 Android launcher/splash assets are synced separately from the chosen store icon into:
 

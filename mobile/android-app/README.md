@@ -134,13 +134,25 @@ Release outputs:
   -PRIVERKING_SIGNING_KEY_PASSWORD=...
 ```
 
-Without signing properties the `release` build type falls back to the debug signing config, which is acceptable only for local verification and not for distribution.
+For store-targeted builds, prefer:
+
+```bash
+mobile/android-app/scripts/build-release-artifacts.sh
+```
+
+The release scripts now fail fast unless:
+
+- `RIVERKING_CANONICAL_APPLICATION_ID=true`
+- all `RIVERKING_SIGNING_*` values are present
+
+Raw Gradle `release` tasks without the canonical package flag remain acceptable for local packaging verification only, not for distribution.
 
 ## Distribution notes
 
 - `directRelease` is the APK intended for itch.io and other manual APK installs.
 - `playRelease` is the AAB intended for Google Play.
 - Both release channels must use the same signing key and a single monotonic `versionCode` sequence.
+- If Play App Signing is enabled, keep the existing RiverKing release keystore compatible with the Play-delivered app-signing identity so itch.io installs can upgrade cleanly.
 - Do not let the itch.io/direct release overtake the Google Play version code once Play becomes the canonical upgrade path.
 - Release builds default to HTTPS-only networking. Cleartext is enabled only from the debug manifest for local emulator work.
 

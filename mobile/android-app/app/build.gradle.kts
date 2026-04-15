@@ -44,6 +44,12 @@ val hasReleaseSigning = listOf(
     signingKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+check(!useCanonicalApplicationId || hasReleaseSigning) {
+    "Canonical store builds require RIVERKING_SIGNING_STORE_FILE, " +
+        "RIVERKING_SIGNING_STORE_PASSWORD, RIVERKING_SIGNING_KEY_ALIAS, and " +
+        "RIVERKING_SIGNING_KEY_PASSWORD."
+}
+
 android {
     namespace = canonicalApplicationId
     compileSdk = 35
@@ -102,7 +108,7 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = if (useCanonicalApplicationId && hasReleaseSigning) {
+            signingConfig = if (useCanonicalApplicationId) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")

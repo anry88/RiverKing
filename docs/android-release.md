@@ -17,7 +17,7 @@ Only release packaging flows that explicitly enable `RIVERKING_CANONICAL_APPLICA
 ## Release Contract
 
 - Use one canonical Android package name: `com.riverking.mobile`
-- Use one signing key for both itch.io APKs and Google Play App Signing upload setup
+- Use one signing lineage for both itch.io APKs and Google Play distribution
 - Use one monotonic `versionCode` sequence across both channels
 - Keep channel differences limited to:
   - `BuildConfig.DISTRIBUTION_CHANNEL`
@@ -26,6 +26,8 @@ Only release packaging flows that explicitly enable `RIVERKING_CANONICAL_APPLICA
   - listing copy and release notes
 
 If the package name or signing key diverges, users cannot upgrade from itch.io to Google Play in place.
+
+If Google Play App Signing is enabled, do not let Play create a different production app-signing identity for RiverKing. The existing RiverKing release keystore must remain compatible with what users receive from Google Play, otherwise upgrades from itch.io installs will break.
 
 ## Backend Compliance Surface
 
@@ -69,14 +71,19 @@ From the repository root:
 
 ```bash
 ./gradlew test
-./gradlew -p mobile/android-app :app:assembleDirectRelease
-./gradlew -p mobile/android-app :app:bundlePlayRelease
+./gradlew -p mobile/android-app :app:assembleDirectRelease :app:bundlePlayRelease
+mobile/android-app/scripts/build-release-artifacts.sh
 ```
 
 Expected outputs:
 
 - APK: `mobile/android-app/app/build/outputs/apk/direct/release/`
 - AAB: `mobile/android-app/app/build/outputs/bundle/playRelease/`
+
+Command intent:
+
+- raw Gradle `assembleDirectRelease` / `bundlePlayRelease` without `RIVERKING_CANONICAL_APPLICATION_ID=true` stays useful for local packaging validation
+- `mobile/android-app/scripts/build-release-artifacts.sh` is the store-targeted path and now fails fast unless the canonical package ID and all `RIVERKING_SIGNING_*` values are configured
 
 ## itch.io First Release
 
@@ -124,8 +131,11 @@ Use or adapt the shipped screenshots under [docs/screenshots](/Users/hq-k14lcdcq
 Branding assets for the listing already exist under [docs/branding](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding):
 
 - [android-icon-1024.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/android-icon-1024.png)
+- [google-play-icon-512.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/google-play-icon-512.png)
 - [itch-cover-1280x720.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/itch-cover-1280x720.png)
+- [itch-cover-630x500.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/itch-cover-630x500.png)
 - [play-feature-1024x500.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/play-feature-1024x500.png)
+- [google-play-developer-header-4096x2304.png](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/branding/google-play-developer-header-4096x2304.png)
 
 Android launcher and startup visuals are sourced separately from the listing assets:
 
@@ -167,6 +177,8 @@ Once the itch.io build is stable, ship the `playRelease` bundle.
 - short description
 - full description
 
+Repository launch checklist and drafted store copy live in [docs/store-launch-checklist.md](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/docs/store-launch-checklist.md).
+
 ### Upgrade Path Rule
 
 Do not let the itch.io channel outpace Google Play in `versionCode` once Play becomes the canonical upgrade path. Otherwise a user who installed from itch.io may be unable to upgrade in place from Play.
@@ -191,4 +203,5 @@ If a physical device still has an older local package such as `com.riverking.mob
 - itch.io getting started: [Your first itch.io page](https://itch.io/docs/creators/getting-started)
 - Google Play app setup: [Create and set up your app](https://support.google.com/googleplay/android-developer/answer/9859152?hl=en)
 - Google Play target API requirements: [Target API level requirements](https://developer.android.com/google/play/requirements/target-sdk)
+- Google Play app signing: [Play App Signing](https://support.google.com/googleplay/android-developer/answer/9842756?hl=en)
 - Google Play Android App Bundle requirement: [Android App Bundles on Google Play](https://support.google.com/googleplay/android-developer/answer/9844279)
