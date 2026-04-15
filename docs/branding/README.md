@@ -1,9 +1,7 @@
 # Branding Assets
 
 This directory contains the committed RiverKing store assets exported from design tools such as Canva and Figma.
-The current softer brand pass can also be regenerated locally:
-
-- `docs/branding/generate_branding_assets.py`
+The current asset set is based on the approved Canva icon export and matching raster listing compositions.
 
 Current release files:
 
@@ -18,9 +16,3 @@ Android launcher/splash assets are synced separately from the chosen store icon 
 - `mobile/android-app/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
 
 When branding changes, replace the files in this directory first, then refresh the Android foreground asset sourced from `android-icon-1024.png`.
-
-To rebuild the committed assets from the local generator:
-
-```bash
-python3 docs/branding/generate_branding_assets.py
-```
