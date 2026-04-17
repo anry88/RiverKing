@@ -20,7 +20,7 @@ The shipped product includes:
 - bot-side commands, auto-casting, admin tooling, and payment-support flows
 - profanity filtering, metrics, and TG Analytics support
 
-The Android code in `mobile/android-app/` is an early client surface, not a feature-complete second frontend. It currently focuses on auth, nickname creation, and shared-backend shell screens.
+The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
 
 ## Core Game Loop
 

@@ -1,7 +1,7 @@
 # Store Launch Checklist
 
 Practical launch checklist for RiverKing on itch.io first and Google Play second.
-Verified against the current repository state on `2026-04-15`.
+Verified against the current repository state on `2026-04-17`.
 
 ## Already Prepared In Repo
 
@@ -51,7 +51,7 @@ This validates that:
 
 The repository also now protects the store release path:
 
-- `mobile/android-app/scripts/build-release-artifacts.sh`
+- `mobile/android-app/scripts/build-android.sh --profile prod release-artifacts`
 - `mobile/android-app/scripts/build-android.sh direct-release-apk`
 - `mobile/android-app/scripts/build-android.sh play-release-aab`
 

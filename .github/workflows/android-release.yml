@@ -1,0 +1,147 @@
+name: Android Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'main') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.head.ref == 'develop')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve checkout ref
+        id: ref
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            CHECKOUT_REF="${{ github.event.pull_request.merge_commit_sha }}"
+            if [[ -z "$CHECKOUT_REF" ]]; then
+              CHECKOUT_REF="${{ github.event.pull_request.base.sha }}"
+            fi
+            echo "ref=$CHECKOUT_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+          SDK_DIR="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          [[ -n "$SDK_DIR" ]] || { echo "::error::Android SDK path is not available"; exit 1; }
+          printf 'sdk.dir=%s\n' "$SDK_DIR" > mobile/android-app/local.properties
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -a
+          source mobile/android-app/version.properties
+          set +a
+
+          [[ -n "${RIVERKING_VERSION_CODE:-}" ]] || { echo "::error::Missing RIVERKING_VERSION_CODE in version.properties"; exit 1; }
+          [[ -n "${RIVERKING_VERSION_NAME:-}" ]] || { echo "::error::Missing RIVERKING_VERSION_NAME in version.properties"; exit 1; }
+
+          echo "version_code=$RIVERKING_VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$RIVERKING_VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "release_tag=android-v${RIVERKING_VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_name=Android ${RIVERKING_VERSION_NAME} (${RIVERKING_VERSION_CODE})" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare signing secrets
+        shell: bash
+        env:
+          RIVERKING_SIGNING_KEYSTORE_BASE64: ${{ secrets.RIVERKING_SIGNING_KEYSTORE_BASE64 }}
+          RIVERKING_SIGNING_STORE_PASSWORD: ${{ secrets.RIVERKING_SIGNING_STORE_PASSWORD }}
+          RIVERKING_SIGNING_KEY_ALIAS: ${{ secrets.RIVERKING_SIGNING_KEY_ALIAS }}
+          RIVERKING_SIGNING_KEY_PASSWORD: ${{ secrets.RIVERKING_SIGNING_KEY_PASSWORD }}
+          RIVERKING_GOOGLE_AUTH_CLIENT_ID: ${{ secrets.RIVERKING_GOOGLE_AUTH_CLIENT_ID }}
+        run: |
+          [[ -n "$RIVERKING_SIGNING_KEYSTORE_BASE64" ]] || { echo "::error::Missing secret RIVERKING_SIGNING_KEYSTORE_BASE64"; exit 1; }
+          [[ -n "$RIVERKING_SIGNING_STORE_PASSWORD" ]] || { echo "::error::Missing secret RIVERKING_SIGNING_STORE_PASSWORD"; exit 1; }
+          [[ -n "$RIVERKING_SIGNING_KEY_ALIAS" ]] || { echo "::error::Missing secret RIVERKING_SIGNING_KEY_ALIAS"; exit 1; }
+          [[ -n "$RIVERKING_SIGNING_KEY_PASSWORD" ]] || { echo "::error::Missing secret RIVERKING_SIGNING_KEY_PASSWORD"; exit 1; }
+
+          mkdir -p "$HOME/.gradle" "$RUNNER_TEMP/riverking"
+          KEYSTORE_PATH="$RUNNER_TEMP/riverking/riverking-release.jks"
+          printf '%s' "$RIVERKING_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+          {
+            echo "RIVERKING_SIGNING_STORE_FILE=$KEYSTORE_PATH"
+            echo "RIVERKING_SIGNING_STORE_PASSWORD=$RIVERKING_SIGNING_STORE_PASSWORD"
+            echo "RIVERKING_SIGNING_KEY_ALIAS=$RIVERKING_SIGNING_KEY_ALIAS"
+            echo "RIVERKING_SIGNING_KEY_PASSWORD=$RIVERKING_SIGNING_KEY_PASSWORD"
+            echo "RIVERKING_GOOGLE_AUTH_CLIENT_ID=$RIVERKING_GOOGLE_AUTH_CLIENT_ID"
+          } >> "$HOME/.gradle/gradle.properties"
+
+      - name: Build Android release artifacts
+        shell: bash
+        env:
+          RIVERKING_GIT_BRANCH: main
+        run: |
+          mobile/android-app/scripts/build-android.sh --profile prod release-artifacts --console=plain
+
+      - name: Write release metadata
+        shell: bash
+        run: |
+          cat > mobile/android-app/dist/prod/release-metadata.txt <<EOF
+          version_name=${{ steps.version.outputs.version_name }}
+          version_code=${{ steps.version.outputs.version_code }}
+          git_sha=${{ steps.ref.outputs.ref }}
+          source_event=${{ github.event_name }}
+          workflow_run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ steps.version.outputs.version_name }}
+          if-no-files-found: error
+          path: |
+            mobile/android-app/dist/prod/app-direct-release-prod.apk
+            mobile/android-app/dist/prod/app-play-release-prod.aab
+            mobile/android-app/dist/prod/release-metadata.txt
+
+      - name: Create or update draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          name: ${{ steps.version.outputs.release_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            mobile/android-app/dist/prod/app-direct-release-prod.apk
+            mobile/android-app/dist/prod/app-play-release-prod.aab
+            mobile/android-app/dist/prod/release-metadata.txt

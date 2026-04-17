@@ -51,7 +51,11 @@ Tracked templates live at:
 - [profiles/prod.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/prod.example.properties)
 - [profiles/test.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/test.example.properties)
 
-Set these Gradle properties when building locally:
+Tracked production versioning lives in:
+
+- [version.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/version.properties)
+
+Set these Gradle properties when building locally when you need to override the defaults:
 
 - `RIVERKING_API_BASE_URL`
 - `RIVERKING_PUBLIC_WEB_URL`
@@ -87,38 +91,51 @@ Build both debug flavors:
 ./gradlew -p mobile/android-app :app:assembleDirectDebug :app:assemblePlayDebug
 ```
 
-Build scripts:
+Common entrypoint:
 
 ```bash
-mobile/android-app/scripts/build-direct-debug-apk.sh
-mobile/android-app/scripts/build-play-debug-apk.sh
-mobile/android-app/scripts/build-direct-release-apk.sh
-mobile/android-app/scripts/build-play-release-apk.sh
-mobile/android-app/scripts/build-play-release-aab.sh
-mobile/android-app/scripts/build-debug-apks.sh
-mobile/android-app/scripts/build-release-artifacts.sh
-mobile/android-app/scripts/build-release-artifacts-prod.sh
-mobile/android-app/scripts/build-debug-apks-test.sh
-mobile/android-app/scripts/install-direct-debug.sh
-mobile/android-app/scripts/install-play-debug.sh
-mobile/android-app/scripts/install-direct-debug-test.sh
+mobile/android-app/scripts/build-android.sh [--profile <name>] <target>
 ```
 
-Generic entrypoint:
+Recommended workflow:
 
 ```bash
-mobile/android-app/scripts/build-android.sh release-artifacts
+mobile/android-app/scripts/build-android.sh --profile test qa-release-apks
 mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
 mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
-mobile/android-app/scripts/build-android.sh play-release-aab --stacktrace
+mobile/android-app/scripts/build-android.sh --profile prod play-release-aab --stacktrace
 mobile/android-app/scripts/build-android.sh direct-debug-install
 ```
 
-The scripts read the same environment variables as Gradle properties, can load additional values from a named profile file, and print the final artifact paths after a successful build.
+Useful targets:
+
+- `debug-apks` builds both debug APKs.
+- `direct-debug-install` builds and installs the `directDebug` APK onto a connected device or emulator.
+- `qa-release-apks` builds shareable `directRelease` + `playRelease` APKs for internal QA while keeping the non-canonical `.direct` / `.play` package IDs and debug signing.
+- `release-artifacts` builds the canonical itch.io APK plus the canonical Google Play AAB for store release.
+- `play-release-aab` builds only the Play bundle when you do not need the itch artifact in the same run.
+
+The script reads the same environment variables as Gradle properties, can load additional values from a named profile file, and prints the final artifact paths after a successful build.
 
 When you build with `--profile <name>`, the script also copies the final artifacts into `mobile/android-app/dist/<name>/` with the profile suffix in the filename, so `prod` and `test` outputs do not get mixed together.
 
-Release targets automatically force `RIVERKING_CANONICAL_APPLICATION_ID=true`, so the shipped itch.io APK and Google Play bundle still use `com.riverking.mobile` with the configured release signing. Android Studio and ad-hoc local Gradle runs default to flavor-specific package IDs and debug signing unless you explicitly pass `-PRIVERKING_CANONICAL_APPLICATION_ID=true`.
+Recommended branch / version flow:
+
+- `develop` -> the script allows only `--profile test` and defaults to it if you omit `--profile`.
+- `main` -> the script allows only `--profile prod` and defaults to it if you omit `--profile`.
+- Production versioning now lives in `mobile/android-app/version.properties`. Bump that file only when you are preparing a real store release from `main`.
+- Test builds derive their version automatically from the tracked prod version plus `date + build number`. The build number comes from `RIVERKING_TEST_BUILD_NUMBER`, `GITHUB_RUN_NUMBER`, or the current git commit count.
+- Because `qa-release-apks` stays on `com.riverking.mobile.direct` / `com.riverking.mobile.play`, its internal cadence can move independently from the canonical store package.
+
+Store release targets automatically force `RIVERKING_CANONICAL_APPLICATION_ID=true`, so the shipped itch.io APK and Google Play bundle still use `com.riverking.mobile` with the configured release signing. `qa-release-apks`, Android Studio, and ad-hoc local Gradle runs stay on flavor-specific package IDs and debug signing unless you explicitly pass `-PRIVERKING_CANONICAL_APPLICATION_ID=true`.
+
+If you intentionally need a non-standard combination, use `RIVERKING_SKIP_BRANCH_PROFILE_GUARD=true` as an explicit escape hatch.
+
+GitHub automation:
+
+- [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml) builds the prod APK/AAB after a merged PR from `develop` into `main`
+- the same workflow also supports manual `workflow_dispatch` on `main`
+- it uploads the release files as workflow artifacts and creates or updates a draft GitHub Release
 
 For Android Studio, keep the active Build Variant on `directDebug` or `playDebug` when using the regular `Run` action. Local `release` variants remain useful for packaging validation, but they still install under the flavor package IDs rather than the canonical store package.
 
@@ -137,8 +154,8 @@ If more than one Android device is connected and no serial is provided, the inst
 Examples:
 
 ```bash
-mobile/android-app/scripts/install-direct-debug.sh
-ANDROID_SERIAL=emulator-5554 mobile/android-app/scripts/install-play-debug.sh
+mobile/android-app/scripts/build-android.sh direct-debug-install
+ANDROID_SERIAL=emulator-5554 mobile/android-app/scripts/build-android.sh install-play-debug
 ```
 
 Release outputs:
@@ -154,11 +171,10 @@ Release outputs:
 For store-targeted builds, prefer:
 
 ```bash
-mobile/android-app/scripts/build-release-artifacts.sh
-mobile/android-app/scripts/build-release-artifacts-prod.sh
+mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
 ```
 
-The release scripts now fail fast unless:
+The store release path now fails fast unless:
 
 - `RIVERKING_CANONICAL_APPLICATION_ID=true`
 - all `RIVERKING_SIGNING_*` values are present in env or standard Gradle property files
