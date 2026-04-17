@@ -73,6 +73,22 @@ Required GitHub repository secrets:
 - `RIVERKING_SIGNING_KEY_PASSWORD`
 - `RIVERKING_GOOGLE_AUTH_CLIENT_ID` (optional, only if you want the CI build to embed Google auth)
 
+Required GitHub repository variables for the prod profile:
+
+- `RIVERKING_PROD_API_BASE_URL`
+- `RIVERKING_PROD_PUBLIC_WEB_URL`
+
+Optional GitHub repository variables for the prod profile:
+
+- `RIVERKING_PROD_ITCH_PROJECT_URL`
+- `RIVERKING_PROD_PLAY_STORE_URL`
+- `RIVERKING_PROD_SUPPORT_URL`
+- `RIVERKING_PROD_PRIVACY_POLICY_URL`
+- `RIVERKING_PROD_ACCOUNT_DELETION_URL`
+
+The workflow writes `mobile/android-app/profiles/prod.properties` on the runner from those GitHub variables before calling `build-android.sh`.
+If you prefer, the same names can be stored as repository secrets instead; the workflow uses variables first and secrets as fallback.
+
 Suggested keystore preparation for the secret:
 
 ```bash

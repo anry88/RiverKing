@@ -108,6 +108,66 @@ jobs:
             echo "RIVERKING_GOOGLE_AUTH_CLIENT_ID=$RIVERKING_GOOGLE_AUTH_CLIENT_ID"
           } >> "$HOME/.gradle/gradle.properties"
 
+      - name: Write CI prod profile
+        shell: bash
+        env:
+          PROD_API_BASE_URL_VAR: ${{ vars.RIVERKING_PROD_API_BASE_URL }}
+          PROD_API_BASE_URL_SECRET: ${{ secrets.RIVERKING_PROD_API_BASE_URL }}
+          PROD_PUBLIC_WEB_URL_VAR: ${{ vars.RIVERKING_PROD_PUBLIC_WEB_URL }}
+          PROD_PUBLIC_WEB_URL_SECRET: ${{ secrets.RIVERKING_PROD_PUBLIC_WEB_URL }}
+          PROD_ITCH_PROJECT_URL_VAR: ${{ vars.RIVERKING_PROD_ITCH_PROJECT_URL }}
+          PROD_ITCH_PROJECT_URL_SECRET: ${{ secrets.RIVERKING_PROD_ITCH_PROJECT_URL }}
+          PROD_PLAY_STORE_URL_VAR: ${{ vars.RIVERKING_PROD_PLAY_STORE_URL }}
+          PROD_PLAY_STORE_URL_SECRET: ${{ secrets.RIVERKING_PROD_PLAY_STORE_URL }}
+          PROD_SUPPORT_URL_VAR: ${{ vars.RIVERKING_PROD_SUPPORT_URL }}
+          PROD_SUPPORT_URL_SECRET: ${{ secrets.RIVERKING_PROD_SUPPORT_URL }}
+          PROD_PRIVACY_POLICY_URL_VAR: ${{ vars.RIVERKING_PROD_PRIVACY_POLICY_URL }}
+          PROD_PRIVACY_POLICY_URL_SECRET: ${{ secrets.RIVERKING_PROD_PRIVACY_POLICY_URL }}
+          PROD_ACCOUNT_DELETION_URL_VAR: ${{ vars.RIVERKING_PROD_ACCOUNT_DELETION_URL }}
+          PROD_ACCOUNT_DELETION_URL_SECRET: ${{ secrets.RIVERKING_PROD_ACCOUNT_DELETION_URL }}
+        run: |
+          resolve_value() {
+            local primary="$1"
+            local fallback="$2"
+            if [[ -n "$primary" ]]; then
+              printf '%s' "$primary"
+            else
+              printf '%s' "$fallback"
+            fi
+          }
+
+          PROD_API_BASE_URL="$(resolve_value "$PROD_API_BASE_URL_VAR" "$PROD_API_BASE_URL_SECRET")"
+          PROD_PUBLIC_WEB_URL="$(resolve_value "$PROD_PUBLIC_WEB_URL_VAR" "$PROD_PUBLIC_WEB_URL_SECRET")"
+          PROD_ITCH_PROJECT_URL="$(resolve_value "$PROD_ITCH_PROJECT_URL_VAR" "$PROD_ITCH_PROJECT_URL_SECRET")"
+          PROD_PLAY_STORE_URL="$(resolve_value "$PROD_PLAY_STORE_URL_VAR" "$PROD_PLAY_STORE_URL_SECRET")"
+          PROD_SUPPORT_URL="$(resolve_value "$PROD_SUPPORT_URL_VAR" "$PROD_SUPPORT_URL_SECRET")"
+          PROD_PRIVACY_POLICY_URL="$(resolve_value "$PROD_PRIVACY_POLICY_URL_VAR" "$PROD_PRIVACY_POLICY_URL_SECRET")"
+          PROD_ACCOUNT_DELETION_URL="$(resolve_value "$PROD_ACCOUNT_DELETION_URL_VAR" "$PROD_ACCOUNT_DELETION_URL_SECRET")"
+
+          [[ -n "$PROD_API_BASE_URL" ]] || { echo "::error::Missing RIVERKING_PROD_API_BASE_URL repository variable/secret"; exit 1; }
+          [[ -n "$PROD_PUBLIC_WEB_URL" ]] || { echo "::error::Missing RIVERKING_PROD_PUBLIC_WEB_URL repository variable/secret"; exit 1; }
+
+          mkdir -p mobile/android-app/profiles
+          {
+            echo "RIVERKING_API_BASE_URL=$PROD_API_BASE_URL"
+            echo "RIVERKING_PUBLIC_WEB_URL=$PROD_PUBLIC_WEB_URL"
+            if [[ -n "$PROD_ITCH_PROJECT_URL" ]]; then
+              echo "RIVERKING_ITCH_PROJECT_URL=$PROD_ITCH_PROJECT_URL"
+            fi
+            if [[ -n "$PROD_PLAY_STORE_URL" ]]; then
+              echo "RIVERKING_PLAY_STORE_URL=$PROD_PLAY_STORE_URL"
+            fi
+            if [[ -n "$PROD_SUPPORT_URL" ]]; then
+              echo "RIVERKING_SUPPORT_URL=$PROD_SUPPORT_URL"
+            fi
+            if [[ -n "$PROD_PRIVACY_POLICY_URL" ]]; then
+              echo "RIVERKING_PRIVACY_POLICY_URL=$PROD_PRIVACY_POLICY_URL"
+            fi
+            if [[ -n "$PROD_ACCOUNT_DELETION_URL" ]]; then
+              echo "RIVERKING_ACCOUNT_DELETION_URL=$PROD_ACCOUNT_DELETION_URL"
+            fi
+          } > mobile/android-app/profiles/prod.properties
+
       - name: Build Android release artifacts
         shell: bash
         env:

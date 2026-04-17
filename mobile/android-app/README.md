@@ -136,6 +136,7 @@ GitHub automation:
 - [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml) builds the prod APK/AAB after a merged PR from `develop` into `main`
 - the same workflow also supports manual `workflow_dispatch` on `main`
 - it uploads the release files as workflow artifacts and creates or updates a draft GitHub Release
+- in CI, the workflow generates `mobile/android-app/profiles/prod.properties` from GitHub repository variables/secrets, so the local ignored `prod.properties` file is not required on the runner
 
 For Android Studio, keep the active Build Variant on `directDebug` or `playDebug` when using the regular `Run` action. Local `release` variants remain useful for packaging validation, but they still install under the flavor package IDs rather than the canonical store package.
 
