@@ -187,6 +187,32 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class ClubQuestMemberDTO(
+        val userId: Long,
+        val name: String?,
+        val role: String,
+        val progress: Int,
+    )
+
+    @Serializable
+    data class ClubQuestDTO(
+        val code: String,
+        val name: String,
+        val description: String,
+        val progress: Int,
+        val target: Int,
+        val rewardCoins: Int,
+        val completed: Boolean,
+        val members: List<ClubQuestMemberDTO>,
+    )
+
+    @Serializable
+    data class ClubQuestWeekDTO(
+        val weekStart: String,
+        val quests: List<ClubQuestDTO>,
+    )
+
+    @Serializable
     data class ClubDetailsDTO(
         val id: Long,
         val name: String,
@@ -198,6 +224,8 @@ fun Application.apiRoutes(
         val recruitingOpen: Boolean,
         val currentWeek: ClubWeekDTO,
         val previousWeek: ClubWeekDTO,
+        val currentQuestWeek: ClubQuestWeekDTO,
+        val previousQuestWeek: ClubQuestWeekDTO,
     )
 
     @Serializable
@@ -231,6 +259,29 @@ fun Application.apiRoutes(
         },
     )
 
+    fun ClubService.ClubQuestWeekView.toDto(): ClubQuestWeekDTO = ClubQuestWeekDTO(
+        weekStart = weekStart.toString(),
+        quests = quests.map { quest ->
+            ClubQuestDTO(
+                code = quest.code,
+                name = quest.name,
+                description = quest.description,
+                progress = quest.progress,
+                target = quest.target,
+                rewardCoins = quest.rewardCoins,
+                completed = quest.completed,
+                members = quest.members.map { member ->
+                    ClubQuestMemberDTO(
+                        userId = member.userId,
+                        name = member.name,
+                        role = member.role,
+                        progress = member.progress,
+                    )
+                },
+            )
+        },
+    )
+
     fun ClubService.ClubDetails.toDto(): ClubDetailsDTO = ClubDetailsDTO(
         id = id,
         name = name,
@@ -242,6 +293,8 @@ fun Application.apiRoutes(
         recruitingOpen = recruitingOpen,
         currentWeek = currentWeek.toDto(),
         previousWeek = previousWeek.toDto(),
+        currentQuestWeek = currentQuestWeek.toDto(),
+        previousQuestWeek = previousQuestWeek.toDto(),
     )
 
     fun ClubService.ClubChatMessage.toDto(): ClubChatMessageDTO = ClubChatMessageDTO(

@@ -25,6 +25,7 @@ Nested Android project for the RiverKing mobile client.
   - catch details dialog plus native Android share sheet backed by `/api/catches/{id}/card`
   - tournaments, ratings, guide, achievements, quests, club, referrals, and shop surfaces running on shared backend contracts
   - quest sheet now mirrors the shared backend quest payload with daily, weekly, and club sections, plus a localized "join a club" info block when the player has no club
+  - club tab now has `Ratings` / `Club` modes, current-vs-previous week switching, and a per-quest selector that shows shared quest progress plus each member's contribution for the selected week
 - `direct` keeps the shop visible but disables real-money packs.
 - `play` uses real `BillingClient` / `ProductDetails` purchase flow and hands the purchase token to the backend for Google Play verification before entitlement delivery.
 - Android Telegram account linking and referral actions live in the profile menu opened from the nickname, not inside the shop tab.

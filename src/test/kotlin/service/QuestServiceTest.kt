@@ -97,10 +97,38 @@ class QuestServiceTest {
 
         val chosenQuest = firstList.quests.first()
         val scenario = questScenario(chosenQuest.code)
+        val initialWeekView = clubs.clubDetails(presidentId)?.currentQuestWeek
+            ?.quests
+            ?.single { it.code == chosenQuest.code }
+            ?: error("Current club quest week missing before catch updates")
         recordClubCatch(clubQuests, leaverId, scenario, Instant.parse("2026-04-14T10:00:00Z"))
         recordClubCatch(clubQuests, veteranId, scenario, Instant.parse("2026-04-14T10:05:00Z"))
 
+        val weekViewBeforeLeave = clubs.clubDetails(presidentId)?.currentQuestWeek
+            ?.quests
+            ?.single { it.code == chosenQuest.code }
+            ?: error("Current club quest week missing")
+        assertEquals(initialWeekView.progress + 2, weekViewBeforeLeave.progress)
+        assertEquals(
+            initialWeekView.members.single { it.userId == presidentId }.progress,
+            weekViewBeforeLeave.members.single { it.userId == presidentId }.progress,
+        )
+        assertEquals(
+            initialWeekView.members.single { it.userId == veteranId }.progress + 1,
+            weekViewBeforeLeave.members.single { it.userId == veteranId }.progress,
+        )
+        assertEquals(
+            initialWeekView.members.single { it.userId == leaverId }.progress + 1,
+            weekViewBeforeLeave.members.single { it.userId == leaverId }.progress,
+        )
+
         clubs.leaveClub(leaverId)
+
+        val weekViewAfterLeave = clubs.clubDetails(presidentId)?.currentQuestWeek
+            ?.quests
+            ?.single { it.code == chosenQuest.code }
+            ?: error("Current club quest week missing after leave")
+        assertEquals(listOf(presidentId, veteranId), weekViewAfterLeave.members.map { it.userId }.sorted())
 
         val progressAfterLeave = chosenQuest.target - 2
         repeat(progressAfterLeave) { index ->

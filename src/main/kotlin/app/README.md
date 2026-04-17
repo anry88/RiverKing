@@ -18,7 +18,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
   - Play Billing: `POST /api/shop/{id}/play/complete` verifies Android purchase tokens through the Google Play Developer API before delivering the entitlement and recording the payment.
   - Tournaments: `/api/tournament*` endpoints rely on `TournamentService` and `RatingPrizeService` to serve leaderboards and process rewards.
   - Quests: `GET /api/quests` now returns additive `daily`, `weekly`, and `club` sections so all three clients can render personal and club quest blocks from one payload.
-  - Clubs: `/api/club`, `/api/club/create`, `/api/club/search`, `/api/club/{id}/join` expose fishing club membership, creation, and discovery.
+  - Clubs: `/api/club`, `/api/club/create`, `/api/club/search`, `/api/club/{id}/join` expose fishing club membership, creation, and discovery. `GET /api/club` now includes both `currentWeek` / `previousWeek` contribution boards and `currentQuestWeek` / `previousQuestWeek` quest views, each with per-member quest progress for the selected club quest.
   - Referrals: `GET/POST /api/referrals` and `POST /api/referrals/apply` handle links via `ReferralService`.
   - Utility calls: `GET /api/assets/{path...}` serves webapp assets with manual path checks; `GET /api/metrics` updates `UserMetrics`.
 - API compatibility rule: any response-shape change in this package must be checked against all three consumers that share these routes — Telegram bot flows, the Telegram Mini App, and the Android client. Prefer additive fields over breaking renames or changed semantics.

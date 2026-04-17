@@ -560,7 +560,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const CLUB_MIN_WEIGHT = 1000;
   const [mode, setMode] = React.useState('hub');
   const [club, setClub] = React.useState(null);
+  const [clubView, setClubView] = React.useState('ratings');
   const [clubTab, setClubTab] = React.useState('current');
+  const [selectedQuestCode, setSelectedQuestCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [search, setSearch] = React.useState([]);
@@ -601,7 +603,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const resetState = React.useCallback(() => {
     setMode('hub');
     setClub(null);
+    setClubView('ratings');
     setClubTab('current');
+    setSelectedQuestCode('');
     setLoading(false);
     setError(null);
     setSearch([]);
@@ -644,7 +648,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       }
       const data = await resp.json();
       setClub(data);
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setMode('club');
     }catch(e){
       setError(e.message==='unauthorized' ? t('authRequired') : t('clubLoadFailed'));
@@ -747,7 +753,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       const data = await resp.json();
       setClub(data);
       setMode('club');
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setName('');
       setConfirming(false);
       onReloadProfile?.();
@@ -771,7 +779,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       const data = await resp.json();
       setClub(data);
       setMode('club');
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setSelectedClubId(null);
       onReloadProfile?.();
     }catch(e){
@@ -857,9 +867,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     });
   }, [chatOpen, chatMessages, chatLoading]);
 
-  if(!active) return null;
-
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
+  const questWeekData = clubTab === 'previous' ? club?.previousQuestWeek : club?.currentQuestWeek;
+  const questList = Array.isArray(questWeekData?.quests) ? questWeekData.quests : [];
+  const selectedQuest = questList.find(quest => quest.code === selectedQuestCode) || questList[0] || null;
   const viewingPreviousWeek = clubTab === 'previous';
   const formatWeekRange = (weekStartValue) => {
     if(!weekStartValue) return '';
@@ -870,6 +881,17 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     const formatter = new Intl.DateTimeFormat(coinLocale, { day:'2-digit', month:'2-digit' });
     return `${formatter.format(start)}–${formatter.format(end)}`;
   };
+
+  React.useEffect(() => {
+    if(!questList.length){
+      setSelectedQuestCode('');
+      return;
+    }
+    if(questList.some(quest => quest.code === selectedQuestCode)) return;
+    setSelectedQuestCode(questList[0].code);
+  }, [club?.id, clubTab, questWeekData?.weekStart, selectedQuestCode, questList]);
+
+  if(!active) return null;
 
   const handleLeave = async () => {
     if(!window.confirm(t('clubConfirmLeave'))) return;
@@ -1138,6 +1160,18 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
           <div className="flex gap-2 text-sm">
             <button
               type="button"
+              onClick={()=>setClubView('ratings')}
+              className={`flex-1 py-2 rounded-xl ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('ratings')}</button>
+            <button
+              type="button"
+              onClick={()=>setClubView('quests')}
+              className={`flex-1 py-2 rounded-xl ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('clubQuests')}</button>
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
               onClick={()=>setClubTab('current')}
               className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
             >{t('clubCurrentWeek')}</button>
@@ -1148,62 +1182,123 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             >{t('clubPreviousWeek')}</button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            <div className="text-xs opacity-70">{formatWeekRange(weekData?.weekStart)}</div>
-            {(weekData?.members || []).length === 0 ? (
-              <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
-            ) : (
-              weekData.members.map(member => (
-                <div key={member.userId} className="p-2 rounded-xl border border-white/10 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-sm">
-                        <bdi>{member.name || '—'}</bdi>
+            <div className="text-xs opacity-70">
+              {formatWeekRange((clubView === 'quests' ? questWeekData?.weekStart : weekData?.weekStart))}
+            </div>
+            {clubView === 'ratings' ? (
+              (weekData?.members || []).length === 0 ? (
+                <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
+              ) : (
+                weekData.members.map(member => (
+                  <div key={member.userId} className="p-2 rounded-xl border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-sm">
+                          <bdi>{member.name || '—'}</bdi>
+                        </div>
+                        <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
                       </div>
-                      <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                      <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
                     </div>
-                    <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
+                    {!viewingPreviousWeek && canManageMembers && canActOnMember(member) && (
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {member.role !== 'heir' && member.role !== 'president' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg glass"
+                            onClick={()=>handleMemberAction(member.userId, 'promote')}
+                          >{t('clubPromote')}</button>
+                        )}
+                        {member.role !== 'novice' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg glass"
+                            onClick={()=>handleMemberAction(member.userId, 'demote')}
+                          >{t('clubDemote')}</button>
+                        )}
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded-lg glass text-red-300"
+                          onClick={()=>{
+                            if(window.confirm(t('clubConfirmKick', member.name || '—'))){
+                              handleMemberAction(member.userId, 'kick');
+                            }
+                          }}
+                        >{t('clubKick')}</button>
+                        {club.role === 'president' && member.role === 'heir' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg bg-yellow-400 text-black"
+                            onClick={()=>handleMemberAction(member.userId, 'appoint-president')}
+                          >{t('clubAppointPresident')}</button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {!viewingPreviousWeek && canManageMembers && canActOnMember(member) && (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {member.role !== 'heir' && member.role !== 'president' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg glass"
-                          onClick={()=>handleMemberAction(member.userId, 'promote')}
-                        >{t('clubPromote')}</button>
-                      )}
-                      {member.role !== 'novice' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg glass"
-                          onClick={()=>handleMemberAction(member.userId, 'demote')}
-                        >{t('clubDemote')}</button>
-                      )}
-                      <button
-                        type="button"
-                        className="px-2 py-1 rounded-lg glass text-red-300"
-                        onClick={()=>{
-                          if(window.confirm(t('clubConfirmKick', member.name || '—'))){
-                            handleMemberAction(member.userId, 'kick');
-                          }
-                        }}
-                      >{t('clubKick')}</button>
-                      {club.role === 'president' && member.role === 'heir' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg bg-yellow-400 text-black"
-                          onClick={()=>handleMemberAction(member.userId, 'appoint-president')}
-                        >{t('clubAppointPresident')}</button>
-                      )}
-                    </div>
-                  )}
+                ))
+              )
+            ) : !questList.length ? (
+              <div className="text-sm opacity-70">{t('noData')}</div>
+            ) : (
+              <>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {questList.map(quest => (
+                    <button
+                      key={quest.code}
+                      type="button"
+                      onClick={()=>setSelectedQuestCode(quest.code)}
+                      className={`px-3 py-2 rounded-xl whitespace-nowrap ${selectedQuest?.code===quest.code ? 'bg-emerald-600' : 'glass'}`}
+                    >{quest.name}</button>
+                  ))}
                 </div>
-              ))
+                {selectedQuest && (
+                  <>
+                    <div className={`p-3 rounded-xl border ${selectedQuest.completed ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-white/10'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">{selectedQuest.name}</div>
+                          <div className="text-xs opacity-70 mt-1">{selectedQuest.description}</div>
+                        </div>
+                        {selectedQuest.completed && <div className="text-emerald-300 text-xs font-semibold uppercase">{t('questCompleted')}</div>}
+                      </div>
+                      <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full ${selectedQuest.completed ? 'bg-emerald-400' : 'bg-emerald-600'}`}
+                          style={{width:`${Math.round(Math.min(1, (Math.max(0, Number(selectedQuest.progress) || 0) / Math.max(1, Number(selectedQuest.target) || 1))) * 100)}%`}}
+                        ></div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                        <div className="opacity-70">{`${Number(selectedQuest.progress) || 0}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                        <div className="text-yellow-300">{t('clubQuestRewardCoins', selectedQuest.rewardCoins)}</div>
+                      </div>
+                    </div>
+                    {(selectedQuest.members || []).length === 0 ? (
+                      <div className="text-sm opacity-70">{t('noData')}</div>
+                    ) : (
+                      selectedQuest.members.map(member => (
+                        <div key={member.userId} className="p-2 rounded-xl border border-white/10">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="font-semibold text-sm">
+                                <bdi>{member.name || '—'}</bdi>
+                              </div>
+                              <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                            </div>
+                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
-          <div className="text-sm opacity-80 text-right">
-            {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
-          </div>
+          {clubView === 'ratings' && (
+            <div className="text-sm opacity-80 text-right">
+              {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
+            </div>
+          )}
           <button
             type="button"
             className="w-full px-3 py-2 rounded-xl glass text-red-300"

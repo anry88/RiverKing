@@ -368,6 +368,32 @@ data class ClubWeekDto(
 )
 
 @Serializable
+data class ClubQuestMemberDto(
+    val userId: Long = 0,
+    val name: String? = null,
+    val role: String = "",
+    val progress: Int = 0,
+)
+
+@Serializable
+data class ClubQuestDto(
+    val code: String = "",
+    val name: String = "",
+    val description: String = "",
+    val progress: Int = 0,
+    val target: Int = 0,
+    val rewardCoins: Int = 0,
+    val completed: Boolean = false,
+    val members: List<ClubQuestMemberDto> = emptyList(),
+)
+
+@Serializable
+data class ClubQuestWeekDto(
+    val weekStart: String = "",
+    val quests: List<ClubQuestDto> = emptyList(),
+)
+
+@Serializable
 data class ClubDetailsDto(
     val id: Long,
     val name: String,
@@ -379,6 +405,8 @@ data class ClubDetailsDto(
     val recruitingOpen: Boolean,
     val currentWeek: ClubWeekDto,
     val previousWeek: ClubWeekDto,
+    val currentQuestWeek: ClubQuestWeekDto = ClubQuestWeekDto(),
+    val previousQuestWeek: ClubQuestWeekDto = ClubQuestWeekDto(),
 )
 
 @Serializable

@@ -9,6 +9,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 - Delivers a Telegram Mini App fishing experience with cast, hook, and catch gameplay.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
 - Ships daily and weekly personal quests plus weekly club quests with pooled progress and split coin rewards for current club members.
+- Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings and weekly club quests, with per-member contribution views for each active club quest.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
 - Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
 

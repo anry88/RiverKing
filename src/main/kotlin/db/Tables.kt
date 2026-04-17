@@ -75,6 +75,7 @@ object DB {
                 Clubs,
                 ClubMembers,
                 ClubQuestProgress,
+                ClubQuestMemberProgress,
                 ClubQuestRewardRecipients,
                 ClubWeeklyContributions,
                 ClubWeeklySnapshots,
@@ -1764,6 +1765,17 @@ object ClubQuestProgress : Table() {
     val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
 
     override val primaryKey = PrimaryKey(clubId, code, periodStart)
+}
+
+object ClubQuestMemberProgress : Table() {
+    val clubId = reference("club_id", Clubs)
+    val code = varchar("code", 100)
+    val periodStart = date("period_start")
+    val userId = reference("user_id", Users)
+    val progress = integer("progress").default(0)
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+
+    override val primaryKey = PrimaryKey(clubId, code, periodStart, userId)
 }
 
 object ClubQuestRewardRecipients : Table() {

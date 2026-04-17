@@ -6,6 +6,7 @@ import db.AchievementProgress
 import db.AuthIdentities
 import db.AuthSessions
 import db.ClubMembers
+import db.ClubQuestMemberProgress
 import db.ClubQuestRewardRecipients
 import db.ClubWeeklyContributions
 import db.ClubWeeklyRewards
@@ -74,6 +75,7 @@ class AccountDeletionService(
             ReferralRewards.deleteWhere { ReferralRewards.userId eq userId }
             AchievementProgress.deleteWhere { AchievementProgress.userId eq userId }
             QuestProgress.deleteWhere { QuestProgress.userId eq userId }
+            ClubQuestMemberProgress.deleteWhere { ClubQuestMemberProgress.userId eq userId }
             ClubQuestRewardRecipients.deleteWhere { ClubQuestRewardRecipients.userId eq userId }
             ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.userId eq userId }
             ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.userId eq userId }

@@ -4,6 +4,7 @@ import db.Catches
 import db.Clubs
 import db.ClubChatMessages
 import db.ClubMembers
+import db.ClubQuestMemberProgress
 import db.ClubQuestProgress
 import db.ClubQuestRewardRecipients
 import db.ClubWeeklyContributions
@@ -30,6 +31,8 @@ import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
 class ClubService {
+    private val clubQuests = ClubQuestService()
+
     data class ClubSummary(
         val id: Long,
         val name: String,
@@ -53,6 +56,29 @@ class ClubService {
         val members: List<ClubMemberContribution>,
     )
 
+    data class ClubQuestMemberView(
+        val userId: Long,
+        val name: String?,
+        val role: String,
+        val progress: Int,
+    )
+
+    data class ClubQuestView(
+        val code: String,
+        val name: String,
+        val description: String,
+        val progress: Int,
+        val target: Int,
+        val rewardCoins: Int,
+        val completed: Boolean,
+        val members: List<ClubQuestMemberView>,
+    )
+
+    data class ClubQuestWeekView(
+        val weekStart: LocalDate,
+        val quests: List<ClubQuestView>,
+    )
+
     data class ClubDetails(
         val id: Long,
         val name: String,
@@ -64,6 +90,8 @@ class ClubService {
         val recruitingOpen: Boolean,
         val currentWeek: ClubWeekView,
         val previousWeek: ClubWeekView,
+        val currentQuestWeek: ClubQuestWeekView,
+        val previousQuestWeek: ClubQuestWeekView,
     )
 
     data class ClubChatMessage(
@@ -85,12 +113,18 @@ class ClubService {
         val clubId = membership[ClubMembers.clubId].value
         val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: return@transaction null
         val role = membership[ClubMembers.role]
+        val lang = Users
+            .slice(Users.language)
+            .select { Users.id eq userId }
+            .single()[Users.language]
         val currentWeekStart = weekStart(LocalDate.now(CLUB_ZONE))
         val previousWeekStart = currentWeekStart.minusWeeks(1)
         finalizeCompletedWeekSnapshotTx(clubId, currentWeekStart)
         val members = loadMembers(clubId)
         val currentWeek = buildWeekView(clubId, members, currentWeekStart)
         val previousWeek = buildHistoricalWeekView(clubId, previousWeekStart)
+        val currentQuestWeek = clubQuests.weekView(clubId, currentWeekStart, lang, members, ensureAssigned = true)
+        val previousQuestWeek = clubQuests.weekView(clubId, previousWeekStart, lang, previousWeek.members, ensureAssigned = false)
         ClubDetails(
             id = clubId,
             name = club[Clubs.name],
@@ -102,6 +136,8 @@ class ClubService {
             recruitingOpen = club[Clubs.recruitingOpen],
             currentWeek = currentWeek,
             previousWeek = previousWeek,
+            currentQuestWeek = currentQuestWeek,
+            previousQuestWeek = previousQuestWeek,
         )
     }
 
@@ -221,6 +257,7 @@ class ClubService {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
                     ClubQuestRewardRecipients.deleteWhere { ClubQuestRewardRecipients.clubId eq clubId }
+                    ClubQuestMemberProgress.deleteWhere { ClubQuestMemberProgress.clubId eq clubId }
                     ClubQuestProgress.deleteWhere { ClubQuestProgress.clubId eq clubId }
                     ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
                     ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.clubId eq clubId }

@@ -140,6 +140,8 @@ import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.ClubChatMessageDto
 import com.riverking.mobile.auth.ClubDetailsDto
 import com.riverking.mobile.auth.ClubMemberDto
+import com.riverking.mobile.auth.ClubQuestDto
+import com.riverking.mobile.auth.ClubQuestMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
 import com.riverking.mobile.auth.FishBriefDto
 import com.riverking.mobile.auth.GuideFishDto
@@ -1802,10 +1804,16 @@ private fun ClubScreen(
     var infoDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.info.orEmpty()) }
     var minWeightDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(((state.club.club?.minJoinWeightKg ?: 0.0).toInt()).toString()) }
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
+    var selectedSection by rememberSaveable(state.club.club?.id) { mutableStateOf("ratings") }
     var selectedWeek by rememberSaveable(state.club.club?.id) { mutableStateOf("current") }
+    var selectedQuestCode by rememberSaveable(state.club.club?.id, selectedWeek) { mutableStateOf("") }
     val club = state.club.club
     val canManageClub = club?.role == "president" || club?.role == "heir"
     val weekData = if (selectedWeek == "previous") club?.previousWeek else club?.currentWeek
+    val questWeekData = if (selectedWeek == "previous") club?.previousQuestWeek else club?.currentQuestWeek
+    val selectedQuest = questWeekData?.quests
+        ?.firstOrNull { it.code == selectedQuestCode }
+        ?: questWeekData?.quests?.firstOrNull()
     val createCostCoins = 1_000L
     val minCreateWeightKg = 1_000.0
     val hasCreateWeight = (me?.totalWeight ?: 0.0) >= minCreateWeightKg
@@ -1817,6 +1825,15 @@ private fun ClubScreen(
     LaunchedEffect(chatOpen, state.club.chat.size, state.club.chatLoading) {
         if (chatOpen && !state.club.chatLoading && state.club.chat.isNotEmpty()) {
             chatListState.scrollToItem(state.club.chat.lastIndex)
+        }
+    }
+
+    LaunchedEffect(club?.id, selectedWeek, questWeekData?.weekStart) {
+        val quests = questWeekData?.quests.orEmpty()
+        selectedQuestCode = when {
+            quests.isEmpty() -> ""
+            quests.any { it.code == selectedQuestCode } -> selectedQuestCode
+            else -> quests.first().code
         }
     }
 
@@ -1885,7 +1902,43 @@ private fun ClubScreen(
                     }
                 }
                 item {
-                    SectionCard(strings.prizes) {
+                    SectionCard(if (selectedSection == "ratings") strings.ratings else strings.clubQuestsLabel) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedButton(
+                                onClick = { selectedSection = "ratings" },
+                                modifier = Modifier.weight(1f),
+                                colors = if (selectedSection == "ratings") {
+                                    ButtonDefaults.outlinedButtonColors(
+                                        containerColor = RiverMoss.copy(alpha = 0.24f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                } else {
+                                    riverOutlinedButtonColors()
+                                },
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(strings.ratings)
+                            }
+                            OutlinedButton(
+                                onClick = { selectedSection = "quests" },
+                                modifier = Modifier.weight(1f),
+                                colors = if (selectedSection == "quests") {
+                                    ButtonDefaults.outlinedButtonColors(
+                                        containerColor = RiverMoss.copy(alpha = 0.24f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                } else {
+                                    riverOutlinedButtonColors()
+                                },
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(strings.clubQuestsLabel)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1922,31 +1975,53 @@ private fun ClubScreen(
                             }
                         }
                         Text(
-                            weekData?.weekStart?.let { formatWeekRange(it, strings) }.orEmpty(),
+                            (
+                                if (selectedSection == "quests") questWeekData?.weekStart else weekData?.weekStart
+                            )?.let { formatWeekRange(it, strings) }.orEmpty(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (weekData == null || weekData.members.isEmpty()) {
-                            EmptyStatePanel(
-                                if (strings.login == "Логин") "Пока нет взносов." else "No contributions yet.",
-                                modifier = Modifier.fillMaxWidth(),
+                        if (selectedSection == "ratings") {
+                            if (weekData == null || weekData.members.isEmpty()) {
+                                EmptyStatePanel(
+                                    if (strings.login == "Логин") "Пока нет взносов." else "No contributions yet.",
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else {
+                                ClubWeekSection(
+                                    strings = strings,
+                                    week = weekData,
+                                    role = club.role,
+                                    allowActions = selectedWeek == "current",
+                                    onMemberAction = onMemberAction,
+                                )
+                            }
+                            Text(
+                                if (strings.login == "Логин") {
+                                    "Итого за неделю: ${weekData?.totalCoins ?: 0} монет"
+                                } else {
+                                    "Weekly total: ${weekData?.totalCoins ?: 0} coins"
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
-                            ClubWeekSection(
-                                strings = strings,
-                                week = weekData,
-                                role = club.role,
-                                allowActions = selectedWeek == "current",
-                                onMemberAction = onMemberAction,
-                            )
-                        }
-                        Text(
-                            if (strings.login == "Логин") {
-                                "Итого за неделю: ${weekData?.totalCoins ?: 0} монет"
+                            if (questWeekData == null || questWeekData.quests.isEmpty()) {
+                                EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
                             } else {
-                                "Weekly total: ${weekData?.totalCoins ?: 0} coins"
-                            },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                                ClubQuestSelectorRow(
+                                    quests = questWeekData.quests,
+                                    selectedCode = selectedQuest?.code.orEmpty(),
+                                    onSelect = { selectedQuestCode = it },
+                                )
+                                selectedQuest?.let { quest ->
+                                    ClubQuestSummaryCard(strings = strings, quest = quest)
+                                    if (quest.members.isEmpty()) {
+                                        EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
+                                    } else {
+                                        ClubQuestSection(strings = strings, quest = quest)
+                                    }
+                                } ?: EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
                     }
                 }
                 item {
@@ -4694,6 +4769,105 @@ private fun ClubWeekSection(
     week.members.forEachIndexed { index, member ->
         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
         ClubMemberRow(strings, member, role, allowActions, onMemberAction)
+    }
+}
+
+@Composable
+private fun ClubQuestSelectorRow(
+    quests: List<ClubQuestDto>,
+    selectedCode: String,
+    onSelect: (String) -> Unit,
+) {
+    HorizontalChipRow {
+        quests.forEach { quest ->
+            FilterChip(
+                selected = quest.code == selectedCode,
+                onClick = { onSelect(quest.code) },
+                label = {
+                    Text(
+                        quest.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClubQuestSummaryCard(
+    strings: RiverStrings,
+    quest: ClubQuestDto,
+) {
+    InfoCard {
+        Text(quest.name, fontWeight = FontWeight.SemiBold)
+        Text(quest.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            StatPill(
+                title = if (strings.login == "Логин") "Прогресс" else "Progress",
+                value = "${quest.progress}/${quest.target}",
+                modifier = Modifier.weight(1f),
+            )
+            StatPill(
+                title = if (strings.login == "Логин") "Награда" else "Reward",
+                value = quest.rewardCoins.toString(),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (quest.completed) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                if (strings.login == "Логин") "Квест выполнен" else "Quest completed",
+                color = RiverMoss,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClubQuestSection(
+    strings: RiverStrings,
+    quest: ClubQuestDto,
+) {
+    quest.members.forEachIndexed { index, member ->
+        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+        ClubQuestMemberRow(strings = strings, member = member, target = quest.target)
+    }
+}
+
+@Composable
+private fun ClubQuestMemberRow(
+    strings: RiverStrings,
+    member: ClubQuestMemberDto,
+    target: Int,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(member.name ?: "Unknown", fontWeight = FontWeight.SemiBold)
+                Text(strings.roleLabel(member.role), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                "${member.progress}/$target",
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
     }
 }
 

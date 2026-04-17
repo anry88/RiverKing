@@ -28,10 +28,13 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import service.ClubService
+import service.ClubQuestService
 import service.FishingService
 import service.PlayPurchaseVerificationResult
 import service.PlayPurchaseVerifier
@@ -423,6 +426,66 @@ class AuthRoutesTest {
         assertEquals(2, withClubSection.getValue("quests").jsonArray.size)
     }
 
+    @Test
+    fun `club api exposes weekly quest progress and member contribution fields`() = testApplication {
+        val env = testEnv("club-api-quest-analytics").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val registered = registerPasswordUser(client, "angler.club.page", "password123")
+        val fishing = FishingService()
+        val clubs = ClubService()
+        val clubQuests = ClubQuestService()
+
+        fishing.addCoins(registered.user.id, ClubService.CREATE_COST_COINS.toInt())
+        addProgressWeight(registered.user.id, ClubService.MIN_CREATE_WEIGHT_KG + 25.0)
+        val clubId = clubs.createClub(registered.user.id, "Weekly View").id
+        val partnerId = fishing.ensureUserByTgId(9_901L)
+        clubs.joinClub(partnerId, clubId)
+
+        val initial = client.get("/api/club") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, initial.status)
+        val initialBody = json.parseToJsonElement(initial.bodyAsText()).jsonObject
+        val currentQuestWeek = initialBody.getValue("currentQuestWeek").jsonObject
+        val currentQuests = currentQuestWeek.getValue("quests").jsonArray
+        assertEquals(2, currentQuests.size)
+
+        val chosenCode = currentQuests.first().jsonObject.getValue("code").jsonPrimitive.content
+        val scenario = clubQuestScenario(chosenCode)
+        recordClubCatch(clubQuests, registered.user.id, scenario, Instant.parse("2026-04-14T12:00:00Z"))
+
+        val updated = client.get("/api/club") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, updated.status)
+        val updatedBody = json.parseToJsonElement(updated.bodyAsText()).jsonObject
+        val updatedQuest = updatedBody
+            .getValue("currentQuestWeek")
+            .jsonObject
+            .getValue("quests")
+            .jsonArray
+            .map { it.jsonObject }
+            .first { it.getValue("code").jsonPrimitive.content == chosenCode }
+
+        assertEquals(true, updatedBody.containsKey("previousQuestWeek"))
+        assertTrue(updatedQuest.getValue("progress").jsonPrimitive.content.toInt() >= 1)
+
+        val members = updatedQuest.getValue("members").jsonArray.map { it.jsonObject }
+        assertEquals(2, members.size)
+        val currentUserProgress = members
+            .first { it.getValue("userId").jsonPrimitive.content.toLong() == registered.user.id }
+            .getValue("progress")
+            .jsonPrimitive
+            .content
+            .toInt()
+        assertTrue(currentUserProgress >= 1)
+    }
+
     private fun Application.installAuthTestModule(
         env: Env,
         playPurchaseVerifier: PlayPurchaseVerifier? = null,
@@ -501,6 +564,51 @@ class AuthRoutesTest {
                 it[Catches.coins] = null
             }
         }
+    }
+
+    private data class ClubQuestScenario(
+        val fishName: String,
+        val rarity: String,
+        val locationName: String,
+        val weight: Double,
+    )
+
+    private fun clubQuestScenario(code: String): ClubQuestScenario = when (code) {
+        "club_epic_20" -> ClubQuestScenario("Паку бурый", "epic", "Русло Амазонки", 12.0)
+        "club_common_200" -> ClubQuestScenario("Уклейка", "common", "Пруд", 0.2)
+        "club_uncommon_100" -> ClubQuestScenario("Пелядь", "uncommon", "Пруд", 1.1)
+        "club_ruffe_40" -> ClubQuestScenario("Ёрш", "common", "Пруд", 0.2)
+        "club_bream_30" -> ClubQuestScenario("Лещ", "uncommon", "Пруд", 1.2)
+        "club_crucian_50" -> ClubQuestScenario("Карась", "common", "Пруд", 0.4)
+        "club_roach_50" -> ClubQuestScenario("Плотва", "common", "Пруд", 0.25)
+        "club_rare_50" -> ClubQuestScenario("Карп", "rare", "Пруд", 2.6)
+        "club_perch_50" -> ClubQuestScenario("Окунь", "common", "Пруд", 0.3)
+        "club_herring_50" -> ClubQuestScenario("Сельдь", "common", "Прибрежье моря", 0.4)
+        else -> error("Unexpected quest code: $code")
+    }
+
+    private fun recordClubCatch(
+        clubQuests: ClubQuestService,
+        userId: Long,
+        scenario: ClubQuestScenario,
+        at: Instant,
+    ) {
+        val (fishId, locationId) = transaction {
+            val fishId = Fish.select { Fish.name eq scenario.fishName }.single()[Fish.id].value
+            val locationId = Locations.select { Locations.name eq scenario.locationName }.single()[Locations.id].value
+            fishId to locationId
+        }
+        transaction {
+            Catches.insert {
+                it[Catches.userId] = userId
+                it[Catches.fishId] = fishId
+                it[Catches.weight] = scenario.weight
+                it[Catches.locationId] = locationId
+                it[Catches.createdAt] = at
+                it[Catches.coins] = null
+            }
+        }
+        clubQuests.updateOnCatch(userId, scenario.fishName, scenario.rarity, at)
     }
 
     private fun verifiedPurchase(

@@ -20,7 +20,7 @@ The shipped product includes:
 - bot-side commands, auto-casting, admin tooling, and payment-support flows
 - profanity filtering, metrics, and TG Analytics support
 
-The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, club quest visibility in the quest sheet, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
+The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, weekly club-page views for ratings and club quests, club quest visibility in the quest sheet, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
 
 ## Core Game Loop
 
@@ -49,6 +49,7 @@ Several systems in the repository are clearly aimed at repeat engagement rather 
 - `tournaments` add time-boxed competition and prize tension
 - `daily ratings` provide lightweight leaderboard pressure even outside tournaments
 - `clubs` create social stickiness through weekly contribution, member roles, and shared weekly quests that pool the whole club's catches into one reward target
+- `club quest analytics` let players inspect the current or previous club week, choose a specific shared quest, and compare each member's contribution to that quest on both Telegram Mini App and Android
 - `auto-casting` extends utility for subscribed or advanced users and connects the bot to the core gameplay loop
 
 The key product decision is that the fishing mechanic is only the front door. The surrounding systems turn it into an engagement product.
