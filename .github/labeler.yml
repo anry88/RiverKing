@@ -1,0 +1,35 @@
+android:
+  - changed-files:
+      - any-glob-to-any-file:
+          - mobile/android-app/**
+          - docs/android-release.md
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/main/kotlin/**
+          - src/test/kotlin/**
+          - src/main/resources/application*.conf
+          - build.gradle.kts
+          - settings.gradle.kts
+          - gradle/**
+
+webapp:
+  - changed-files:
+      - any-glob-to-any-file:
+          - src/main/resources/webapp/**
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**
+          - README.md
+          - DOCUMENTATION.md
+          - AGENTS.md
+          - src/main/kotlin/**/README.md
+          - mobile/android-app/README.md
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**

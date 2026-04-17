@@ -36,6 +36,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.
+- GitHub release automation creates or updates a draft `develop -> main` Android release PR after pushes to `develop`, and GitHub Release notes are label-driven through `.github/release.yml`.
 
 ## First Pass For Any Agent
 
@@ -120,6 +121,7 @@ Seed data and schema compatibility matter because the Mini App and bot both depe
 - If you change the product scope or operating model, update `docs/product-overview.md`.
 - If you change package structure or runtime surfaces, update `AGENTS.md` and the nearest package README.
 - If you change a server API contract, verify compatibility across Telegram bot flows, the Telegram Mini App, and the Android client before closing the task. Prefer additive response changes over breaking field changes.
+- If you change GitHub release automation or PR labeling rules, update `docs/android-release.md`, the relevant `.github/workflows/*.yml`, and `.github/release.yml` / `.github/labeler.yml` as needed so the documented release flow stays current.
 - After each completed block of work, create a separate commit if there are changes to save so the history remains complete and incremental. Do not batch multiple finished tasks into one opaque commit.
 - Keep public claims honest: do not describe flows, admin tooling, or analytics that the code does not actually support.
 - Treat `docs/screenshots/` as showcase assets. Refresh them when the visible product surface changes in a meaningful way.

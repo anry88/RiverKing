@@ -1,0 +1,160 @@
+name: Release Pull Request
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-pr-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Android prod version
+        id: version
+        shell: bash
+        run: |
+          set -a
+          source mobile/android-app/version.properties
+          set +a
+
+          [[ -n "${RIVERKING_VERSION_CODE:-}" ]] || { echo "::error::Missing RIVERKING_VERSION_CODE in version.properties"; exit 1; }
+          [[ -n "${RIVERKING_VERSION_NAME:-}" ]] || { echo "::error::Missing RIVERKING_VERSION_NAME in version.properties"; exit 1; }
+
+          echo "version_code=$RIVERKING_VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$RIVERKING_VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Build release PR body
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/release-pr-body.md" <<EOF
+          ## Release Train
+
+          - Source branch: \`develop\`
+          - Target branch: \`main\`
+          - Android version from \`mobile/android-app/version.properties\`: \`${{ steps.version.outputs.version_name }}\` (\`${{ steps.version.outputs.version_code }}\`)
+          - Trigger: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          ## Before Merge
+
+          - [ ] Confirm \`mobile/android-app/version.properties\` already contains the version you want to ship
+          - [ ] Confirm the Android release workflow on \`main\` will have valid signing secrets and prod variables
+          - [ ] Review merged PR labels in \`develop\` so generated GitHub release notes stay readable
+          - [ ] Add any short manual summary you want to reuse when publishing the GitHub Release draft
+
+          ## Release Notes Input
+
+          - User-facing changes:
+          - Distribution / rollout notes:
+          EOF
+
+      - name: Ensure release label exists
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = {
+              name: 'release',
+              color: 'B60205',
+              description: 'Release PRs and release train changes.'
+            };
+
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label.name
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label.name,
+                color: label.color,
+                description: label.description
+              });
+            }
+
+      - name: Create or update release PR
+        uses: actions/github-script@v7
+        env:
+          RELEASE_PR_TITLE: Release Android ${{ steps.version.outputs.version_name }}
+          RELEASE_PR_BODY_PATH: ${{ runner.temp }}/release-pr-body.md
+        with:
+          script: |
+            const fs = require('fs');
+            const title = process.env.RELEASE_PR_TITLE;
+            const body = fs.readFileSync(process.env.RELEASE_PR_BODY_PATH, 'utf8');
+
+            const comparison = await github.request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              basehead: 'main...develop'
+            });
+
+            if ((comparison.data.ahead_by || 0) === 0) {
+              core.info('Develop is not ahead of main. Skipping release PR sync.');
+              return;
+            }
+
+            const existing = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              base: 'main',
+              head: `${context.repo.owner}:develop`
+            });
+
+            let pullRequest;
+
+            if (existing.data.length > 0) {
+              pullRequest = (
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: existing.data[0].number,
+                  title,
+                  body
+                })
+              ).data;
+              core.info(`Updated release PR #${pullRequest.number}`);
+            } else {
+              pullRequest = (
+                await github.rest.pulls.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  head: 'develop',
+                  base: 'main',
+                  body,
+                  draft: true
+                })
+              ).data;
+              core.info(`Created release PR #${pullRequest.number}`);
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pullRequest.number,
+              labels: ['release']
+            });

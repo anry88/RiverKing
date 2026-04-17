@@ -51,6 +51,12 @@ If Google Play App Signing is enabled, do not let Play create a different produc
 ## GitHub Release Automation
 
 The repository now includes [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml).
+It also now includes:
+
+- [`.github/workflows/release-pr.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/release-pr.yml) to create or update the `develop -> main` draft release PR after every push to `develop`
+- [`.github/workflows/pr-labeler.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/pr-labeler.yml) to apply scope labels automatically
+- [`.github/workflows/pr-required-labels.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/pr-required-labels.yml) to fail PRs that do not carry a required change-type label
+- [`.github/release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/release.yml) to shape GitHub auto-generated release notes
 
 It runs in two modes:
 
@@ -69,8 +75,56 @@ What it does:
 Current version behavior is intentional:
 
 - production builds use `RIVERKING_VERSION_NAME` and `RIVERKING_VERSION_CODE` from `mobile/android-app/version.properties`
-- if that file still says `0.1.0`, the release build will also be `0.1.0`
+- the release build uses whatever value is currently tracked in that file
 - bump `version.properties` in the release PR before merging into `main` whenever you want the shipped version to change
+
+## GitHub PR Rules
+
+After every push to `develop`, GitHub can now create or update a single draft release PR from `develop` into `main`.
+
+The release PR:
+
+- is titled `Release Android <version>`
+- reads `<version>` from `mobile/android-app/version.properties`
+- carries the `release` label automatically
+- stays reusable as the running release train until you merge or close it
+
+Regular PRs should carry:
+
+- one required change-type label: `feature`, `fix`, `docs`, `ci`, `chore`, `refactor`, `breaking-change`, or `release`
+- any scope labels that GitHub applies automatically from changed paths, such as `android`, `backend`, `webapp`, `docs`, or `ci`
+
+To make the rule actually blocking in GitHub, add the `PR Required Labels` workflow as a required status check in your branch protection rule or ruleset for `develop` and `main`.
+
+To let the release PR workflow create PRs with `GITHUB_TOKEN`, enable this repository setting:
+
+- `Settings -> Actions -> General -> Workflow permissions -> Read and write permissions`
+- `Allow GitHub Actions to create and approve pull requests`
+
+Without that repository setting, GitHub can run the workflow file but will reject the PR creation request.
+
+## GitHub Release Notes
+
+GitHub release notes now use [`.github/release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/release.yml).
+
+Generated categories are:
+
+- `Breaking Changes`
+- `Features`
+- `Fixes`
+- `Documentation`
+- `CI and Maintenance`
+- `Releases`
+- `Other Changes`
+
+The practical flow is:
+
+1. Push release-bound work into `develop`.
+2. Let GitHub update the draft `develop -> main` release PR.
+3. Keep PR labels accurate so generated release notes stay readable.
+4. Merge that PR into `main`.
+5. Let `android-release.yml` build artifacts and create the draft GitHub Release with auto-generated notes.
+6. Review the draft release body, add a short manual preface if needed, then publish.
 
 Required GitHub repository secrets:
 
