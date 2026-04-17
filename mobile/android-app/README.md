@@ -51,7 +51,11 @@ Tracked templates live at:
 - [profiles/prod.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/prod.example.properties)
 - [profiles/test.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/test.example.properties)
 
-Set these Gradle properties when building locally:
+Tracked production versioning lives in:
+
+- [version.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/version.properties)
+
+Set these Gradle properties when building locally when you need to override the defaults:
 
 - `RIVERKING_API_BASE_URL`
 - `RIVERKING_PUBLIC_WEB_URL`
@@ -99,7 +103,7 @@ Recommended workflow:
 mobile/android-app/scripts/build-android.sh --profile test qa-release-apks
 mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
 mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
-mobile/android-app/scripts/build-android.sh play-release-aab --stacktrace
+mobile/android-app/scripts/build-android.sh --profile prod play-release-aab --stacktrace
 mobile/android-app/scripts/build-android.sh direct-debug-install
 ```
 
@@ -117,12 +121,15 @@ When you build with `--profile <name>`, the script also copies the final artifac
 
 Recommended branch / version flow:
 
-- `develop` -> point the app at `--profile test` and produce frequent tester drops with `qa-release-apks`.
-- `main` -> merge from `develop` only when ready to ship, then run `--profile prod release-artifacts`.
-- Keep store `RIVERKING_VERSION_CODE` / `RIVERKING_VERSION_NAME` changes on the release path to `main`, not on every `develop` build.
-- Keep `test` builds visibly separate with a suffix such as `-test` or `-dev.<date>`. Because `qa-release-apks` stays on `com.riverking.mobile.direct` / `com.riverking.mobile.play`, its internal cadence can move independently from the canonical store package.
+- `develop` -> the script allows only `--profile test` and defaults to it if you omit `--profile`.
+- `main` -> the script allows only `--profile prod` and defaults to it if you omit `--profile`.
+- Production versioning now lives in `mobile/android-app/version.properties`. Bump that file only when you are preparing a real store release from `main`.
+- Test builds derive their version automatically from the tracked prod version plus `date + build number`. The build number comes from `RIVERKING_TEST_BUILD_NUMBER`, `GITHUB_RUN_NUMBER`, or the current git commit count.
+- Because `qa-release-apks` stays on `com.riverking.mobile.direct` / `com.riverking.mobile.play`, its internal cadence can move independently from the canonical store package.
 
 Store release targets automatically force `RIVERKING_CANONICAL_APPLICATION_ID=true`, so the shipped itch.io APK and Google Play bundle still use `com.riverking.mobile` with the configured release signing. `qa-release-apks`, Android Studio, and ad-hoc local Gradle runs stay on flavor-specific package IDs and debug signing unless you explicitly pass `-PRIVERKING_CANONICAL_APPLICATION_ID=true`.
+
+If you intentionally need a non-standard combination, use `RIVERKING_SKIP_BRANCH_PROFILE_GUARD=true` as an explicit escape hatch.
 
 For Android Studio, keep the active Build Variant on `directDebug` or `playDebug` when using the regular `Run` action. Local `release` variants remain useful for packaging validation, but they still install under the flavor package IDs rather than the canonical store package.
 

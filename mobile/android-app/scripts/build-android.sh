@@ -7,6 +7,8 @@ ANDROID_PROJECT_DIR="$REPO_ROOT/mobile/android-app"
 GRADLEW="$REPO_ROOT/gradlew"
 BUILD_PROFILE="${RIVERKING_BUILD_PROFILE:-}"
 PROFILE_FILE=""
+VERSION_FILE="$ANDROID_PROJECT_DIR/version.properties"
+CURRENT_GIT_BRANCH=""
 
 usage() {
     cat <<'EOF'
@@ -41,6 +43,8 @@ Aliases:
 
 Environment:
   RIVERKING_BUILD_PROFILE
+  RIVERKING_SKIP_BRANCH_PROFILE_GUARD
+  RIVERKING_TEST_BUILD_NUMBER
   ANDROID_SERIAL / ADB_SERIAL / RIVERKING_ANDROID_SERIAL
   RIVERKING_API_BASE_URL
   RIVERKING_PUBLIC_WEB_URL
@@ -71,6 +75,25 @@ EOF
 die() {
     echo "error: $*" >&2
     exit 1
+}
+
+resolve_git_branch() {
+    if [[ -n "${RIVERKING_GIT_BRANCH:-}" ]]; then
+        printf '%s' "$RIVERKING_GIT_BRANCH"
+        return 0
+    fi
+
+    if [[ -n "${GITHUB_HEAD_REF:-}" ]]; then
+        printf '%s' "$GITHUB_HEAD_REF"
+        return 0
+    fi
+
+    if [[ -n "${GITHUB_REF_NAME:-}" ]]; then
+        printf '%s' "$GITHUB_REF_NAME"
+        return 0
+    fi
+
+    git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true
 }
 
 has_gradle_property() {
@@ -115,6 +138,22 @@ read_property_file_value() {
     ' "$property_file"
 }
 
+tracked_version_value() {
+    local property_name="$1"
+    if [[ ! -f "$VERSION_FILE" ]]; then
+        return 1
+    fi
+
+    local version_value=""
+    version_value="$(read_property_file_value "$VERSION_FILE" "$property_name")"
+    if [[ -n "$version_value" ]]; then
+        printf '%s' "$version_value"
+        return 0
+    fi
+
+    return 1
+}
+
 resolved_property_value() {
     local property_name="$1"
     if [[ -n "${!property_name:-}" ]]; then
@@ -130,6 +169,38 @@ resolved_property_value() {
             return 0
         fi
     fi
+
+    return 1
+}
+
+resolved_version_property_value() {
+    local property_name="$1"
+    local property_value=""
+
+    property_value="$(resolved_property_value "$property_name" || true)"
+    if [[ -n "$property_value" ]]; then
+        printf '%s' "$property_value"
+        return 0
+    fi
+
+    property_value="$(tracked_version_value "$property_name" || true)"
+    if [[ -n "$property_value" ]]; then
+        printf '%s' "$property_value"
+        return 0
+    fi
+
+    local property_file
+    for property_file in \
+        "$ANDROID_PROJECT_DIR/gradle.properties" \
+        "$HOME/.gradle/gradle.properties"; do
+        if [[ -f "$property_file" ]]; then
+            property_value="$(read_property_file_value "$property_file" "$property_name")"
+            if [[ -n "$property_value" ]]; then
+                printf '%s' "$property_value"
+                return 0
+            fi
+        fi
+    done
 
     return 1
 }
@@ -213,6 +284,28 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+CURRENT_GIT_BRANCH="$(resolve_git_branch)"
+
+if [[ "${RIVERKING_SKIP_BRANCH_PROFILE_GUARD:-false}" != "true" ]]; then
+    required_profile=""
+    case "$CURRENT_GIT_BRANCH" in
+        develop)
+            required_profile="test"
+            ;;
+        main)
+            required_profile="prod"
+            ;;
+    esac
+
+    if [[ -n "$required_profile" ]]; then
+        if [[ -z "$BUILD_PROFILE" ]]; then
+            BUILD_PROFILE="$required_profile"
+        elif [[ "$BUILD_PROFILE" != "$required_profile" ]]; then
+            die "branch '$CURRENT_GIT_BRANCH' only allows --profile $required_profile; set RIVERKING_SKIP_BRANCH_PROFILE_GUARD=true to bypass this intentionally"
+        fi
+    fi
+fi
 
 if [[ -n "$BUILD_PROFILE" ]]; then
     PROFILE_FILE="$ANDROID_PROJECT_DIR/profiles/$BUILD_PROFILE.properties"
@@ -308,6 +401,35 @@ for task in "${tasks[@]}"; do
     gradle_args+=( "$task" )
 done
 
+prod_version_code="$(resolved_version_property_value RIVERKING_VERSION_CODE || true)"
+prod_version_name="$(resolved_version_property_value RIVERKING_VERSION_NAME || true)"
+
+[[ -n "$prod_version_code" ]] || die "missing RIVERKING_VERSION_CODE; define it in $VERSION_FILE or pass it explicitly"
+[[ "$prod_version_code" =~ ^[0-9]+$ ]] || die "RIVERKING_VERSION_CODE must be numeric, got '$prod_version_code'"
+[[ -n "$prod_version_name" ]] || die "missing RIVERKING_VERSION_NAME; define it in $VERSION_FILE or pass it explicitly"
+
+explicit_version_code="$(resolved_property_value RIVERKING_VERSION_CODE || true)"
+explicit_version_name="$(resolved_property_value RIVERKING_VERSION_NAME || true)"
+resolved_version_code="$prod_version_code"
+resolved_version_name="$prod_version_name"
+
+if [[ "$BUILD_PROFILE" == "test" ]]; then
+    test_build_number="${RIVERKING_TEST_BUILD_NUMBER:-${GITHUB_RUN_NUMBER:-}}"
+    if [[ -z "$test_build_number" ]]; then
+        test_build_number="$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || printf '1')"
+    fi
+    [[ "$test_build_number" =~ ^[0-9]+$ ]] || die "test build number must be numeric, got '$test_build_number'"
+    (( test_build_number > 0 )) || die "test build number must be positive"
+    (( test_build_number <= 99999 )) || die "test build number must be <= 99999"
+    (( prod_version_code <= 21474 )) || die "RIVERKING_VERSION_CODE is too large for generated test version codes"
+
+    auto_test_version_code=$(( prod_version_code * 100000 + test_build_number ))
+    auto_test_version_name="${prod_version_name}-test.$(date +%Y%m%d).${test_build_number}"
+
+    resolved_version_code="${explicit_version_code:-$auto_test_version_code}"
+    resolved_version_name="${explicit_version_name:-$auto_test_version_name}"
+fi
+
 for property_name in \
     RIVERKING_API_BASE_URL \
     RIVERKING_GOOGLE_AUTH_CLIENT_ID \
@@ -317,14 +439,15 @@ for property_name in \
     RIVERKING_SUPPORT_URL \
     RIVERKING_PRIVACY_POLICY_URL \
     RIVERKING_ACCOUNT_DELETION_URL \
-    RIVERKING_CANONICAL_APPLICATION_ID \
-    RIVERKING_VERSION_CODE \
-    RIVERKING_VERSION_NAME; do
+    RIVERKING_CANONICAL_APPLICATION_ID; do
     property_value="$(resolved_property_value "$property_name" || true)"
     if [[ -n "$property_value" ]]; then
         gradle_args+=( "-P${property_name}=$property_value" )
     fi
 done
+
+gradle_args+=( "-PRIVERKING_VERSION_CODE=$resolved_version_code" )
+gradle_args+=( "-PRIVERKING_VERSION_NAME=$resolved_version_name" )
 
 for property_name in \
     RIVERKING_SIGNING_STORE_FILE \
@@ -339,6 +462,12 @@ done
 
 if [[ "$force_noncanonical_build" == true ]]; then
     gradle_args+=( "-PRIVERKING_CANONICAL_APPLICATION_ID=false" )
+fi
+
+if [[ "$release_build" == true ]] && [[ "${RIVERKING_SKIP_BRANCH_PROFILE_GUARD:-false}" != "true" ]]; then
+    if [[ "$BUILD_PROFILE" != "prod" ]]; then
+        die "release targets require --profile prod; use qa-release-apks for test builds or set RIVERKING_SKIP_BRANCH_PROFILE_GUARD=true to bypass intentionally"
+    fi
 fi
 
 if [[ "$release_build" == true ]]; then
@@ -372,10 +501,15 @@ fi
 
 echo "==> RiverKing Android build"
 echo "target: $target"
+if [[ -n "$CURRENT_GIT_BRANCH" ]]; then
+    echo "branch: $CURRENT_GIT_BRANCH"
+fi
 if [[ -n "$BUILD_PROFILE" ]]; then
     echo "profile: $BUILD_PROFILE"
     echo "profile file: $PROFILE_FILE"
 fi
+echo "version code: $resolved_version_code"
+echo "version name: $resolved_version_name"
 api_base_url="$(resolved_property_value RIVERKING_API_BASE_URL || true)"
 if [[ -n "$api_base_url" ]]; then
     echo "api base url: $api_base_url"

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,6 +9,14 @@ plugins {
 
 val ktorVersion = "2.3.11"
 val canonicalApplicationId = "com.riverking.mobile"
+val trackedVersionProperties = Properties().apply {
+    val versionFile = rootProject.file("version.properties")
+    if (versionFile.isFile) {
+        versionFile.inputStream().use(::load)
+    }
+}
+fun trackedVersionProperty(name: String): String? =
+    trackedVersionProperties.getProperty(name)?.takeIf { it.isNotBlank() }
 // Android Studio local runs keep flavor/build-type suffixes so debug and ad-hoc release
 // installs do not collide with the signed store package on the same device.
 val useCanonicalApplicationId = (findProperty("RIVERKING_CANONICAL_APPLICATION_ID") as String?)
@@ -16,8 +26,11 @@ val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?)
     ?: "https://v759468.hosted-by-vdsina.com"
 val publicWebUrl = ((findProperty("RIVERKING_PUBLIC_WEB_URL") as String?) ?: apiBaseUrl).trimEnd('/')
 val googleClientId = (findProperty("RIVERKING_GOOGLE_AUTH_CLIENT_ID") as String?) ?: ""
-val versionCodeValue = (findProperty("RIVERKING_VERSION_CODE") as String?)?.toIntOrNull() ?: 1
-val versionNameValue = (findProperty("RIVERKING_VERSION_NAME") as String?) ?: "0.1.0"
+val versionCodeValue = ((findProperty("RIVERKING_VERSION_CODE") as String?) ?: trackedVersionProperty("RIVERKING_VERSION_CODE"))
+    ?.toIntOrNull()
+    ?: 1
+val versionNameValue = ((findProperty("RIVERKING_VERSION_NAME") as String?) ?: trackedVersionProperty("RIVERKING_VERSION_NAME"))
+    ?: "0.1.0"
 val itchProjectUrl = (findProperty("RIVERKING_ITCH_PROJECT_URL") as String?)
     ?.takeIf { it.isNotBlank() }
     ?: "$publicWebUrl/support"
