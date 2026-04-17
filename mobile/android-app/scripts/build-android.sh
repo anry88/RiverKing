@@ -558,15 +558,30 @@ done
 if [[ -n "$BUILD_PROFILE" ]]; then
     dist_dir="$ANDROID_PROJECT_DIR/dist/$BUILD_PROFILE"
     mkdir -p "$dist_dir"
+    file_version="${resolved_version_name// /-}"
+    file_version="$(printf '%s' "$file_version" | tr -cs 'A-Za-z0-9._-' '-')"
+    file_version="${file_version#-}"
+    file_version="${file_version%-}"
+    [[ -n "$file_version" ]] || file_version="$resolved_version_code"
 
     echo
     echo "Profile artifacts:"
     for artifact in "${artifacts[@]}"; do
         if [[ -f "$artifact" ]]; then
             artifact_name="$(basename "$artifact")"
-            artifact_stem="${artifact_name%.*}"
             artifact_ext="${artifact_name##*.}"
-            profile_artifact="$dist_dir/${artifact_stem}-${BUILD_PROFILE}.${artifact_ext}"
+            artifact_suffix=""
+            if [[ "${#artifacts[@]}" -gt 1 ]] && [[ "$(printf '%s\n' "${artifacts[@]}" | awk -F. -v ext="$artifact_ext" '$NF == ext { count++ } END { print count + 0 }')" -gt 1 ]]; then
+                case "$artifact" in
+                    *"/direct/"*)
+                        artifact_suffix="-direct"
+                        ;;
+                    *"/play/"*|*"/playRelease/"*)
+                        artifact_suffix="-play"
+                        ;;
+                esac
+            fi
+            profile_artifact="$dist_dir/app-riverking-${file_version}${artifact_suffix}.${artifact_ext}"
             cp "$artifact" "$profile_artifact"
             echo "  $profile_artifact"
         fi
