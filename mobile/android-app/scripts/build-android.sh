@@ -16,6 +16,7 @@ Usage:
 Targets:
   direct-debug-apk     Build direct debug APK
   direct-debug-install Build and install direct debug APK on a chosen Android device
+  qa-release-apks      Build non-canonical direct + play release APKs for internal QA
   direct-release-apk   Build direct release APK
   play-debug-apk       Build play debug APK
   play-debug-install   Build and install play debug APK on a chosen Android device
@@ -27,6 +28,9 @@ Targets:
 Aliases:
   direct-debug         -> direct-debug-apk
   install-direct-debug -> direct-debug-install
+  qa-release           -> qa-release-apks
+  internal-release     -> qa-release-apks
+  staging-release      -> qa-release-apks
   direct-release       -> direct-release-apk
   play-debug           -> play-debug-apk
   install-play-debug   -> play-debug-install
@@ -56,6 +60,7 @@ Environment:
 
 Examples:
   mobile/android-app/scripts/build-android.sh direct-debug-apk
+  mobile/android-app/scripts/build-android.sh --profile test qa-release-apks
   mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
   mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
   mobile/android-app/scripts/build-android.sh direct-debug-install
@@ -222,6 +227,7 @@ fi
 declare -a tasks=()
 declare -a artifacts=()
 release_build=false
+force_noncanonical_build=false
 install_build=false
 install_allow_downgrade=false
 
@@ -239,6 +245,14 @@ case "$target" in
         artifacts=( "$ANDROID_PROJECT_DIR/app/build/outputs/apk/direct/debug/app-direct-debug.apk" )
         install_build=true
         install_allow_downgrade=true
+        ;;
+    qa-release-apks|qa-release|internal-release|staging-release)
+        tasks=( ":app:assembleDirectRelease" ":app:assemblePlayRelease" )
+        artifacts=(
+            "$ANDROID_PROJECT_DIR/app/build/outputs/apk/direct/release/app-direct-release.apk"
+            "$ANDROID_PROJECT_DIR/app/build/outputs/apk/play/release/app-play-release.apk"
+        )
+        force_noncanonical_build=true
         ;;
     direct-release|direct-release-apk)
         tasks=( ":app:assembleDirectRelease" )
@@ -322,6 +336,10 @@ for property_name in \
         gradle_args+=( "-P${property_name}=$property_value" )
     fi
 done
+
+if [[ "$force_noncanonical_build" == true ]]; then
+    gradle_args+=( "-PRIVERKING_CANONICAL_APPLICATION_ID=false" )
+fi
 
 if [[ "$release_build" == true ]]; then
     effective_canonical_application_id="${RIVERKING_CANONICAL_APPLICATION_ID:-}"

@@ -29,6 +29,24 @@ If the package name or signing key diverges, users cannot upgrade from itch.io t
 
 If Google Play App Signing is enabled, do not let Play create a different production app-signing identity for RiverKing. The existing RiverKing release keystore must remain compatible with what users receive from Google Play, otherwise upgrades from itch.io installs will break.
 
+## Recommended Git / Release Flow
+
+- `develop` is the integration branch. Point Android builds at the test backend profile and cut frequent tester drops with:
+
+  ```bash
+  mobile/android-app/scripts/build-android.sh --profile test qa-release-apks
+  ```
+
+- `main` is the store-release branch. Merge `develop` into `main` through a PR only when you are ready to ship, then cut the production artifacts with:
+
+  ```bash
+  mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
+  ```
+
+- Keep store `RIVERKING_VERSION_CODE` / `RIVERKING_VERSION_NAME` changes on the release path to `main`, not in every `develop` build.
+- Keep test builds visually distinct with a suffix such as `-test` or `-dev.<date>`.
+- `qa-release-apks` keeps the non-canonical `com.riverking.mobile.direct` / `com.riverking.mobile.play` package IDs and uses debug signing, so internal staging builds do not collide with the shipped store app and do not consume the canonical release line.
+
 ## Backend Compliance Surface
 
 The backend now exposes the public pages required for Android distribution:
@@ -77,6 +95,12 @@ Tracked starter templates live at:
 - [prod.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/prod.example.properties)
 - [test.example.properties](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/mobile/android-app/profiles/test.example.properties)
 
+Practical versioning policy:
+
+- keep the store `RIVERKING_VERSION_CODE` and `RIVERKING_VERSION_NAME` in the production release flow
+- keep the test profile on a distinct `RIVERKING_VERSION_NAME` suffix such as `1.4.0-test`
+- if you distribute repeated QA APKs to testers, keep the test build's `versionCode` increasing inside that internal line even though it uses a separate package ID
+
 ## Build Commands
 
 From the repository root:
@@ -84,9 +108,9 @@ From the repository root:
 ```bash
 ./gradlew test
 ./gradlew -p mobile/android-app :app:assembleDirectRelease :app:bundlePlayRelease
-mobile/android-app/scripts/build-release-artifacts.sh
-mobile/android-app/scripts/build-release-artifacts-prod.sh
-mobile/android-app/scripts/build-android.sh --profile test debug-apks
+mobile/android-app/scripts/build-android.sh --profile test qa-release-apks
+mobile/android-app/scripts/build-android.sh --profile test direct-debug-install
+mobile/android-app/scripts/build-android.sh --profile prod release-artifacts
 ```
 
 Expected outputs:
@@ -97,8 +121,8 @@ Expected outputs:
 Command intent:
 
 - raw Gradle `assembleDirectRelease` / `bundlePlayRelease` without `RIVERKING_CANONICAL_APPLICATION_ID=true` stays useful for local packaging validation
-- `mobile/android-app/scripts/build-release-artifacts.sh` is the store-targeted path and now fails fast unless the canonical package ID and all `RIVERKING_SIGNING_*` values are configured
-- `mobile/android-app/scripts/build-release-artifacts-prod.sh` is the explicit production release path when you want the store build to use the `prod` backend profile
+- `mobile/android-app/scripts/build-android.sh --profile test qa-release-apks` is the simplest internal staging path for `develop` because it gives you shareable APKs against the test backend without touching the canonical store identity
+- `mobile/android-app/scripts/build-android.sh --profile prod release-artifacts` is the store-targeted path and fails fast unless the canonical package ID and all `RIVERKING_SIGNING_*` values are configured
 - profile builds also copy artifacts into `mobile/android-app/dist/<profile>/` so production and test outputs stay separate
 
 ## itch.io First Release
