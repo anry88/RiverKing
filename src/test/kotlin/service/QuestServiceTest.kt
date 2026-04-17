@@ -20,6 +20,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import util.Metrics
 
 class QuestServiceTest {
     @Test
@@ -162,6 +163,10 @@ class QuestServiceTest {
             }.count()
         }
         assertEquals(2L, recipientCount)
+
+        val metrics = Metrics.dump()
+        assertTrue(metrics.lineSequence().any { it.startsWith("quests_complete_total{period=\"club\"} ") })
+        assertTrue(metrics.lineSequence().any { it.startsWith("club_quests_complete_total{code=\"${chosenQuest.code}\"} ") })
     }
 
     private data class QuestScenario(

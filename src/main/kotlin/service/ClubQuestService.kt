@@ -556,6 +556,7 @@ class ClubQuestService {
                 it[ClubQuestRewardRecipients.createdAt] = completedAt
             }
         }
+        Metrics.counter("quests_complete_total", mapOf("period" to CLUB_PERIOD))
         Metrics.counter("club_quests_complete_total", mapOf("code" to code))
         return if (currentUserId in members) perMember else 0
     }
