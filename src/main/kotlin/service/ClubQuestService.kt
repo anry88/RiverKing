@@ -180,7 +180,7 @@ class ClubQuestService {
                 descRu = "Клубом поймайте 50 сельдей.",
                 descEn = "Catch 50 herring as a club.",
                 target = 50,
-                rewardCoins = 4000,
+                rewardCoins = 4500,
                 rule = FishCountRule(setOf("Сельдь")),
             ),
         )
