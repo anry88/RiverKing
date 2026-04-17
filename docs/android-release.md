@@ -54,16 +54,23 @@ The repository now includes [`.github/workflows/android-release.yml`](/Users/hq-
 
 It runs in two modes:
 
-- automatically after a merged PR from `develop` into `main`
+- automatically after a push to `main`
 - manually through `workflow_dispatch` when you launch the workflow on the `main` branch
 
 What it does:
 
-- checks out the merged `main` commit
+- checks out the pushed `main` commit
 - reads the prod version from `mobile/android-app/version.properties`
 - builds `--profile prod release-artifacts`
 - uploads the APK/AAB as workflow artifacts
 - creates or updates a **draft** GitHub Release with the built files attached
+- release copies use `app-riverking-<version>.apk` and `app-riverking-<version>.aab`
+
+Current version behavior is intentional:
+
+- production builds use `RIVERKING_VERSION_NAME` and `RIVERKING_VERSION_CODE` from `mobile/android-app/version.properties`
+- if that file still says `0.1.0`, the release build will also be `0.1.0`
+- bump `version.properties` in the release PR before merging into `main` whenever you want the shipped version to change
 
 Required GitHub repository secrets:
 

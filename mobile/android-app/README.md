@@ -133,10 +133,16 @@ If you intentionally need a non-standard combination, use `RIVERKING_SKIP_BRANCH
 
 GitHub automation:
 
-- [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml) builds the prod APK/AAB after a merged PR from `develop` into `main`
+- [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml) builds the prod APK/AAB after a push to `main`, so the workflow always executes from the `main` branch definition
 - the same workflow also supports manual `workflow_dispatch` on `main`
 - it uploads the release files as workflow artifacts and creates or updates a draft GitHub Release
 - in CI, the workflow generates `mobile/android-app/profiles/prod.properties` from GitHub repository variables/secrets, so the local ignored `prod.properties` file is not required on the runner
+
+Artifact naming:
+
+- profile copies under `mobile/android-app/dist/<profile>/` now use `app-riverking-<version>.<ext>`
+- the APK/AAB are distinguished by extension: `.apk` for `direct`, `.aab` for `play`
+- if a target produces two files with the same extension, the copies keep `-direct` / `-play` suffixes to avoid collisions
 
 For Android Studio, keep the active Build Variant on `directDebug` or `playDebug` when using the regular `Run` action. Local `release` variants remain useful for packaging validation, but they still install under the flavor package IDs rather than the canonical store package.
 
