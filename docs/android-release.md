@@ -48,6 +48,39 @@ If Google Play App Signing is enabled, do not let Play create a different produc
 - Test builds now derive their version automatically from the tracked prod version plus `date + build number`, so frequent QA drops do not require manual version edits.
 - `qa-release-apks` keeps the non-canonical `com.riverking.mobile.direct` / `com.riverking.mobile.play` package IDs and uses debug signing, so internal staging builds do not collide with the shipped store app and do not consume the canonical release line.
 
+## GitHub Release Automation
+
+The repository now includes [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml).
+
+It runs in two modes:
+
+- automatically after a merged PR from `develop` into `main`
+- manually through `workflow_dispatch` when you launch the workflow on the `main` branch
+
+What it does:
+
+- checks out the merged `main` commit
+- reads the prod version from `mobile/android-app/version.properties`
+- builds `--profile prod release-artifacts`
+- uploads the APK/AAB as workflow artifacts
+- creates or updates a **draft** GitHub Release with the built files attached
+
+Required GitHub repository secrets:
+
+- `RIVERKING_SIGNING_KEYSTORE_BASE64`
+- `RIVERKING_SIGNING_STORE_PASSWORD`
+- `RIVERKING_SIGNING_KEY_ALIAS`
+- `RIVERKING_SIGNING_KEY_PASSWORD`
+- `RIVERKING_GOOGLE_AUTH_CLIENT_ID` (optional, only if you want the CI build to embed Google auth)
+
+Suggested keystore preparation for the secret:
+
+```bash
+base64 < /absolute/path/to/release.keystore | tr -d '\n'
+```
+
+Use the resulting single-line string as `RIVERKING_SIGNING_KEYSTORE_BASE64`.
+
 ## Backend Compliance Surface
 
 The backend now exposes the public pages required for Android distribution:
