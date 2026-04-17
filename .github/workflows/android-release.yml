@@ -101,6 +101,10 @@ jobs:
           printf '%s' "$RIVERKING_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
 
           {
+            echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8"
+            echo "android.useAndroidX=true"
+            echo "kotlin.code.style=official"
+            echo "android.nonTransitiveRClass=true"
             echo "RIVERKING_SIGNING_STORE_FILE=$KEYSTORE_PATH"
             echo "RIVERKING_SIGNING_STORE_PASSWORD=$RIVERKING_SIGNING_STORE_PASSWORD"
             echo "RIVERKING_SIGNING_KEY_ALIAS=$RIVERKING_SIGNING_KEY_ALIAS"
