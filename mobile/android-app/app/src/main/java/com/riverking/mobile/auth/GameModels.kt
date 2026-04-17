@@ -266,9 +266,17 @@ data class QuestDto(
 )
 
 @Serializable
+data class ClubQuestSectionDto(
+    val available: Boolean = false,
+    val message: String? = null,
+    val quests: List<QuestDto> = emptyList(),
+)
+
+@Serializable
 data class QuestListDto(
     val daily: List<QuestDto>,
     val weekly: List<QuestDto>,
+    val club: ClubQuestSectionDto = ClubQuestSectionDto(),
 )
 
 @Serializable

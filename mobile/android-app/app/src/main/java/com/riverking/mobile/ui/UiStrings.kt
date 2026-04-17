@@ -103,6 +103,8 @@ data class RiverStrings(
     val chooseBait: String,
     val dailyQuestsLabel: String,
     val weeklyQuestsLabel: String,
+    val clubQuestsLabel: String,
+    val clubQuestsLockedMessage: String,
     val changeNickname: String,
     val statistics: String,
     val totalWeight: String,
@@ -221,6 +223,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Выбор наживки",
             dailyQuestsLabel = "Ежедневные",
             weeklyQuestsLabel = "Недельные",
+            clubQuestsLabel = "Клубные",
+            clubQuestsLockedMessage = "Вступи в клуб, чтобы открыть клубные задания.",
             changeNickname = "Изменить никнейм",
             statistics = "Статистика",
             totalWeight = "Общий вес",
@@ -336,6 +340,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Choose bait",
             dailyQuestsLabel = "Daily",
             weeklyQuestsLabel = "Weekly",
+            clubQuestsLabel = "Club",
+            clubQuestsLockedMessage = "Join a club to unlock club quests.",
             changeNickname = "Change nickname",
             statistics = "Statistics",
             totalWeight = "Total weight",
@@ -395,8 +401,12 @@ fun RiverStrings.rarityLabel(rarity: String?): String = when (rarity) {
 fun RiverStrings.dayLabel(day: Int): String =
     if (login == "Логин") "День $day" else "Day $day"
 
-fun RiverStrings.questRewardLabel(coins: Int): String =
-    if (login == "Логин") "Награда: $coins монет" else "Reward: $coins coins"
+fun RiverStrings.questRewardLabel(coins: Int, isClub: Boolean = false): String =
+    if (login == "Логин") {
+        if (isClub) "Награда клуба: $coins монет" else "Награда: $coins монет"
+    } else {
+        if (isClub) "Club reward: $coins coins" else "Reward: $coins coins"
+    }
 
 fun RiverStrings.catchResultTitle(): String =
     if (login == "Логин") "Улов" else "Catch"

@@ -2,8 +2,11 @@ package service
 
 import db.Catches
 import db.Fish
+import db.LocationFishWeights
 import db.Locations
 import db.QuestProgress
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -17,9 +20,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.sum
-import org.jetbrains.exposed.sql.update
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import util.Metrics
 import util.Rng
 import java.time.DayOfWeek
@@ -47,10 +50,21 @@ object QuestService {
         val completed: Boolean,
     )
 
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    data class ClubQuestSectionDTO(
+        @EncodeDefault
+        val available: Boolean = false,
+        val message: String? = null,
+        @EncodeDefault
+        val quests: List<QuestDTO> = emptyList(),
+    )
+
     @Serializable
     data class QuestListDTO(
         val daily: List<QuestDTO>,
         val weekly: List<QuestDTO>,
+        val club: ClubQuestSectionDTO = ClubQuestSectionDTO(),
     )
 
     @Serializable
@@ -64,14 +78,24 @@ object QuestService {
     private data class CatchContext(
         val fishName: String,
         val rarity: String,
-        val locationId: Long,
         val weight: Double,
+    )
+
+    private data class QuestKey(
+        val code: String,
+        val period: String,
+        val periodStart: LocalDate,
     )
 
     private data class AvailabilityContext(
         val unlockedLocations: Int,
-        val hasMountainRiver: Boolean,
-    )
+        val unlockedLocationNames: Set<String>,
+        val unlockedFishNames: Set<String>,
+    ) {
+        fun hasLocation(name: String): Boolean = name in unlockedLocationNames
+        fun hasFish(name: String): Boolean = name in unlockedFishNames
+        fun hasAnyFish(names: Set<String>): Boolean = names.any(::hasFish)
+    }
 
     private sealed class QuestRule {
         abstract fun initialProgress(userId: Long, periodStart: LocalDate): Int
@@ -87,12 +111,12 @@ object QuestService {
         }
     }
 
-    private class FishCountRule(private val fishName: String) : QuestRule() {
+    private class FishCountRule(private val fishNames: Set<String>) : QuestRule() {
         override fun initialProgress(userId: Long, periodStart: LocalDate): Int =
-            countByFish(userId, periodStart, fishName)
+            countByFishNames(userId, periodStart, fishNames)
 
         override fun updatedProgress(current: Int, context: CatchContext, userId: Long, periodStart: LocalDate): Int {
-            return if (context.fishName == fishName) current + 1 else current
+            return if (context.fishName in fishNames) current + 1 else current
         }
     }
 
@@ -141,6 +165,8 @@ object QuestService {
     }
 
     private const val MOUNTAIN_RIVER = "Горная река"
+    private val PIRANHA_FISH = linkedSetOf("Пиранья краснобрюхая", "Пиранья чёрная")
+    private val PACU_FISH = linkedSetOf("Паку чёрный", "Паку краснобрюхий", "Паку бурый")
     private val zone = ZoneId.of("Europe/Belgrade")
 
     private val definitions: List<QuestDefinition> = listOf(
@@ -206,6 +232,7 @@ object QuestService {
             fishName = "Лещ",
             nameRu = "Лещ на крючке",
             nameEn = "Bream on the Hook",
+            target = 1,
             rewardCoins = 100,
         ),
         questForFish(
@@ -214,6 +241,7 @@ object QuestService {
             fishName = "Язь",
             nameRu = "Язь дня",
             nameEn = "Ide of the Day",
+            target = 1,
             rewardCoins = 100,
         ),
         questForFish(
@@ -222,6 +250,7 @@ object QuestService {
             fishName = "Пелядь",
             nameRu = "Пелядь дня",
             nameEn = "Peled of the Day",
+            target = 1,
             rewardCoins = 100,
         ),
         questForFish(
@@ -230,6 +259,61 @@ object QuestService {
             fishName = "Линь",
             nameRu = "Линь на берегу",
             nameEn = "Tench on the Bank",
+            target = 1,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_roach_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Плотва",
+            nameRu = "Шевелись, плотва!",
+            nameEn = "Move, Roach!",
+            target = 3,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_crucian_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Карась",
+            nameRu = "Карасёвый день",
+            nameEn = "Crucian Day",
+            target = 3,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_bleak_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Уклейка",
+            nameRu = "Быстрая уклейка",
+            nameEn = "Quick Bleak",
+            target = 3,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_herring_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Сельдь",
+            nameRu = "Сельдь на волне",
+            nameEn = "Herring on the Wave",
+            target = 3,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_sardine_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Сардина",
+            nameRu = "Сардиновый заход",
+            nameEn = "Sardine Run",
+            target = 3,
+            rewardCoins = 100,
+        ),
+        questForFish(
+            code = "daily_sprat_3",
+            period = QuestPeriod.DAILY,
+            fishName = "Килька",
+            nameRu = "Килька к берегу",
+            nameEn = "Sprat to Shore",
+            target = 3,
             rewardCoins = 100,
         ),
         QuestDefinition(
@@ -298,7 +382,7 @@ object QuestService {
             target = 1,
             rewardCoins = 1500,
             rule = WeightThresholdRule(30.0, inclusive = false),
-            availability = { it.hasMountainRiver },
+            availability = { it.hasLocation(MOUNTAIN_RIVER) },
         ),
         questForFish(
             code = "weekly_pike",
@@ -306,6 +390,7 @@ object QuestService {
             fishName = "Щука",
             nameRu = "Щука недели",
             nameEn = "Pike of the Week",
+            target = 1,
             rewardCoins = 500,
         ),
         questForFish(
@@ -314,6 +399,7 @@ object QuestService {
             fishName = "Судак",
             nameRu = "Судак недели",
             nameEn = "Zander of the Week",
+            target = 1,
             rewardCoins = 500,
         ),
         questForFish(
@@ -322,7 +408,78 @@ object QuestService {
             fishName = "Карп",
             nameRu = "Карп недели",
             nameEn = "Carp of the Week",
+            target = 1,
             rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_roach_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Плотва",
+            nameRu = "Неделя плотвы",
+            nameEn = "Roach Week",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_crucian_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Карась",
+            nameRu = "Карасёвый запас",
+            nameEn = "Crucian Reserve",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_bleak_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Уклейка",
+            nameRu = "Поток уклейки",
+            nameEn = "Bleak Stream",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_herring_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Сельдь",
+            nameRu = "Неделя сельди",
+            nameEn = "Herring Week",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_sardine_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Сардина",
+            nameRu = "Сардиновая неделя",
+            nameEn = "Sardine Week",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFish(
+            code = "weekly_sprat_10",
+            period = QuestPeriod.WEEKLY,
+            fishName = "Килька",
+            nameRu = "Килька на неделю",
+            nameEn = "Sprat Week",
+            target = 10,
+            rewardCoins = 500,
+        ),
+        questForFishGroup(
+            code = "weekly_piranha_hunt",
+            fishNames = PIRANHA_FISH,
+            nameRu = "Охота на пиранью",
+            nameEn = "Piranha Hunt",
+            target = 5,
+            rewardCoins = 1000,
+        ),
+        questForFishGroup(
+            code = "weekly_pacu_hunt",
+            fishNames = PACU_FISH,
+            nameRu = "Охота на паку",
+            nameEn = "Pacu Hunt",
+            target = 5,
+            rewardCoins = 1000,
         ),
     )
 
@@ -332,6 +489,7 @@ object QuestService {
         fishName: String,
         nameRu: String,
         nameEn: String,
+        target: Int,
         rewardCoins: Int,
     ): QuestDefinition {
         val fishNameEn = I18n.fish(fishName, "en")
@@ -340,12 +498,53 @@ object QuestService {
             period = period,
             nameRu = nameRu,
             nameEn = nameEn,
-            descRu = "Поймайте рыбу: $fishName.",
-            descEn = "Catch a $fishNameEn.",
-            target = 1,
+            descRu = fishQuestDescriptionRu(setOf(fishName), target),
+            descEn = fishQuestDescriptionEn(setOf(fishNameEn), target),
+            target = target,
             rewardCoins = rewardCoins,
-            rule = FishCountRule(fishName),
+            rule = FishCountRule(setOf(fishName)),
+            availability = availabilityForFish(fishName),
         )
+    }
+
+    private fun questForFishGroup(
+        code: String,
+        fishNames: Set<String>,
+        nameRu: String,
+        nameEn: String,
+        target: Int,
+        rewardCoins: Int,
+    ): QuestDefinition {
+        val fishNamesEn = fishNames.map { I18n.fish(it, "en") }.toSet()
+        return QuestDefinition(
+            code = code,
+            period = QuestPeriod.WEEKLY,
+            nameRu = nameRu,
+            nameEn = nameEn,
+            descRu = fishQuestDescriptionRu(fishNames, target),
+            descEn = fishQuestDescriptionEn(fishNamesEn, target),
+            target = target,
+            rewardCoins = rewardCoins,
+            rule = FishCountRule(fishNames),
+            availability = { it.hasAnyFish(fishNames) },
+        )
+    }
+
+    private fun fishQuestDescriptionRu(fishNames: Set<String>, target: Int): String {
+        val names = fishNames.joinToString(", ")
+        val fishWord = if (target == 1) "рыбу" else "рыб"
+        return "Поймайте $target $fishWord: $names."
+    }
+
+    private fun fishQuestDescriptionEn(fishNames: Set<String>, target: Int): String {
+        val names = fishNames.joinToString(", ")
+        val fishWord = if (target == 1) "fish" else "fish"
+        return "Catch $target $fishWord: $names."
+    }
+
+    private fun availabilityForFish(vararg fishNames: String): (AvailabilityContext) -> Boolean {
+        val required = fishNames.toSet()
+        return { context -> context.hasAnyFish(required) }
     }
 
     private inline fun <T> inTxn(crossinline block: () -> T): T {
@@ -357,11 +556,33 @@ object QuestService {
 
     private fun availabilityContext(userId: Long): AvailabilityContext {
         val total = totalKg(userId)
-        val unlockedLocations = Locations.select { Locations.unlockKg lessEq total }.count().toInt()
-        val hasMountainRiver = Locations.select {
-            (Locations.name eq MOUNTAIN_RIVER) and (Locations.unlockKg lessEq total)
-        }.limit(1).any()
-        return AvailabilityContext(unlockedLocations, hasMountainRiver)
+        val unlockedLocations = Locations.select { Locations.unlockKg lessEq total }
+            .map {
+                it[Locations.id].value to it[Locations.name]
+            }
+        val unlockedLocationIds = unlockedLocations.map { it.first }
+        val unlockedFishNames = if (unlockedLocationIds.isEmpty()) {
+            emptySet()
+        } else {
+            (LocationFishWeights innerJoin Fish)
+                .slice(Fish.name)
+                .select { LocationFishWeights.locationId inList unlockedLocationIds }
+                .withDistinct()
+                .map { it[Fish.name] }
+                .toSet()
+        }
+        return AvailabilityContext(
+            unlockedLocations = unlockedLocations.size,
+            unlockedLocationNames = unlockedLocations.map { it.second }.toSet(),
+            unlockedFishNames = unlockedFishNames,
+        )
+    }
+
+    internal fun availableQuestCodes(userId: Long, period: QuestPeriod): Set<String> = inTxn {
+        val context = availabilityContext(userId)
+        definitions
+            .filter { it.period == period && it.availability(context) }
+            .mapTo(linkedSetOf()) { it.code }
     }
 
     private fun selectQuests(period: QuestPeriod, context: AvailabilityContext): List<QuestDefinition> {
@@ -370,12 +591,13 @@ object QuestService {
         return available.shuffled(Rng.fast()).take(3)
     }
 
-    fun ensureCurrentQuests(userId: Long) = inTxn {
+    private fun ensureAssignedQuests(userId: Long): Set<QuestKey> = inTxn {
+        val created = mutableSetOf<QuestKey>()
         val context = availabilityContext(userId)
         QuestPeriod.values().forEach { period ->
             val start = periodStart(period)
             val exists = QuestProgress
-                .slice(QuestProgress.id)
+                .slice(QuestProgress.code)
                 .select {
                     (QuestProgress.userId eq userId) and
                         (QuestProgress.period eq period.code) and
@@ -385,6 +607,7 @@ object QuestService {
                 .any()
             if (!exists) {
                 val selected = selectQuests(period, context)
+                val now = Instant.now()
                 selected.forEach { def ->
                     val initial = def.initialProgress(userId, start)
                     QuestProgress.insert {
@@ -395,20 +618,31 @@ object QuestService {
                         it[QuestProgress.progress] = initial
                         it[QuestProgress.target] = def.target
                         it[QuestProgress.rewardCoins] = def.rewardCoins
-                        it[QuestProgress.updatedAt] = Instant.now()
+                        it[QuestProgress.completedAt] = if (initial >= def.target) now else null
+                        it[QuestProgress.updatedAt] = now
                     }
+                    created += QuestKey(def.code, def.period.code, start)
                 }
             }
         }
+        created
     }
 
-    fun list(userId: Long, lang: String): QuestListDTO = inTxn {
-        ensureCurrentQuests(userId)
+    fun ensureCurrentQuests(userId: Long) {
+        ensureAssignedQuests(userId)
+    }
+
+    fun list(
+        userId: Long,
+        lang: String,
+        club: ClubQuestSectionDTO = ClubQuestSectionDTO(),
+    ): QuestListDTO = inTxn {
+        ensureAssignedQuests(userId)
         val dailyStart = periodStart(QuestPeriod.DAILY)
         val weeklyStart = periodStart(QuestPeriod.WEEKLY)
         val daily = listForPeriod(userId, QuestPeriod.DAILY, dailyStart, lang)
         val weekly = listForPeriod(userId, QuestPeriod.WEEKLY, weeklyStart, lang)
-        QuestListDTO(daily, weekly)
+        QuestListDTO(daily, weekly, club)
     }
 
     private fun listForPeriod(
@@ -446,11 +680,28 @@ object QuestService {
         locationId: Long,
         weight: Double,
     ): List<QuestUpdate> = inTxn {
-        ensureCurrentQuests(userId)
-        val context = CatchContext(fishName, rarity, locationId, weight)
         val now = Instant.now()
         val dailyStart = periodStart(QuestPeriod.DAILY)
         val weeklyStart = periodStart(QuestPeriod.WEEKLY)
+        val existingKeys = QuestProgress
+            .slice(QuestProgress.code, QuestProgress.period, QuestProgress.periodStart)
+            .select {
+                (QuestProgress.userId eq userId) and
+                    (
+                        ((QuestProgress.period eq QuestPeriod.DAILY.code) and (QuestProgress.periodStart eq dailyStart)) or
+                            ((QuestProgress.period eq QuestPeriod.WEEKLY.code) and (QuestProgress.periodStart eq weeklyStart))
+                        )
+            }
+            .map {
+                QuestKey(
+                    code = it[QuestProgress.code],
+                    period = it[QuestProgress.period],
+                    periodStart = it[QuestProgress.periodStart],
+                )
+            }
+            .toSet()
+        val createdKeys = ensureAssignedQuests(userId)
+        val context = CatchContext(fishName, rarity, weight)
         val rows = QuestProgress.select {
             (QuestProgress.userId eq userId) and
                 (
@@ -463,10 +714,20 @@ object QuestService {
 
         rows.forEach { row ->
             val code = row[QuestProgress.code]
+            val period = row[QuestProgress.period]
+            val start = row[QuestProgress.periodStart]
             val def = definitionFor(code) ?: return@forEach
-            val current = row[QuestProgress.progress]
-            val updated = def.updatedProgress(current, context, userId, row[QuestProgress.periodStart])
+            val key = QuestKey(code, period, start)
             val completedAt = row[QuestProgress.completedAt]
+            if (key in createdKeys && key !in existingKeys) {
+                if (completedAt != null) {
+                    completions += QuestUpdate(code = def.code, period = def.period.code, rewardCoins = def.rewardCoins)
+                }
+                return@forEach
+            }
+
+            val current = row[QuestProgress.progress]
+            val updated = def.updatedProgress(current, context, userId, start)
             if (updated != current) {
                 QuestProgress.update({ QuestProgress.id eq row[QuestProgress.id].value }) {
                     it[QuestProgress.progress] = updated
@@ -474,18 +735,16 @@ object QuestService {
                 }
             }
             if (updated >= def.target && completedAt == null) {
-                QuestProgress.update({ QuestProgress.id eq row[QuestProgress.id].value }) {
+                val marked = QuestProgress.update({
+                    (QuestProgress.id eq row[QuestProgress.id].value) and QuestProgress.completedAt.isNull()
+                }) {
                     it[QuestProgress.completedAt] = now
                     it[QuestProgress.updatedAt] = now
                 }
-                Metrics.counter("quests_complete_total", mapOf("period" to def.period.code))
-                completions.add(
-                    QuestUpdate(
-                        code = def.code,
-                        period = def.period.code,
-                        rewardCoins = def.rewardCoins,
-                    )
-                )
+                if (marked > 0) {
+                    Metrics.counter("quests_complete_total", mapOf("period" to def.period.code))
+                    completions += QuestUpdate(code = def.code, period = def.period.code, rewardCoins = def.rewardCoins)
+                }
             }
         }
 
@@ -549,11 +808,11 @@ object QuestService {
             ?.toInt() ?: 0
     }
 
-    private fun countByFish(userId: Long, periodStart: LocalDate, fishName: String): Int {
+    private fun countByFishNames(userId: Long, periodStart: LocalDate, fishNames: Set<String>): Int {
         val countExpr = Catches.id.count()
         return (Catches innerJoin Fish)
             .slice(countExpr)
-            .select { baseCatchCondition(userId, periodStart) and (Fish.name eq fishName) }
+            .select { baseCatchCondition(userId, periodStart) and (Fish.name inList fishNames.toList()) }
             .single()[countExpr]
             ?.toInt() ?: 0
     }

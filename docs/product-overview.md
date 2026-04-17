@@ -13,14 +13,14 @@ The shipped product includes:
 - interactive fishing flow with cast, hook, catch, reaction timing, and catch presentation
 - progression through locations, rods, lure inventory, and fish discovery
 - tournaments with multiple ranking metrics and prize distribution
-- daily rewards, daily and weekly quests, achievements, and daily ratings
-- fishing clubs with recruiting, roles, weekly contribution tracking, and chat feed
+- daily rewards, daily and weekly quests, weekly club quests, achievements, and daily ratings
+- fishing clubs with recruiting, roles, weekly contribution tracking, shared weekly quests, and chat feed
 - referral links and referral rewards
 - shop flows with Telegram Stars purchases and in-game coin purchases
 - bot-side commands, auto-casting, admin tooling, and payment-support flows
 - profanity filtering, metrics, and TG Analytics support
 
-The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
+The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, club quest visibility in the quest sheet, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
 
 ## Core Game Loop
 
@@ -44,11 +44,11 @@ That loop is intentionally short, but it feeds larger systems that create reason
 Several systems in the repository are clearly aimed at repeat engagement rather than one-off play:
 
 - `daily rewards` create a predictable return path with streak behavior
-- `daily and weekly quests` create short and medium-term goals
+- `daily and weekly quests` create short and medium-term goals and are filtered by what fish the player can actually access
 - `achievements` convert collection and milestone play into visible progression
 - `tournaments` add time-boxed competition and prize tension
 - `daily ratings` provide lightweight leaderboard pressure even outside tournaments
-- `clubs` create social stickiness through weekly contribution and member roles
+- `clubs` create social stickiness through weekly contribution, member roles, and shared weekly quests that pool the whole club's catches into one reward target
 - `auto-casting` extends utility for subscribed or advanced users and connects the bot to the core gameplay loop
 
 The key product decision is that the fishing mechanic is only the front door. The surrounding systems turn it into an engagement product.
@@ -70,7 +70,7 @@ This matters from a product-engineering perspective because monetization is not 
 - `Telegram client`: launches the Mini App and bot commands
 - `Android client`: signs in with Google or password auth and consumes the same gameplay backend
 - `Mini App frontend`: shipped from `src/main/resources/webapp`
-- `Ktor backend`: handles auth, profile, fishing actions, guide, ratings, shop, tournaments, clubs, quests, referrals, and mobile sessions
+- `Ktor backend`: handles auth, profile, fishing actions, guide, ratings, shop, tournaments, clubs, personal quests, club quests, referrals, and mobile sessions
 - `Telegram bot layer`: handles commands, inline flows, admin actions, payment-support actions, and auto-casting
 - `Exposed + SQLite`: store users, catches, inventories, tournaments, prizes, quests, achievements, clubs, referrals, and payments
 - `scheduler`: distributes rewards, restores state, runs auto-fishing, and keeps periodic systems moving

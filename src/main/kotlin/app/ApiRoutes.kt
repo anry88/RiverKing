@@ -30,6 +30,7 @@ import service.AchievementService
 import service.AchievementRewardDTO
 import service.QuestService
 import service.ClubService
+import service.ClubQuestService
 import service.PrizeSource
 import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
@@ -61,6 +62,7 @@ fun Application.apiRoutes(
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
+    val clubQuests = ClubQuestService()
     val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val bot = TelegramBot(env.botToken)
     val accountDeletion = AccountDeletionService(clubs)
@@ -761,7 +763,7 @@ fun Application.apiRoutes(
         get("/api/quests") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val list = QuestService.list(uid, language)
+            val list = QuestService.list(uid, language, club = clubQuests.list(uid, language))
             Metrics.counter("quests_view_total", mapOf("source" to "app"))
             call.respond(list)
         }

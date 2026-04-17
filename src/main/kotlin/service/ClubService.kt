@@ -4,6 +4,8 @@ import db.Catches
 import db.Clubs
 import db.ClubChatMessages
 import db.ClubMembers
+import db.ClubQuestProgress
+import db.ClubQuestRewardRecipients
 import db.ClubWeeklyContributions
 import db.ClubWeeklySnapshots
 import db.ClubWeeklyRewards
@@ -218,6 +220,8 @@ class ClubService {
             if (role == ROLE_PRESIDENT) {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
+                    ClubQuestRewardRecipients.deleteWhere { ClubQuestRewardRecipients.clubId eq clubId }
+                    ClubQuestProgress.deleteWhere { ClubQuestProgress.clubId eq clubId }
                     ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
                     ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.clubId eq clubId }
                     ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }

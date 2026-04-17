@@ -1,6 +1,6 @@
 # RiverKing
 
-RiverKing is a Telegram-first fishing game with a Kotlin/Ktor backend, a shipped Telegram Mini App frontend, Telegram bot flows, progression systems, tournaments, quests, clubs, referrals, and Stars-based monetization. The repository now also includes an Android client subtree that reuses the same backend and player data model.
+RiverKing is a Telegram-first fishing game with a Kotlin/Ktor backend, a shipped Telegram Mini App frontend, Telegram bot flows, progression systems, tournaments, personal and club quests, clubs, referrals, and Stars-based monetization. The repository now also includes an Android client subtree that reuses the same backend and player data model.
 
 It is built as a working product rather than a thin game prototype: the repository already includes session-authenticated Mini App flows, real gameplay systems, persistent progression, background jobs, operational metrics, moderation rules, and admin-side bot tooling.
 
@@ -8,6 +8,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 
 - Delivers a Telegram Mini App fishing experience with cast, hook, and catch gameplay.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
+- Ships daily and weekly personal quests plus weekly club quests with pooled progress and split coin rewards for current club members.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
 - Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
 
@@ -76,8 +77,8 @@ flowchart LR
 
 - `Fishing loop`: cast -> hook -> catch with timing, catch presentation, and recent catch history.
 - `Progression`: locations, rods, lures, fish discovery, unlocks, and recommendation logic.
-- `Retention`: daily rewards, quests, achievements, daily ratings, and tournament participation.
-- `Social loops`: clubs, member roles, weekly contribution boards, and club chat feed.
+- `Retention`: daily rewards, location-aware quest pools, achievements, daily ratings, and tournament participation.
+- `Social loops`: clubs, member roles, weekly contribution boards, shared club quests, and club chat feed.
 - `Economy`: Stars purchases, coin purchases, referral rewards, and prize distribution.
 - `Operations`: profanity filtering, metrics, TG Analytics hooks, startup recovery, and scheduled background jobs.
 - `Bot automation`: command flows, auto-casting, admin tournament tooling, and payment-support operations.

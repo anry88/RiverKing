@@ -88,7 +88,7 @@ function App(){
   const [claimingAchievement, setClaimingAchievement] = React.useState(null);
   const [achievementReward, setAchievementReward] = React.useState(null);
   const [questsOpen, setQuestsOpen] = React.useState(false);
-  const [quests, setQuests] = React.useState({ daily: [], weekly: [] });
+  const [quests, setQuests] = React.useState({ daily: [], weekly: [], club: { available: false, message: null, quests: [] } });
   const [questsLoading, setQuestsLoading] = React.useState(false);
   const [questsError, setQuestsError] = React.useState(null);
   const analyticsPrevTabRef = React.useRef(tab);

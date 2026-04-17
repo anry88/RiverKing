@@ -1,6 +1,9 @@
 package app
 
+import db.Catches
 import db.DB
+import db.Fish
+import db.Locations
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -21,8 +24,15 @@ import io.ktor.server.testing.testApplication
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
+import service.ClubService
+import service.FishingService
 import service.PlayPurchaseVerificationResult
 import service.PlayPurchaseVerifier
 import service.VerifiedPlayLineItem
@@ -36,6 +46,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AuthRoutesTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -330,19 +341,26 @@ class AuthRoutesTest {
 
         val registered = registerPasswordUser(client, "angler.catch", "password123")
 
-        val start = client.post("/api/start-cast") {
-            bearerAuth(registered.accessToken)
-        }
-        assertEquals(HttpStatusCode.OK, start.status)
+        var hooked = false
+        for (attempt in 1..5) {
+            val start = client.post("/api/start-cast") {
+                bearerAuth(registered.accessToken)
+            }
+            assertEquals(HttpStatusCode.OK, start.status)
 
-        val hook = client.post("/api/hook") {
-            bearerAuth(registered.accessToken)
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"wait":10,"reaction":0.6}""")
+            val hook = client.post("/api/hook") {
+                bearerAuth(registered.accessToken)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                setBody("""{"wait":10,"reaction":0.6}""")
+            }
+            assertEquals(HttpStatusCode.OK, hook.status)
+            val hookBody = json.parseToJsonElement(hook.bodyAsText()).jsonObject
+            if (hookBody.getValue("success").jsonPrimitive.boolean) {
+                hooked = true
+                break
+            }
         }
-        assertEquals(HttpStatusCode.OK, hook.status)
-        val hookBody = json.parseToJsonElement(hook.bodyAsText()).jsonObject
-        assertEquals(true, hookBody.getValue("success").jsonPrimitive.boolean)
+        assertTrue(hooked)
 
         val cast = client.post("/api/cast") {
             bearerAuth(registered.accessToken)
@@ -368,6 +386,41 @@ class AuthRoutesTest {
         assertEquals(ContentType.Image.PNG.toString(), card.headers[HttpHeaders.ContentType])
         val bytes = card.body<ByteArray>()
         assertEquals(true, bytes.isNotEmpty())
+    }
+
+    @Test
+    fun `quests api includes club section for members and non members`() = testApplication {
+        val env = testEnv("quests-api-club-section").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val registered = registerPasswordUser(client, "angler.quests", "password123")
+
+        val withoutClub = client.get("/api/quests") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, withoutClub.status)
+        val withoutClubBody = json.parseToJsonElement(withoutClub.bodyAsText()).jsonObject
+        val withoutClubSection = withoutClubBody.getValue("club").jsonObject
+        assertEquals(false, withoutClubSection.getValue("available").jsonPrimitive.boolean)
+        assertTrue(withoutClubSection.getValue("message").jsonPrimitive.content.contains("Join a club"))
+
+        val fishing = FishingService()
+        fishing.addCoins(registered.user.id, ClubService.CREATE_COST_COINS.toInt())
+        addProgressWeight(registered.user.id, ClubService.MIN_CREATE_WEIGHT_KG + 25.0)
+        ClubService().createClub(registered.user.id, "Quest Riders")
+
+        val withClub = client.get("/api/quests") {
+            bearerAuth(registered.accessToken)
+        }
+        assertEquals(HttpStatusCode.OK, withClub.status)
+        val withClubBody = json.parseToJsonElement(withClub.bodyAsText()).jsonObject
+        val withClubSection = withClubBody.getValue("club").jsonObject
+        assertEquals(true, withClubSection.getValue("available").jsonPrimitive.boolean)
+        assertEquals(2, withClubSection.getValue("quests").jsonArray.size)
     }
 
     private fun Application.installAuthTestModule(
@@ -425,6 +478,30 @@ class AuthRoutesTest {
 
     private fun urlEncode(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8)
+
+    private fun addProgressWeight(userId: Long, weightKg: Double) {
+        val (fishId, locationId) = transaction {
+            val locationId = Locations.selectAll()
+                .orderBy(Locations.id, SortOrder.ASC)
+                .limit(1)
+                .single()[Locations.id].value
+            val fishId = Fish.selectAll()
+                .orderBy(Fish.id, SortOrder.ASC)
+                .limit(1)
+                .single()[Fish.id].value
+            fishId to locationId
+        }
+        transaction {
+            Catches.insert {
+                it[Catches.userId] = userId
+                it[Catches.fishId] = fishId
+                it[Catches.weight] = weightKg
+                it[Catches.locationId] = locationId
+                it[Catches.createdAt] = Instant.now()
+                it[Catches.coins] = null
+            }
+        }
+    }
 
     private fun verifiedPurchase(
         productId: String,

@@ -36,6 +36,7 @@ import service.COIN_PRIZE_ID
 import service.AchievementService
 import service.QuestService
 import service.ClubService
+import service.ClubQuestService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -184,6 +185,7 @@ fun Application.botRoutes(env: Env) {
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
+    val clubQuests = ClubQuestService()
     val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
@@ -1363,9 +1365,9 @@ fun Application.botRoutes(env: Env) {
                 lang: String,
                 replyToMessageId: Long? = null,
             ) {
-                val quests = QuestService.list(uid, lang)
+                val quests = QuestService.list(uid, lang, club = clubQuests.list(uid, lang))
                 val header = if (lang == "ru") "Задания" else "Quests"
-                fun formatSection(title: String, items: List<QuestService.QuestDTO>): String {
+                fun formatSection(title: String, items: List<QuestService.QuestDTO>, isClub: Boolean = false): String {
                     if (items.isEmpty()) {
                         val emptyText = if (lang == "ru") "Нет активных заданий." else "No active quests."
                         return "$title\n$emptyText"
@@ -1378,10 +1380,12 @@ fun Application.botRoutes(env: Env) {
                             "Progress ${quest.progress}/${quest.target}"
                         }
                         val reward = if (lang == "ru") {
-                            "Награда: ${quest.rewardCoins} монет"
+                            if (isClub) "Общая награда клуба: ${quest.rewardCoins} монет"
+                            else "Награда: ${quest.rewardCoins} монет"
                         } else {
                             val suffix = if (quest.rewardCoins == 1) "" else "s"
-                            "Reward: ${quest.rewardCoins} coin$suffix"
+                            if (isClub) "Club reward: ${quest.rewardCoins} coin$suffix"
+                            else "Reward: ${quest.rewardCoins} coin$suffix"
                         }
                         "$status ${quest.name}\n${quest.description}\n$progress\n$reward"
                     }
@@ -1389,12 +1393,27 @@ fun Application.botRoutes(env: Env) {
                 }
                 val dailyTitle = if (lang == "ru") "Ежедневные задания" else "Daily quests"
                 val weeklyTitle = if (lang == "ru") "Еженедельные задания" else "Weekly quests"
+                val clubTitle = if (lang == "ru") "Клубные задания" else "Club quests"
                 val text = buildString {
                     append(header)
                     append(":\n\n")
                     append(formatSection(dailyTitle, quests.daily))
                     append("\n\n")
                     append(formatSection(weeklyTitle, quests.weekly))
+                    append("\n\n")
+                    if (quests.club.available) {
+                        append(formatSection(clubTitle, quests.club.quests, isClub = true))
+                    } else {
+                        append(clubTitle)
+                        append("\n")
+                        append(
+                            quests.club.message ?: if (lang == "ru") {
+                                "Вступи в клуб, чтобы открыть клубные задания."
+                            } else {
+                                "Join a club to unlock club quests."
+                            }
+                        )
+                    }
                 }
                 trySend(chatId, text, replyToMessageId = replyToMessageId)
             }

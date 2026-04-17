@@ -27,5 +27,6 @@ Manages the player lifecycle and fishing process.
 - **ReferralService** — creates and applies referral tokens: `generateLink`, `currentLink`, `invited`, `applyToken`; `onPurchase` awards the referrer after purchases.
 - **PrizeService** (supporting types) — `UserPrize` and `PrizeSpec` DTOs are reused by `/api/tournament*` routes.
 - **ClubService** — manages fishing clubs: `createClub`, `joinClub`, `searchClubs`, `clubDetails`, weekly contribution tracking (from daily rating rewards), and weekly club reward distribution.
+- **ClubQuestService** — manages shared weekly club quests: assigns `2` quests from the club pool each week, tracks pooled catch progress for the whole club, and splits completion rewards across the active roster at completion time.
 - **AchievementService** — tracks the full achievement catalog and player progress: rarity ladders, koi collection, location completion, traveler/trophy milestones, tournament wins, and daily-rating stars. Rewards and claim status are persisted in `AchievementProgress` and surfaced through the API and bot.
-- **QuestService** — assigns daily/weekly quests, tracks progress based on catches, awards coin rewards on completion, and powers the `/api/quests` endpoint plus the `/quests` bot command.
+- **QuestService** — assigns daily/weekly personal quests, filters fish-specific quests by actually unlocked fish via `LocationFishWeights`, tracks progress based on catches, awards coin rewards on completion, and powers the `daily` / `weekly` parts of `/api/quests` plus the `/quests` bot command.

@@ -33,6 +33,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, and a nested Android client project.
 - Android distribution contract: `direct` and `play` share one canonical `applicationId`, one monotonic `versionCode` line, and should be signed with the same release key so users can move from itch.io APK installs to Google Play without reinstalling.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
+- Quests: `GET /api/quests` now returns personal `daily` / `weekly` lists plus a `club` section; club quests are shared across the whole club and are rendered in the bot, Mini App, and Android client.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.
@@ -94,7 +95,7 @@ You usually need to touch:
 You usually need to touch:
 
 - `src/main/kotlin/service/FishingService.kt`
-- a specialized service such as `TournamentService.kt`, `QuestService.kt`, `ClubService.kt`, `AchievementService.kt`, or `ReferralService.kt`
+- a specialized service such as `TournamentService.kt`, `QuestService.kt`, `ClubQuestService.kt`, `ClubService.kt`, `AchievementService.kt`, or `ReferralService.kt`
 - possibly `src/main/kotlin/db/Tables.kt`
 
 ### Bot or admin flows

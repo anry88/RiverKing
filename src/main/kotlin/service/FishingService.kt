@@ -59,6 +59,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
     private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
     private val clubs = ClubService()
+    private val clubQuests = ClubQuestService()
 
     @Serializable
     data class StartCastResult(
@@ -1889,6 +1890,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             }
         }
 
+        clubQuests.updateOnCatch(
+            userId = userId,
+            fishName = fishName,
+            rarity = rarity,
+            caughtAt = caughtAt,
+        )
+        val totalCoinsFinal = Users.select { Users.id eq userId }.single()[Users.coins]
+
         finish(
             true,
             CatchDTO(
@@ -1905,7 +1914,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             unlockedLocations = unlockedLocations,
             unlockedRods = unlockedRods,
             coinsAwarded = coinsAwarded,
-            totalCoins = totalCoinsAfter + questRewardCoins,
+            totalCoins = totalCoinsFinal,
             todayCoins = todayCoinsAfter,
             achievements = achievements,
             questUpdates = questUpdates,

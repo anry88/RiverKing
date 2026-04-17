@@ -1201,6 +1201,8 @@ private fun FishingScreen(
                 QuestPreviewCard(
                     strings = strings,
                     quests = state.guide.quests,
+                    isClubMember = state.club.club != null,
+                    clubMembershipKnown = state.club.loaded,
                     onOpenQuests = { activeSheet = FishingSheetType.QUESTS },
                 )
             } else {
@@ -1277,6 +1279,8 @@ private fun FishingScreen(
             strings = strings,
             quests = state.guide.quests,
             loading = state.guide.loading,
+            isClubMember = state.club.club != null,
+            clubMembershipKnown = state.club.loaded,
             onDismiss = { activeSheet = null },
             onReload = { onLoadGuide(true) },
         )
@@ -3205,17 +3209,44 @@ private fun FishingRewardsCard(
 private fun QuestPreviewCard(
     strings: RiverStrings,
     quests: QuestListDto,
+    isClubMember: Boolean,
+    clubMembershipKnown: Boolean,
     onOpenQuests: () -> Unit,
 ) {
-    val activeQuests = quests.daily.take(2) + quests.weekly.take(2)
     SectionCard(strings.quests) {
-        if (activeQuests.isEmpty()) {
-            EmptyStatePanel(strings.noData)
-        } else {
-            activeQuests.forEachIndexed { index, quest ->
-                if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+        val clubFallbackMessage = when {
+            quests.club.message != null -> quests.club.message
+            clubMembershipKnown && !isClubMember -> strings.clubQuestsLockedMessage
+            else -> strings.noData
+        }
+        val previewSections = listOf(
+            strings.dailyQuestsLabel to quests.daily.take(2),
+            strings.weeklyQuestsLabel to quests.weekly.take(2),
+            strings.clubQuestsLabel to quests.club.quests.take(2),
+        )
+        var renderedAnySection = false
+        previewSections.forEachIndexed { index, (title, items) ->
+            if (items.isEmpty()) return@forEachIndexed
+            renderedAnySection = true
+            if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            items.forEachIndexed { itemIndex, quest ->
+                if (itemIndex > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                 QuestSummaryRow(strings = strings, quest = quest)
             }
+        }
+        if (!quests.club.available) {
+            renderedAnySection = true
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(strings.clubQuestsLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+            Text(
+                clubFallbackMessage,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (!renderedAnySection) {
+            EmptyStatePanel(strings.noData)
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = onOpenQuests, modifier = Modifier.fillMaxWidth()) {
@@ -3243,14 +3274,18 @@ private fun QuestSummaryRow(
                     Text(quest.name, fontWeight = FontWeight.SemiBold)
                 }
                 Text(
-                    "${quest.progress}/${quest.target} • ${strings.questRewardLabel(quest.rewardCoins)}",
+                    "${quest.progress}/${quest.target} • ${strings.questRewardLabel(quest.rewardCoins, isClub = quest.period == "club")}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
             if (showPeriod) {
                 Text(
-                    if (quest.period == "weekly") strings.weeklyQuestsLabel else strings.dailyQuestsLabel,
+                    when (quest.period) {
+                        "weekly" -> strings.weeklyQuestsLabel
+                        "club" -> strings.clubQuestsLabel
+                        else -> strings.dailyQuestsLabel
+                    },
                     color = MaterialTheme.colorScheme.secondary,
                     style = MaterialTheme.typography.labelSmall,
                 )
@@ -3414,6 +3449,8 @@ private fun QuestSheet(
     strings: RiverStrings,
     quests: QuestListDto?,
     loading: Boolean,
+    isClubMember: Boolean,
+    clubMembershipKnown: Boolean,
     onDismiss: () -> Unit,
     onReload: () -> Unit,
 ) {
@@ -3444,8 +3481,18 @@ private fun QuestSheet(
                     Text(strings.refresh)
                 }
             } else {
+                val clubFallbackMessage = when {
+                    quests.club.message != null -> quests.club.message
+                    clubMembershipKnown && !isClubMember -> strings.clubQuestsLockedMessage
+                    else -> strings.noData
+                }
                 QuestSection(strings.dailyQuestsLabel, quests.daily, strings)
                 QuestSection(strings.weeklyQuestsLabel, quests.weekly, strings)
+                if (quests.club.available) {
+                    QuestSection(strings.clubQuestsLabel, quests.club.quests, strings)
+                } else {
+                    QuestInfoSection(strings.clubQuestsLabel, clubFallbackMessage)
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -3479,6 +3526,19 @@ private fun QuestSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuestInfoSection(
+    title: String,
+    message: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        InfoCard {
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

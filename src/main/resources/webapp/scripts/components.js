@@ -144,7 +144,7 @@ function LocationsDrawer({open, onClose, me, onSelect}){
   );
 }
 
-function QuestCard({quest}){
+function QuestCard({quest, isClub = false}){
   if(!quest) return null;
   const progress = Math.max(0, Number(quest.progress) || 0);
   const target = Math.max(1, Number(quest.target) || 1);
@@ -165,7 +165,9 @@ function QuestCard({quest}){
           style={{width:`${Math.round(ratio*100)}%`}}
         ></div>
       </div>
-      <div className="text-xs mt-2 text-yellow-300">{t('questRewardCoins', quest.rewardCoins)}</div>
+      <div className="text-xs mt-2 text-yellow-300">
+        {isClub ? t('clubQuestRewardCoins', quest.rewardCoins) : t('questRewardCoins', quest.rewardCoins)}
+      </div>
     </div>
   );
 }
@@ -173,6 +175,8 @@ function QuestCard({quest}){
 function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
   const daily = quests?.daily || [];
   const weekly = quests?.weekly || [];
+  const club = quests?.club || { available:false, message:null, quests:[] };
+  const clubQuests = club?.quests || [];
   return (
     <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
@@ -213,6 +217,20 @@ function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
               ) : (
                 <div className="space-y-2">
                   {weekly.map(q => <QuestCard key={q.code} quest={q} />)}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-2">{t('clubQuests')}</div>
+              {!club.available ? (
+                <div className="text-sm opacity-70 glass rounded-xl px-3 py-3">
+                  {club.message || t('clubQuestsLocked')}
+                </div>
+              ) : clubQuests.length === 0 ? (
+                <div className="text-sm opacity-60">{t('questsEmpty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {clubQuests.map(q => <QuestCard key={q.code} quest={q} isClub />)}
                 </div>
               )}
             </div>
