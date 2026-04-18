@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -1462,12 +1463,6 @@ private fun RatingsScreen(
         }
         item {
             SectionCard(strings.ratings) {
-                Text(
-                    text = if (strings.login == "Логин") "Режим" else "Mode",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
                 SegmentedSelectionBar(
                     items = RatingsMode.entries.toList(),
                     selected = ratings.mode,
@@ -1478,12 +1473,6 @@ private fun RatingsScreen(
                     },
                 )
                 Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = if (strings.login == "Логин") "Сортировка" else "Sort",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
                 SegmentedSelectionBar(
                     items = RatingsOrder.entries.toList(),
                     selected = ratings.order,
@@ -4519,7 +4508,7 @@ private fun ShopPackageRow(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             AsyncImage(
                 model = pack.rodCode?.let(::rodImageAsset) ?: shopIconAsset(pack.id),
@@ -4530,7 +4519,7 @@ private fun ShopPackageRow(
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
                     text = pack.name,
@@ -4549,76 +4538,81 @@ private fun ShopPackageRow(
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
-            }
-            Column(
-                modifier = Modifier.width(104.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (pack.originalPrice != null) {
-                    Text(
-                        text = "${pack.originalPrice}★",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-                when {
-                    canBuyCoins -> {
-                        Button(
-                            onClick = onBuyWithCoins,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 36.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    Column(
+                        modifier = Modifier.widthIn(min = 96.dp, max = 104.dp),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (pack.originalPrice != null) {
                             Text(
-                                text = "${pack.coinPrice} 🪙",
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis,
+                                text = "${pack.originalPrice}★",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
                             )
                         }
-                    }
-                    paidUnavailableInDirect -> {
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 36.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = strings.unavailable,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    else -> {
-                        Button(
-                            onClick = onPlayPurchase,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 36.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = playPrice ?: "Google Play",
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                        when {
+                            canBuyCoins -> {
+                                Button(
+                                    onClick = onBuyWithCoins,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 36.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        text = "${pack.coinPrice} 🪙",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            paidUnavailableInDirect -> {
+                                OutlinedButton(
+                                    onClick = {},
+                                    enabled = false,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 36.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        text = strings.unavailable,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            else -> {
+                                Button(
+                                    onClick = onPlayPurchase,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 36.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                                ) {
+                                    Text(
+                                        text = playPrice ?: "Google Play",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
