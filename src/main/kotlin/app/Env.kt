@@ -6,6 +6,7 @@ data class Env(
     val botToken: String,
     val telegramWebhookSecret: String,
     val publicBaseUrl: String,
+    val itchProjectUrl: String,
     val dbUrl: String,
     val dbUser: String,
     val dbPass: String,
@@ -36,6 +37,10 @@ data class Env(
                         ?: props.getProperty("WEBHOOK_SECRET")
                         ?: "dev-secret",
                 publicBaseUrl = props.getProperty("PUBLIC_BASE_URL") ?: error("PUBLIC_BASE_URL required"),
+                itchProjectUrl =
+                    props.getProperty("RIVERKING_ITCH_PROJECT_URL")
+                        ?: System.getenv("RIVERKING_ITCH_PROJECT_URL")
+                        ?: "",
                 dbUrl = props.getProperty("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
                 dbUser = props.getProperty("DATABASE_USER") ?: "postgres",
                 dbPass = props.getProperty("DATABASE_PASSWORD") ?: "postgres",

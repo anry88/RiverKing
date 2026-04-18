@@ -1187,7 +1187,6 @@ fun Application.botRoutes(env: Env) {
                     return
                 }
                 val buttons = unlocked
-                    .sortedBy { I18n.location(it.name, lang) }
                     .map { loc ->
                         val label = buildString {
                             append(I18n.location(loc.name, lang))
@@ -1874,6 +1873,7 @@ Available commands:
 /nickname — change your nickname""".trimIndent()
                         }
                         val openButtonText = if (lang == "ru") "Открыть игру" else "Open game"
+                        val itchButtonText = if (lang == "ru") "Страница на itch.io" else "itch.io page"
                         val channelButtonText = if (lang == "ru") "Присоединиться к каналу" else "Join the channel"
                         val gameLink = "https://t.me/${env.botName}?startapp"
                         val channelLink = if (lang == "ru") {
@@ -1881,14 +1881,15 @@ Available commands:
                         } else {
                             "https://t.me/riverking_en"
                         }
-                        val markup = Json.encodeToString(
-                            mapOf(
-                                "inline_keyboard" to listOf(
-                                    listOf(mapOf("text" to openButtonText, "url" to gameLink)),
-                                    listOf(mapOf("text" to channelButtonText, "url" to channelLink)),
-                                )
-                            )
-                        )
+                        val keyboardRows = mutableListOf(
+                            listOf(mapOf("text" to openButtonText, "url" to gameLink))
+                        ).apply {
+                            env.itchProjectUrl.takeIf { it.isNotBlank() }?.let { itchUrl ->
+                                add(listOf(mapOf("text" to itchButtonText, "url" to itchUrl)))
+                            }
+                            add(listOf(mapOf("text" to channelButtonText, "url" to channelLink)))
+                        }
+                        val markup = Json.encodeToString(mapOf("inline_keyboard" to keyboardRows))
                         trySend(chatId, message, markup, replyTo)
                         return true
                     }

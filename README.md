@@ -175,6 +175,7 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `BOT_TOKEN`
 - `BOT_NAME`
 - `PUBLIC_BASE_URL`
+- `RIVERKING_ITCH_PROJECT_URL`
 - `DATABASE_URL`
 - `DATABASE_USER`
 - `DATABASE_PASSWORD`

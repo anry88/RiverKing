@@ -12,6 +12,7 @@ fun testEnv(name: String): Env {
     botToken = "",
     telegramWebhookSecret = "",
     publicBaseUrl = "http://localhost",
+    itchProjectUrl = "",
     dbUrl = "jdbc:sqlite:${dbFile.absolutePath}",
     dbUser = "",
     dbPass = "",

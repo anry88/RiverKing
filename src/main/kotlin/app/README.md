@@ -4,7 +4,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
 
 ## Server and plugins
 - **`Application.kt`** — the `main()` function loads `Env`, boots the Netty server, installs plugins (`ContentNegotiation`, `CORS`, `DoubleReceive`, sessions), initializes the database (`DB.init`), and registers routes through `apiRoutes` and `botRoutes`. It also exposes `/metrics` and `/health`, restores lost lures via `FishingService.restoreCastingLuresOnStartup()`, and schedules background jobs via `Scheduler.install()`.
-- **`Env.kt`** — reads `config.properties` and builds the environment object: bot token, public URL, port, development mode, and more.
+- **`Env.kt`** — reads `config.properties` and builds the environment object: bot token, public URL, optional `RIVERKING_ITCH_PROJECT_URL` for bot launch links, port, development mode, and more.
 - **`Sessions.kt`** — configures the cookie session `AppSession` for the mini‑app, now keyed by shared `userId` rather than Telegram ID; `installSessions` installs the Ktor plugin.
 
 ## Routes and integrations
@@ -22,7 +22,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
   - Referrals: `GET/POST /api/referrals` and `POST /api/referrals/apply` handle links via `ReferralService`.
   - Utility calls: `GET /api/assets/{path...}` serves webapp assets with manual path checks; `GET /api/metrics` updates `UserMetrics`.
 - API compatibility rule: any response-shape change in this package must be checked against all three consumers that share these routes — Telegram bot flows, the Telegram Mini App, and the Android client. Prefer additive fields over breaking renames or changed semantics.
-- **`BotRoutes.kt`** — registers the Telegram bot webhook. Processes updates, sends responses through `TelegramBot`, and calls game services to handle bot commands, including the three-section `/quests` output with club quests.
+- **`BotRoutes.kt`** — registers the Telegram bot webhook. Processes updates, sends responses through `TelegramBot`, and calls game services to handle bot commands, including the three-section `/quests` output with club quests, `/start` launch links, and `/location` menus in unlock order.
 - **`TelegramBot.kt`** — thin client over the Telegram Bot API for sending messages, invoices, and alerts; used by the webhook and by the redirect from `/`.
 - **`TelegramModels.kt`** — DTOs for Telegram WebApp/bot (keyboards, invoices, updates).
 - **`PublicPages.kt`** — serves public support/legal/account-deletion pages used by Android release surfaces and Google Play policy links.
