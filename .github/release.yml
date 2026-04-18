@@ -3,6 +3,9 @@ changelog:
     labels:
       - ignore-for-release
   categories:
+    - title: Mandatory Android Updates
+      labels:
+        - android-force-update
     - title: Breaking Changes
       labels:
         - breaking-change

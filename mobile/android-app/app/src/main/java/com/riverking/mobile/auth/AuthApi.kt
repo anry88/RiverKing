@@ -17,6 +17,9 @@ class AuthApi(
     private val client: HttpClient,
     private val baseUrl: String = BuildConfig.API_BASE_URL,
 ) {
+    suspend fun appUpdate(): AppUpdateInfoDto =
+        client.get("$baseUrl/api/mobile/update").body()
+
     suspend fun registerPassword(login: String, password: String, refToken: String? = null): AuthResponseDto =
         client.post("$baseUrl/api/auth/password/register") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

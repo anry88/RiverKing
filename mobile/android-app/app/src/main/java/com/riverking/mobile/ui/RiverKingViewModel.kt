@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
+import com.riverking.mobile.auth.AppUpdateInfoDto
 import com.riverking.mobile.auth.AuthRepository
 import com.riverking.mobile.auth.CatchStatsDto
 import com.riverking.mobile.auth.CastResultDto
@@ -170,6 +171,7 @@ data class RiverKingUiState(
     val pendingExternalUrl: String? = null,
     val profileRefreshing: Boolean = false,
     val error: String? = null,
+    val appUpdate: AppUpdateInfoDto? = null,
     val selectedCatch: CatchDto? = null,
     val selectedCatchCard: ByteArray? = null,
     val catchLoading: Boolean = false,
@@ -194,8 +196,10 @@ class RiverKingViewModel(
     private var biteJob: Job? = null
     private var tapJob: Job? = null
     private var cooldownJob: Job? = null
+    private var appUpdateJob: Job? = null
     private var telegramLoginJob: Job? = null
     private var telegramLinkJob: Job? = null
+    private var dismissedRecommendedUpdateCode: Int? = null
     private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
     private var biteStartedAtMillis: Long = 0L
 
@@ -206,6 +210,7 @@ class RiverKingViewModel(
     override fun onCleared() {
         cancelFishingJobs()
         cancelTelegramJobs()
+        appUpdateJob?.cancel()
         super.onCleared()
     }
 
@@ -261,10 +266,11 @@ class RiverKingViewModel(
                 }
                 onAuthenticated(me)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -278,10 +284,11 @@ class RiverKingViewModel(
                 val me = repository.loginGoogle(idToken)
                 onAuthenticated(me)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -311,11 +318,12 @@ class RiverKingViewModel(
                 }
                 awaitTelegramLogin(started.sessionToken)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
                         telegramLoginPending = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -340,11 +348,12 @@ class RiverKingViewModel(
                 }
                 awaitTelegramLink(started.sessionToken)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
                         telegramLinkPending = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -365,10 +374,11 @@ class RiverKingViewModel(
                 _state.update { it.copy(working = false) }
                 warmupPlayerSurfaces()
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -392,10 +402,11 @@ class RiverKingViewModel(
                 }
                 warmupPlayerSurfaces()
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -410,10 +421,11 @@ class RiverKingViewModel(
                 val me = repository.refreshProfile()
                 applyProfileUpdate(me)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         profileRefreshing = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -429,10 +441,11 @@ class RiverKingViewModel(
                 applyProfileUpdate(me)
                 _state.update { it.copy(working = false) }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -500,10 +513,11 @@ class RiverKingViewModel(
                 }
                 launchWaitCountdown(waitSeconds)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         fishing = it.fishing.copy(phase = FishingPhase.READY, phaseTimeLeftMillis = 0L),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -592,10 +606,11 @@ class RiverKingViewModel(
                 }
                 _state.update { it.copy(tournaments = data, error = null) }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         tournaments = it.tournaments.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -626,10 +641,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         tournaments = it.tournaments.copy(selectedTournamentLoading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -663,10 +679,11 @@ class RiverKingViewModel(
                 }
                 loadTournaments(force = true)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         tournaments = it.tournaments.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -749,10 +766,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         ratings = it.ratings.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -799,10 +817,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         guide = it.guide.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -825,10 +844,11 @@ class RiverKingViewModel(
                 }
                 loadGuide(force = true)
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -851,10 +871,11 @@ class RiverKingViewModel(
                     it.copy(catchStats = CatchStatsUiState(loading = false, period = period, stats = stats))
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         catchStats = it.catchStats.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -879,10 +900,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         club = it.club.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -897,10 +919,11 @@ class RiverKingViewModel(
                 val messages = repository.loadClubChat()
                 _state.update { it.copy(club = it.club.copy(chat = messages, chatLoading = false)) }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         club = it.club.copy(chatLoading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -922,10 +945,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         club = it.club.copy(searchLoading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -950,7 +974,8 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -972,7 +997,8 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -984,7 +1010,8 @@ class RiverKingViewModel(
                 val club = repository.updateClubInfo(info)
                 _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -996,7 +1023,8 @@ class RiverKingViewModel(
                 val club = repository.updateClubSettings(minJoinWeightKg, recruitingOpen)
                 _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1013,7 +1041,8 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1025,7 +1054,8 @@ class RiverKingViewModel(
                 val club = repository.clubMemberAction(memberId, action)
                 _state.update { it.copy(working = false, club = it.club.copy(club = club)) }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1044,10 +1074,11 @@ class RiverKingViewModel(
                 )
                 _state.update { it.copy(shop = data) }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         shop = it.shop.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -1073,10 +1104,11 @@ class RiverKingViewModel(
                 }
                 _state.update { it.copy(referrals = data) }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         referrals = it.referrals.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -1106,10 +1138,11 @@ class RiverKingViewModel(
                     )
                 }
             } catch (error: Throwable) {
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         referrals = it.referrals.copy(loading = false),
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
             }
@@ -1130,7 +1163,8 @@ class RiverKingViewModel(
                 }
                 loadReferrals(force = true)
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1144,7 +1178,8 @@ class RiverKingViewModel(
                 _state.update { it.copy(working = false, shop = it.shop.copy(loaded = false)) }
                 loadShop(force = true)
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1168,13 +1203,13 @@ class RiverKingViewModel(
             loadShop(force = true)
             PlayPurchaseSyncResult.Completed
         } catch (error: Throwable) {
-            val message = repository.describeError(error)
+            val message = describeError(error)
             _state.update { it.copy(working = false) }
             when (message) {
                 "duplicate_purchase" -> PlayPurchaseSyncResult.Duplicate
                 else -> PlayPurchaseSyncResult.Failed(
-                    code = message,
-                    message = message,
+                    code = message ?: "app_update_required",
+                    message = message ?: "",
                 )
             }
         }
@@ -1229,7 +1264,8 @@ class RiverKingViewModel(
                     error = deletedMessage,
                 )
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1239,6 +1275,24 @@ class RiverKingViewModel(
     fun openPrivacyPolicy() = queueExternalUrl(BuildConfig.PRIVACY_POLICY_URL)
 
     fun openAccountDeletionHelp() = queueExternalUrl(BuildConfig.ACCOUNT_DELETION_URL)
+
+    fun refreshAppUpdateStatus() {
+        if (appUpdateJob?.isActive == true) return
+        appUpdateJob = viewModelScope.launch {
+            try {
+                applyAppUpdate(repository.checkAppUpdate())
+            } catch (_: Throwable) {
+                // Update checks are best-effort during resume; API calls still enforce mandatory upgrades.
+            }
+        }
+    }
+
+    fun dismissAppUpdate() {
+        val update = state.value.appUpdate ?: return
+        if (update.isMandatory) return
+        dismissedRecommendedUpdateCode = update.latestVersionCode
+        _state.update { it.copy(appUpdate = null) }
+    }
 
     fun consumeError() {
         _state.update { it.copy(error = null) }
@@ -1269,10 +1323,62 @@ class RiverKingViewModel(
         _state.update { it.copy(pendingExternalUrl = target) }
     }
 
+    private suspend fun describeError(error: Throwable): String? {
+        repository.appUpdateFrom(error)?.let { update ->
+            applyAppUpdate(update)
+            return null
+        }
+        return repository.describeError(error)
+    }
+
+    private fun applyAppUpdate(update: AppUpdateInfoDto) {
+        if (!update.isUpdateAvailable) {
+            _state.update { it.copy(appUpdate = null) }
+            return
+        }
+        if (!update.isMandatory && dismissedRecommendedUpdateCode == update.latestVersionCode) {
+            return
+        }
+        _state.update {
+            it.copy(
+                loading = false,
+                working = false,
+                profileRefreshing = false,
+                appUpdate = update,
+                error = null,
+            )
+        }
+    }
+
     private fun bootstrap() {
         viewModelScope.launch {
-            val me = repository.restoreProfile()
             val rememberedLogin = repository.lastLoginDraft()
+            val update = try {
+                repository.checkAppUpdate()
+            } catch (_: Throwable) {
+                null
+            }
+            if (update?.isMandatory == true) {
+                _state.value = RiverKingUiState(
+                    loading = false,
+                    login = rememberedLogin,
+                    appUpdate = update,
+                )
+                return@launch
+            }
+            val me = try {
+                repository.restoreProfile()
+            } catch (error: Throwable) {
+                repository.appUpdateFrom(error)?.let { requiredUpdate ->
+                    _state.value = RiverKingUiState(
+                        loading = false,
+                        login = rememberedLogin,
+                        appUpdate = requiredUpdate,
+                    )
+                    return@launch
+                }
+                null
+            }
             val pendingTelegramLogin = if (me == null) {
                 repository.pendingTelegramLogin()
             } else {
@@ -1293,6 +1399,7 @@ class RiverKingViewModel(
                 nickname = me?.username.orEmpty(),
                 telegramLoginPending = pendingTelegramLogin != null,
                 telegramLinkPending = pendingTelegramLink != null,
+                appUpdate = update?.takeIf { it.isUpdateAvailable },
                 ratings = RatingsUiState(locationId = me?.locationId?.toString() ?: "all"),
             )
             if (me != null) {
@@ -1312,6 +1419,7 @@ class RiverKingViewModel(
                 me = me,
                 authProvider = repository.currentAuthProvider(),
                 nickname = me.username.orEmpty(),
+                appUpdate = state.value.appUpdate,
                 ratings = RatingsUiState(locationId = me.locationId.toString()),
                 fishing = FishingUiState(autoCastEnabled = false),
             )
@@ -1369,11 +1477,12 @@ class RiverKingViewModel(
                     continue
                 }
                 repository.clearPendingTelegramLogin()
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         telegramLoginPending = false,
                         working = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
                 return
@@ -1421,10 +1530,11 @@ class RiverKingViewModel(
                     continue
                 }
                 repository.clearPendingTelegramLink()
+                val message = describeError(error)
                 _state.update {
                     it.copy(
                         telegramLinkPending = false,
-                        error = repository.describeError(error),
+                        error = message,
                     )
                 }
                 return
@@ -1586,7 +1696,8 @@ class RiverKingViewModel(
                 hookReactionSeconds = reaction
                 startTapChallenge()
             } catch (error: Throwable) {
-                _state.update { it.copy(error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(error = message) }
                 startCooldown(triggerAutoCast = false)
             }
         }
@@ -1647,7 +1758,8 @@ class RiverKingViewModel(
                 loadTournaments(force = true)
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
             } catch (error: Throwable) {
-                _state.update { it.copy(error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(error = message) }
                 startCooldown(triggerAutoCast = false)
             }
         }
@@ -1724,7 +1836,8 @@ class RiverKingViewModel(
                 }
                 loadRatings(force = true)
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1738,7 +1851,8 @@ class RiverKingViewModel(
                 applyProfileUpdate(me)
                 _state.update { it.copy(working = false) }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }
@@ -1752,7 +1866,8 @@ class RiverKingViewModel(
                 applyProfileUpdate(me)
                 _state.update { it.copy(working = false) }
             } catch (error: Throwable) {
-                _state.update { it.copy(working = false, error = repository.describeError(error)) }
+                val message = describeError(error)
+                _state.update { it.copy(working = false, error = message) }
             }
         }
     }

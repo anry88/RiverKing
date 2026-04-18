@@ -1,16 +1,20 @@
 package com.riverking.mobile.auth
 
+import com.riverking.mobile.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.accept
+import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
@@ -22,6 +26,7 @@ import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.Locale
 
 sealed interface TelegramLoginPollResult {
     data object Pending : TelegramLoginPollResult
@@ -58,8 +63,25 @@ class AuthRepository(
         install(HttpTimeout) {
             requestTimeoutMillis = 15_000
         }
+        HttpResponseValidator {
+            handleResponseExceptionWithRequest { cause, _ ->
+                val responseException = cause as? ResponseException ?: return@handleResponseExceptionWithRequest
+                if (responseException.response.status != HttpStatusCode.UpgradeRequired) {
+                    return@handleResponseExceptionWithRequest
+                }
+                val update = runCatching {
+                    json.decodeFromString<AppUpdateInfoDto>(responseException.response.bodyAsText())
+                }.getOrNull() ?: return@handleResponseExceptionWithRequest
+                throw AppUpgradeRequiredException(update, cause)
+            }
+        }
         defaultRequest {
             accept(ContentType.Application.Json)
+            header(APP_PLATFORM_HEADER, APP_PLATFORM_ANDROID)
+            header(APP_CHANNEL_HEADER, BuildConfig.DISTRIBUTION_CHANNEL)
+            header(APP_VERSION_CODE_HEADER, BuildConfig.VERSION_CODE.toString())
+            header(APP_VERSION_NAME_HEADER, BuildConfig.VERSION_NAME)
+            header(HttpHeaders.AcceptLanguage, Locale.getDefault().toLanguageTag())
         }
     }
 
@@ -67,12 +89,18 @@ class AuthRepository(
 
     suspend fun restoreProfile(): MeResponseDto? {
         sessionStore.read() ?: return null
-        return runCatching { withFreshAccessToken { accessToken -> api.me(accessToken) } }
-            .getOrElse {
-                sessionStore.clear()
-                null
-            }
+        return try {
+            withFreshAccessToken { accessToken -> api.me(accessToken) }
+        } catch (error: AppUpgradeRequiredException) {
+            throw error
+        } catch (error: Throwable) {
+            sessionStore.clear()
+            null
+        }
     }
+
+    suspend fun checkAppUpdate(): AppUpdateInfoDto =
+        api.appUpdate()
 
     suspend fun registerPassword(login: String, password: String): MeResponseDto {
         sessionStore.writeLastLogin(login)
@@ -310,10 +338,20 @@ class AuthRepository(
     }
 
     suspend fun describeError(error: Throwable): String = when (error) {
+        is AppUpgradeRequiredException -> "Update RiverKing to continue"
         is ClientRequestException -> error.response.readErrorMessage() ?: "Request failed"
         is ServerResponseException -> error.response.readErrorMessage() ?: "Server error"
         is ResponseException -> error.response.readErrorMessage() ?: "Request failed"
         else -> humanizeThrowable(error)
+    }
+
+    fun appUpdateFrom(error: Throwable): AppUpdateInfoDto? {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is AppUpgradeRequiredException) return current.update
+            current = current.cause
+        }
+        return null
     }
 
     fun isTransientNetworkError(error: Throwable): Boolean {
@@ -465,5 +503,10 @@ class AuthRepository(
         const val AUTH_PROVIDER_TELEGRAM = "telegram"
         const val AUTH_PROVIDER_GOOGLE = "google"
         const val AUTH_PROVIDER_PASSWORD = "password"
+        private const val APP_PLATFORM_HEADER = "X-RiverKing-App-Platform"
+        private const val APP_CHANNEL_HEADER = "X-RiverKing-App-Channel"
+        private const val APP_VERSION_CODE_HEADER = "X-RiverKing-App-Version-Code"
+        private const val APP_VERSION_NAME_HEADER = "X-RiverKing-App-Version-Name"
+        private const val APP_PLATFORM_ANDROID = "android"
     }
 }

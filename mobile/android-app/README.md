@@ -17,6 +17,8 @@ Nested Android project for the RiverKing mobile client.
   - `playDebug` -> `com.riverking.mobile.play`
 - Local non-canonical `release` builds keep those same flavor package IDs and use debug signing, so Android Studio can still launch them without package/signature mismatches.
 - Existing Android profiles can link a Telegram account and continue on the same backend player profile inside the Mini App/bot.
+- The app checks `GET /api/mobile/update` at startup/resume and sends Android version headers on API calls. Recommended updates show a dismissible prompt; mandatory updates block the old build before auth/gameplay.
+- The `direct` flavor can download a replacement APK through Android `DownloadManager` when the backend provides `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`; otherwise it opens the itch.io page. The `play` flavor opens the configured Google Play listing.
 - Android shell now mirrors the TG client much more closely:
   - five-tab layout: fishing, leaders, catalog, club, shop
   - custom dark game-theme with header stats, language toggle, and badgeable bottom navigation
@@ -79,6 +81,15 @@ The backend also needs Google Play verification configured before `/api/shop/{id
 - `GOOGLE_PLAY_PACKAGE_NAME`
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`
 
+The backend controls Android update prompts through:
+
+- `src/main/resources/android-update-policy.json`
+- `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`
+
+Keep `requireVersionHeaders=false` for normal releases. Set it to `true` only for a fatal rollout that must also block legacy Android builds without version headers.
+
 Example:
 
 ```bash
@@ -118,6 +129,12 @@ Useful targets:
 - `play-release-aab` builds only the Play bundle when you do not need the itch artifact in the same run.
 
 The script reads the same environment variables as Gradle properties, can load additional values from a named profile file, and prints the final artifact paths after a successful build.
+
+Before shipping a version bump or mandatory update, verify that the Android version file and backend update policy agree:
+
+```bash
+python3 mobile/android-app/scripts/check-update-policy.py
+```
 
 When you build with `--profile <name>`, the script also copies the final artifacts into `mobile/android-app/dist/<name>/` with the profile suffix in the filename, so `prod` and `test` outputs do not get mixed together.
 
@@ -235,4 +252,10 @@ To verify that the Android bundle still covers the fish catalog, shop/menu icons
 
 ```bash
 python3 mobile/android-app/scripts/check-assets.py
+```
+
+To verify release metadata for Android update prompts, run:
+
+```bash
+python3 mobile/android-app/scripts/check-update-policy.py
 ```

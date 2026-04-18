@@ -13,6 +13,8 @@ fun testEnv(name: String): Env {
     telegramWebhookSecret = "",
     publicBaseUrl = "http://localhost",
     itchProjectUrl = "",
+    playStoreUrl = "",
+    androidDirectDownloadUrl = "",
     dbUrl = "jdbc:sqlite:${dbFile.absolutePath}",
     dbUser = "",
     dbPass = "",

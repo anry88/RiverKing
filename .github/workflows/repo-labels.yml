@@ -27,6 +27,7 @@ jobs:
             const labels = [
               { name: 'release', color: 'B60205', description: 'Release PRs and release train changes.' },
               { name: 'breaking-change', color: 'D93F0B', description: 'User-facing or API-breaking changes.' },
+              { name: 'android-force-update', color: 'B60205', description: 'Android release requires users to update before continuing.' },
               { name: 'feature', color: '1D76DB', description: 'New functionality for users or operators.' },
               { name: 'fix', color: '0E8A16', description: 'Bug fixes and behavior corrections.' },
               { name: 'docs', color: '5319E7', description: 'Documentation-only changes.' },

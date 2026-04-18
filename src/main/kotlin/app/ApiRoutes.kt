@@ -36,6 +36,7 @@ import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
 import service.AccountDeletionService
+import service.AndroidUpdateService
 import db.AuthIdentities
 import db.Payments
 import db.Users
@@ -67,6 +68,24 @@ fun Application.apiRoutes(
     val bot = TelegramBot(env.botToken)
     val accountDeletion = AccountDeletionService(clubs)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
+    val androidUpdates = AndroidUpdateService(env)
+    val mobileVersionGuardPrefixes = listOf(
+        "/api/auth/password/",
+        "/api/auth/google",
+        "/api/auth/refresh",
+        "/api/auth/logout",
+        "/api/auth/telegram/mobile/",
+        "/api/auth/telegram/link/",
+    )
+
+    fun ApplicationCall.isAndroidOrMobileApiCall(path: String): Boolean {
+        val explicitAndroid = request.headers[AndroidUpdateService.HEADER_PLATFORM]
+            ?.equals(AndroidUpdateService.PLATFORM_ANDROID, ignoreCase = true) == true
+        val bearerAuth = request.headers[HttpHeaders.Authorization]
+            ?.startsWith("Bearer ", ignoreCase = true) == true
+        val mobileAuthFlow = mobileVersionGuardPrefixes.any { path.startsWith(it) }
+        return explicitAndroid || bearerAuth || mobileAuthFlow
+    }
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -74,6 +93,18 @@ fun Application.apiRoutes(
     // that are served before the Sessions plugin runs.
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
+        if (
+            path.startsWith("/api/") &&
+            path != "/api/mobile/update" &&
+            call.isAndroidOrMobileApiCall(path)
+        ) {
+            val update = androidUpdates.checkFromHeaders(call.request.headers)
+            if (update.mandatory) {
+                call.respond(HttpStatusCode.UpgradeRequired, update)
+                finish()
+                return@intercept
+            }
+        }
         if (path != "/metrics") {
             val session = call.sessions.get<AppSession>()
             val userId = session?.userId
@@ -444,6 +475,22 @@ fun Application.apiRoutes(
     }
 
     routing {
+        get("/api/mobile/update") {
+            val headers = call.request.headers
+            call.respond(
+                androidUpdates.check(
+                    versionCode = call.request.queryParameters["versionCode"]?.toIntOrNull()
+                        ?: headers[AndroidUpdateService.HEADER_VERSION_CODE]?.toIntOrNull(),
+                    versionName = call.request.queryParameters["versionName"]
+                        ?: headers[AndroidUpdateService.HEADER_VERSION_NAME],
+                    channel = call.request.queryParameters["channel"]
+                        ?: headers[AndroidUpdateService.HEADER_CHANNEL],
+                    localeHint = call.request.queryParameters["lang"]
+                        ?: headers[HttpHeaders.AcceptLanguage],
+                )
+            )
+        }
+
         get("/api/assets/{path...}") {
             call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val segments = call.parameters.getAll("path")?.takeIf { it.isNotEmpty() }

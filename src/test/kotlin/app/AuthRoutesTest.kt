@@ -5,6 +5,7 @@ import db.DB
 import db.Fish
 import db.Locations
 import io.ktor.client.call.body
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -33,6 +34,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import service.AndroidUpdateService
 import service.ClubService
 import service.ClubQuestService
 import service.FishingService
@@ -78,6 +80,20 @@ class AuthRoutesTest {
         val webFallbackLink: String,
     )
 
+    @Serializable
+    private data class UpdateResponse(
+        val status: String,
+        val latestVersionCode: Int,
+        val latestVersionName: String,
+        val minSupportedVersionCode: Int,
+        val mandatory: Boolean,
+        val releaseNotes: List<String>,
+        val installMode: String,
+        val installUrl: String,
+        val fallbackUrl: String? = null,
+        val downloadFileName: String? = null,
+    )
+
     @Test
     fun `password auth uses shared me endpoint and refresh logout flow`() = testApplication {
         val env = testEnv("password-auth-routes").copy(
@@ -88,6 +104,7 @@ class AuthRoutesTest {
         application { installAuthTestModule(env) }
 
         val register = client.post("/api/auth/password/register") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"login":"angler.one","password":"password123","language":"ru"}""")
         }
@@ -97,6 +114,7 @@ class AuthRoutesTest {
         assertEquals("ru", registered.user.language)
 
         val login = client.post("/api/auth/password/login") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"login":"angler.one","password":"password123"}""")
         }
@@ -106,6 +124,7 @@ class AuthRoutesTest {
 
         val meBeforeNickname = client.get("/api/me") {
             bearerAuth(loggedIn.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, meBeforeNickname.status)
         val meBeforeBody = json.parseToJsonElement(meBeforeNickname.bodyAsText()).jsonObject
@@ -113,6 +132,7 @@ class AuthRoutesTest {
 
         val nickname = client.post("/api/nickname") {
             bearerAuth(loggedIn.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"nickname":"Captain River"}""")
         }
@@ -120,6 +140,7 @@ class AuthRoutesTest {
 
         val meAfterNickname = client.get("/api/me") {
             bearerAuth(loggedIn.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, meAfterNickname.status)
         val meAfterBody = json.parseToJsonElement(meAfterNickname.bodyAsText()).jsonObject
@@ -127,12 +148,14 @@ class AuthRoutesTest {
         assertEquals(false, meAfterBody.getValue("needsNickname").jsonPrimitive.boolean)
 
         val logout = client.post("/api/auth/logout") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"refreshToken":"${loggedIn.refreshToken}"}""")
         }
         assertEquals(HttpStatusCode.NoContent, logout.status)
 
         val refreshAfterLogout = client.post("/api/auth/refresh") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"refreshToken":"${loggedIn.refreshToken}"}""")
         }
@@ -153,21 +176,25 @@ class AuthRoutesTest {
 
         val delete = client.post("/api/account/delete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.NoContent, delete.status)
 
         val meAfterDelete = client.get("/api/me") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.Unauthorized, meAfterDelete.status)
 
         val loginAfterDelete = client.post("/api/auth/password/login") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"login":"angler.delete","password":"password123"}""")
         }
         assertEquals(HttpStatusCode.Unauthorized, loginAfterDelete.status)
 
         val refreshAfterDelete = client.post("/api/auth/refresh") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"refreshToken":"${registered.refreshToken}"}""")
         }
@@ -250,6 +277,7 @@ class AuthRoutesTest {
 
         val referrals = client.get("/api/referrals") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, referrals.status)
         val referralBody = json.decodeFromString<ReferralResponse>(referrals.bodyAsText())
@@ -260,6 +288,7 @@ class AuthRoutesTest {
 
         val purchase = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-1","orderId":"play-order-1"}""")
         }
@@ -267,10 +296,64 @@ class AuthRoutesTest {
 
         val duplicate = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-1","orderId":"play-order-1"}""")
         }
         assertEquals(HttpStatusCode.Conflict, duplicate.status)
+    }
+
+    @Test
+    fun `android update endpoint returns install targets and guard blocks stale mobile builds`() = testApplication {
+        val env = testEnv("android-update-policy").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            publicBaseUrl = "https://riverking.example",
+            itchProjectUrl = "https://itch.example/riverking",
+            playStoreUrl = "https://play.example/riverking",
+            androidDirectDownloadUrl = "https://itch.example/downloads/riverking.apk",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+
+        val directUpdate = client.get("/api/mobile/update") {
+            androidClientHeaders(versionCode = 0, channel = AndroidUpdateService.CHANNEL_DIRECT)
+            header(HttpHeaders.AcceptLanguage, "ru-RU,ru;q=0.9")
+        }
+        assertEquals(HttpStatusCode.OK, directUpdate.status)
+        val directBody = json.decodeFromString<UpdateResponse>(directUpdate.bodyAsText())
+        assertEquals(AndroidUpdateService.STATUS_UPDATE_REQUIRED, directBody.status)
+        assertEquals(true, directBody.mandatory)
+        assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
+        assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
+        assertEquals("https://itch.example/riverking", directBody.fallbackUrl)
+        assertEquals(true, directBody.releaseNotes.any { it.contains("Android-клиент") })
+
+        val playUpdate = client.get("/api/mobile/update") {
+            androidClientHeaders(versionCode = 0, channel = AndroidUpdateService.CHANNEL_PLAY)
+        }
+        val playBody = json.decodeFromString<UpdateResponse>(playUpdate.bodyAsText())
+        assertEquals(AndroidUpdateService.INSTALL_MODE_EXTERNAL, playBody.installMode)
+        assertEquals("https://play.example/riverking", playBody.installUrl)
+
+        val legacyRegister = client.post("/api/auth/password/register") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"login":"angler.stale","password":"password123","language":"en"}""")
+        }
+        assertEquals(HttpStatusCode.OK, legacyRegister.status)
+
+        val registered = registerPasswordUser(client, "angler.current", "password123")
+        val staleProfile = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders(versionCode = 0)
+        }
+        assertEquals(HttpStatusCode.UpgradeRequired, staleProfile.status)
+
+        val currentProfile = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, currentProfile.status)
     }
 
     @Test
@@ -306,6 +389,7 @@ class AuthRoutesTest {
 
         val pending = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-pending"}""")
         }
@@ -313,6 +397,7 @@ class AuthRoutesTest {
 
         val cancelled = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-cancelled"}""")
         }
@@ -320,6 +405,7 @@ class AuthRoutesTest {
 
         val mismatch = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-mismatch"}""")
         }
@@ -327,6 +413,7 @@ class AuthRoutesTest {
 
         val wrongUser = client.post("/api/shop/fresh_topup_s/play/complete") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"purchaseToken":"play-token-wrong-user"}""")
         }
@@ -348,11 +435,13 @@ class AuthRoutesTest {
         for (attempt in 1..5) {
             val start = client.post("/api/start-cast") {
                 bearerAuth(registered.accessToken)
+                androidClientHeaders()
             }
             assertEquals(HttpStatusCode.OK, start.status)
 
             val hook = client.post("/api/hook") {
                 bearerAuth(registered.accessToken)
+                androidClientHeaders()
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("""{"wait":10,"reaction":0.6}""")
             }
@@ -367,6 +456,7 @@ class AuthRoutesTest {
 
         val cast = client.post("/api/cast") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"wait":10,"reaction":0.6,"success":true}""")
         }
@@ -376,6 +466,7 @@ class AuthRoutesTest {
 
         val details = client.get("/api/catches/$catchId") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, details.status)
         val detailsBody = json.parseToJsonElement(details.bodyAsText()).jsonObject
@@ -384,6 +475,7 @@ class AuthRoutesTest {
 
         val card = client.get("/api/catches/$catchId/card") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, card.status)
         assertEquals(ContentType.Image.PNG.toString(), card.headers[HttpHeaders.ContentType])
@@ -404,6 +496,7 @@ class AuthRoutesTest {
 
         val withoutClub = client.get("/api/quests") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, withoutClub.status)
         val withoutClubBody = json.parseToJsonElement(withoutClub.bodyAsText()).jsonObject
@@ -418,6 +511,7 @@ class AuthRoutesTest {
 
         val withClub = client.get("/api/quests") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, withClub.status)
         val withClubBody = json.parseToJsonElement(withClub.bodyAsText()).jsonObject
@@ -448,6 +542,7 @@ class AuthRoutesTest {
 
         val initial = client.get("/api/club") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, initial.status)
         val initialBody = json.parseToJsonElement(initial.bodyAsText()).jsonObject
@@ -461,6 +556,7 @@ class AuthRoutesTest {
 
         val updated = client.get("/api/club") {
             bearerAuth(registered.accessToken)
+            androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, updated.status)
         val updatedBody = json.parseToJsonElement(updated.bodyAsText()).jsonObject
@@ -505,11 +601,23 @@ class AuthRoutesTest {
         language: String = "en",
     ): AuthResponse {
         val register = client.post("/api/auth/password/register") {
+            androidClientHeaders()
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"login":"$login","password":"$password","language":"$language"}""")
         }
         assertEquals(HttpStatusCode.OK, register.status)
         return json.decodeFromString(register.bodyAsText())
+    }
+
+    private fun HttpRequestBuilder.androidClientHeaders(
+        versionCode: Int = 1,
+        versionName: String = "0.1.2",
+        channel: String = AndroidUpdateService.CHANNEL_DIRECT,
+    ) {
+        header(AndroidUpdateService.HEADER_PLATFORM, AndroidUpdateService.PLATFORM_ANDROID)
+        header(AndroidUpdateService.HEADER_CHANNEL, channel)
+        header(AndroidUpdateService.HEADER_VERSION_CODE, versionCode.toString())
+        header(AndroidUpdateService.HEADER_VERSION_NAME, versionName)
     }
 
     private fun signedTelegramInitData(botToken: String, userJson: String): String {

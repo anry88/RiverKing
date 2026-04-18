@@ -67,6 +67,7 @@ What it does:
 
 - checks out the pushed `main` commit
 - reads the prod version from `mobile/android-app/version.properties`
+- validates `src/main/resources/android-update-policy.json` against that version
 - builds `--profile prod release-artifacts`
 - uploads the APK/AAB as workflow artifacts
 - creates or updates a **draft** GitHub Release with the built files attached
@@ -77,6 +78,42 @@ Current version behavior is intentional:
 - production builds use `RIVERKING_VERSION_NAME` and `RIVERKING_VERSION_CODE` from `mobile/android-app/version.properties`
 - the release build uses whatever value is currently tracked in that file
 - bump `version.properties` in the release PR before merging into `main` whenever you want the shipped version to change
+
+## Android Update Policy
+
+The backend controls Android app freshness through [src/main/resources/android-update-policy.json](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/src/main/resources/android-update-policy.json). The Android client calls `GET /api/mobile/update` at startup/resume and sends these headers on API calls:
+
+- `X-RiverKing-App-Platform: android`
+- `X-RiverKing-App-Channel: direct` or `play`
+- `X-RiverKing-App-Version-Code`
+- `X-RiverKing-App-Version-Name`
+
+Policy fields:
+
+- `latestVersionCode` / `latestVersionName` describe the newest shipped Android release.
+- `minSupportedVersionCode` is the hard floor. If a mobile request is below it, the API returns `426 Upgrade Required` and the Android client shows a blocking update screen.
+- `requireVersionHeaders` should stay `false` during normal rollout. Set it to `true` only when a fatal change must also block legacy Android builds that do not send version headers yet.
+- `releaseNotes.en` and `releaseNotes.ru` feed the optional/mandatory update UI and generated release context.
+
+Normal release bump:
+
+1. Update `mobile/android-app/version.properties`.
+2. Update `src/main/resources/android-update-policy.json` `latestVersionCode`, `latestVersionName`, and release notes.
+3. Keep `minSupportedVersionCode` unchanged unless older clients truly cannot keep using the backend.
+4. Run `python3 mobile/android-app/scripts/check-update-policy.py`.
+
+Mandatory/fatal release bump:
+
+1. Raise `minSupportedVersionCode` to the first version that can safely use the current backend contract.
+2. If the incompatible clients predate Android version headers, set `requireVersionHeaders` to `true`; otherwise keep it `false` and let `minSupportedVersionCode` do the blocking.
+3. Add the `android-force-update` label to the release-bound PR, and also use `breaking-change` when the server/client contract is incompatible.
+4. Put the forced update reason in the PR release notes and `android-update-policy.json` notes.
+5. Publish the new APK/store artifact and install URL first, then deploy the backend policy so stale clients receive a clear upgrade response instead of a dead-end block.
+
+Install targets:
+
+- `direct` opens the itch.io page unless the backend has `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`; with that URL it downloads the APK in-app through Android `DownloadManager` and opens the system package installer.
+- `play` opens `RIVERKING_PLAY_STORE_URL`, or a Google Play URL built from `GOOGLE_PLAY_PACKAGE_NAME`, falling back to itch.io/support only if no store URL is available.
 
 ## GitHub PR Rules
 
@@ -109,6 +146,7 @@ GitHub release notes now use [`.github/release.yml`](/Users/hq-k14lcdcq7d/Docume
 
 Generated categories are:
 
+- `Mandatory Android Updates`
 - `Breaking Changes`
 - `Features`
 - `Fixes`
@@ -149,6 +187,12 @@ Optional GitHub repository variables for the prod profile:
 
 The workflow writes `mobile/android-app/profiles/prod.properties` on the runner from those GitHub variables before calling `build-android.sh`.
 If you prefer, the same names can be stored as repository secrets instead; the workflow uses variables first and secrets as fallback.
+
+Backend deploys should also set these runtime values for Android update/install prompts:
+
+- `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL` when the direct APK should install from an in-app download instead of only opening itch.io
 
 Suggested keystore preparation for the secret:
 

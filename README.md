@@ -49,7 +49,7 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Product systems for progression, achievements, quests, tournament prize logic, club competition, referral rewards, and in-game economy.
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
-- A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
+- A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, update prompts/mandatory upgrade blocking, and real Google Play Billing verification for the `play` flavor.
 - Public Android-compliance surfaces for privacy, support, terms, and account deletion, plus an authenticated account deletion endpoint for mobile users.
 
 ## Architecture
@@ -176,6 +176,8 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `BOT_NAME`
 - `PUBLIC_BASE_URL`
 - `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`
 - `DATABASE_URL`
 - `DATABASE_USER`
 - `DATABASE_PASSWORD`

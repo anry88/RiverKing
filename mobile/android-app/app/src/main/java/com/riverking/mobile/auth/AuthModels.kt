@@ -75,6 +75,42 @@ data class NicknameRequest(
 )
 
 @Serializable
+data class AppUpdateInfoDto(
+    val status: String = UPDATE_STATUS_UP_TO_DATE,
+    val latestVersionCode: Int = 0,
+    val latestVersionName: String = "",
+    val minSupportedVersionCode: Int = 0,
+    val mandatory: Boolean = false,
+    val releaseNotes: List<String> = emptyList(),
+    val installMode: String = INSTALL_MODE_EXTERNAL,
+    val installUrl: String = "",
+    val fallbackUrl: String? = null,
+    val downloadFileName: String? = null,
+) {
+    val isUpdateAvailable: Boolean
+        get() = status == UPDATE_STATUS_AVAILABLE || status == UPDATE_STATUS_REQUIRED
+
+    val isMandatory: Boolean
+        get() = mandatory || status == UPDATE_STATUS_REQUIRED
+
+    val usesApkDownload: Boolean
+        get() = installMode == INSTALL_MODE_DOWNLOAD_APK
+
+    companion object {
+        const val UPDATE_STATUS_UP_TO_DATE = "up_to_date"
+        const val UPDATE_STATUS_AVAILABLE = "update_available"
+        const val UPDATE_STATUS_REQUIRED = "update_required"
+        const val INSTALL_MODE_EXTERNAL = "external"
+        const val INSTALL_MODE_DOWNLOAD_APK = "download_apk"
+    }
+}
+
+class AppUpgradeRequiredException(
+    val update: AppUpdateInfoDto,
+    cause: Throwable? = null,
+) : RuntimeException("app_update_required", cause)
+
+@Serializable
 data class MeResponseDto(
     val id: Long,
     val username: String? = null,

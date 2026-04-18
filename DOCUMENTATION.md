@@ -11,7 +11,7 @@ This document explains how the RiverKing backend and adjacent client projects ar
 
 The server starts from `main()` in `Application.kt`: it loads the configuration, configures Ktor plugins, initializes the database, and registers HTTP routes for both the API and the Telegram bot. The `resources/webapp` directory contains the static mini‑app client that is served by the same server.
 
-`mobile/android-app/` is a separate nested Gradle project. It does not participate in the backend build graph, but it consumes the same backend contracts and account model through mobile auth endpoints and the shared gameplay API.
+`mobile/android-app/` is a separate nested Gradle project. It does not participate in the backend build graph, but it consumes the same backend contracts and account model through mobile auth endpoints, the shared gameplay API, and the Android update policy served at `/api/mobile/update`.
 
 Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, tournaments, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the Mini App, Android client, or bot. The auth/session layer now supports both Telegram cookie sessions and bearer tokens backed by refresh sessions.
 

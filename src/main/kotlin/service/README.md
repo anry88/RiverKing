@@ -24,6 +24,7 @@ Manages the player lifecycle and fishing process.
 
 ## Additional services
 - **I18n** — catalog of localized names for fish, locations, rods, and lures; functions like `fish(code, lang)` and `location(code, lang)` are used by the API for readable responses.
+- **AndroidUpdateService** — loads `src/main/resources/android-update-policy.json`, compares Android client version headers against `latestVersionCode` / `minSupportedVersionCode`, honors the explicit `requireVersionHeaders` fatal rollout switch, and returns store/APK install targets for optional or mandatory upgrades.
 - **ReferralService** — creates and applies referral tokens: `generateLink`, `currentLink`, `invited`, `applyToken`; `onPurchase` awards the referrer after purchases.
 - **PrizeService** (supporting types) — `UserPrize` and `PrizeSpec` DTOs are reused by `/api/tournament*` routes.
 - **ClubService** — manages fishing clubs: `createClub`, `joinClub`, `searchClubs`, `clubDetails`, weekly contribution tracking (from daily rating rewards), and weekly club reward distribution. `clubDetails` now returns both current/previous weekly rating views and current/previous weekly club-quest views for the club page.

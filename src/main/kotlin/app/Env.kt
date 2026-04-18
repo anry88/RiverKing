@@ -7,6 +7,8 @@ data class Env(
     val telegramWebhookSecret: String,
     val publicBaseUrl: String,
     val itchProjectUrl: String,
+    val playStoreUrl: String,
+    val androidDirectDownloadUrl: String,
     val dbUrl: String,
     val dbUser: String,
     val dbPass: String,
@@ -50,6 +52,10 @@ data class Env(
                 itchProjectUrl =
                     configuredValue("RIVERKING_ITCH_PROJECT_URL", "ITCH_PROJECT_URL")
                         ?: DEFAULT_ITCH_PROJECT_URL,
+                playStoreUrl = configuredValue("RIVERKING_PLAY_STORE_URL", "PLAY_STORE_URL") ?: "",
+                androidDirectDownloadUrl =
+                    configuredValue("RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL", "ANDROID_DIRECT_DOWNLOAD_URL")
+                        ?: "",
                 dbUrl = configuredValue("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
                 dbUser = configuredValue("DATABASE_USER") ?: "postgres",
                 dbPass = configuredValue("DATABASE_PASSWORD") ?: "postgres",
