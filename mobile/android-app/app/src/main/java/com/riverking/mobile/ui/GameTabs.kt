@@ -1462,29 +1462,35 @@ private fun RatingsScreen(
         }
         item {
             SectionCard(strings.ratings) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    SegmentedSelectionBar(
-                        modifier = Modifier.weight(1f),
-                        items = RatingsMode.entries.toList(),
-                        selected = ratings.mode,
-                        onSelect = onSetMode,
-                        accentFor = { RiverTide },
-                        labelFor = {
-                            if (it == RatingsMode.PERSONAL) strings.personal else strings.global
-                        },
-                    )
-                    SegmentedSelectionBar(
-                        modifier = Modifier.weight(1f),
-                        items = RatingsOrder.entries.toList(),
-                        selected = ratings.order,
-                        onSelect = onSetOrder,
-                        accentFor = { RiverAmber },
-                        labelFor = strings::orderLabel,
-                    )
-                }
+                Text(
+                    text = if (strings.login == "Логин") "Режим" else "Mode",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                SegmentedSelectionBar(
+                    items = RatingsMode.entries.toList(),
+                    selected = ratings.mode,
+                    onSelect = onSetMode,
+                    accentFor = { RiverTide },
+                    labelFor = {
+                        if (it == RatingsMode.PERSONAL) strings.personal else strings.global
+                    },
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = if (strings.login == "Логин") "Сортировка" else "Sort",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                SegmentedSelectionBar(
+                    items = RatingsOrder.entries.toList(),
+                    selected = ratings.order,
+                    onSelect = onSetOrder,
+                    accentFor = { RiverAmber },
+                    labelFor = strings::orderLabel,
+                )
                 Spacer(modifier = Modifier.height(10.dp))
                 SelectionDropdown(
                     title = if (strings.login == "Логин") "Период" else "Period",
@@ -1799,6 +1805,7 @@ private fun ClubScreen(
     onMemberAction: (Long, String) -> Unit,
 ) {
     val me = state.me
+    val questsSectionLabel = if (strings.login == "Логин") "Квесты" else "Quests"
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var createName by rememberSaveable { mutableStateOf("") }
     var infoDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.info.orEmpty()) }
@@ -1902,7 +1909,7 @@ private fun ClubScreen(
                     }
                 }
                 item {
-                    SectionCard(if (selectedSection == "ratings") strings.ratings else strings.clubQuestsLabel) {
+                    SectionCard(if (selectedSection == "ratings") strings.ratings else questsSectionLabel) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1935,7 +1942,7 @@ private fun ClubScreen(
                                 },
                                 border = riverOutlineBorder(),
                             ) {
-                                Text(strings.clubQuestsLabel)
+                                Text(questsSectionLabel)
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -4544,7 +4551,7 @@ private fun ShopPackageRow(
                 }
             }
             Column(
-                modifier = Modifier.width(112.dp),
+                modifier = Modifier.width(104.dp),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -4559,15 +4566,19 @@ private fun ShopPackageRow(
                     canBuyCoins -> {
                         Button(
                             onClick = onBuyWithCoins,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 36.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         ) {
                             Text(
                                 text = "${pack.coinPrice} 🪙",
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -4575,43 +4586,43 @@ private fun ShopPackageRow(
                         OutlinedButton(
                             onClick = {},
                             enabled = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 36.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         ) {
                             Text(
                                 text = strings.unavailable,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                     else -> {
                         Button(
                             onClick = onPlayPurchase,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 36.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         ) {
                             Text(
                                 text = playPrice ?: "Google Play",
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
             }
-        }
-        if (paidUnavailableInDirect) {
-            Text(
-                text = strings.shopDisabledDirect,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(start = 68.dp),
-            )
         }
     }
 }
