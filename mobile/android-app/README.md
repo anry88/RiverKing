@@ -230,3 +230,9 @@ If you add or update gameplay assets or achievement badges in the webapp project
 ```bash
 python3 mobile/android-app/convert_assets.py
 ```
+
+To verify that the Android bundle still covers the fish catalog, shop/menu icons, and achievement art expected by the shared code, run:
+
+```bash
+python3 mobile/android-app/scripts/check-assets.py
+```
