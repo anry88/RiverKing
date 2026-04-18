@@ -1827,10 +1827,24 @@ fun Application.botRoutes(env: Env) {
                         }
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
+                        val androidLine = if (lang == "ru") {
+                            if (env.itchProjectUrl.isNotBlank()) {
+                                "Есть и Android-версия — ссылка на itch.io ниже."
+                            } else {
+                                "Есть и Android-версия игры."
+                            }
+                        } else {
+                            if (env.itchProjectUrl.isNotBlank()) {
+                                "There is also an Android version — the itch.io link is below."
+                            } else {
+                                "There is also an Android version of the game."
+                            }
+                        }
                         val message = if (lang == "ru") {
-                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
+                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. $androidLine Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
 
 Доступные команды:
+/start — список команд и ссылки запуска
 /cast — забросить снасть
 /autocast — запустить автоловлю
 /stop_autocast — остановить автоловлю
@@ -1850,9 +1864,10 @@ fun Application.botRoutes(env: Env) {
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
                         } else {
-                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands. Bot commands also work in group chats if you add the bot and allow it to access messages.
+                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands. $androidLine Bot commands also work in group chats if you add the bot and allow it to access messages.
 
 Available commands:
+/start — command list and launch links
 /cast — cast your line
 /autocast — start auto casting
 /stop_autocast — stop auto casting

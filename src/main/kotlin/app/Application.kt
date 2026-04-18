@@ -137,6 +137,7 @@ fun main() {
 }
 
 private fun defaultBotCommands(): List<BotCommand> = listOf(
+    BotCommand("start", "Show the command list and launch links"),
     BotCommand("startapp", "Open the game"),
     BotCommand("cast", "Cast your line"),
     BotCommand("autocast", "Start auto casting"),
@@ -159,6 +160,7 @@ private fun defaultBotCommands(): List<BotCommand> = listOf(
 )
 
 private fun russianBotCommands(): List<BotCommand> = listOf(
+    BotCommand("start", "Показать список команд и ссылки запуска"),
     BotCommand("startapp", "Открыть игру"),
     BotCommand("cast", "Сделать заброс"),
     BotCommand("autocast", "Запустить автоловлю"),
