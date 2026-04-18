@@ -5,12 +5,12 @@
   "requireVersionHeaders": false,
   "releaseNotes": {
     "en": [
-      "Android clients now check for available updates before entering the game.",
-      "Unsupported builds can be blocked by the backend with a mandatory upgrade response."
+      "This version improves app compatibility with the RiverKing server.",
+      "Fixed issues that could interrupt sign-in or gameplay."
     ],
     "ru": [
-      "Android-клиент теперь проверяет наличие обновлений до входа в игру.",
-      "Backend может жёстко блокировать неподдерживаемые сборки и требовать обновление."
+      "В новой версии улучшена совместимость приложения с сервером RiverKing.",
+      "Исправлены проблемы, которые могли мешать входу или продолжению игры."
     ]
   }
 }
