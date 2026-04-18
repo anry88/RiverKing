@@ -3039,21 +3039,14 @@ private fun RarityDropdown(
                             .size(10.dp)
                             .background(accent, CircleShape)
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = if (strings.login == "Логин") "Редкость" else "Rarity",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = accent,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 Text(
                     text = "▾",
@@ -3218,24 +3211,15 @@ private fun CaughtOnlyToggleCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
+            Text(
+                text = if (strings.login == "Логин") "Пойманные" else "Caught",
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = if (strings.login == "Логин") "Улов" else "Catch",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = if (strings.login == "Логин") "Пойманные" else "Caught",
-                    color = if (checked) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+                color = if (checked) RiverMoss else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Checkbox(
                 checked = checked,
                 onCheckedChange = null,
@@ -4560,7 +4544,7 @@ private fun ShopPackageRow(
                 }
             }
             Column(
-                modifier = Modifier.width(124.dp),
+                modifier = Modifier.width(112.dp),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -4576,11 +4560,14 @@ private fun ShopPackageRow(
                         Button(
                             onClick = onBuyWithCoins,
                             modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                         ) {
                             Text(
                                 text = "${pack.coinPrice} 🪙",
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         }
                     }
@@ -4589,11 +4576,14 @@ private fun ShopPackageRow(
                             onClick = {},
                             enabled = false,
                             modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                         ) {
                             Text(
                                 text = strings.unavailable,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         }
                     }
@@ -4601,11 +4591,14 @@ private fun ShopPackageRow(
                         Button(
                             onClick = onPlayPurchase,
                             modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
                         ) {
                             Text(
                                 text = playPrice ?: "Google Play",
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false,
                             )
                         }
                     }
@@ -4661,10 +4654,9 @@ private fun ClubChatWindow(
                         .padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
                             if (strings.login == "Логин") "Чат клуба" else "Club chat",
@@ -4672,23 +4664,30 @@ private fun ClubChatWindow(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             OutlinedButton(
                                 onClick = onRefresh,
                                 enabled = !loading,
+                                modifier = Modifier.weight(1f),
                                 colors = riverOutlinedButtonColors(),
                                 border = riverOutlineBorder(),
                             ) {
-                                Text(strings.refresh)
+                                Text(strings.refresh, maxLines = 1, softWrap = false)
                             }
                             OutlinedButton(
                                 onClick = onDismiss,
+                                modifier = Modifier.weight(1f),
                                 colors = riverOutlinedButtonColors(),
                                 border = riverOutlineBorder(),
                             ) {
-                                Text(if (strings.login == "Логин") "Закрыть" else "Close")
+                                Text(
+                                    if (strings.login == "Логин") "Закрыть" else "Close",
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         }
                     }
@@ -4837,7 +4836,7 @@ private fun ClubQuestSection(
 ) {
     quest.members.forEachIndexed { index, member ->
         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-        ClubQuestMemberRow(strings = strings, member = member, target = quest.target)
+        ClubQuestMemberRow(strings = strings, member = member)
     }
 }
 
@@ -4845,7 +4844,6 @@ private fun ClubQuestSection(
 private fun ClubQuestMemberRow(
     strings: RiverStrings,
     member: ClubQuestMemberDto,
-    target: Int,
 ) {
     Column(
         modifier = Modifier
@@ -4863,7 +4861,7 @@ private fun ClubQuestMemberRow(
                 Text(strings.roleLabel(member.role), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
-                "${member.progress}/$target",
+                member.progress.toString(),
                 color = MaterialTheme.colorScheme.secondary,
                 fontWeight = FontWeight.SemiBold,
             )
