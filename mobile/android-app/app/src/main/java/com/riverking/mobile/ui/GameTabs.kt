@@ -408,6 +408,8 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
+                    onReloadTournaments = onLoadTournaments,
+                    onReloadRatings = onLoadRatings,
                     onOpenTournament = onOpenTournament,
                     onClaimPrize = onClaimPrize,
                     onSetMode = onSetRatingsMode,
@@ -430,6 +432,7 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
+                    onReloadClub = onLoadClub,
                     onLoadChat = onLoadClubChat,
                     onSearchClubs = onSearchClubs,
                     onCreateClub = onCreateClub,
@@ -591,6 +594,8 @@ private fun LeadersScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
+    onReloadTournaments: (Boolean) -> Unit,
+    onReloadRatings: (Boolean) -> Unit,
     onOpenTournament: (Long) -> Unit,
     onClaimPrize: (Long) -> Unit,
     onSetMode: (RatingsMode) -> Unit,
@@ -606,6 +611,14 @@ private fun LeadersScreen(
     val tournamentsBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
     val ratingsBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementsBadge = state.guide.achievements.any { it.claimable }
+
+    LaunchedEffect(section) {
+        when (section) {
+            LeaderSection.TOURNAMENTS -> onReloadTournaments(true)
+            LeaderSection.RATINGS -> onReloadRatings(true)
+            LeaderSection.ACHIEVEMENTS -> onReloadGuide(true)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
@@ -1784,6 +1797,7 @@ private fun ClubScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
+    onReloadClub: (Boolean) -> Unit,
     onLoadChat: () -> Unit,
     onSearchClubs: (String?) -> Unit,
     onCreateClub: (String) -> Unit,
@@ -1904,7 +1918,10 @@ private fun ClubScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             OutlinedButton(
-                                onClick = { selectedSection = "ratings" },
+                                onClick = {
+                                    selectedSection = "ratings"
+                                    onReloadClub(true)
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = if (selectedSection == "ratings") {
                                     ButtonDefaults.outlinedButtonColors(
@@ -1919,7 +1936,10 @@ private fun ClubScreen(
                                 Text(strings.ratings)
                             }
                             OutlinedButton(
-                                onClick = { selectedSection = "quests" },
+                                onClick = {
+                                    selectedSection = "quests"
+                                    onReloadClub(true)
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = if (selectedSection == "quests") {
                                     ButtonDefaults.outlinedButtonColors(
@@ -1940,7 +1960,10 @@ private fun ClubScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             OutlinedButton(
-                                onClick = { selectedWeek = "current" },
+                                onClick = {
+                                    selectedWeek = "current"
+                                    onReloadClub(true)
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = if (selectedWeek == "current") {
                                     ButtonDefaults.outlinedButtonColors(
@@ -1955,7 +1978,10 @@ private fun ClubScreen(
                                 Text(if (strings.login == "Логин") "Текущая неделя" else "This week")
                             }
                             OutlinedButton(
-                                onClick = { selectedWeek = "previous" },
+                                onClick = {
+                                    selectedWeek = "previous"
+                                    onReloadClub(true)
+                                },
                                 modifier = Modifier.weight(1f),
                                 colors = if (selectedWeek == "previous") {
                                     ButtonDefaults.outlinedButtonColors(

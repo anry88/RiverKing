@@ -27,6 +27,7 @@ import com.riverking.mobile.auth.TelegramLinkPollResult
 import com.riverking.mobile.auth.TelegramLinkStartDto
 import com.riverking.mobile.auth.TelegramLoginPollResult
 import com.riverking.mobile.auth.TournamentDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -199,6 +200,7 @@ class RiverKingViewModel(
     private var appUpdateJob: Job? = null
     private var telegramLoginJob: Job? = null
     private var telegramLinkJob: Job? = null
+    private var postCatchRefreshJob: Job? = null
     private var dismissedRecommendedUpdateCode: Int? = null
     private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
     private var biteStartedAtMillis: Long = 0L
@@ -210,6 +212,7 @@ class RiverKingViewModel(
     override fun onCleared() {
         cancelFishingJobs()
         cancelTelegramJobs()
+        postCatchRefreshJob?.cancel()
         appUpdateJob?.cancel()
         super.onCleared()
     }
@@ -1752,15 +1755,52 @@ class RiverKingViewModel(
                         selectedCatch = cast.catch ?: it.selectedCatch,
                     )
                 }
-                if (cast.achievements.isNotEmpty() || cast.questUpdates.isNotEmpty()) {
-                    loadGuide(force = true)
+                if (cast.caught) {
+                    refreshPostCatchSurfaces()
                 }
-                loadTournaments(force = true)
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
             } catch (error: Throwable) {
                 val message = describeError(error)
                 _state.update { it.copy(error = message) }
                 startCooldown(triggerAutoCast = false)
+            }
+        }
+    }
+
+    private fun refreshPostCatchSurfaces() {
+        postCatchRefreshJob?.cancel()
+        postCatchRefreshJob = viewModelScope.launch {
+            try {
+                val snapshot = coroutineScope {
+                    val currentTournament = async { repository.loadCurrentTournament() }
+                    val achievements = async { repository.loadAchievements() }
+                    val quests = async { repository.loadQuests() }
+                    Triple(currentTournament.await(), achievements.await(), quests.await())
+                }
+                _state.update { current ->
+                    val (currentTournament, achievements, quests) = snapshot
+                    current.copy(
+                        tournaments = current.tournaments.copy(
+                            current = currentTournament,
+                            selectedTournament = if (
+                                currentTournament != null &&
+                                current.tournaments.selectedTournamentId == currentTournament.tournament.id
+                            ) {
+                                currentTournament
+                            } else {
+                                current.tournaments.selectedTournament
+                            },
+                        ),
+                        guide = current.guide.copy(
+                            achievements = achievements,
+                            quests = quests,
+                        ),
+                    )
+                }
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                val message = describeError(error)
+                _state.update { it.copy(error = message) }
             }
         }
     }
