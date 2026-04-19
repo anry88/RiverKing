@@ -951,6 +951,7 @@ function App(){
             }))
           : [];
         const questUpdates = Array.isArray(d.questUpdates) ? d.questUpdates : [];
+        const questProgressChanged = d.questProgressChanged === true || questUpdates.length > 0;
         const animationId = ++catchAnimationIdRef.current;
         setResult({
           ...c,
@@ -978,7 +979,7 @@ function App(){
         if(achievementUnlocks.length>0){
           loadAchievements();
         }
-        if(questUpdates.length>0){
+        if(questProgressChanged){
           loadQuests();
         }
         try{

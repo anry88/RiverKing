@@ -130,6 +130,7 @@ data class CastResultDto(
     val todayCoins: Long? = null,
     val achievements: List<AchievementUnlockDto> = emptyList(),
     val questUpdates: List<QuestUpdateDto> = emptyList(),
+    val questProgressChanged: Boolean = false,
 )
 
 @Serializable

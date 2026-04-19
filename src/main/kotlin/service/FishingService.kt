@@ -1614,6 +1614,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val todayCoins: Long? = null,
         val achievements: List<AchievementUnlock> = emptyList(),
         val questUpdates: List<QuestService.QuestUpdate> = emptyList(),
+        val questProgressChanged: Boolean = false,
     )
 
     private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
@@ -1797,6 +1798,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             todayCoins: Long? = null,
             achievements: List<AchievementUnlock> = emptyList(),
             questUpdates: List<QuestService.QuestUpdate> = emptyList(),
+            questProgressChanged: Boolean = false,
         ): CastResultDTO {
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
@@ -1815,6 +1817,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 todayCoins,
                 achievements,
                 questUpdates,
+                questProgressChanged,
             )
         }
 
@@ -1871,13 +1874,14 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
         val achievements = AchievementService.updateOnCatch(userId, fishId, locId)
-        val questUpdates = QuestService.updateOnCatch(
+        val questResult = QuestService.updateOnCatch(
             userId = userId,
             fishName = fishName,
             rarity = rarity,
             locationId = locId,
             weight = weight,
         )
+        val questUpdates = questResult.completions
         val questRewardCoins = questUpdates.sumOf { it.rewardCoins }
 
         if (rarity == "mythic" || rarity == "legendary") {
@@ -1890,7 +1894,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             }
         }
 
-        clubQuests.updateOnCatch(
+        val clubQuestResult = clubQuests.updateOnCatch(
             userId = userId,
             fishName = fishName,
             rarity = rarity,
@@ -1918,6 +1922,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             todayCoins = todayCoinsAfter,
             achievements = achievements,
             questUpdates = questUpdates,
+            questProgressChanged = questResult.progressChanged || clubQuestResult.progressChanged,
         )
     }
 

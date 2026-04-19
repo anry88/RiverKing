@@ -200,7 +200,7 @@ class RiverKingViewModel(
     private var appUpdateJob: Job? = null
     private var telegramLoginJob: Job? = null
     private var telegramLinkJob: Job? = null
-    private var postCatchQuestRefreshJob: Job? = null
+    private var postCatchProgressRefreshJob: Job? = null
     private var dismissedRecommendedUpdateCode: Int? = null
     private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
     private var biteStartedAtMillis: Long = 0L
@@ -212,7 +212,7 @@ class RiverKingViewModel(
     override fun onCleared() {
         cancelFishingJobs()
         cancelTelegramJobs()
-        postCatchQuestRefreshJob?.cancel()
+        postCatchProgressRefreshJob?.cancel()
         appUpdateJob?.cancel()
         super.onCleared()
     }
@@ -1756,7 +1756,10 @@ class RiverKingViewModel(
                     )
                 }
                 if (cast.caught) {
-                    refreshPostCatchProgress(refreshAchievements = cast.achievements.isNotEmpty())
+                    refreshPostCatchProgress(
+                        refreshQuests = cast.questProgressChanged || cast.questUpdates.isNotEmpty(),
+                        refreshAchievements = cast.achievements.isNotEmpty(),
+                    )
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
             } catch (error: Throwable) {
@@ -1767,23 +1770,20 @@ class RiverKingViewModel(
         }
     }
 
-    private fun refreshPostCatchProgress(refreshAchievements: Boolean) {
-        postCatchQuestRefreshJob?.cancel()
-        postCatchQuestRefreshJob = viewModelScope.launch {
+    private fun refreshPostCatchProgress(refreshQuests: Boolean, refreshAchievements: Boolean) {
+        if (!refreshQuests && !refreshAchievements) return
+        postCatchProgressRefreshJob?.cancel()
+        postCatchProgressRefreshJob = viewModelScope.launch {
             try {
-                val (quests, achievements) = if (refreshAchievements) {
-                    coroutineScope {
-                        val quests = async { repository.loadQuests() }
-                        val achievements = async { repository.loadAchievements() }
-                        quests.await() to achievements.await()
-                    }
-                } else {
-                    repository.loadQuests() to null
+                val (quests, achievements) = coroutineScope {
+                    val quests = if (refreshQuests) async { repository.loadQuests() } else null
+                    val achievements = if (refreshAchievements) async { repository.loadAchievements() } else null
+                    quests?.await() to achievements?.await()
                 }
                 _state.update { current ->
                     current.copy(
                         guide = current.guide.copy(
-                            quests = quests,
+                            quests = quests ?: current.guide.quests,
                             achievements = achievements ?: current.guide.achievements,
                         ),
                     )

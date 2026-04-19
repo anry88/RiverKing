@@ -75,6 +75,11 @@ object QuestService {
         val name: String = "",
     )
 
+    data class CatchUpdateResult(
+        val completions: List<QuestUpdate> = emptyList(),
+        val progressChanged: Boolean = false,
+    )
+
     private data class CatchContext(
         val fishName: String,
         val rarity: String,
@@ -679,7 +684,7 @@ object QuestService {
         rarity: String,
         locationId: Long,
         weight: Double,
-    ): List<QuestUpdate> = inTxn {
+    ): CatchUpdateResult = inTxn {
         val now = Instant.now()
         val dailyStart = periodStart(QuestPeriod.DAILY)
         val weeklyStart = periodStart(QuestPeriod.WEEKLY)
@@ -711,6 +716,7 @@ object QuestService {
         }.toList()
 
         val completions = mutableListOf<QuestUpdate>()
+        var progressChanged = createdKeys.isNotEmpty()
 
         rows.forEach { row ->
             val code = row[QuestProgress.code]
@@ -729,6 +735,7 @@ object QuestService {
             val current = row[QuestProgress.progress]
             val updated = def.updatedProgress(current, context, userId, start)
             if (updated != current) {
+                progressChanged = true
                 QuestProgress.update({ QuestProgress.id eq row[QuestProgress.id].value }) {
                     it[QuestProgress.progress] = updated
                     it[QuestProgress.updatedAt] = now
@@ -742,13 +749,17 @@ object QuestService {
                     it[QuestProgress.updatedAt] = now
                 }
                 if (marked > 0) {
+                    progressChanged = true
                     Metrics.counter("quests_complete_total", mapOf("period" to def.period.code))
                     completions += QuestUpdate(code = def.code, period = def.period.code, rewardCoins = def.rewardCoins)
                 }
             }
         }
 
-        completions
+        CatchUpdateResult(
+            completions = completions,
+            progressChanged = progressChanged,
+        )
     }
 
     fun localizeUpdates(updates: List<QuestUpdate>, lang: String): List<QuestUpdate> {

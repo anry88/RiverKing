@@ -102,8 +102,10 @@ class QuestServiceTest {
             ?.quests
             ?.single { it.code == chosenQuest.code }
             ?: error("Current club quest week missing before catch updates")
-        recordClubCatch(clubQuests, leaverId, scenario, Instant.parse("2026-04-14T10:00:00Z"))
-        recordClubCatch(clubQuests, veteranId, scenario, Instant.parse("2026-04-14T10:05:00Z"))
+        val leaverUpdate = recordClubCatch(clubQuests, leaverId, scenario, Instant.parse("2026-04-14T10:00:00Z"))
+        val veteranUpdate = recordClubCatch(clubQuests, veteranId, scenario, Instant.parse("2026-04-14T10:05:00Z"))
+        assertTrue(leaverUpdate.progressChanged)
+        assertTrue(veteranUpdate.progressChanged)
 
         val weekViewBeforeLeave = clubs.clubDetails(presidentId)?.currentQuestWeek
             ?.quests
@@ -195,7 +197,7 @@ class QuestServiceTest {
         userId: Long,
         scenario: QuestScenario,
         at: Instant,
-    ) {
+    ): ClubQuestService.UpdateResult {
         val (fishId, locationId) = transaction {
             val fishId = Fish.select { Fish.name eq scenario.fishName }.single()[Fish.id].value
             val locationId = Locations.select { Locations.name eq scenario.locationName }.single()[Locations.id].value
@@ -211,7 +213,7 @@ class QuestServiceTest {
                 it[Catches.coins] = null
             }
         }
-        clubQuests.updateOnCatch(userId, scenario.fishName, scenario.rarity, at)
+        return clubQuests.updateOnCatch(userId, scenario.fishName, scenario.rarity, at)
     }
 
     private fun addProgressWeight(userId: Long, weightKg: Double) {

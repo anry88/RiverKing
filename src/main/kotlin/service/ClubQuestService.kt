@@ -30,6 +30,7 @@ import kotlin.math.min
 class ClubQuestService {
     data class UpdateResult(
         val coinsAwardedToUser: Int = 0,
+        val progressChanged: Boolean = false,
     )
 
     private data class CatchContext(
@@ -401,6 +402,7 @@ class ClubQuestService {
         val context = CatchContext(fishName = fishName, rarity = rarity)
         val now = Instant.now()
         var coinsAwardedToUser = 0
+        var progressChanged = createdCodes.isNotEmpty()
 
         ClubQuestProgress.select {
             (ClubQuestProgress.clubId eq clubId) and
@@ -419,6 +421,7 @@ class ClubQuestService {
             val current = row[ClubQuestProgress.progress]
             val updated = def.updatedProgress(current, context, clubId, start)
             if (updated != current) {
+                progressChanged = true
                 ClubQuestProgress.update({
                     (ClubQuestProgress.clubId eq clubId) and
                         (ClubQuestProgress.code eq def.code) and
@@ -440,12 +443,16 @@ class ClubQuestService {
                     it[ClubQuestProgress.updatedAt] = now
                 }
                 if (marked > 0) {
+                    progressChanged = true
                     coinsAwardedToUser += grantReward(clubId, def.code, start, def.rewardCoins, userId, now)
                 }
             }
         }
 
-        UpdateResult(coinsAwardedToUser = coinsAwardedToUser)
+        UpdateResult(
+            coinsAwardedToUser = coinsAwardedToUser,
+            progressChanged = progressChanged,
+        )
     }
 
     private fun definitionFor(code: String): QuestDefinition? = definitions.find { it.code == code }
