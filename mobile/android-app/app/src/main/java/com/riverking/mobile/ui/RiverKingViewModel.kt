@@ -200,7 +200,7 @@ class RiverKingViewModel(
     private var appUpdateJob: Job? = null
     private var telegramLoginJob: Job? = null
     private var telegramLinkJob: Job? = null
-    private var postCatchRefreshJob: Job? = null
+    private var postCatchQuestRefreshJob: Job? = null
     private var dismissedRecommendedUpdateCode: Int? = null
     private var hookReactionSeconds: Double = FAIL_REACTION_SECONDS
     private var biteStartedAtMillis: Long = 0L
@@ -212,7 +212,7 @@ class RiverKingViewModel(
     override fun onCleared() {
         cancelFishingJobs()
         cancelTelegramJobs()
-        postCatchRefreshJob?.cancel()
+        postCatchQuestRefreshJob?.cancel()
         appUpdateJob?.cancel()
         super.onCleared()
     }
@@ -1756,7 +1756,7 @@ class RiverKingViewModel(
                     )
                 }
                 if (cast.caught) {
-                    refreshPostCatchSurfaces()
+                    refreshPostCatchQuests()
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
             } catch (error: Throwable) {
@@ -1767,34 +1767,14 @@ class RiverKingViewModel(
         }
     }
 
-    private fun refreshPostCatchSurfaces() {
-        postCatchRefreshJob?.cancel()
-        postCatchRefreshJob = viewModelScope.launch {
+    private fun refreshPostCatchQuests() {
+        postCatchQuestRefreshJob?.cancel()
+        postCatchQuestRefreshJob = viewModelScope.launch {
             try {
-                val snapshot = coroutineScope {
-                    val currentTournament = async { repository.loadCurrentTournament() }
-                    val achievements = async { repository.loadAchievements() }
-                    val quests = async { repository.loadQuests() }
-                    Triple(currentTournament.await(), achievements.await(), quests.await())
-                }
+                val quests = repository.loadQuests()
                 _state.update { current ->
-                    val (currentTournament, achievements, quests) = snapshot
                     current.copy(
-                        tournaments = current.tournaments.copy(
-                            current = currentTournament,
-                            selectedTournament = if (
-                                currentTournament != null &&
-                                current.tournaments.selectedTournamentId == currentTournament.tournament.id
-                            ) {
-                                currentTournament
-                            } else {
-                                current.tournaments.selectedTournament
-                            },
-                        ),
-                        guide = current.guide.copy(
-                            achievements = achievements,
-                            quests = quests,
-                        ),
+                        guide = current.guide.copy(quests = quests),
                     )
                 }
             } catch (error: Throwable) {
