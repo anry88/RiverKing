@@ -1756,7 +1756,7 @@ class RiverKingViewModel(
                     )
                 }
                 if (cast.caught) {
-                    refreshPostCatchQuests()
+                    refreshPostCatchProgress(refreshAchievements = cast.achievements.isNotEmpty())
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
             } catch (error: Throwable) {
@@ -1767,14 +1767,25 @@ class RiverKingViewModel(
         }
     }
 
-    private fun refreshPostCatchQuests() {
+    private fun refreshPostCatchProgress(refreshAchievements: Boolean) {
         postCatchQuestRefreshJob?.cancel()
         postCatchQuestRefreshJob = viewModelScope.launch {
             try {
-                val quests = repository.loadQuests()
+                val (quests, achievements) = if (refreshAchievements) {
+                    coroutineScope {
+                        val quests = async { repository.loadQuests() }
+                        val achievements = async { repository.loadAchievements() }
+                        quests.await() to achievements.await()
+                    }
+                } else {
+                    repository.loadQuests() to null
+                }
                 _state.update { current ->
                     current.copy(
-                        guide = current.guide.copy(quests = quests),
+                        guide = current.guide.copy(
+                            quests = quests,
+                            achievements = achievements ?: current.guide.achievements,
+                        ),
                     )
                 }
             } catch (error: Throwable) {
