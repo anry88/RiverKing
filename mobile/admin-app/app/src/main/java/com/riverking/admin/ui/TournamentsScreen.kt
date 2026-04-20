@@ -30,6 +30,7 @@ import com.riverking.admin.ui.theme.riverPrimaryButtonColors
 import com.riverking.admin.ui.theme.riverTextFieldColors
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
@@ -39,6 +40,7 @@ import java.time.format.DateTimeFormatter
 private const val TOURNAMENT_PAGE_SIZE = 10
 private const val COIN_PRIZE_ID = "coins"
 private val AdminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private val TournamentJson = Json { ignoreUnknownKeys = true }
 
 @Serializable
 data class PrizeSpec(
@@ -58,6 +60,7 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
     var canLoadMore by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<TournamentDTO?>(null) }
+    var selectedTournament by remember { mutableStateOf<TournamentDTO?>(null) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -149,6 +152,13 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
                     items(tournaments, key = { it.id }) { tournament ->
                         TournamentAdminCard(
                             tournament = tournament,
+                            onOpenClick = {
+                                if (catalog == null) {
+                                    scope.launch { snackbarHostState.showSnackbar("Catalog is still loading") }
+                                } else {
+                                    selectedTournament = tournament
+                                }
+                            },
                             onDeleteClick = { pendingDelete = tournament }
                         )
                     }
@@ -209,12 +219,27 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
 
     val loadedCatalog = catalog
     if (showCreateDialog && loadedCatalog != null) {
-        CreateTournamentDialog(
+        TournamentEditorDialog(
             apiClient = apiClient,
             catalog = loadedCatalog,
+            tournament = null,
             onDismiss = { showCreateDialog = false },
-            onCreated = {
+            onSaved = {
                 showCreateDialog = false
+                reloadTournaments()
+            }
+        )
+    }
+
+    val tournamentToEdit = selectedTournament
+    if (tournamentToEdit != null && loadedCatalog != null) {
+        TournamentEditorDialog(
+            apiClient = apiClient,
+            catalog = loadedCatalog,
+            tournament = tournamentToEdit,
+            onDismiss = { selectedTournament = null },
+            onSaved = {
+                selectedTournament = null
                 reloadTournaments()
             }
         )
@@ -224,9 +249,11 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
 @Composable
 private fun TournamentAdminCard(
     tournament: TournamentDTO,
+    onOpenClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Card(
+        onClick = onOpenClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
@@ -263,11 +290,12 @@ private fun TournamentAdminCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateTournamentDialog(
+fun TournamentEditorDialog(
     apiClient: AdminApiClient,
     catalog: AdminCatalogDTO,
+    tournament: TournamentDTO?,
     onDismiss: () -> Unit,
-    onCreated: () -> Unit
+    onSaved: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val today = remember { LocalDate.now(ZoneOffset.UTC) }
@@ -276,33 +304,39 @@ fun CreateTournamentDialog(
             listOf(PrizeOptionDTO(COIN_PRIZE_ID, "Монеты", defaultQty = 1000, coins = true))
         }
     }
-    var nameRu by remember { mutableStateOf("") }
-    var nameEn by remember { mutableStateOf("") }
-    var metric by remember { mutableStateOf(catalog.metrics.firstOrNull()?.id ?: "total_weight") }
-    var fish by remember { mutableStateOf<String?>(null) }
-    var location by remember { mutableStateOf<String?>(null) }
-    var startDate by remember { mutableStateOf(today.format(AdminDateFormatter)) }
-    var endDate by remember { mutableStateOf(today.plusDays(1).format(AdminDateFormatter)) }
-    var prizePlacesStr by remember { mutableStateOf("3") }
+    val initialPrizePlaces = tournament?.prizePlaces ?: 3
+    val initialPrizes = remember(tournament?.id, prizeOptions) {
+        val parsed = tournament?.prizesJson?.let { parseTournamentPrizes(it, prizeOptions) }
+            ?: List(initialPrizePlaces) { defaultPrize(prizeOptions.first()) }
+        adjustPrizes(parsed, initialPrizePlaces, prizeOptions)
+    }
+    var nameRu by remember(tournament?.id) { mutableStateOf(tournament?.nameRu.orEmpty()) }
+    var nameEn by remember(tournament?.id) { mutableStateOf(tournament?.nameEn.orEmpty()) }
+    var metric by remember(tournament?.id) { mutableStateOf(tournament?.metric ?: catalog.metrics.firstOrNull()?.id ?: "total_weight") }
+    var fish by remember(tournament?.id) { mutableStateOf(tournament?.fish) }
+    var location by remember(tournament?.id) { mutableStateOf(tournament?.location) }
+    var startDate by remember(tournament?.id) {
+        mutableStateOf(tournament?.startTime?.let(::formatDateMillis) ?: today.format(AdminDateFormatter))
+    }
+    var endDate by remember(tournament?.id) {
+        mutableStateOf(tournament?.endTime?.let(::formatDateMillis) ?: today.plusDays(1).format(AdminDateFormatter))
+    }
+    var prizePlacesStr by remember(tournament?.id) { mutableStateOf(initialPrizePlaces.toString()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val prizePlaces = prizePlacesStr.toIntOrNull()?.coerceAtLeast(0) ?: 0
-    var prizes by remember {
-        mutableStateOf(List(3) { defaultPrize(prizeOptions.first()) })
+    var prizes by remember(tournament?.id, prizeOptions) {
+        mutableStateOf(initialPrizes)
     }
 
     LaunchedEffect(prizePlaces, prizeOptions) {
-        prizes = when {
-            prizePlaces > prizes.size -> prizes + List(prizePlaces - prizes.size) { defaultPrize(prizeOptions.first()) }
-            prizePlaces < prizes.size -> prizes.take(prizePlaces)
-            else -> prizes
-        }
+        prizes = adjustPrizes(prizes, prizePlaces, prizeOptions)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.9f),
-        title = { Text("Create Tournament") },
+        title = { Text(if (tournament == null) "Create Tournament" else "Tournament #${tournament.id}") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -394,17 +428,21 @@ fun CreateTournamentDialog(
                                     location = location,
                                     metric = metric,
                                     prizePlaces = prizePlaces,
-                                    prizesJson = Json.encodeToString(prizes.map { normalizePrize(it) })
+                                    prizesJson = TournamentJson.encodeToString(prizes.map { normalizePrize(it) })
                                 )
-                                apiClient.createTournament(req)
-                                onCreated()
+                                if (tournament == null) {
+                                    apiClient.createTournament(req)
+                                } else {
+                                    apiClient.updateTournament(tournament.id, req)
+                                }
+                                onSaved()
                             } catch (e: Exception) {
-                                errorMessage = "Create failed: ${e.message}"
+                                errorMessage = "Save failed: ${e.message}"
                             }
                         }
                     }
                 }
-            }) { Text("Create") }
+            }) { Text(if (tournament == null) "Create" else "Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -553,6 +591,34 @@ private fun normalizePrize(prize: PrizeSpec): PrizeSpec =
     } else {
         prize.copy(coins = null)
     }
+
+private fun parseTournamentPrizes(raw: String, options: List<PrizeOptionDTO>): List<PrizeSpec> {
+    val fallback = listOf(defaultPrize(options.first()))
+    return runCatching {
+        TournamentJson.decodeFromString<List<PrizeSpec>>(raw)
+            .ifEmpty { fallback }
+            .map { prize ->
+                when {
+                    prize.pack == COIN_PRIZE_ID || prize.coins != null -> {
+                        val amount = prize.coins ?: prize.qty
+                        PrizeSpec(pack = COIN_PRIZE_ID, qty = amount.coerceAtLeast(1), coins = amount.coerceAtLeast(1))
+                    }
+                    prize.pack.isBlank() -> defaultPrize(options.first())
+                    else -> prize.copy(qty = prize.qty.coerceAtLeast(1), coins = null)
+                }
+            }
+    }.getOrElse { fallback }
+}
+
+private fun adjustPrizes(
+    current: List<PrizeSpec>,
+    prizePlaces: Int,
+    options: List<PrizeOptionDTO>
+): List<PrizeSpec> = when {
+    prizePlaces > current.size -> current + List(prizePlaces - current.size) { defaultPrize(options.first()) }
+    prizePlaces < current.size -> current.take(prizePlaces)
+    else -> current
+}
 
 private fun parseAdminDateMillis(value: String): Long? =
     runCatching {

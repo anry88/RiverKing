@@ -9,7 +9,7 @@ This project is separate from the public player app in `mobile/android-app`. It 
 - Saved server profiles with backend URL and admin API token.
 - Dashboard navigation for tournaments, discounts, and broadcasts.
 - Tournament list loaded from `/api/admin/tournaments` in pages of 10, sorted newest first.
-- Tournament creation using backend catalog choices for metric, fish, location, and prizes.
+- Tournament creation and editing using backend catalog choices for metric, fish, location, and prizes.
 - Tournament deletion with explicit confirmation.
 - Shop discount management using selectable shop packages, rods, and subscriptions with current price context.
 - Broadcast sending through the backend admin API.
