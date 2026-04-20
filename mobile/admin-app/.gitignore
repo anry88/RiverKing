@@ -1,1 +1,5 @@
 *.jks
+!gradle-wrapper.properties
+!gradle.properties
+!gradle.example.properties
+!version.properties
