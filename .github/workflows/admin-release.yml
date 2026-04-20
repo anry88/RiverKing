@@ -28,18 +28,21 @@ jobs:
         working-directory: mobile/admin-app
 
       - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: mobile/admin-app/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.ADMIN_KEYSTORE_BASE64 }}
-          alias: ${{ secrets.ADMIN_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.ADMIN_KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.ADMIN_KEY_PASSWORD }}
-          buildToolsVersion: 34.0.0
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ADMIN_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ADMIN_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ADMIN_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ADMIN_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > admin.jks
+          BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
+          APK_PATH=mobile/admin-app/app/build/outputs/apk/release/app-release-unsigned.apk
+          SIGNED_APK=mobile/admin-app/app/build/outputs/apk/release/app-release.apk
+          $BUILD_TOOLS/zipalign -v -p 4 $APK_PATH $SIGNED_APK
+          $BUILD_TOOLS/apksigner sign --ks admin.jks --ks-pass pass:$KEYSTORE_PASSWORD --ks-key-alias $KEY_ALIAS --key-pass pass:$KEY_PASSWORD $SIGNED_APK
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: admin-app-release
-          path: ${{steps.sign_app.outputs.signedReleaseFile}}
+          path: mobile/admin-app/app/build/outputs/apk/release/app-release.apk
