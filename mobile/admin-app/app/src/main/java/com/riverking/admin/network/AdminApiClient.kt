@@ -67,6 +67,12 @@ data class BroadcastReq(
     val textEn: String
 )
 
+@Serializable
+data class BroadcastResp(
+    val status: String = "",
+    val count: Int = 0
+)
+
 class AdminApiClient(
     var baseUrl: String = "",
     var token: String = ""
@@ -141,12 +147,13 @@ class AdminApiClient(
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
-    suspend fun sendBroadcast(req: BroadcastReq) {
+    suspend fun sendBroadcast(req: BroadcastReq): BroadcastResp {
         val response = client.post(apiUrl("/api/admin/broadcast")) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
     }
 }

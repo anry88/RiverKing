@@ -11,16 +11,71 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import service.FishingService
-import service.Tournament
 import service.TournamentService
 import java.time.Instant
 import java.time.LocalDate
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+// ── Serializable DTOs for API responses ──
+
+@Serializable
+data class TournamentReq(
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val fish: String? = null,
+    val location: String? = null,
+    val metric: String,
+    val prizePlaces: Int,
+    val prizesJson: String
+)
+
+@Serializable
+data class TournamentResp(
+    val id: Long,
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val fish: String? = null,
+    val location: String? = null,
+    val metric: String,
+    val prizePlaces: Int,
+    val prizesJson: String
+)
+
+@Serializable
+data class DiscountReq(
+    val packageId: String,
+    val price: Int,
+    val start: String,
+    val end: String
+)
+
+@Serializable
+data class DiscountResp(
+    val packageId: String,
+    val price: Int,
+    val startDate: String,
+    val endDate: String
+)
+
+@Serializable
+data class BroadcastReq(
+    val textRu: String,
+    val textEn: String
+)
+
+@Serializable
+data class BroadcastResp(
+    val status: String,
+    val count: Int
+)
 
 fun Application.adminApiRoutes(env: Env) {
     val tournaments = TournamentService()
@@ -39,22 +94,24 @@ fun Application.adminApiRoutes(env: Env) {
                 }
             }
 
-            @Serializable
-            data class TournamentReq(
-                val nameRu: String,
-                val nameEn: String,
-                val startTime: Long, // Epoch millis
-                val endTime: Long,
-                val fish: String?,
-                val location: String?,
-                val metric: String,
-                val prizePlaces: Int,
-                val prizesJson: String
-            )
+            // ── Tournaments ──
 
-            // Tournaments
             get("/tournaments") {
-                call.respond(tournaments.listTournaments())
+                val list = tournaments.listTournaments().map { t ->
+                    TournamentResp(
+                        id = t.id,
+                        nameRu = t.nameRu,
+                        nameEn = t.nameEn,
+                        startTime = t.startTime.toEpochMilli(),
+                        endTime = t.endTime.toEpochMilli(),
+                        fish = t.fish,
+                        location = t.location,
+                        metric = t.metric,
+                        prizePlaces = t.prizePlaces,
+                        prizesJson = t.prizesJson
+                    )
+                }
+                call.respond(list)
             }
 
             post("/tournaments") {
@@ -97,18 +154,18 @@ fun Application.adminApiRoutes(env: Env) {
                 call.respond(HttpStatusCode.NoContent)
             }
 
-            @Serializable
-            data class DiscountReq(
-                val packageId: String,
-                val price: Int,
-                val start: String, // ISO date string e.g. "2026-04-20"
-                val end: String
-            )
+            // ── Discounts ──
 
-            // Discounts
             get("/discounts") {
-                val discounts = fishing.listDiscounts()
-                call.respond(discounts)
+                val list = fishing.listDiscounts().map { d ->
+                    DiscountResp(
+                        packageId = d.packageId,
+                        price = d.price,
+                        startDate = d.startDate.toString(),
+                        endDate = d.endDate.toString()
+                    )
+                }
+                call.respond(list)
             }
 
             post("/discounts") {
@@ -125,21 +182,16 @@ fun Application.adminApiRoutes(env: Env) {
                 call.respond(HttpStatusCode.NoContent)
             }
 
-            @Serializable
-            data class BroadcastReq(
-                val textRu: String,
-                val textEn: String
-            )
+            // ── Broadcast ──
 
-            // Broadcast
             post("/broadcast") {
                 val req = call.receive<BroadcastReq>()
                 val users = transaction {
-                    Users.select { Users.tgId.isNotNull() }.map { 
+                    Users.select { Users.tgId.isNotNull() }.map {
                         it[Users.tgId]!! to (it[Users.language] ?: "en")
                     }
                 }
-                
+
                 broadcastScope.launch {
                     users.forEach { (tgId, lang) ->
                         val msg = if (lang == "ru" && req.textRu.isNotBlank()) req.textRu else req.textEn
@@ -152,7 +204,7 @@ fun Application.adminApiRoutes(env: Env) {
                         }
                     }
                 }
-                call.respond(HttpStatusCode.Accepted, mapOf("status" to "Broadcast started", "count" to users.size))
+                call.respond(HttpStatusCode.Accepted, BroadcastResp(status = "Broadcast started", count = users.size))
             }
         }
     }
