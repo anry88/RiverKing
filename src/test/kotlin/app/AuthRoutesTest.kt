@@ -40,6 +40,7 @@ import service.ClubQuestService
 import service.FishingService
 import service.PlayPurchaseVerificationResult
 import service.PlayPurchaseVerifier
+import service.TournamentService
 import service.VerifiedPlayLineItem
 import service.VerifiedPlayPurchase
 import support.testEnv
@@ -354,6 +355,41 @@ class AuthRoutesTest {
             androidClientHeaders()
         }
         assertEquals(HttpStatusCode.OK, currentProfile.status)
+    }
+
+    @Test
+    fun `current tournament route returns tournament created with admin timestamp payload`() = testApplication {
+        val env = testEnv("admin-created-current-tournament").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+        val registered = registerPasswordUser(client, "angler.admin.tournament", "password123", language = "ru")
+        val now = Instant.now()
+        val tournamentId = TournamentService().createTournament(
+            nameRu = "тест",
+            nameEn = "test",
+            start = Instant.ofEpochMilli(now.minusSeconds(3_600).toEpochMilli()),
+            end = Instant.ofEpochMilli(now.plusSeconds(3_600).toEpochMilli()),
+            fish = "Карась",
+            location = null,
+            metric = "largest",
+            prizePlaces = 5,
+            prizes = """[{"pack":"coins","qty":1500,"coins":1500},{"pack":"autofish_week","qty":2},{"pack":"autofish"},{"pack":"fresh_topup_s","qty":2},{"pack":"bundle_pro"}]""",
+        )
+
+        val current = client.get("/api/tournament/current") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+
+        assertEquals(HttpStatusCode.OK, current.status)
+        val body = json.parseToJsonElement(current.bodyAsText()).jsonObject
+        val tournament = body.getValue("tournament").jsonObject
+        assertEquals(tournamentId, tournament.getValue("id").jsonPrimitive.content.toLong())
+        assertEquals("тест", tournament.getValue("name").jsonPrimitive.content)
+        assertEquals("Карась", tournament.getValue("fish").jsonPrimitive.content)
     }
 
     @Test

@@ -148,20 +148,14 @@ class TournamentService {
     fun currentTournament(now: Instant = Instant.now()): Tournament? = transaction {
         Tournaments.select {
             (Tournaments.startTime lessEq now) and (Tournaments.endTime greaterEq now)
-        }.singleOrNull()?.let { row ->
-            Tournament(
-                id = row[Tournaments.id].value,
-                nameRu = row[Tournaments.nameRu],
-                nameEn = row[Tournaments.nameEn],
-                startTime = row[Tournaments.startTime],
-                endTime = row[Tournaments.endTime],
-                fish = row[Tournaments.fish],
-                location = row[Tournaments.location],
-                metric = row[Tournaments.metric],
-                prizePlaces = row[Tournaments.prizePlaces],
-                prizesJson = row[Tournaments.prizesJson],
-            )
         }
+            .orderBy(
+                Tournaments.startTime to SortOrder.DESC,
+                Tournaments.id to SortOrder.DESC,
+            )
+            .limit(1)
+            .firstOrNull()
+            ?.toTournament()
     }
 
     fun upcomingTournaments(now: Instant = Instant.now()): List<Tournament> = transaction {
