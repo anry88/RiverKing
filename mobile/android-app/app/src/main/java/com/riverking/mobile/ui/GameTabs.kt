@@ -279,8 +279,9 @@ fun MainShell(
     var showReferralSheet by rememberSaveable { mutableStateOf(false) }
     var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
 
-    val tournamentBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
+    val tournamentBadge = state.tournaments.prizes.any(::isTournamentPrize)
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
+    val clubBadge = state.tournaments.prizes.any(::isClubPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
     val showReferralMenuItem =
@@ -341,6 +342,7 @@ fun MainShell(
                     MainTab.entries.forEach { tab ->
                         val showBadge = when (tab) {
                             MainTab.LEADERS -> leadersBadge
+                            MainTab.CLUB -> clubBadge
                             else -> false
                         }
                         NavigationBarItem(
@@ -441,6 +443,7 @@ fun MainShell(
                     onUpdateClubSettings = onUpdateClubSettings,
                     onLeaveClub = onLeaveClub,
                     onMemberAction = onClubMemberAction,
+                    onClaimPrize = onClaimPrize,
                 )
                 MainTab.SHOP -> ShopScreen(
                     state = state,
@@ -608,7 +611,7 @@ private fun LeadersScreen(
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     var section by rememberSaveable { mutableStateOf(LeaderSection.TOURNAMENTS) }
-    val tournamentsBadge = state.tournaments.prizes.any { !isRatingPrize(it) }
+    val tournamentsBadge = state.tournaments.prizes.any(::isTournamentPrize)
     val ratingsBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementsBadge = state.guide.achievements.any { it.claimable }
 
@@ -1329,7 +1332,7 @@ private fun TournamentsScreen(
 ) {
     val tournaments = state.tournaments
     val me = state.me
-    val visiblePrizes = tournaments.prizes.filterNot(::isRatingPrize)
+    val visiblePrizes = tournaments.prizes.filter(::isTournamentPrize)
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -1337,24 +1340,11 @@ private fun TournamentsScreen(
     ) {
         if (visiblePrizes.isNotEmpty()) {
             item {
-                SectionCard(strings.prizes) {
-                    visiblePrizes.forEachIndexed { index, prize ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(pendingPrizeLabel(strings, prize), fontWeight = FontWeight.SemiBold)
-                                tournamentPrizeDetailsLabel(strings, prize)?.let { details ->
-                                    Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            Button(onClick = { onClaimPrize(prize.id) }) { Text(strings.claim) }
-                        }
-                    }
-                }
+                PendingPrizeCard(
+                    strings = strings,
+                    prizes = visiblePrizes,
+                    onClaimPrize = onClaimPrize,
+                )
             }
         }
         item {
@@ -1427,6 +1417,34 @@ private fun TournamentsScreen(
                         if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                         TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingPrizeCard(
+    strings: RiverStrings,
+    prizes: List<PrizeDto>,
+    onClaimPrize: (Long) -> Unit,
+) {
+    SectionCard(strings.prizes) {
+        prizes.forEachIndexed { index, prize ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(pendingPrizeLabel(strings, prize), fontWeight = FontWeight.SemiBold)
+                    tournamentPrizeDetailsLabel(strings, prize)?.let { details ->
+                        Text(details, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Button(onClick = { onClaimPrize(prize.id) }) {
+                    Text(strings.claim)
                 }
             }
         }
@@ -1820,6 +1838,7 @@ private fun ClubScreen(
     onUpdateClubSettings: (Double, Boolean) -> Unit,
     onLeaveClub: () -> Unit,
     onMemberAction: (Long, String) -> Unit,
+    onClaimPrize: (Long) -> Unit,
 ) {
     val me = state.me
     val questsSectionLabel = if (strings.login == "Логин") "Квесты" else "Quests"
@@ -1838,6 +1857,7 @@ private fun ClubScreen(
     val selectedQuest = questWeekData?.quests
         ?.firstOrNull { it.code == selectedQuestCode }
         ?: questWeekData?.quests?.firstOrNull()
+    val clubPrizes = state.tournaments.prizes.filter(::isClubPrize)
     val createCostCoins = 1_000L
     val minCreateWeightKg = 1_000.0
     val hasCreateWeight = (me?.totalWeight ?: 0.0) >= minCreateWeightKg
@@ -1876,8 +1896,20 @@ private fun ClubScreen(
                 item {
                     SectionCard(strings.club) {
                         ClubOverview(strings, club)
-                        if (canManageClub) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+                if (clubPrizes.isNotEmpty()) {
+                    item {
+                        PendingPrizeCard(
+                            strings = strings,
+                            prizes = clubPrizes,
+                            onClaimPrize = onClaimPrize,
+                        )
+                    }
+                }
+                if (canManageClub) {
+                    item {
+                        SectionCard(if (strings.login == "Логин") "Настройки клуба" else "Club settings") {
                             OutlinedTextField(
                                 value = infoDraft,
                                 onValueChange = { infoDraft = it },
@@ -1890,7 +1922,6 @@ private fun ClubScreen(
                                     },
                                 label = { Text(strings.club) },
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = minWeightDraft,
                                 onValueChange = { minWeightDraft = it },
@@ -1907,7 +1938,6 @@ private fun ClubScreen(
                                     },
                                 label = { Text(if (strings.login == "Логин") "Мин. вес для входа" else "Min join weight") },
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2075,6 +2105,15 @@ private fun ClubScreen(
                     }
                 }
             } else {
+                if (clubPrizes.isNotEmpty()) {
+                    item {
+                        PendingPrizeCard(
+                            strings = strings,
+                            prizes = clubPrizes,
+                            onClaimPrize = onClaimPrize,
+                        )
+                    }
+                }
                 item {
                     SectionCard(strings.searchClub) {
                         OutlinedTextField(
@@ -6355,7 +6394,11 @@ private fun englishOrdinal(value: Int): String {
     return "$value$suffix"
 }
 
+private fun isTournamentPrize(prize: PrizeDto): Boolean = prize.source == "tournament"
+
 private fun isRatingPrize(prize: PrizeDto): Boolean = prize.source == "rating"
+
+private fun isClubPrize(prize: PrizeDto): Boolean = prize.source == "club"
 
 private fun achievementRewardTitle(
     strings: RiverStrings,
