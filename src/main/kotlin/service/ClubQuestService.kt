@@ -1,17 +1,12 @@
 package service
 
-import db.Catches
 import db.ClubMembers
 import db.ClubQuestMemberProgress
 import db.ClubQuestProgress
 import db.ClubQuestRewardRecipients
-import db.Fish
 import db.Users
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.TransactionManager
@@ -39,30 +34,16 @@ class ClubQuestService {
     )
 
     private sealed class QuestRule {
-        abstract fun initialProgress(clubId: Long, periodStart: LocalDate): Int
-        abstract fun initialProgressByMember(clubId: Long, periodStart: LocalDate): Map<Long, Int>
         abstract fun updatedProgress(current: Int, context: CatchContext, clubId: Long, periodStart: LocalDate): Int
     }
 
     private class RarityCountRule(private val rarities: Set<String>) : QuestRule() {
-        override fun initialProgress(clubId: Long, periodStart: LocalDate): Int =
-            Companion.countByRarity(clubId, periodStart, rarities)
-
-        override fun initialProgressByMember(clubId: Long, periodStart: LocalDate): Map<Long, Int> =
-            Companion.countByRarityByMember(clubId, periodStart, rarities)
-
         override fun updatedProgress(current: Int, context: CatchContext, clubId: Long, periodStart: LocalDate): Int {
             return if (context.rarity in rarities) current + 1 else current
         }
     }
 
     private class FishCountRule(private val fishNames: Set<String>) : QuestRule() {
-        override fun initialProgress(clubId: Long, periodStart: LocalDate): Int =
-            Companion.countByFishNames(clubId, periodStart, fishNames)
-
-        override fun initialProgressByMember(clubId: Long, periodStart: LocalDate): Map<Long, Int> =
-            Companion.countByFishNamesByMember(clubId, periodStart, fishNames)
-
         override fun updatedProgress(current: Int, context: CatchContext, clubId: Long, periodStart: LocalDate): Int {
             return if (context.fishName in fishNames) current + 1 else current
         }
@@ -80,13 +61,6 @@ class ClubQuestService {
     ) {
         fun name(lang: String) = if (lang.startsWith("en", ignoreCase = true)) nameEn else nameRu
         fun description(lang: String) = if (lang.startsWith("en", ignoreCase = true)) descEn else descRu
-        fun initialProgress(clubId: Long, periodStart: LocalDate): Int =
-            min(target, rule.initialProgress(clubId, periodStart))
-
-        fun initialProgressByMember(clubId: Long, periodStart: LocalDate): Map<Long, Int> =
-            rule.initialProgressByMember(clubId, periodStart)
-                .mapValues { (_, progress) -> min(target, progress) }
-
         fun updatedProgress(current: Int, context: CatchContext, clubId: Long, periodStart: LocalDate): Int =
             min(target, rule.updatedProgress(current, context, clubId, periodStart))
     }
@@ -197,80 +171,6 @@ class ClubQuestService {
                 rule = FishCountRule(setOf("Сельдь")),
             ),
         )
-
-        private fun memberIds(clubId: Long): List<Long> {
-            return ClubMembers
-                .slice(ClubMembers.userId)
-                .select { ClubMembers.clubId eq clubId }
-                .map { it[ClubMembers.userId].value }
-        }
-
-        private fun periodStartInstant(periodStart: LocalDate): Instant =
-            periodStart.atStartOfDay(CLUB_ZONE).toInstant()
-
-        private fun countByRarity(clubId: Long, periodStart: LocalDate, rarities: Set<String>): Int {
-            val members = memberIds(clubId)
-            if (members.isEmpty()) return 0
-            val countExpr = Catches.id.count()
-            return (Catches innerJoin Fish)
-                .slice(countExpr)
-                .select {
-                    (Catches.userId inList members) and
-                        (Catches.createdAt greaterEq periodStartInstant(periodStart)) and
-                        (Fish.rarity inList rarities.toList())
-                }
-                .single()[countExpr]
-                .toInt()
-        }
-
-        private fun countByRarityByMember(clubId: Long, periodStart: LocalDate, rarities: Set<String>): Map<Long, Int> {
-            val members = memberIds(clubId)
-            if (members.isEmpty()) return emptyMap()
-            val countExpr = Catches.id.count()
-            return (Catches innerJoin Fish)
-                .slice(Catches.userId, countExpr)
-                .select {
-                    (Catches.userId inList members) and
-                        (Catches.createdAt greaterEq periodStartInstant(periodStart)) and
-                        (Fish.rarity inList rarities.toList())
-                }
-                .groupBy(Catches.userId)
-                .associate { row ->
-                    row[Catches.userId].value to row[countExpr].toInt()
-                }
-        }
-
-        private fun countByFishNames(clubId: Long, periodStart: LocalDate, fishNames: Set<String>): Int {
-            val members = memberIds(clubId)
-            if (members.isEmpty()) return 0
-            val countExpr = Catches.id.count()
-            return (Catches innerJoin Fish)
-                .slice(countExpr)
-                .select {
-                    (Catches.userId inList members) and
-                        (Catches.createdAt greaterEq periodStartInstant(periodStart)) and
-                        (Fish.name inList fishNames.toList())
-                }
-                .single()[countExpr]
-                .toInt()
-        }
-
-        private fun countByFishNamesByMember(clubId: Long, periodStart: LocalDate, fishNames: Set<String>): Map<Long, Int> {
-            val members = memberIds(clubId)
-            if (members.isEmpty()) return emptyMap()
-            val countExpr = Catches.id.count()
-            return (Catches innerJoin Fish)
-                .slice(Catches.userId, countExpr)
-                .select {
-                    (Catches.userId inList members) and
-                        (Catches.createdAt greaterEq periodStartInstant(periodStart)) and
-                        (Fish.name inList fishNames.toList())
-                }
-                .groupBy(Catches.userId)
-                .associate { row ->
-                    row[Catches.userId].value to row[countExpr].toInt()
-                }
-        }
     }
 
     private inline fun <T> inTxn(crossinline block: () -> T): T {
@@ -470,30 +370,16 @@ class ClubQuestService {
         val selected = definitions.shuffled(Rng.fast()).take(2)
         val now = Instant.now()
         selected.forEach { def ->
-            val initial = def.initialProgress(clubId, periodStart)
-            val byMember = def.initialProgressByMember(clubId, periodStart)
             ClubQuestProgress.insert {
                 it[ClubQuestProgress.clubId] = clubId
                 it[ClubQuestProgress.code] = def.code
                 it[ClubQuestProgress.periodStart] = periodStart
-                it[ClubQuestProgress.progress] = initial
+                it[ClubQuestProgress.progress] = 0
                 it[ClubQuestProgress.target] = def.target
                 it[ClubQuestProgress.rewardCoins] = def.rewardCoins
-                it[ClubQuestProgress.completedAt] = if (initial >= def.target) now else null
+                it[ClubQuestProgress.completedAt] = null
                 it[ClubQuestProgress.createdAt] = now
                 it[ClubQuestProgress.updatedAt] = now
-            }
-            byMember.forEach { (userId, progress) ->
-                if (progress > 0) {
-                    ClubQuestMemberProgress.insert {
-                        it[ClubQuestMemberProgress.clubId] = clubId
-                        it[ClubQuestMemberProgress.code] = def.code
-                        it[ClubQuestMemberProgress.periodStart] = periodStart
-                        it[ClubQuestMemberProgress.userId] = userId
-                        it[ClubQuestMemberProgress.progress] = progress
-                        it[ClubQuestMemberProgress.updatedAt] = now
-                    }
-                }
             }
         }
         return selected.mapTo(linkedSetOf()) { it.code }

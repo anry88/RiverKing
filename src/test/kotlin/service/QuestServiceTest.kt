@@ -16,7 +16,11 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import support.testEnv
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -84,6 +88,9 @@ class QuestServiceTest {
 
         fishing.addCoins(presidentId, ClubService.CREATE_COST_COINS.toInt())
         addProgressWeight(presidentId, ClubService.MIN_CREATE_WEIGHT_KG + 100.0)
+        allClubQuestCodes.forEachIndexed { index, code ->
+            recordCatchOnly(presidentId, questScenario(code), currentClubWeekInstant().plusSeconds(index.toLong()))
+        }
 
         clubs.createClub(presidentId, "Quest Club")
         val clubId = findClubId(presidentId)
@@ -95,6 +102,13 @@ class QuestServiceTest {
         assertTrue(firstList.available)
         assertEquals(2, firstList.quests.size)
         assertEquals(firstList.quests.map { it.code }, secondList.quests.map { it.code })
+        firstList.quests.forEach { quest ->
+            assertEquals(
+                0,
+                quest.progress,
+                "Club quest ${quest.code} must not include fish caught before the club was created.",
+            )
+        }
 
         val chosenQuest = firstList.quests.first()
         val scenario = questScenario(chosenQuest.code)
@@ -102,8 +116,8 @@ class QuestServiceTest {
             ?.quests
             ?.single { it.code == chosenQuest.code }
             ?: error("Current club quest week missing before catch updates")
-        val leaverUpdate = recordClubCatch(clubQuests, leaverId, scenario, Instant.parse("2026-04-14T10:00:00Z"))
-        val veteranUpdate = recordClubCatch(clubQuests, veteranId, scenario, Instant.parse("2026-04-14T10:05:00Z"))
+        val leaverUpdate = recordClubCatch(clubQuests, leaverId, scenario, currentClubWeekInstant(dayOffset = 1))
+        val veteranUpdate = recordClubCatch(clubQuests, veteranId, scenario, currentClubWeekInstant(dayOffset = 1, secondOffset = 300))
         assertTrue(leaverUpdate.progressChanged)
         assertTrue(veteranUpdate.progressChanged)
 
@@ -125,6 +139,7 @@ class QuestServiceTest {
             weekViewBeforeLeave.members.single { it.userId == leaverId }.progress,
         )
 
+        clubs.addContribution(leaverId, 75, currentClubWeekInstant(dayOffset = 1, secondOffset = 600))
         clubs.leaveClub(leaverId)
 
         val weekViewAfterLeave = clubs.clubDetails(presidentId)?.currentQuestWeek
@@ -133,6 +148,22 @@ class QuestServiceTest {
             ?: error("Current club quest week missing after leave")
         assertEquals(listOf(presidentId, veteranId), weekViewAfterLeave.members.map { it.userId }.sorted())
 
+        clubs.joinClub(leaverId, clubId)
+        val detailsAfterRejoin = clubs.clubDetails(presidentId) ?: error("Club details missing after rejoin")
+        val weekViewAfterRejoin = detailsAfterRejoin.currentQuestWeek.quests
+            .single { it.code == chosenQuest.code }
+        assertEquals(
+            weekViewBeforeLeave.members.single { it.userId == leaverId }.progress,
+            weekViewAfterRejoin.members.single { it.userId == leaverId }.progress,
+            "Rejoining the same club must preserve current-week club quest progress.",
+        )
+        assertEquals(
+            75,
+            detailsAfterRejoin.currentWeek.members.single { it.userId == leaverId }.coins,
+            "Rejoining the same club must preserve current-week rating contribution.",
+        )
+        clubs.leaveClub(leaverId)
+
         val progressAfterLeave = chosenQuest.target - 2
         repeat(progressAfterLeave) { index ->
             val actorId = if (index % 2 == 0) presidentId else veteranId
@@ -140,7 +171,7 @@ class QuestServiceTest {
                 clubQuests,
                 actorId,
                 scenario,
-                Instant.parse("2026-04-14T11:00:00Z").plusSeconds(index.toLong()),
+                currentClubWeekInstant(dayOffset = 1, secondOffset = 3_600L + index.toLong()),
             )
         }
 
@@ -190,6 +221,52 @@ class QuestServiceTest {
         "club_perch_50" -> QuestScenario("Окунь", "common", "Пруд", 0.3)
         "club_herring_50" -> QuestScenario("Сельдь", "common", "Прибрежье моря", 0.4)
         else -> error("Unexpected quest code: $code")
+    }
+
+    private val allClubQuestCodes = listOf(
+        "club_epic_20",
+        "club_common_200",
+        "club_uncommon_100",
+        "club_ruffe_40",
+        "club_bream_30",
+        "club_crucian_50",
+        "club_roach_50",
+        "club_rare_50",
+        "club_perch_50",
+        "club_herring_50",
+    )
+
+    private fun currentClubWeekInstant(dayOffset: Long = 0, secondOffset: Long = 0): Instant {
+        val zone = ZoneId.of("Europe/Belgrade")
+        val weekStart = LocalDate.now(zone).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return weekStart
+            .plusDays(dayOffset)
+            .atTime(12, 0)
+            .atZone(zone)
+            .toInstant()
+            .plusSeconds(secondOffset)
+    }
+
+    private fun recordCatchOnly(
+        userId: Long,
+        scenario: QuestScenario,
+        at: Instant,
+    ) {
+        val (fishId, locationId) = transaction {
+            val fishId = Fish.select { Fish.name eq scenario.fishName }.single()[Fish.id].value
+            val locationId = Locations.select { Locations.name eq scenario.locationName }.single()[Locations.id].value
+            fishId to locationId
+        }
+        transaction {
+            Catches.insert {
+                it[Catches.userId] = userId
+                it[Catches.fishId] = fishId
+                it[Catches.weight] = scenario.weight
+                it[Catches.locationId] = locationId
+                it[Catches.createdAt] = at
+                it[Catches.coins] = null
+            }
+        }
     }
 
     private fun recordClubCatch(

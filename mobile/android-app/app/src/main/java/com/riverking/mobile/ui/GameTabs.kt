@@ -922,6 +922,7 @@ private fun HeaderBar(
     onOpenCatchStats: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var languagePickerOpen by remember { mutableStateOf(false) }
     val languageFlag = if (me.language == "ru") "\uD83C\uDDF7\uD83C\uDDFA" else "\uD83C\uDDEC\uD83C\uDDE7"
 
     Column(
@@ -1003,8 +1004,7 @@ private fun HeaderBar(
                         colors = riverMenuItemColors(),
                         onClick = {
                             menuExpanded = false
-                            val newLang = if (me.language == "ru") "en" else "ru"
-                            onChangeLanguage(newLang)
+                            languagePickerOpen = true
                         },
                     )
                     DropdownMenuItem(
@@ -1051,6 +1051,20 @@ private fun HeaderBar(
                 HeaderCounterChip(icon = "\uD83E\uDE99", value = me.coins.toString())
             }
         }
+    }
+
+    if (languagePickerOpen) {
+        LanguagePickerDialog(
+            strings = strings,
+            currentLanguage = me.language,
+            onDismiss = { languagePickerOpen = false },
+            onSelect = { selectedLanguage ->
+                languagePickerOpen = false
+                if (selectedLanguage != me.language) {
+                    onChangeLanguage(selectedLanguage)
+                }
+            },
+        )
     }
 }
 
@@ -3300,24 +3314,12 @@ private fun QuestPreviewCard(
             clubMembershipKnown && !isClubMember -> strings.clubQuestsLockedMessage
             else -> strings.noData
         }
-        val previewSections = listOf(
-            strings.dailyQuestsLabel to quests.daily.take(2),
-            strings.weeklyQuestsLabel to quests.weekly.take(2),
-            strings.clubQuestsLabel to quests.club.quests.take(2),
-        )
-        var renderedAnySection = false
-        previewSections.forEachIndexed { index, (title, items) ->
-            if (items.isEmpty()) return@forEachIndexed
-            renderedAnySection = true
-            if (index > 0) Spacer(modifier = Modifier.height(10.dp))
-            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
-            items.forEachIndexed { itemIndex, quest ->
-                if (itemIndex > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                QuestSummaryRow(strings = strings, quest = quest)
-            }
+        val previewItems = questPreviewItems(strings, quests)
+        previewItems.forEachIndexed { index, item ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            QuestSummaryRow(strings = strings, quest = item.quest)
         }
         if (!quests.club.available) {
-            renderedAnySection = true
             Spacer(modifier = Modifier.height(10.dp))
             Text(strings.clubQuestsLabel, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
             Text(
@@ -3326,7 +3328,7 @@ private fun QuestPreviewCard(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (!renderedAnySection) {
+        if (previewItems.isEmpty() && quests.club.available) {
             EmptyStatePanel(strings.noData)
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -3334,6 +3336,39 @@ private fun QuestPreviewCard(
             Text(strings.viewAll)
         }
     }
+}
+
+private data class QuestPreviewItem(
+    val quest: QuestDto,
+)
+
+private fun questPreviewItems(
+    strings: RiverStrings,
+    quests: QuestListDto,
+): List<QuestPreviewItem> {
+    val sections = listOf(
+        strings.dailyQuestsLabel to quests.daily,
+        strings.weeklyQuestsLabel to quests.weekly,
+        strings.clubQuestsLabel to quests.club.quests,
+    )
+    val selected = mutableListOf<QuestPreviewItem>()
+    val selectedLabels = mutableSetOf<String>()
+    sections.forEach { (label, items) ->
+        val nextOpenQuest = items.firstOrNull { !it.completed } ?: return@forEach
+        selected += QuestPreviewItem(nextOpenQuest)
+        selectedLabels += label
+    }
+
+    val remainingSlots = 3 - selected.size
+    if (remainingSlots <= 0) return selected.take(3)
+
+    val completedFallbacks = sections
+        .filterNot { (label, _) -> label in selectedLabels }
+        .mapNotNull { (_, items) ->
+            items.firstOrNull { it.completed }?.let { QuestPreviewItem(it) }
+        }
+        .takeLast(remainingSlots)
+    return (selected + completedFallbacks).take(3)
 }
 
 @Composable
@@ -5813,6 +5848,43 @@ private fun StatPill(title: String, value: String, modifier: Modifier = Modifier
             Text(value, fontWeight = FontWeight.Bold)
         }
     }
+}
+
+@Composable
+private fun LanguagePickerDialog(
+    strings: RiverStrings,
+    currentLanguage: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    val options = listOf(
+        "en" to "English",
+        "ru" to "Русский",
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.language) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { (code, label) ->
+                    val selected = currentLanguage == code
+                    OutlinedButton(
+                        onClick = { onSelect(code) },
+                        enabled = !selected,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (selected) "$label (${strings.currentLabel.lowercase(Locale.getDefault())})" else label)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.cancel)
+            }
+        },
+    )
 }
 
 @Composable

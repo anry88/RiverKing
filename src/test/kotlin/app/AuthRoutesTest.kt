@@ -46,7 +46,11 @@ import service.VerifiedPlayPurchase
 import support.testEnv
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
@@ -588,7 +592,7 @@ class AuthRoutesTest {
 
         val chosenCode = currentQuests.first().jsonObject.getValue("code").jsonPrimitive.content
         val scenario = clubQuestScenario(chosenCode)
-        recordClubCatch(clubQuests, registered.user.id, scenario, Instant.parse("2026-04-14T12:00:00Z"))
+        recordClubCatch(clubQuests, registered.user.id, scenario, currentClubWeekInstant(dayOffset = 1))
 
         val updated = client.get("/api/club") {
             bearerAuth(registered.accessToken)
@@ -753,6 +757,17 @@ class AuthRoutesTest {
             }
         }
         clubQuests.updateOnCatch(userId, scenario.fishName, scenario.rarity, at)
+    }
+
+    private fun currentClubWeekInstant(dayOffset: Long = 0, secondOffset: Long = 0): Instant {
+        val zone = ZoneId.of("Europe/Belgrade")
+        val weekStart = LocalDate.now(zone).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return weekStart
+            .plusDays(dayOffset)
+            .atTime(12, 0)
+            .atZone(zone)
+            .toInstant()
+            .plusSeconds(secondOffset)
     }
 
     private fun verifiedPurchase(
