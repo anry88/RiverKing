@@ -28,7 +28,7 @@ jobs:
         working-directory: mobile/admin-app
 
       - name: Sign APK
-        uses: illyaskel/action-android-sign@v1.0.0
+        uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
           releaseDirectory: mobile/admin-app/app/build/outputs/apk/release
