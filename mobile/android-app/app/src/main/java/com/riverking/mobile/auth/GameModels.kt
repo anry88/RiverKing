@@ -188,7 +188,7 @@ data class PrizeDto(
     val qty: Int,
     val rank: Int,
     val coins: Int? = null,
-    val source: String,
+    val source: String = "tournament",
     val sourceLabel: String? = null,
 )
 
