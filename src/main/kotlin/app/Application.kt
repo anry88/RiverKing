@@ -36,6 +36,9 @@ fun main() {
         // API for Mini App
         apiRoutes(env)
 
+        // Admin API
+        adminApiRoutes(env)
+
         // Public support and policy pages
         publicPagesRoutes(env)
 

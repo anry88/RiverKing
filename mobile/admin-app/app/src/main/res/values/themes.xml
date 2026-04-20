@@ -1,0 +1,4 @@
+<resources>
+    <style name="Theme.RiverKing" parent="Theme.Material3.Dark.NoActionBar" />
+
+</resources>
