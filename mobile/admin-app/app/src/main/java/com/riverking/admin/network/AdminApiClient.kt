@@ -2,8 +2,8 @@ package com.riverking.admin.network
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -23,7 +23,7 @@ data class TournamentDTO(
     val id: Long = 0,
     val nameRu: String,
     val nameEn: String,
-    val startTime: Long, // Epoch millis. Note: backend sends/expects Instant if using kotlinx.serialization but we used Long in our AdminApiRoutes!
+    val startTime: Long,
     val endTime: Long,
     val fish: String? = null,
     val location: String? = null,
@@ -71,71 +71,82 @@ class AdminApiClient(
     var baseUrl: String = "",
     var token: String = ""
 ) {
-    private val client = HttpClient {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-        defaultRequest {
-            if (baseUrl.isNotBlank()) {
-                url(baseUrl)
-            }
-            if (token.isNotBlank()) {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            json(json)
         }
     }
 
+    private fun apiUrl(path: String): String {
+        val base = baseUrl.trimEnd('/')
+        return "$base$path"
+    }
+
     suspend fun getTournaments(): List<TournamentDTO> {
-        val response = client.get("/api/admin/tournaments")
-        if (!response.status.isSuccess()) throw Exception("Failed to load tournaments: ${response.status}")
+        val response = client.get(apiUrl("/api/admin/tournaments")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
         return response.body()
     }
 
     suspend fun createTournament(req: TournamentReq) {
-        val response = client.post("/api/admin/tournaments") {
+        val response = client.post(apiUrl("/api/admin/tournaments")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (!response.status.isSuccess()) throw Exception("Failed to create tournament: ${response.status}")
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun updateTournament(id: Long, req: TournamentReq) {
-        val response = client.put("/api/admin/tournaments/$id") {
+        val response = client.put(apiUrl("/api/admin/tournaments/$id")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (!response.status.isSuccess()) throw Exception("Failed to update tournament: ${response.status}")
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun deleteTournament(id: Long) {
-        val response = client.delete("/api/admin/tournaments/$id")
-        if (!response.status.isSuccess()) throw Exception("Failed to delete tournament: ${response.status}")
+        val response = client.delete(apiUrl("/api/admin/tournaments/$id")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun getDiscounts(): List<DiscountDTO> {
-        val response = client.get("/api/admin/discounts")
-        if (!response.status.isSuccess()) throw Exception("Failed to load discounts: ${response.status}")
+        val response = client.get(apiUrl("/api/admin/discounts")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
         return response.body()
     }
 
     suspend fun createDiscount(req: DiscountReq) {
-        val response = client.post("/api/admin/discounts") {
+        val response = client.post(apiUrl("/api/admin/discounts")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (!response.status.isSuccess()) throw Exception("Failed to create discount: ${response.status}")
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun deleteDiscount(packageId: String) {
-        val response = client.delete("/api/admin/discounts/$packageId")
-        if (!response.status.isSuccess()) throw Exception("Failed to delete discount: ${response.status}")
+        val response = client.delete(apiUrl("/api/admin/discounts/$packageId")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun sendBroadcast(req: BroadcastReq) {
-        val response = client.post("/api/admin/broadcast") {
+        val response = client.post(apiUrl("/api/admin/broadcast")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
-        if (!response.status.isSuccess()) throw Exception("Failed to send broadcast: ${response.status}")
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 }
