@@ -77,7 +77,10 @@ fun LoginScreen(onLoginSuccess: (String, String) -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize().riverBackdrop()) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(48.dp))
