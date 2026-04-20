@@ -9,6 +9,15 @@ plugins {
 
 val ktorVersion = "2.3.11"
 
+val versionProps = Properties().apply {
+    val versionFile = rootProject.file("version.properties")
+    if (versionFile.isFile) {
+        versionFile.inputStream().use(::load)
+    }
+}
+val vCode = (versionProps.getProperty("RIVERKING_VERSION_CODE")?.toIntOrNull() ?: 1)
+val vName = (versionProps.getProperty("RIVERKING_VERSION_NAME") ?: "1.0")
+
 android {
     namespace = "com.riverking.admin"
     compileSdk = 35
@@ -17,8 +26,8 @@ android {
         applicationId = "com.riverking.admin"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = vCode
+        versionName = vName
     }
 
     buildTypes {
