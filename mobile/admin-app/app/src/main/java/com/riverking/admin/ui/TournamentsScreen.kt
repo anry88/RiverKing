@@ -38,6 +38,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private const val TOURNAMENT_PAGE_SIZE = 10
+private const val MAX_TOURNAMENT_PRIZE_PLACES = 1000
 private const val COIN_PRIZE_ID = "coins"
 private val AdminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 private val TournamentJson = Json { ignoreUnknownKeys = true }
@@ -382,8 +383,8 @@ fun TournamentEditorDialog(
                 )
                 OutlinedTextField(
                     value = prizePlacesStr,
-                    onValueChange = { prizePlacesStr = it.filter(Char::isDigit).take(2) },
-                    label = { Text("Prize Places") },
+                    onValueChange = { prizePlacesStr = sanitizePrizePlacesInput(it) },
+                    label = { Text("Prize Places (max $MAX_TOURNAMENT_PRIZE_PLACES)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = riverTextFieldColors(),
                     singleLine = true,
@@ -415,6 +416,7 @@ fun TournamentEditorDialog(
                     startMillis == null || endMillis == null -> errorMessage = "Use date format dd.mm.yyyy"
                     endMillis <= startMillis -> errorMessage = "End date must be after start date"
                     prizePlaces <= 0 -> errorMessage = "Prize places must be greater than zero"
+                    prizePlaces > MAX_TOURNAMENT_PRIZE_PLACES -> errorMessage = "Prize places must be $MAX_TOURNAMENT_PRIZE_PLACES or less"
                     else -> {
                         errorMessage = null
                         scope.launch {
@@ -448,6 +450,12 @@ fun TournamentEditorDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+private fun sanitizePrizePlacesInput(value: String): String {
+    val digits = value.filter(Char::isDigit).take(MAX_TOURNAMENT_PRIZE_PLACES.toString().length)
+    val places = digits.toIntOrNull() ?: return digits
+    return if (places > MAX_TOURNAMENT_PRIZE_PLACES) MAX_TOURNAMENT_PRIZE_PLACES.toString() else digits
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
