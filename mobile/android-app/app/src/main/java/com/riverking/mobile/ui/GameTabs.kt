@@ -3353,7 +3353,7 @@ private fun QuestPreviewCard(
             clubMembershipKnown && !isClubMember -> strings.clubQuestsLockedMessage
             else -> strings.noData
         }
-        val previewItems = questPreviewItems(strings, quests)
+        val previewItems = questPreviewItems(quests)
         previewItems.forEachIndexed { index, item ->
             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
             QuestSummaryRow(strings = strings, quest = item.quest)
@@ -3381,33 +3381,37 @@ private data class QuestPreviewItem(
     val quest: QuestDto,
 )
 
-private fun questPreviewItems(
-    strings: RiverStrings,
-    quests: QuestListDto,
-): List<QuestPreviewItem> {
+private fun questPreviewItems(quests: QuestListDto): List<QuestPreviewItem> {
     val sections = listOf(
-        strings.dailyQuestsLabel to quests.daily,
-        strings.weeklyQuestsLabel to quests.weekly,
-        strings.clubQuestsLabel to quests.club.quests,
+        quests.daily,
+        quests.weekly,
+        quests.club.quests,
     )
     val selected = mutableListOf<QuestPreviewItem>()
-    val selectedLabels = mutableSetOf<String>()
-    sections.forEach { (label, items) ->
-        val nextOpenQuest = items.firstOrNull { !it.completed } ?: return@forEach
-        selected += QuestPreviewItem(nextOpenQuest)
-        selectedLabels += label
+    val selectedKeys = mutableSetOf<String>()
+    fun addQuest(quest: QuestDto): Boolean {
+        if (selected.size >= 3) return false
+        val key = "${quest.period}:${quest.code}"
+        if (!selectedKeys.add(key)) return false
+        selected += QuestPreviewItem(quest)
+        return true
     }
 
-    val remainingSlots = 3 - selected.size
-    if (remainingSlots <= 0) return selected.take(3)
-
-    val completedFallbacks = sections
-        .filterNot { (label, _) -> label in selectedLabels }
-        .mapNotNull { (_, items) ->
-            items.firstOrNull { it.completed }?.let { QuestPreviewItem(it) }
+    sections.forEach { items ->
+        items.firstOrNull { !it.completed }?.let(::addQuest)
+    }
+    sections.forEach { items ->
+        items.filterNot { it.completed }.forEach { quest ->
+            addQuest(quest)
         }
-        .takeLast(remainingSlots)
-    return (selected + completedFallbacks).take(3)
+    }
+    if (selected.size >= 3) return selected
+
+    val fallbackSections = sections.takeLast(3 - selected.size)
+    fallbackSections.forEach { items ->
+        items.firstOrNull { it.completed }?.let(::addQuest)
+    }
+    return selected
 }
 
 @Composable
