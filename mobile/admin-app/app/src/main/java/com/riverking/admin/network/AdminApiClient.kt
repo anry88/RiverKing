@@ -73,6 +73,41 @@ data class BroadcastResp(
     val count: Int = 0
 )
 
+@Serializable
+data class CatalogOptionDTO(
+    val id: String,
+    val label: String
+)
+
+@Serializable
+data class PrizeOptionDTO(
+    val id: String,
+    val label: String,
+    val defaultQty: Int,
+    val coins: Boolean = false
+)
+
+@Serializable
+data class DiscountPackageDTO(
+    val id: String,
+    val name: String,
+    val category: String,
+    val basePrice: Int,
+    val currentPrice: Int,
+    val activeDiscountPrice: Int? = null,
+    val activeDiscountStart: String? = null,
+    val activeDiscountEnd: String? = null
+)
+
+@Serializable
+data class AdminCatalogDTO(
+    val metrics: List<CatalogOptionDTO> = emptyList(),
+    val fish: List<CatalogOptionDTO> = emptyList(),
+    val locations: List<CatalogOptionDTO> = emptyList(),
+    val tournamentPrizes: List<PrizeOptionDTO> = emptyList(),
+    val discountPackages: List<DiscountPackageDTO> = emptyList()
+)
+
 class AdminApiClient(
     var baseUrl: String = "",
     var token: String = ""
@@ -90,8 +125,16 @@ class AdminApiClient(
         return "$base$path"
     }
 
-    suspend fun getTournaments(): List<TournamentDTO> {
-        val response = client.get(apiUrl("/api/admin/tournaments")) {
+    suspend fun getTournaments(offset: Int = 0, limit: Int = 10): List<TournamentDTO> {
+        val response = client.get(apiUrl("/api/admin/tournaments?offset=$offset&limit=$limit")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
+    }
+
+    suspend fun getCatalog(): AdminCatalogDTO {
+        val response = client.get(apiUrl("/api/admin/catalog")) {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")

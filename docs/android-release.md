@@ -5,6 +5,8 @@ RiverKing ships Android in two channels:
 - `directRelease` APK for `itch.io`
 - `playRelease` AAB for `Google Play`
 
+This guide covers the public player app in `mobile/android-app`. The internal operator app in `mobile/admin-app` is a separate Android project with its own README and is not part of the itch.io / Google Play release contract below.
+
 The rollout order is deliberate: publish and validate the itch.io APK first, then ship the Google Play bundle on the same product identity.
 
 For local Android Studio work, the project deliberately keeps flavor-specific package IDs so debug and ad-hoc release installs do not collide with the canonical store package on the same device:

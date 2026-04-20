@@ -23,6 +23,7 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
   - Referrals: `GET/POST /api/referrals` and `POST /api/referrals/apply` handle links via `ReferralService`.
   - Utility calls: `GET /api/assets/{path...}` serves webapp assets with manual path checks; `GET /api/metrics` updates `UserMetrics`.
 - API compatibility rule: any response-shape change in this package must be checked against all three consumers that share these routes — Telegram bot flows, the Telegram Mini App, and the Android client. Prefer additive fields over breaking renames or changed semantics.
+- **`AdminApiRoutes.kt`** — registers protected `/api/admin/*` endpoints for the internal Android admin app. Authentication uses `Authorization: Bearer <ADMIN_API_TOKEN>`. Current groups cover tournament CRUD with `limit`/`offset` listing, discount CRUD with `dd.MM.yyyy` or ISO date parsing, broadcast sending, and `/api/admin/catalog` for selectable metrics, fish, locations, prize packs, and discountable shop items.
 - **`BotRoutes.kt`** — registers the Telegram bot webhook. Processes updates, sends responses through `TelegramBot`, and calls game services to handle bot commands, including the three-section `/quests` output with club quests, `/start` launch links, and `/location` menus in unlock order.
 - **`TelegramBot.kt`** — thin client over the Telegram Bot API for sending messages, invoices, and alerts; used by the webhook and by the redirect from `/`.
 - **`TelegramModels.kt`** — DTOs for Telegram WebApp/bot (keyboards, invoices, updates).

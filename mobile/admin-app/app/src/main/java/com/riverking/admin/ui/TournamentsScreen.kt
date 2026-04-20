@@ -4,18 +4,25 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.riverking.admin.network.AdminApiClient
+import com.riverking.admin.network.AdminCatalogDTO
+import com.riverking.admin.network.CatalogOptionDTO
+import com.riverking.admin.network.PrizeOptionDTO
 import com.riverking.admin.network.TournamentDTO
 import com.riverking.admin.network.TournamentReq
 import com.riverking.admin.ui.theme.riverBackdrop
@@ -25,7 +32,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
+private const val TOURNAMENT_PAGE_SIZE = 10
+private const val COIN_PRIZE_ID = "coins"
+private val AdminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
 @Serializable
 data class PrizeSpec(
@@ -38,29 +51,63 @@ data class PrizeSpec(
 @Composable
 fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
     var tournaments by remember { mutableStateOf<List<TournamentDTO>>(emptyList()) }
+    var catalog by remember { mutableStateOf<AdminCatalogDTO?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var isPageLoading by remember { mutableStateOf(false) }
+    var nextOffset by remember { mutableStateOf(0) }
+    var canLoadMore by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<TournamentDTO?>(null) }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    fun loadTournaments() {
+    fun loadCatalog() {
         scope.launch {
             try {
-                tournaments = apiClient.getTournaments()
+                catalog = apiClient.getCatalog()
             } catch (e: Exception) {
-            } finally {
-                isLoading = false
+                snackbarHostState.showSnackbar("Catalog failed: ${e.message}")
             }
         }
     }
 
-    LaunchedEffect(Unit) { loadTournaments() }
+    fun loadTournaments(reset: Boolean) {
+        if (isPageLoading) return
+        scope.launch {
+            val offset = if (reset) 0 else nextOffset
+            if (reset) isLoading = true else isPageLoading = true
+            try {
+                val page = apiClient.getTournaments(offset = offset, limit = TOURNAMENT_PAGE_SIZE + 1)
+                val visible = page.take(TOURNAMENT_PAGE_SIZE)
+                tournaments = if (reset) visible else tournaments + visible
+                nextOffset = offset + visible.size
+                canLoadMore = page.size > TOURNAMENT_PAGE_SIZE
+            } catch (e: Exception) {
+                snackbarHostState.showSnackbar("Failed to load: ${e.message}")
+            } finally {
+                isLoading = false
+                isPageLoading = false
+            }
+        }
+    }
+
+    fun reloadTournaments() {
+        nextOffset = 0
+        canLoadMore = false
+        loadTournaments(reset = true)
+    }
+
+    LaunchedEffect(Unit) {
+        loadCatalog()
+        reloadTournaments()
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Tournaments") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
@@ -70,44 +117,54 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
+            FloatingActionButton(
+                onClick = {
+                    if (catalog == null) {
+                        scope.launch { snackbarHostState.showSnackbar("Catalog is still loading") }
+                    } else {
+                        showCreateDialog = true
+                    }
+                }
+            ) {
                 Icon(Icons.Default.Add, "Add")
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().riverBackdrop().padding(padding)) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (tournaments.isEmpty()) {
+                Text(
+                    text = "No tournaments",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item { Spacer(modifier = Modifier.height(8.dp)) }
-                    items(tournaments) { t ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    items(tournaments, key = { it.id }) { tournament ->
+                        TournamentAdminCard(
+                            tournament = tournament,
+                            onDeleteClick = { pendingDelete = tournament }
+                        )
+                    }
+                    if (canLoadMore) {
+                        item {
+                            Button(
+                                onClick = { loadTournaments(reset = false) },
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                enabled = !isPageLoading,
+                                colors = riverPrimaryButtonColors()
                             ) {
-                                Column {
-                                    Text(text = t.nameRu, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                                    Text(text = "Metric: ${t.metric} | Places: ${t.prizePlaces}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (isPageLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
-                                IconButton(onClick = {
-                                    scope.launch {
-                                        try {
-                                            apiClient.deleteTournament(t.id)
-                                            loadTournaments()
-                                        } catch (e: Exception) { }
-                                    }
-                                }) {
-                                    Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
-                                }
+                                Text(if (isPageLoading) "Loading..." else "Load 10 more")
                             }
                         }
                     }
@@ -117,12 +174,90 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
         }
     }
 
-    if (showCreateDialog) {
+    val tournamentToDelete = pendingDelete
+    if (tournamentToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete tournament?") },
+            text = {
+                Text(
+                    text = "This will permanently delete \"${tournamentToDelete.nameRu}\".",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                apiClient.deleteTournament(tournamentToDelete.id)
+                                pendingDelete = null
+                                snackbarHostState.showSnackbar("Tournament deleted")
+                                reloadTournaments()
+                            } catch (e: Exception) {
+                                snackbarHostState.showSnackbar("Delete failed: ${e.message}")
+                            }
+                        }
+                    }
+                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    val loadedCatalog = catalog
+    if (showCreateDialog && loadedCatalog != null) {
         CreateTournamentDialog(
             apiClient = apiClient,
+            catalog = loadedCatalog,
             onDismiss = { showCreateDialog = false },
-            onCreated = { loadTournaments(); showCreateDialog = false }
+            onCreated = {
+                showCreateDialog = false
+                reloadTournaments()
+            }
         )
+    }
+}
+
+@Composable
+private fun TournamentAdminCard(
+    tournament: TournamentDTO,
+    onDeleteClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                    text = tournament.nameRu,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "Metric: ${tournament.metric} | Places: ${tournament.prizePlaces}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${formatDateMillis(tournament.startTime)} -> ${formatDateMillis(tournament.endTime)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 }
 
@@ -130,33 +265,36 @@ fun TournamentsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
 @Composable
 fun CreateTournamentDialog(
     apiClient: AdminApiClient,
+    catalog: AdminCatalogDTO,
     onDismiss: () -> Unit,
     onCreated: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val today = remember { LocalDate.now(ZoneOffset.UTC) }
+    val prizeOptions = remember(catalog) {
+        catalog.tournamentPrizes.ifEmpty {
+            listOf(PrizeOptionDTO(COIN_PRIZE_ID, "Монеты", defaultQty = 1000, coins = true))
+        }
+    }
     var nameRu by remember { mutableStateOf("") }
     var nameEn by remember { mutableStateOf("") }
-    var metric by remember { mutableStateOf("total_weight") }
-    var fish by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    
-    // Times
-    val now = Instant.now().toEpochMilli()
-    var startTimeStr by remember { mutableStateOf(now.toString()) }
-    var endTimeStr by remember { mutableStateOf((now + 86400000).toString()) }
-
+    var metric by remember { mutableStateOf(catalog.metrics.firstOrNull()?.id ?: "total_weight") }
+    var fish by remember { mutableStateOf<String?>(null) }
+    var location by remember { mutableStateOf<String?>(null) }
+    var startDate by remember { mutableStateOf(today.format(AdminDateFormatter)) }
+    var endDate by remember { mutableStateOf(today.plusDays(1).format(AdminDateFormatter)) }
     var prizePlacesStr by remember { mutableStateOf("3") }
-    val prizePlaces = prizePlacesStr.toIntOrNull() ?: 0
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val prizePlaces = prizePlacesStr.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    var prizes by remember {
+        mutableStateOf(List(3) { defaultPrize(prizeOptions.first()) })
+    }
 
-    // Prizes
-    var prizes by remember { mutableStateOf(List(prizePlaces) { PrizeSpec(pack = "coins", qty = 100) }) }
-
-    // Re-sync prizes list when places count changes
-    LaunchedEffect(prizePlaces) {
-        if (prizePlaces > prizes.size) {
-            prizes = prizes + List(prizePlaces - prizes.size) { PrizeSpec(pack = "coins", qty = 100) }
-        } else if (prizePlaces < prizes.size && prizePlaces >= 0) {
-            prizes = prizes.take(prizePlaces)
+    LaunchedEffect(prizePlaces, prizeOptions) {
+        prizes = when {
+            prizePlaces > prizes.size -> prizes + List(prizePlaces - prizes.size) { defaultPrize(prizeOptions.first()) }
+            prizePlaces < prizes.size -> prizes.take(prizePlaces)
+            else -> prizes
         }
     }
 
@@ -168,91 +306,103 @@ fun CreateTournamentDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(value = nameRu, onValueChange = { nameRu = it }, label = { Text("Name RU") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = nameEn, onValueChange = { nameEn = it }, label = { Text("Name EN") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = metric, onValueChange = { metric = it }, label = { Text("Metric (total_weight/count/largest/smallest)") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = fish, onValueChange = { fish = it }, label = { Text("Fish (optional)") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = location, onValueChange = { location = it }, label = { Text("Location (optional)") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = startTimeStr, onValueChange = { startTimeStr = it }, label = { Text("Start Time (Millis)") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = endTimeStr, onValueChange = { endTimeStr = it }, label = { Text("End Time (Millis)") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
-                
+                AdminOptionDropdown(
+                    label = "Metric",
+                    options = catalog.metrics,
+                    selectedId = metric,
+                    onSelected = { selected -> metric = selected ?: metric }
+                )
+                AdminOptionDropdown(
+                    label = "Fish",
+                    options = catalog.fish,
+                    selectedId = fish,
+                    emptyLabel = "Any fish",
+                    onSelected = { fish = it }
+                )
+                AdminOptionDropdown(
+                    label = "Location",
+                    options = catalog.locations,
+                    selectedId = location,
+                    emptyLabel = "Any location",
+                    onSelected = { location = it }
+                )
+                OutlinedTextField(
+                    value = startDate,
+                    onValueChange = { startDate = it },
+                    label = { Text("Start date (dd.mm.yyyy)") },
+                    colors = riverTextFieldColors(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = endDate,
+                    onValueChange = { endDate = it },
+                    label = { Text("End date (dd.mm.yyyy)") },
+                    colors = riverTextFieldColors(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 OutlinedTextField(
                     value = prizePlacesStr,
-                    onValueChange = { prizePlacesStr = it },
+                    onValueChange = { prizePlacesStr = it.filter(Char::isDigit).take(2) },
                     label = { Text("Prize Places") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = riverTextFieldColors(),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Prizes configuration", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-
+                Text("Prizes", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 prizes.forEachIndexed { index, prize ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text("Place ${index + 1}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedTextField(
-                                value = prize.pack,
-                                onValueChange = { newPack ->
-                                    val newPrizes = prizes.toMutableList()
-                                    newPrizes[index] = prize.copy(pack = newPack)
-                                    prizes = newPrizes
-                                },
-                                label = { Text("Prize Pack ID") },
-                                colors = riverTextFieldColors(),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Quantity:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(onClick = {
-                                    val newQty = (prize.qty - 1).coerceAtLeast(1)
-                                    val newPrizes = prizes.toMutableList()
-                                    newPrizes[index] = prize.copy(qty = newQty)
-                                    prizes = newPrizes
-                                }) { Icon(Icons.Default.Add, "Decrease") } // Ideally use Remove icon
-                                Text("${prize.qty}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                IconButton(onClick = {
-                                    val newPrizes = prizes.toMutableList()
-                                    newPrizes[index] = prize.copy(qty = prize.qty + 1)
-                                    prizes = newPrizes
-                                }) { Icon(Icons.Default.Add, "Increase") }
-                                
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Button(onClick = {
-                                    val newPrizes = prizes.toMutableList()
-                                    newPrizes[index] = prize.copy(qty = prize.qty + 10)
-                                    prizes = newPrizes
-                                }) { Text("+10") }
-                            }
+                    PrizeEditorCard(
+                        place = index + 1,
+                        prize = prize,
+                        options = prizeOptions,
+                        onChange = { updated ->
+                            prizes = prizes.toMutableList().also { it[index] = updated }
                         }
-                    }
+                    )
+                }
+                errorMessage?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                scope.launch {
-                    try {
-                        val req = TournamentReq(
-                            nameRu = nameRu,
-                            nameEn = nameEn,
-                            startTime = startTimeStr.toLongOrNull() ?: 0L,
-                            endTime = endTimeStr.toLongOrNull() ?: 0L,
-                            fish = fish.takeIf { it.isNotBlank() },
-                            location = location.takeIf { it.isNotBlank() },
-                            metric = metric,
-                            prizePlaces = prizePlaces,
-                            prizesJson = Json.encodeToString(prizes)
-                        )
-                        apiClient.createTournament(req)
-                        onCreated()
-                    } catch (e: Exception) { }
+                val startMillis = parseAdminDateMillis(startDate)
+                val endMillis = parseAdminDateMillis(endDate)
+                when {
+                    nameRu.isBlank() || nameEn.isBlank() -> errorMessage = "Names are required"
+                    startMillis == null || endMillis == null -> errorMessage = "Use date format dd.mm.yyyy"
+                    endMillis <= startMillis -> errorMessage = "End date must be after start date"
+                    prizePlaces <= 0 -> errorMessage = "Prize places must be greater than zero"
+                    else -> {
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val req = TournamentReq(
+                                    nameRu = nameRu.trim(),
+                                    nameEn = nameEn.trim(),
+                                    startTime = startMillis,
+                                    endTime = endMillis,
+                                    fish = fish,
+                                    location = location,
+                                    metric = metric,
+                                    prizePlaces = prizePlaces,
+                                    prizesJson = Json.encodeToString(prizes.map { normalizePrize(it) })
+                                )
+                                apiClient.createTournament(req)
+                                onCreated()
+                            } catch (e: Exception) {
+                                errorMessage = "Create failed: ${e.message}"
+                            }
+                        }
+                    }
                 }
             }) { Text("Create") }
         },
@@ -261,3 +411,161 @@ fun CreateTournamentDialog(
         }
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdminOptionDropdown(
+    label: String,
+    options: List<CatalogOptionDTO>,
+    selectedId: String?,
+    onSelected: (String?) -> Unit,
+    emptyLabel: String? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val visibleOptions = remember(options, emptyLabel) {
+        if (emptyLabel == null) options else listOf(CatalogOptionDTO("", emptyLabel)) + options
+    }
+    val selectedLabel = when {
+        selectedId.isNullOrBlank() -> emptyLabel.orEmpty()
+        else -> options.firstOrNull { it.id == selectedId }?.label ?: selectedId
+    }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = riverTextFieldColors(),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            visibleOptions.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        onSelected(option.id.takeIf { it.isNotBlank() })
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrizeOptionDropdown(
+    options: List<PrizeOptionDTO>,
+    selectedId: String,
+    onSelected: (PrizeOptionDTO) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.id == selectedId }?.label ?: selectedId
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Prize") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = riverTextFieldColors(),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        onSelected(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrizeEditorCard(
+    place: Int,
+    prize: PrizeSpec,
+    options: List<PrizeOptionDTO>,
+    onChange: (PrizeSpec) -> Unit
+) {
+    val amount = prize.coins ?: prize.qty
+    val step = if (prize.pack == COIN_PRIZE_ID) 100 else 1
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Place $place", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            PrizeOptionDropdown(
+                options = options,
+                selectedId = prize.pack.ifBlank { COIN_PRIZE_ID },
+                onSelected = { onChange(defaultPrize(it)) }
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Qty:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(onClick = { onChange(prize.withAmount((amount - step).coerceAtLeast(1))) }) {
+                    Icon(Icons.Default.Remove, "Decrease")
+                }
+                OutlinedTextField(
+                    value = amount.toString(),
+                    onValueChange = { raw ->
+                        raw.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }?.let {
+                            onChange(prize.withAmount(it))
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = riverTextFieldColors(),
+                    singleLine = true,
+                    modifier = Modifier.width(100.dp)
+                )
+                IconButton(onClick = { onChange(prize.withAmount(amount + step)) }) {
+                    Icon(Icons.Default.Add, "Increase")
+                }
+            }
+        }
+    }
+}
+
+private fun defaultPrize(option: PrizeOptionDTO): PrizeSpec =
+    if (option.coins || option.id == COIN_PRIZE_ID) {
+        PrizeSpec(pack = COIN_PRIZE_ID, qty = option.defaultQty, coins = option.defaultQty)
+    } else {
+        PrizeSpec(pack = option.id, qty = option.defaultQty, coins = null)
+    }
+
+private fun PrizeSpec.withAmount(amount: Int): PrizeSpec =
+    if (pack == COIN_PRIZE_ID) {
+        copy(qty = amount, coins = amount)
+    } else {
+        copy(qty = amount, coins = null)
+    }
+
+private fun normalizePrize(prize: PrizeSpec): PrizeSpec =
+    if (prize.pack == COIN_PRIZE_ID) {
+        val amount = prize.coins ?: prize.qty
+        PrizeSpec(pack = COIN_PRIZE_ID, qty = amount, coins = amount)
+    } else {
+        prize.copy(coins = null)
+    }
+
+private fun parseAdminDateMillis(value: String): Long? =
+    runCatching {
+        LocalDate.parse(value.trim(), AdminDateFormatter)
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+    }.getOrNull()
+
+private fun formatDateMillis(value: Long): String =
+    runCatching {
+        java.time.Instant.ofEpochMilli(value)
+            .atZone(ZoneOffset.UTC)
+            .toLocalDate()
+            .format(AdminDateFormatter)
+    }.getOrElse { value.toString() }

@@ -45,6 +45,19 @@ data class UserPrize(
 )
 
 class TournamentService {
+    private fun ResultRow.toTournament() = Tournament(
+        id = this[Tournaments.id].value,
+        nameRu = this[Tournaments.nameRu],
+        nameEn = this[Tournaments.nameEn],
+        startTime = this[Tournaments.startTime],
+        endTime = this[Tournaments.endTime],
+        fish = this[Tournaments.fish],
+        location = this[Tournaments.location],
+        metric = this[Tournaments.metric],
+        prizePlaces = this[Tournaments.prizePlaces],
+        prizesJson = this[Tournaments.prizesJson],
+    )
+
     fun createTournament(
         nameRu: String,
         nameEn: String,
@@ -69,21 +82,21 @@ class TournamentService {
         } get Tournaments.id
     }.value
 
-    fun listTournaments(): List<Tournament> = transaction {
-        Tournaments.selectAll().map { row ->
-            Tournament(
-                id = row[Tournaments.id].value,
-                nameRu = row[Tournaments.nameRu],
-                nameEn = row[Tournaments.nameEn],
-                startTime = row[Tournaments.startTime],
-                endTime = row[Tournaments.endTime],
-                fish = row[Tournaments.fish],
-                location = row[Tournaments.location],
-                metric = row[Tournaments.metric],
-                prizePlaces = row[Tournaments.prizePlaces],
-                prizesJson = row[Tournaments.prizesJson],
+    fun listTournaments(
+        limit: Int? = null,
+        offset: Long = 0L,
+        newestFirst: Boolean = false,
+    ): List<Tournament> = transaction {
+        val query = if (newestFirst) {
+            Tournaments.selectAll().orderBy(
+                Tournaments.startTime to SortOrder.DESC,
+                Tournaments.id to SortOrder.DESC,
             )
+        } else {
+            Tournaments.selectAll()
         }
+        val limited = if (limit != null) query.limit(limit, offset) else query
+        limited.map { it.toTournament() }
     }
 
     fun getTournament(id: Long): Tournament? = transaction {

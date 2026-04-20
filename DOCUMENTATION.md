@@ -6,6 +6,8 @@ This document explains how the RiverKing backend and adjacent client projects ar
 - [Domain services (`src/main/kotlin/service`)](src/main/kotlin/service/README.md)
 - [Data layer (`src/main/kotlin/db`)](src/main/kotlin/db/README.md)
 - [Utilities (`src/main/kotlin/util`)](src/main/kotlin/util/README.md)
+- [Android player client (`mobile/android-app`)](mobile/android-app/README.md)
+- [Android admin app (`mobile/admin-app`)](mobile/admin-app/README.md)
 
 ## Overview
 
@@ -13,7 +15,9 @@ The server starts from `main()` in `Application.kt`: it loads the configuration,
 
 `mobile/android-app/` is a separate nested Gradle project. It does not participate in the backend build graph, but it consumes the same backend contracts and account model through mobile auth endpoints, the shared gameplay API, and the Android update policy served at `/api/mobile/update`.
 
-Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, tournaments, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the Mini App, Android client, or bot. The auth/session layer now supports both Telegram cookie sessions and bearer tokens backed by refresh sessions.
+`mobile/admin-app/` is a separate internal Gradle project for operators. It stores one or more backend server profiles locally and calls the protected `/api/admin/*` routes with `ADMIN_API_TOKEN` to manage tournaments, shop discounts, and broadcasts. The admin app uses `/api/admin/catalog` to render selectable tournament metrics, fish, locations, prizes, and discountable shop items instead of relying on hand-entered IDs.
+
+Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, tournaments, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the Mini App, Android client, or bot. Protected operator routes live in `app/AdminApiRoutes.kt`. The auth/session layer now supports both Telegram cookie sessions and bearer tokens backed by refresh sessions.
 
 Achievements are tracked through `AchievementService` and exposed via `/api/achievements` plus the `/achievements` bot command. The current catalog includes rarity ladders, traveler and trophy milestones, tournament and daily-rating progress, koi collection, and location-completion achievements with claimable rewards surfaced in both the mini-app and the bot.
 

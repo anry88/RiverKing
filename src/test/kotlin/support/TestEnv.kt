@@ -29,6 +29,7 @@ fun testEnv(name: String): Env {
     authTokenSecret = "test-secret",
     authAccessTokenTtlMinutes = 60L,
     authRefreshTokenTtlDays = 30L,
+    adminApiToken = "test-admin-token",
     googleAuthClientId = "",
     googlePlayPackageName = "",
     googlePlayServiceAccountFile = "",

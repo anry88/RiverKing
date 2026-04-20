@@ -13,7 +13,7 @@ Manages the player lifecycle and fishing process.
 - **Rods and recommendations:** `listRods`, `setRod`, `recommendRod` suggest rods for the current location and lure.
 
 ## TournamentService, PrizeService, RatingPrizeService
-- **TournamentService** stores tournament parameters: `createTournament`, `updateTournament`, `listTournaments`, `currentTournament`, `upcomingTournaments`, `pastTournaments`. Leaderboards are built via `leaderboard`, which aggregates catches in the required metric.
+- **TournamentService** stores tournament parameters: `createTournament`, `updateTournament`, paged/sorted `listTournaments`, `currentTournament`, `upcomingTournaments`, `pastTournaments`. Leaderboards are built via `leaderboard`, which aggregates catches in the required metric.
 - **PrizeService** issues and records rewards: `pendingPrizes`, `grantPrizes`, `userPrizes`, and `applyPrize` (used by the scheduler and API).
 - **RatingPrizeService** helps compute rating prizes after tournaments and prepares `PrizeSpec` for delivery.
 
