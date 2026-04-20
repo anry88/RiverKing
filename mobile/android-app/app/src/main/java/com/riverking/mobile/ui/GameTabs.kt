@@ -5873,7 +5873,7 @@ private fun LanguagePickerDialog(
                         enabled = !selected,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(if (selected) "$label (${strings.currentLabel.lowercase(Locale.getDefault())})" else label)
+                        Text(if (selected) "✓ $label" else label)
                     }
                 }
             }
