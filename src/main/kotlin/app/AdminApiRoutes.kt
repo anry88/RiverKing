@@ -33,7 +33,7 @@ fun Application.adminApiRoutes(env: Env) {
             intercept(ApplicationCallPipeline.Call) {
                 val authHeader = call.request.headers[HttpHeaders.Authorization]
                 val token = authHeader?.removePrefix("Bearer ")?.trim()
-                if (token != env.adminApiToken) {
+                if (env.adminApiToken.isBlank() || token != env.adminApiToken) {
                     call.respond(HttpStatusCode.Unauthorized)
                     finish()
                 }

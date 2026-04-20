@@ -73,7 +73,7 @@ data class Env(
                     ?: error("AUTH_TOKEN_SECRET required"),
                 authAccessTokenTtlMinutes = configuredValue("AUTH_ACCESS_TOKEN_TTL_MINUTES")?.toLongOrNull() ?: 60L,
                 authRefreshTokenTtlDays = configuredValue("AUTH_REFRESH_TOKEN_TTL_DAYS")?.toLongOrNull() ?: 30L,
-                adminApiToken = configuredValue("ADMIN_API_TOKEN") ?: error("ADMIN_API_TOKEN required"),
+                adminApiToken = configuredValue("ADMIN_API_TOKEN") ?: "",
                 googleAuthClientId = configuredValue("GOOGLE_AUTH_CLIENT_ID") ?: "",
                 googlePlayPackageName = configuredValue("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
                 googlePlayServiceAccountFile = configuredValue("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
