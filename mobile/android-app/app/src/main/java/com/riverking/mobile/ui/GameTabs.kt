@@ -4,7 +4,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -165,6 +164,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -211,6 +211,13 @@ private data class BobberVisualState(
     val tilt: Float = 0f,
     val submerge: Float = 0f,
 )
+
+private const val TG_CAST_WATER_TOP = 0.48f
+private const val TG_CAST_LEFT_MARGIN = 0.05f
+private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
+private const val TG_CAST_MAX_DISTANCE_FROM_TIP = 0.20f
+private const val TG_CAST_MIN_WATER_DEPTH = 0.12f
+private const val TG_CAST_WATER_DEPTH_VARIANCE = 0.18f
 
 @Composable
 fun MainShell(
@@ -2362,7 +2369,17 @@ private fun FishingStageScene(
         }
     }
     val phase = state.fishing.phase
-    val inWater = phase == FishingPhase.WAITING_BITE || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE
+    val castSpot = state.fishing.castSpot
+    val inWater = when (phase) {
+        FishingPhase.WAITING_BITE,
+        FishingPhase.BITING,
+        FishingPhase.TAP_CHALLENGE,
+        -> true
+        FishingPhase.RESOLVING -> castSpot != null
+        FishingPhase.READY,
+        FishingPhase.COOLDOWN,
+        -> false
+    }
     val infinite = rememberInfiniteTransition(label = "fishing-scene")
     val rippleProgress by infinite.animateFloat(
         initialValue = 0f,
@@ -2371,37 +2388,10 @@ private fun FishingStageScene(
         label = "ripple-progress",
     )
     var bobberVisual by remember { mutableStateOf(BobberVisualState()) }
-
-    // --- Bobber position (relative fractions matching the TG webapp) ---
-    // In the TG webapp the bobber lands to the LEFT of the rod tip,
-    // in the water area (waterTop ~0.48, bobber Y ~0.60-0.80).
-    // When idle / ready the bobber sits near the shore (left side).
-    val castX by animateFloatAsState(
-        targetValue = when (phase) {
-            FishingPhase.READY -> 0.09f
-            FishingPhase.COOLDOWN -> 0.12f
-            FishingPhase.WAITING_BITE -> 0.22f
-            FishingPhase.BITING -> 0.20f
-            FishingPhase.TAP_CHALLENGE -> 0.19f
-            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.28f else 0.21f
-        },
-        animationSpec = tween(durationMillis = 850),
-        label = "cast-x",
-    )
-    val castY by animateFloatAsState(
-        targetValue = when (phase) {
-            FishingPhase.READY -> 0.45f
-            FishingPhase.COOLDOWN -> 0.48f
-            FishingPhase.WAITING_BITE -> 0.62f
-            FishingPhase.BITING -> 0.60f
-            FishingPhase.TAP_CHALLENGE -> 0.58f
-            FishingPhase.RESOLVING -> if (state.fishing.lastCast?.caught == true) 0.40f else 0.61f
-        },
-        animationSpec = tween(durationMillis = 850),
-        label = "cast-y",
-    )
-    // Wait until the float actually reaches the water zone before submerging it or showing ripples.
-    val hasSplashed = inWater && castY >= 0.56f
+    val shoreSpot = remember { Offset(0.09f, TG_CAST_WATER_TOP - 0.03f) }
+    var bobberRel by remember { mutableStateOf(shoreSpot) }
+    var castLanded by remember { mutableStateOf(false) }
+    val hasSplashed = inWater && (castLanded || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
     val shouldAnimateFloat = hasSplashed
 
     LaunchedEffect(shouldAnimateFloat, phase) {
@@ -2532,6 +2522,45 @@ private fun FishingStageScene(
             // Push rod bottom aligned with the scene
             val rodBottomOvershoot = 50.dp
             val rodTopDp = maxHeight - rodHeightDp + rodBottomOvershoot
+            val rodTipRelX = if (maxWidth.value > 0f) {
+                (rodLeftDp.value + rodWidthDp.value * rodTipAnchor.x) / maxWidth.value
+            } else {
+                0.25f
+            }
+            val activeCastTarget = castSpot?.let { tgStyleCastTarget(it, rodTipRelX) }
+
+            LaunchedEffect(activeCastTarget) {
+                if (activeCastTarget == null) {
+                    castLanded = false
+                    bobberRel = shoreSpot
+                    return@LaunchedEffect
+                }
+
+                castLanded = false
+                val startRel = bobberRel.takeIf { it.isFinite() } ?: shoreSpot
+                val relDistanceY = abs(activeCastTarget.y - startRel.y)
+                val arcHeight = max(0.015f, min(0.08f, relDistanceY * 0.75f))
+                val durationNanos = 750_000_000L
+                var startNanos = 0L
+
+                while (isActive) {
+                    val frameNanos = withFrameNanos { it }
+                    if (startNanos == 0L) {
+                        startNanos = frameNanos
+                    }
+                    val progress = ((frameNanos - startNanos).toFloat() / durationNanos).coerceIn(0f, 1f)
+                    val eased = easeInOutCubic(progress)
+                    val arc = sin(progress * PI.toFloat()) * arcHeight
+                    bobberRel = Offset(
+                        x = startRel.x + (activeCastTarget.x - startRel.x) * eased,
+                        y = startRel.y + (activeCastTarget.y - startRel.y) * eased - arc,
+                    )
+                    if (progress >= 1f) break
+                }
+
+                bobberRel = activeCastTarget
+                castLanded = true
+            }
 
             coil.compose.AsyncImage(
                 model = rodUrl,
@@ -2544,8 +2573,8 @@ private fun FishingStageScene(
             )
 
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val waterTop = size.height * 0.48f
-                val bobberBase = Offset(size.width * castX, size.height * castY)
+                val waterTop = size.height * TG_CAST_WATER_TOP
+                val bobberBase = Offset(size.width * bobberRel.x, size.height * bobberRel.y)
                 val bobberRectSize = size.width * 0.08f
                 val bobberRadius = bobberRectSize / 2f
                 val visibleAboveWater = bobberRadius * 0.75f
@@ -2686,6 +2715,26 @@ private fun FishingStageScene(
         }
     }
 }
+
+private fun tgStyleCastTarget(castSpot: FishingCastSpot, rodTipRelX: Float): Offset {
+    val minX = max(TG_CAST_LEFT_MARGIN, rodTipRelX - TG_CAST_MAX_DISTANCE_FROM_TIP)
+    val maxX = max(minX, rodTipRelX - TG_CAST_MIN_DISTANCE_FROM_TIP)
+    return Offset(
+        x = minX + castSpot.xRoll * (maxX - minX),
+        y = TG_CAST_WATER_TOP + TG_CAST_MIN_WATER_DEPTH + castSpot.yRoll * TG_CAST_WATER_DEPTH_VARIANCE,
+    )
+}
+
+private fun easeInOutCubic(progress: Float): Float =
+    if (progress < 0.5f) {
+        4f * progress * progress * progress
+    } else {
+        val shifted = -2f * progress + 2f
+        1f - (shifted * shifted * shifted) / 2f
+    }
+
+private fun Offset.isFinite(): Boolean =
+    !x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()
 
 @Composable
 private fun SceneBadge(

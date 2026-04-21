@@ -54,6 +54,11 @@ enum class FishingPhase {
     RESOLVING,
 }
 
+data class FishingCastSpot(
+    val xRoll: Float,
+    val yRoll: Float,
+)
+
 enum class RatingsMode(val apiValue: String) {
     PERSONAL("personal"),
     GLOBAL("global"),
@@ -91,6 +96,7 @@ data class FishingUiState(
     val tapGoal: Int = TAP_CHALLENGE_GOAL,
     val autoCastEnabled: Boolean = false,
     val castWaitSeconds: Int = 0,
+    val castSpot: FishingCastSpot? = null,
     val lastStart: StartCastResultDto? = null,
     val lastCast: CastResultDto? = null,
     val lastCatchWasNewFish: Boolean = false,
@@ -478,10 +484,17 @@ class RiverKingViewModel(
             return
         }
 
+        val castSpot = randomFishingCastSpot()
         viewModelScope.launch {
             _state.update {
                 it.copy(
-                    fishing = it.fishing.copy(phase = FishingPhase.RESOLVING, phaseTimeLeftMillis = 0L),
+                    fishing = it.fishing.copy(
+                        phase = FishingPhase.RESOLVING,
+                        phaseTimeLeftMillis = 0L,
+                        castSpot = castSpot,
+                        lastCast = null,
+                        lastEscape = false,
+                    ),
                     error = null,
                 )
             }
@@ -507,6 +520,7 @@ class RiverKingViewModel(
                             phase = FishingPhase.WAITING_BITE,
                             phaseTimeLeftMillis = waitSeconds * 1_000L,
                             castWaitSeconds = waitSeconds,
+                            castSpot = castSpot,
                             lastStart = start,
                             lastCast = null,
                             lastCatchWasNewFish = false,
@@ -519,7 +533,11 @@ class RiverKingViewModel(
                 val message = describeError(error)
                 _state.update {
                     it.copy(
-                        fishing = it.fishing.copy(phase = FishingPhase.READY, phaseTimeLeftMillis = 0L),
+                        fishing = it.fishing.copy(
+                            phase = FishingPhase.READY,
+                            phaseTimeLeftMillis = 0L,
+                            castSpot = null,
+                        ),
                         error = message,
                     )
                 }
@@ -1807,6 +1825,7 @@ class RiverKingViewModel(
                     phase = FishingPhase.COOLDOWN,
                     phaseTimeLeftMillis = CAST_READY_DELAY_MILLIS,
                     tapCount = 0,
+                    castSpot = null,
                 )
             )
         }
@@ -1911,3 +1930,9 @@ private const val CAST_READY_DELAY_MILLIS = 3_000L
 private const val TELEGRAM_POLL_INTERVAL_MS = 2_000L
 private const val FAIL_REACTION_SECONDS = 9.99
 private val REGISTER_LOGIN_REGEX = Regex("^[a-z0-9._-]{3,32}$")
+
+private fun randomFishingCastSpot(): FishingCastSpot =
+    FishingCastSpot(
+        xRoll = Random.nextFloat(),
+        yRoll = Random.nextFloat(),
+    )
