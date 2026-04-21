@@ -79,37 +79,38 @@ function BottomNav({tab,setTab,dailyAvailable,achievementsAvailable}){
     ...item,
     label: typeof item.label === 'function' ? item.label() : item.label,
   }));
-  const isAndroid = (window.Telegram?.WebApp?.platform || '').toLowerCase() === 'android';
   return (
-    <div className="-mx-4 sticky bottom-0 z-20">
-      <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2" aria-label={t('menu')}>
-        {items.map(item=>(
-          <button
-            key={item.id}
-            type="button"
-            onClick={()=>setTab(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
-            aria-current={tab===item.id ? 'page' : undefined}
-          >
-            <div className="relative">
-              <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
-              {dailyAvailable && item.id==='shop' && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  !
-                </span>
-              )}
-              {achievementsAvailable && item.id==='guide' && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  !
-                </span>
-              )}
-            </div>
-            <span className="leading-tight text-center">{item.label}</span>
-          </button>
-        ))}
-      </nav>
-      {isAndroid && <div className="app-footer-placeholder" aria-hidden="true"></div>}
-    </div>
+    <>
+      <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+        <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2 max-w-5xl xl:max-w-6xl mx-auto pointer-events-auto" aria-label={t('menu')}>
+          {items.map(item=>(
+            <button
+              key={item.id}
+              type="button"
+              onClick={()=>setTab(item.id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+              aria-current={tab===item.id ? 'page' : undefined}
+            >
+              <div className="relative">
+                <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+                {dailyAvailable && item.id==='shop' && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    !
+                  </span>
+                )}
+                {achievementsAvailable && item.id==='guide' && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    !
+                  </span>
+                )}
+              </div>
+              <span className="leading-tight text-center">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div className="app-footer-placeholder" aria-hidden="true"></div>
+    </>
   );
 }
 

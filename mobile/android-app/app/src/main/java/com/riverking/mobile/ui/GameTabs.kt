@@ -2519,9 +2519,14 @@ private fun FishingStageScene(
     var bobberRel by remember { mutableStateOf(shoreSpot) }
     var castLanded by remember { mutableStateOf(false) }
     val hasSplashed = inWater && (castLanded || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
-    val shouldAnimateFloat = hasSplashed
+    val showRipple = hasSplashed && (!proMode || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
+    val shouldAnimateFloat = if (proMode) {
+        phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE
+    } else {
+        hasSplashed
+    }
 
-    LaunchedEffect(shouldAnimateFloat, phase) {
+    LaunchedEffect(shouldAnimateFloat, phase, proMode) {
         if (!shouldAnimateFloat) {
             bobberVisual = BobberVisualState()
             return@LaunchedEffect
@@ -2547,7 +2552,8 @@ private fun FishingStageScene(
             val nextVisual = when (stateMode) {
                 "biting" -> {
                     val extraWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.75f))
-                    val offset = mainWave * 6.5f + extraWave * 1.8f
+                    val sinkOffset = if (proMode) 10f else 0f
+                    val offset = sinkOffset + mainWave * 6.5f + extraWave * 1.8f
                     BobberVisualState(
                         offset = offset,
                         tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.9f)) * 6.5f,
@@ -2684,7 +2690,7 @@ private fun FishingStageScene(
             val rodLeftDp = baseDesiredX - rodWidthDp * rodBaseAnchorX
 
             // Push rod bottom aligned with the scene
-            val rodBottomOvershoot = 50.dp
+            val rodBottomOvershoot = if (proMode) (maxHeight.value * -0.28f).dp else 50.dp
             val rodTopDp = maxHeight - rodHeightDp + rodBottomOvershoot
             val rodTipRelX = if (maxWidth.value > 0f) {
                 (rodLeftDp.value + rodWidthDp.value * rodTipAnchor.x) / maxWidth.value
@@ -2808,7 +2814,7 @@ private fun FishingStageScene(
                         style = Stroke(width = 2f, cap = StrokeCap.Round),
                     )
                 }
-                if (hasSplashed) {
+                if (hasSplashed && !proMode) {
                     clipRect(left = 0f, top = 0f, right = size.width, bottom = waterlineY) {
                         drawPath(
                             path = waterLinePath,
@@ -2825,7 +2831,7 @@ private fun FishingStageScene(
                 }
 
                 // Ripple circles around bobber
-                if (hasSplashed) {
+                if (showRipple) {
                     repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
                         val progress = ((rippleProgress + index * 0.35f) % 1f)
                         val radius = size.width * (0.04f + progress * 0.08f)
@@ -2891,13 +2897,6 @@ private fun FishingStageScene(
                         .statusBarsPadding()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     panelAlpha = 0.68f,
-                )
-                FishingPhasePill(
-                    text = fishingPhaseLabel(strings, phase),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
-                        .padding(bottom = 58.dp),
                 )
             }
             FishingOverlayToggle(
@@ -2966,15 +2965,6 @@ private fun easeInOutCubic(progress: Float): Float =
 private fun Offset.isFinite(): Boolean =
     !x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()
 
-private fun fishingPhaseLabel(strings: RiverStrings, phase: FishingPhase): String = when (phase) {
-    FishingPhase.READY -> strings.castRod
-    FishingPhase.BITING -> strings.hook
-    FishingPhase.TAP_CHALLENGE -> strings.tapFast
-    FishingPhase.RESOLVING -> strings.casting
-    FishingPhase.WAITING_BITE -> strings.waitingBite
-    FishingPhase.COOLDOWN -> strings.castCooldown
-}
-
 @Composable
 private fun FishingOverlayToggle(
     label: String,
@@ -3016,28 +3006,6 @@ private fun FishingOverlayToggle(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-    }
-}
-
-@Composable
-private fun FishingPhasePill(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        color = RiverPanelRaised.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.42f)),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 

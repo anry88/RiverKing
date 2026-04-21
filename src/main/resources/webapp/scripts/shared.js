@@ -221,16 +221,17 @@
     document.documentElement.style.setProperty('--safe-top-fb', safeTopFB + 'px');
     document.documentElement.style.setProperty('--safe-bottom-fb', safeBottomFB + 'px');
 
+    const plat = (tg?.platform || '').toLowerCase();
+    const isMobileTG = plat === 'android' || plat === 'ios';
     const sh = window.screen?.height || vh;
-    const bottomGapLegacy = Math.max(0, Math.round(sh - vh));
+    const bottomGapLegacyRaw = Math.max(0, Math.round(sh - vh));
+    const bottomGapLegacy = Math.min(bottomGapLegacyRaw, isMobileTG ? 48 : 96);
     const bottomGap = Math.max(safeBottomFB, bottomGapLegacy);
     document.documentElement.style.setProperty('--bottom-gap', bottomGap + 'px');
 
     const isOverlay = (bottomGap >= 8) || (safeTopFB >= 8);
     document.documentElement.style.setProperty('--overlay', isOverlay ? '1' : '0');
 
-    const plat = (tg?.platform || '').toLowerCase();
-    const isMobileTG = plat === 'android' || plat === 'ios';
     const needTGTopbarFallback = isMobileTG && safeTopFB < 4;
     const tgTopbarGuess = needTGTopbarFallback
       ? (plat === 'ios' ? 54 : 48)

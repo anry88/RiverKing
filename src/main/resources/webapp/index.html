@@ -268,17 +268,16 @@
     }
 
     .app-footer {
-      padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
       height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
-      padding: 8px calc(16px * var(--ui-scale));
-      padding-top: 5px;
+      box-sizing: border-box;
+      padding: 5px calc(16px * var(--ui-scale)) calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
       display: flex;
       align-items: stretch;
       gap: 12px;
     }
 
     .app-footer-placeholder {
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
+      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
       background: var(--tg-bg);
     }
 

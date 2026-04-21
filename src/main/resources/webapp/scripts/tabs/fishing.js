@@ -110,14 +110,6 @@ function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
   );
 }
 
-function fishingPhaseLabel({ casting, biting, tapping, castReady }) {
-  if (tapping) return t('tapButton');
-  if (biting) return t('hook');
-  if (casting) return t('waitingBite');
-  if (!castReady) return t('castCooldown');
-  return t('castRod');
-}
-
 function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
@@ -168,7 +160,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }), [floatPx.x, floatPx.y]);
   const lineClipId = React.useMemo(() => `line-clip-${Math.random().toString(36).slice(2, 9)}`, []);
   const lineClipHeight = Math.max(0, Math.min(h, waterlineY));
-  const shouldClipLine = isCastInWater && lineClipHeight > 0 && w > 0;
+  const shouldClipLine = !proMode && isCastInWater && lineClipHeight > 0 && w > 0;
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
     return {
@@ -177,7 +169,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     };
   }, [bobberClipPath]);
 
-  const shouldAnimateFloat = (casting && castLanded) || biting || tapping;
+  const shouldAnimateFloat = proMode ? (biting || tapping) : ((casting && castLanded) || biting || tapping);
   React.useEffect(() => {
     let frame;
     if (!shouldAnimateFloat) {
@@ -201,7 +193,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       let submerge;
       if (state === 'biting') {
         const extraWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.75));
-        offset = mainWave * 6.5 + extraWave * 1.8;
+        const sinkOffset = proMode ? 10 : 0;
+        offset = sinkOffset + mainWave * 6.5 + extraWave * 1.8;
         tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.9)) * 6.5;
         submerge = offset > 0 ? Math.min(1, offset / 11) : 0;
       } else if (state === 'tapping') {
@@ -237,7 +230,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     return () => {
       if (frame) { cancelAnimationFrame(frame); }
     };
-  }, [shouldAnimateFloat, biting, tapping]);
+  }, [shouldAnimateFloat, biting, tapping, proMode]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
@@ -279,7 +272,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const baseDesiredX = w * ROD_BASE_X_FRACTION;
   const rodLeft = baseDesiredX - rodW * ROD_BASE_ANCHOR.x;
 
-  const rodBottomOvershoot = Math.min(Math.max(h * 0.08, 50), 140);
+  const rodBottomOvershoot = proMode ? -h * 0.28 : Math.min(Math.max(h * 0.08, 50), 140);
   const rodTop = h - rodH + rodBottomOvershoot;
 
   const tipX = rodLeft + rodW * rodTipAnchor.x;
@@ -782,13 +775,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
           </div>
         )}
       </div>}
-      {proMode && (
-        <div data-pro-ui="true" className="absolute left-1/2 -translate-x-1/2 pro-safe-bottom-center z-20 pointer-events-none">
-          <div className="glass px-3 py-2 rounded-xl text-xs font-semibold bg-black/30 pointer-events-auto">
-            {fishingPhaseLabel({ casting, biting, tapping, castReady })}
-          </div>
-        </div>
-      )}
       <FishingOverlayToggle
         label="Pro"
         checked={!!proMode}
