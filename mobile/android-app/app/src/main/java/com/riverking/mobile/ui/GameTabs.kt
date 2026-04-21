@@ -228,10 +228,12 @@ private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
 private const val TG_CAST_MAX_DISTANCE_FROM_TIP = 0.20f
 private const val TG_CAST_MIN_WATER_DEPTH = 0.12f
 private const val TG_CAST_WATER_DEPTH_VARIANCE = 0.18f
-private const val PRO_CAST_MIN_X = 0.16f
-private const val PRO_CAST_MAX_X = 0.84f
-private const val PRO_CAST_FAR_Y = 0.56f
-private const val PRO_CAST_NEAR_Y = 0.84f
+private const val PRO_CAST_MIN_X = 0.14f
+private const val PRO_CAST_MAX_X = 0.86f
+private const val PRO_CAST_FAR_Y = 0.34f
+private const val PRO_CAST_NEAR_Y = 0.70f
+private const val PRO_CAST_SHORE_X = 0.44f
+private const val PRO_CAST_SHORE_Y = 0.56f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
 private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
 private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
@@ -2514,7 +2516,7 @@ private fun FishingStageScene(
     )
     var bobberVisual by remember { mutableStateOf(BobberVisualState()) }
     val shoreSpot = remember(proMode) {
-        if (proMode) Offset(0.44f, 0.56f) else Offset(0.09f, TG_CAST_WATER_TOP - 0.03f)
+        if (proMode) Offset(PRO_CAST_SHORE_X, PRO_CAST_SHORE_Y) else Offset(0.09f, TG_CAST_WATER_TOP - 0.03f)
     }
     var bobberRel by remember { mutableStateOf(shoreSpot) }
     var castLanded by remember { mutableStateOf(false) }
@@ -2737,7 +2739,7 @@ private fun FishingStageScene(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * TG_CAST_WATER_TOP
                 val bobberBase = Offset(size.width * bobberRel.x, size.height * bobberRel.y)
-                val bobberRectSize = size.width * 0.08f
+                val bobberRectSize = size.width * if (proMode) 0.105f else 0.08f
                 val bobberRadius = bobberRectSize / 2f
                 val visibleAboveWater = bobberRadius * 0.75f
                 val waterlineY = (bobberBase.y - bobberRadius + visibleAboveWater).coerceIn(0f, size.height)
@@ -2969,12 +2971,13 @@ private fun proFishingCastSpotFromSwipe(
     heightPx: Float,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
-    val distance = hypot(swipe.x, swipe.y)
-    val horizontal = (swipe.x / (minSide * 1.1f)).coerceIn(-0.5f, 0.5f)
-    val forward = ((max(0f, -swipe.y) + distance * 0.2f) / (minSide * 0.8f)).coerceIn(0f, 1f)
+    val targetX = (PRO_CAST_SHORE_X + (swipe.x / (minSide * 0.9f)) * 0.42f)
+        .coerceIn(PRO_CAST_MIN_X, PRO_CAST_MAX_X)
+    val targetY = (PRO_CAST_SHORE_Y + (swipe.y / (minSide * 0.9f)) * 0.42f)
+        .coerceIn(PRO_CAST_FAR_Y, PRO_CAST_NEAR_Y)
     return FishingCastSpot(
-        xRoll = (0.5f + horizontal).coerceIn(0f, 1f),
-        yRoll = (1f - forward).coerceIn(0f, 1f),
+        xRoll = ((targetX - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)).coerceIn(0f, 1f),
+        yRoll = ((targetY - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)).coerceIn(0f, 1f),
         proMode = true,
     )
 }

@@ -33,7 +33,7 @@
       /* удобные «максимумы» */
       --safe-top-max: max(env(safe-area-inset-top, 0px), var(--safe-top-fb));
       --safe-bottom-max: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-fb));
-      --safe-top-ui: var(--safe-top-max);
+      --safe-top-ui: calc(var(--safe-top-max) + var(--tg-topbar));
       --safe-top-overlay: calc(var(--safe-top-max) + var(--tg-topbar));
     }
 
@@ -301,12 +301,12 @@
 
     .pro-safe-bottom-left {
       left: 12px;
-      bottom: calc(12px + max(var(--safe-bottom-max), var(--bottom-gap)));
+      bottom: calc(28px + max(var(--safe-bottom-max), var(--bottom-gap)));
     }
 
     .pro-safe-bottom-right {
       right: 12px;
-      bottom: calc(12px + max(var(--safe-bottom-max), var(--bottom-gap)));
+      bottom: calc(28px + max(var(--safe-bottom-max), var(--bottom-gap)));
     }
 
     .pro-safe-bottom-center {

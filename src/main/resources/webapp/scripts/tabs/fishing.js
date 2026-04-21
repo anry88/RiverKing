@@ -1,7 +1,12 @@
 const ACTION_HEIGHT_CLASS = "min-h-[72px] md:min-h-[76px]";
 const BOBBER_SIZE = 24;
-const BOBBER_RADIUS = BOBBER_SIZE / 2;
-const BOBBER_VISIBLE_ABOVE_WATER = Math.round(BOBBER_RADIUS * 0.75);
+const PRO_BOBBER_SIZE = 30;
+const PRO_SHORE_X = 0.44;
+const PRO_SHORE_Y = 0.56;
+const PRO_CAST_MIN_X = 0.14;
+const PRO_CAST_MAX_X = 0.86;
+const PRO_CAST_FAR_Y = 0.34;
+const PRO_CAST_NEAR_Y = 0.70;
 const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
@@ -12,19 +17,20 @@ function clamp01(value) {
 
 function proCastTargetFromSpot(spot) {
   return {
-    x: 0.16 + clamp01(Number(spot?.xRoll) || 0) * 0.68,
-    y: 0.56 + clamp01(Number(spot?.yRoll) || 0) * 0.28,
+    x: PRO_CAST_MIN_X + clamp01(Number(spot?.xRoll) || 0) * (PRO_CAST_MAX_X - PRO_CAST_MIN_X),
+    y: PRO_CAST_FAR_Y + clamp01(Number(spot?.yRoll) || 0) * (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y),
   };
 }
 
 function proFishingCastSpotFromSwipe(dx, dy, w, h) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
-  const distance = Math.hypot(dx, dy);
-  const horizontal = Math.max(-0.5, Math.min(0.5, dx / (minSide * 1.1)));
-  const forward = clamp01((Math.max(0, -dy) + distance * 0.2) / (minSide * 0.8));
+  const target = {
+    x: Math.max(PRO_CAST_MIN_X, Math.min(PRO_CAST_MAX_X, PRO_SHORE_X + (dx / (minSide * 0.9)) * 0.42)),
+    y: Math.max(PRO_CAST_FAR_Y, Math.min(PRO_CAST_NEAR_Y, PRO_SHORE_Y + (dy / (minSide * 0.9)) * 0.42)),
+  };
   return {
-    xRoll: clamp01(0.5 + horizontal),
-    yRoll: clamp01(1 - forward),
+    xRoll: clamp01((target.x - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)),
+    yRoll: clamp01((target.y - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)),
     proMode: true,
   };
 }
@@ -114,10 +120,13 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
+  const bobberSize = proMode ? PRO_BOBBER_SIZE : BOBBER_SIZE;
+  const bobberRadius = bobberSize / 2;
+  const bobberVisibleAboveWater = Math.round(bobberRadius * 0.75);
 
   const WATER_TOP_REL = 0.48;
   const shorePosRel = React.useMemo(() => (
-    proMode ? { x: 0.44, y: 0.56 } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
+    proMode ? { x: PRO_SHORE_X, y: PRO_SHORE_Y } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
   ), [proMode]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [floatVisual, setFloatVisual] = React.useState({ offset: 0, tilt: 0, submerge: 0 });
@@ -145,14 +154,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   React.useEffect(() => { floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
 
   const waterlineY = React.useMemo(() => {
-    const value = floatBasePx.y - BOBBER_RADIUS + BOBBER_VISIBLE_ABOVE_WATER;
+    const value = floatBasePx.y - bobberRadius + bobberVisibleAboveWater;
     return Math.max(0, Math.min(h, value));
-  }, [floatBasePx.y, h]);
+  }, [floatBasePx.y, h, bobberRadius, bobberVisibleAboveWater]);
   const isCastInWater = (casting && castLanded) || biting || tapping;
-  const bobberBottom = floatPx.y + BOBBER_RADIUS;
-  const bobberHiddenHeight = Math.max(0, Math.min(BOBBER_SIZE, bobberBottom - waterlineY));
+  const bobberBottom = floatPx.y + bobberRadius;
+  const bobberHiddenHeight = Math.max(0, Math.min(bobberSize, bobberBottom - waterlineY));
   const bobberClipPath = isCastInWater && bobberHiddenHeight > 0.01
-    ? `inset(0 0 ${bobberHiddenHeight}px 0 round ${BOBBER_RADIUS}px)`
+    ? `inset(0 0 ${bobberHiddenHeight}px 0 round ${bobberRadius}px)`
     : null;
   const lineAttach = React.useMemo(() => ({
     x: floatPx.x,
@@ -308,7 +317,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     const rawDx = lineAttach.x - lastPoint.x;
     const rawDy = lineAttach.y - lastPoint.y;
     const rawDist = Math.hypot(rawDx, rawDy);
-    const endInset = isCastInWater && rawDist > 0 ? BOBBER_RADIUS * (proMode ? 1.15 : 0.65) : 0;
+    const endInset = isCastInWater && rawDist > 0 ? bobberRadius * (proMode ? 1.15 : 0.65) : 0;
     const lineEnd = endInset > 0 && rawDist > endInset
       ? {
         x: lineAttach.x - (rawDx / rawDist) * endInset,
@@ -340,7 +349,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineEnd.x},${lineEnd.y}`;
     }
     return { rodLinePath: rPath, waterLinePath: wPath };
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, isCastInWater, proMode]);
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, isCastInWater, proMode, bobberRadius]);
 
   const catchTargetPx = React.useMemo(() => {
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -718,17 +727,17 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       <div
         className="absolute"
         style={{
-          left: floatPx.x - BOBBER_RADIUS,
-          top: floatPx.y - BOBBER_RADIUS,
-          width: BOBBER_SIZE,
-          height: BOBBER_SIZE
+          left: floatPx.x - bobberRadius,
+          top: floatPx.y - bobberRadius,
+          width: bobberSize,
+          height: bobberSize
         }}
       >
         <div className="absolute inset-0">
           <AssetImage
             src={bobberIcon}
             alt="bobber"
-            className="relative bobber-cast drop-shadow"
+            className="relative bobber-cast drop-shadow w-full h-full object-contain"
             style={{
               transform: `rotate(${floatVisual.tilt}deg)`,
               ...(bobberClipStyle || {})
