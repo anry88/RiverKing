@@ -499,6 +499,7 @@ fun MainShell(
         TournamentDialog(
             strings = strings,
             details = tournament,
+            shopPacks = state.shop.categories.flatMap { it.packs },
             caughtFishIds = me.caughtFishIds,
             fishGuide = state.guide.guide?.fish,
             currentUserId = me.id,
@@ -5126,6 +5127,7 @@ private fun TournamentCard(
 private fun TournamentDialog(
     strings: RiverStrings,
     details: CurrentTournamentDto,
+    shopPacks: List<ShopPackageDto>,
     caughtFishIds: List<Long>,
     fishGuide: List<GuideFishDto>?,
     currentUserId: Long,
@@ -5171,6 +5173,7 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = mine,
+                            shopPacks = shopPacks,
                             fishDiscovered = isFishDiscovered(
                                 fishId = mine.fishId,
                                 fishName = mine.fish,
@@ -5195,6 +5198,7 @@ private fun TournamentDialog(
                             strings = strings,
                             tournament = details.tournament,
                             entry = entry,
+                            shopPacks = shopPacks,
                             fishDiscovered = isFishDiscovered(
                                 fishId = entry.fishId,
                                 fishName = entry.fish,
@@ -5306,6 +5310,7 @@ private fun TournamentLeaderboardRow(
     strings: RiverStrings,
     tournament: TournamentDto,
     entry: LeaderboardEntryDto,
+    shopPacks: List<ShopPackageDto>,
     fishDiscovered: Boolean,
     highlighted: Boolean,
     onOpenCatch: (CatchDto) -> Unit,
@@ -5393,14 +5398,18 @@ private fun TournamentLeaderboardRow(
                 )
             }
             entry.prize?.let { prize ->
-                PrizeChip(prize = prize)
+                PrizeChip(strings = strings, prize = prize, shopPacks = shopPacks)
             }
         }
     }
 }
 
 @Composable
-private fun PrizeChip(prize: PrizeSpecDto) {
+private fun PrizeChip(
+    strings: RiverStrings,
+    prize: PrizeSpecDto,
+    shopPacks: List<ShopPackageDto>,
+) {
     Surface(
         color = Color(0x22FFD76A),
         shape = RoundedCornerShape(999.dp),
@@ -5419,7 +5428,7 @@ private fun PrizeChip(prize: PrizeSpecDto) {
                 )
             } ?: Text("🪙")
             Text(
-                tournamentPrizeLabel(prize),
+                tournamentPrizeLabel(strings, prize, shopPacks),
                 color = Color(0xFFFFD76A),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -6234,19 +6243,45 @@ private fun tournamentEntrySubtitle(strings: RiverStrings, tournament: Tournamen
         ).joinToString(" • ").ifBlank { unknownUserLabel(strings) }
     }
 
-private fun tournamentPrizeLabel(prize: PrizeSpecDto): String = when {
+private fun tournamentPrizeLabel(
+    strings: RiverStrings,
+    prize: PrizeSpecDto,
+    shopPacks: List<ShopPackageDto>,
+): String = when {
     prize.packageId == "coins" || prize.coins != null -> "+${prize.coins ?: prize.qty}"
-    prize.qty > 1 -> "${humanizePackId(prize.packageId)} x${prize.qty}"
-    else -> humanizePackId(prize.packageId)
+    prize.qty > 1 -> "${tournamentPrizePackName(strings, prize.packageId, shopPacks)} ×${prize.qty}"
+    else -> tournamentPrizePackName(strings, prize.packageId, shopPacks)
 }
 
+private fun tournamentPrizePackName(
+    strings: RiverStrings,
+    packageId: String,
+    shopPacks: List<ShopPackageDto>,
+): String =
+    shopPacks.firstOrNull { it.id == packageId }?.name
+        ?: achievementRewardPackName(strings, packageId)
+
 private fun achievementRewardPackName(strings: RiverStrings, packId: String): String = when (packId) {
-    "fresh_topup_s" -> if (strings.login == "Логин") "Пресное пополнение S" else "Fresh Top-up S"
-    "fresh_stock_m" -> if (strings.login == "Логин") "Пресный запас M" else "Fresh Stock M"
-    "fresh_crate_l" -> if (strings.login == "Логин") "Пресный ящик L" else "Fresh Crate L"
+    "fresh_topup_s" -> if (strings.login == "Логин") "Пресное пополнение S" else "Freshwater Top-up S"
+    "fresh_stock_m" -> if (strings.login == "Логин") "Пресный запас M" else "Freshwater Stock M"
+    "fresh_crate_l" -> if (strings.login == "Логин") "Пресный ящик L" else "Freshwater Crate L"
+    "salt_topup_s" -> if (strings.login == "Логин") "Морское пополнение S" else "Saltwater Top-up S"
+    "salt_stock_m" -> if (strings.login == "Логин") "Морской запас M" else "Saltwater Stock M"
     "salt_crate_l" -> if (strings.login == "Логин") "Морской ящик L" else "Saltwater Crate L"
-    "autofish" -> if (strings.login == "Логин") "Автоловля" else "Autofish"
-    "autofish_week" -> if (strings.login == "Логин") "Автоловля (неделя)" else "Autofish (week)"
+    "fresh_boost_s" -> if (strings.login == "Логин") "Пресный буст S" else "Fresh Boost S"
+    "fresh_boost_m" -> if (strings.login == "Логин") "Пресный буст M" else "Fresh Boost M"
+    "fresh_boost_l" -> if (strings.login == "Логин") "Пресный буст L" else "Fresh Boost L"
+    "salt_boost_s" -> if (strings.login == "Логин") "Морской буст S" else "Saltwater Boost S"
+    "salt_boost_m" -> if (strings.login == "Логин") "Морской буст M" else "Saltwater Boost M"
+    "salt_boost_l" -> if (strings.login == "Логин") "Морской буст L" else "Saltwater Boost L"
+    "bundle_starter" -> if (strings.login == "Логин") "Стартовый набор" else "Starter Pack"
+    "bundle_pro" -> if (strings.login == "Логин") "Профи рыболов" else "Pro Angler"
+    "bundle_whale" -> if (strings.login == "Логин") "Китовый ящик" else "Whale Crate"
+    "micro_pred_fresh" -> if (strings.login == "Логин") "Пополнение пресных хищных" else "Predator Top-up"
+    "micro_salt_starter" -> if (strings.login == "Логин") "Морской старт" else "Sea Start"
+    "micro_salt_pred_refill" -> if (strings.login == "Логин") "Морской хищный запас" else "Saltwater Predator Stock"
+    "autofish" -> if (strings.login == "Логин") "Автоловля" else "Auto Catch"
+    "autofish_week" -> if (strings.login == "Логин") "Автоловля (неделя)" else "Auto Catch (week)"
     else -> humanizePackId(packId)
 }
 
@@ -6298,7 +6333,6 @@ private fun isFishDiscovered(
 }
 
 private fun humanizePackId(packId: String): String = when {
-    packId.startsWith("autofish") -> "Autofish"
     else -> packId.replace('_', ' ')
 }
 
