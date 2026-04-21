@@ -288,6 +288,31 @@
       overflow: auto;
     }
 
+    .pro-fishing-stage {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .pro-safe-top {
+      top: calc(12px + var(--safe-top-ui));
+    }
+
+    .pro-safe-bottom-left {
+      left: 12px;
+      bottom: calc(12px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
+    .pro-safe-bottom-right {
+      right: 12px;
+      bottom: calc(12px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
+    .pro-safe-bottom-center {
+      bottom: calc(56px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
     .btn-lg {
       font-size: calc(14px * var(--ui-scale));
       padding: calc(10px * var(--ui-scale)) calc(14px * var(--ui-scale));

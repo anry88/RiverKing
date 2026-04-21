@@ -38,6 +38,10 @@ const BOBBER_ICON = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 const AssetImage = window.AssetImage;
 const preloadAsset = window.preloadAsset;
 
+function randomProFishingCastSpot(){
+  return { xRoll: Math.random(), yRoll: Math.random(), proMode: true };
+}
+
 function App(){
   const [me,setMe] = React.useState(null);
   const [loading,setLoading] = React.useState(true);
@@ -126,6 +130,9 @@ function App(){
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
+  const [proFishingMode,setProFishingMode] = React.useState(()=>{ try{ return localStorage.getItem('proFishingMode')==='1'; }catch(e){ return false; }});
+  const proFishingModeRef = React.useRef(proFishingMode);
+  const [currentCastSpot,setCurrentCastSpot] = React.useState(null);
   const [castReady,setCastReady] = React.useState(true);
   const castReadyRef = React.useRef(true);
   const castReadyTimeoutRef = React.useRef(null);
@@ -283,6 +290,27 @@ function App(){
     }
   }, [autoCast, me?.autoFish]);
   React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
+  React.useEffect(()=>{
+    proFishingModeRef.current = proFishingMode;
+    try{ localStorage.setItem('proFishingMode', proFishingMode?'1':'0'); }catch(e){}
+  }, [proFishingMode]);
+  React.useEffect(()=>{
+    const active = proFishingMode && tab === 'fish';
+    try{
+      if(active){
+        if(typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+        else if(typeof tg?.expand === 'function') tg.expand();
+        tg?.disableVerticalSwipes?.();
+      }else{
+        tg?.enableVerticalSwipes?.();
+        tg?.exitFullscreen?.();
+        tg?.expand?.();
+      }
+    }catch(e){}
+    return ()=>{
+      try{ tg?.enableVerticalSwipes?.(); }catch(e){}
+    };
+  }, [proFishingMode, tab]);
 
   React.useEffect(()=>()=>{
     if(castReadyTimeoutRef.current){
@@ -1000,6 +1028,7 @@ function App(){
     }finally{
       castingRef.current = false;
       setCasting(false);
+      setCurrentCastSpot(null);
       startCastCooldown();
       tapFinishingRef.current = false;
       tapReactionRef.current = 0;
@@ -1046,15 +1075,17 @@ function App(){
     }
   }
 
-  async function cast(auto=false){
+  async function cast(auto=false, visualSpot=null){
     if(!auto && !castReadyRef.current) return;
     if(castingRef.current) return; if(!me) return;
     const curId = me.currentLureId;
     const curLure = me.lures.find(l=>l.id===curId);
     if(!curLure || curLure.qty<=0){ setError(t('noBaits')); return; }
+    const nextCastSpot = visualSpot || (proFishingModeRef.current ? randomProFishingCastSpot() : null);
     setError(null);
     setDrawerOpen(false);
     setBaitsOpen(false);
+    setRodsOpen(false);
     try{
       const r = await fetch(`/api/start-cast`,{method:'POST',credentials:'include'});
       if(!r.ok){
@@ -1078,6 +1109,7 @@ function App(){
       return;
     }
     castingRef.current = true;
+    setCurrentCastSpot(nextCastSpot);
     setCasting(true);
     setResult(null);
     const wait = 5 + Math.floor(Math.random()*26);
@@ -1114,6 +1146,7 @@ function App(){
         setError(t('fishEscaped'));
         castingRef.current = false;
         setCasting(false);
+        setCurrentCastSpot(null);
         startCastCooldown();
         tapActiveRef.current = false;
         setTapActive(false);
@@ -1136,6 +1169,7 @@ function App(){
         : t('castOften'));
       castingRef.current = false;
       setCasting(false);
+      setCurrentCastSpot(null);
       startCastCooldown();
       tapActiveRef.current = false;
       setTapActive(false);
@@ -1210,9 +1244,14 @@ function App(){
     );
   }
 
+  const fishingProActive = tab === 'fish' && proFishingMode;
+
   return (
-    <div className="app-content w-full px-4 flex justify-center" onClick={()=>setPrizeHint(null)}>
-      <div className="w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full">
+    <div
+      className={`app-content w-full ${fishingProActive ? 'px-0' : 'px-4 flex justify-center'}`}
+      onClick={()=>setPrizeHint(null)}
+    >
+      <div className={fishingProActive ? 'w-full min-h-full flex flex-col' : 'w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full'}>
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1285,15 +1324,17 @@ function App(){
             </div>
           </div>
         )}
-        <Header
-          me={me}
-          lang={me.language}
-          onEditNickname={()=>setNickOpen(true)}
-          onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
-          onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
-          onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
-          onToggleLanguage={toggleLanguage}
-        />
+        {!fishingProActive && (
+          <Header
+            me={me}
+            lang={me.language}
+            onEditNickname={()=>setNickOpen(true)}
+            onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
+            onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
+            onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
+            onToggleLanguage={toggleLanguage}
+          />
+        )}
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
         {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={closeDailyModal} onClaim={claimDaily} />}
         {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
@@ -1362,9 +1403,12 @@ function App(){
               tapCount={tapCount}
               tapTimeLeft={tapTimeLeft}
               castReady={castReady}
-              onCast={()=>cast(false)}
+              onCast={(visualSpot)=>cast(false, visualSpot)}
               onHook={()=>hook(false)}
               onTap={handleTap}
+              castSpot={currentCastSpot}
+              proMode={proFishingMode}
+              onToggleProMode={()=>setProFishingMode(v=>!v)}
               result={result}
               error={error}
               autoCast={autoCast}
@@ -1375,6 +1419,9 @@ function App(){
               markCatchAnimationShown={markCatchAnimationShown}
               onCatchClick={handleCatchClick}
               onOpenQuests={openQuests}
+              onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
+              onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
+              onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
               onOpenClub={()=>{
                 prevTabRef.current = tab;
                 setTab('club');
@@ -1439,7 +1486,7 @@ function App(){
           )}
         </div>
 
-        {tab !== 'club' && (
+        {tab !== 'club' && !fishingProActive && (
           <BottomNav
             tab={tab}
             setTab={setTab}

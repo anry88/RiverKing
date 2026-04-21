@@ -57,6 +57,7 @@ enum class FishingPhase {
 data class FishingCastSpot(
     val xRoll: Float,
     val yRoll: Float,
+    val proMode: Boolean = false,
 )
 
 enum class RatingsMode(val apiValue: String) {
@@ -477,7 +478,7 @@ class RiverKingViewModel(
         }
     }
 
-    fun beginCast(auto: Boolean = false) {
+    fun beginCast(auto: Boolean = false, visualSpot: FishingCastSpot? = null) {
         val current = state.value
         val me = current.me ?: return
         if (current.fishing.phase != FishingPhase.READY) return
@@ -487,7 +488,7 @@ class RiverKingViewModel(
             return
         }
 
-        val castSpot = randomFishingCastSpot()
+        val castSpot = visualSpot ?: randomFishingCastSpot()
         viewModelScope.launch {
             _state.update {
                 it.copy(

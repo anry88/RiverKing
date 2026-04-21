@@ -6,6 +6,29 @@ const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function proCastTargetFromSpot(spot) {
+  return {
+    x: 0.16 + clamp01(Number(spot?.xRoll) || 0) * 0.68,
+    y: 0.56 + clamp01(Number(spot?.yRoll) || 0) * 0.28,
+  };
+}
+
+function proFishingCastSpotFromSwipe(dx, dy, w, h) {
+  const minSide = Math.max(1, Math.min(w || 0, h || 0));
+  const distance = Math.hypot(dx, dy);
+  const horizontal = Math.max(-0.5, Math.min(0.5, dx / (minSide * 1.1)));
+  const forward = clamp01((Math.max(0, -dy) + distance * 0.2) / (minSide * 0.8));
+  return {
+    xRoll: clamp01(0.5 + horizontal),
+    yRoll: clamp01(1 - forward),
+    proMode: true,
+  };
+}
+
 function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
   const timeLabel = Math.max(0, timeLeft).toFixed(1);
   const ariaLabel = `${t('tapPrompt', goal)} ${t('tapCount', { count, goal })}. ${t('tapCountdown', timeLabel)}`;
@@ -37,13 +60,73 @@ function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub }) {
+function ProFishingSetupBar({ me, enabled, onOpenLocations, onOpenBaits, onOpenRods }) {
+  const currentLoc = (me.locations || []).find(x => Number(x.id) === Number(me.locationId))?.name || '—';
+  const currentRod = (me.rods || []).find(r => r.id === me.currentRodId);
+  const rodVal = currentRod ? currentRod.name : '—';
+  const curLure = (me.lures || []).find(l => l.id === me.currentLureId);
+  const lureName = curLure?.displayName || (curLure ? (window.translateLure?.(curLure.name) || curLure.name) : null);
+  const lureVal = curLure ? `${lureName} (${curLure.qty})` : '—';
+  const lureIconPath = curLure ? window.getLureIcon?.(curLure) : null;
+  const itemClass = `flex-1 min-w-0 px-2 py-2 rounded-xl text-center ${enabled ? 'hover:bg-white/10' : 'opacity-50 pointer-events-none'}`;
+  return (
+    <div data-pro-ui="true" className="absolute left-3 right-3 pro-safe-top z-20 glass rounded-2xl bg-black/30">
+      <div className="flex items-stretch divide-x divide-white/10">
+        <button type="button" className={itemClass} onClick={onOpenLocations} disabled={!enabled}>
+          <div className="text-[10px] uppercase opacity-70">{t('location')}</div>
+          <div className="text-sm font-semibold truncate">{currentLoc}</div>
+        </button>
+        <button type="button" className={itemClass} onClick={onOpenRods} disabled={!enabled}>
+          <div className="text-[10px] uppercase opacity-70">{t('rod')}</div>
+          <div className="text-sm font-semibold truncate">{rodVal}</div>
+        </button>
+        <button type="button" className={itemClass} onClick={onOpenBaits} disabled={!enabled}>
+          <div className="text-[10px] uppercase opacity-70">{t('baits')}</div>
+          <div className="text-sm font-semibold truncate flex items-center justify-center gap-1">
+            {lureIconPath && <AssetImage src={lureIconPath} alt="" className="w-4 h-4 object-contain shrink-0" />}
+            <span className="truncate">{lureVal}</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      data-pro-ui="true"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick?.();
+      }}
+      className={`z-20 glass px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 bg-black/30 ${className}`}
+      aria-pressed={checked}
+    >
+      <span className={`w-3.5 h-3.5 rounded border border-white/50 ${checked ? 'bg-emerald-500' : 'bg-transparent'}`}></span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function fishingPhaseLabel({ casting, biting, tapping, castReady }) {
+  if (tapping) return t('tapButton');
+  if (biting) return t('hook');
+  if (casting) return t('waitingBite');
+  if (!castReady) return t('castCooldown');
+  return t('castRod');
+}
+
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
 
   const WATER_TOP_REL = 0.48;
-  const shorePosRel = React.useMemo(() => ({ x: 0.09, y: WATER_TOP_REL - 0.03 }), []);
+  const shorePosRel = React.useMemo(() => (
+    proMode ? { x: 0.5, y: 0.88 } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
+  ), [proMode]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [floatVisual, setFloatVisual] = React.useState({ offset: 0, tilt: 0, submerge: 0 });
   const floatPxRef = React.useRef({ x: 0, y: 0 });
@@ -163,6 +246,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const targetHFrac = isSmall ? 0.92 : (isTablet ? 0.90 : 0.86);
 
   const stageHeight = React.useMemo(() => {
+    if (proMode) {
+      return 'var(--vh)';
+    }
     if (isSmall) {
       return 'clamp(220px, calc(var(--vh) * 0.48), 340px)';
     }
@@ -170,7 +256,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       return 'clamp(320px, calc(var(--vh) * 0.54), 420px)';
     }
     return 'clamp(360px, calc(var(--vh) * 0.56), 540px)';
-  }, [isSmall, isTablet]);
+  }, [isSmall, isTablet, proMode]);
 
   const currentRod = (me.rods || []).find(r => r.id === me.currentRodId);
   const rodImage = (window.ROD_IMAGES && currentRod?.code && window.ROD_IMAGES[currentRod.code])
@@ -398,12 +484,17 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
           prevCastingRef.current = false;
           return;
         }
-        const minX = Math.max(0.05, tipRelX - 0.20);
-        const maxX = Math.max(minX, tipRelX - 0.05);
-        const target = {
-          x: minX + Math.random() * (maxX - minX),
-          y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
-        };
+        let target;
+        if (castSpot?.proMode || proMode) {
+          target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() });
+        } else {
+          const minX = Math.max(0.05, tipRelX - 0.20);
+          const maxX = Math.max(minX, tipRelX - 0.05);
+          target = {
+            x: minX + Math.random() * (maxX - minX),
+            y: WATER_TOP_REL + 0.12 + Math.random() * 0.18,
+          };
+        }
         const startRel = floatRelRef.current;
         const relDistanceY = Math.abs((target?.y ?? startRel.y) - startRel.y);
         const arcHeight = Math.max(0.015, Math.min(0.08, relDistanceY * 0.75));
@@ -426,7 +517,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       setFloatRel(shorePosRel);
       prevCastingRef.current = false;
     }
-  }, [casting, shorePosRel, tipX, tweenTo, w]);
+  }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode]);
 
   const resolveLocationBg = React.useCallback((id, name) => {
     if (typeof window.getLocationBackground === 'function') {
@@ -468,6 +559,57 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     return () => { img.onload = null; };
   }, [bgUrl]);
   const showRipple = castLanded && (biting || tapping);
+  const proPointerRef = React.useRef(null);
+  const handleProPointerDown = React.useCallback((event) => {
+    if (!proMode) return;
+    if (event.target?.closest?.('[data-pro-ui="true"]')) return;
+    if (biting) {
+      event.preventDefault();
+      onHook?.();
+      return;
+    }
+    if (tapping) {
+      event.preventDefault();
+      onTap?.();
+      return;
+    }
+    if (casting || !castReady) return;
+    proPointerRef.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      dx: 0,
+      dy: 0,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, [biting, castReady, casting, onHook, onTap, proMode, tapping]);
+
+  const handleProPointerMove = React.useCallback((event) => {
+    const active = proPointerRef.current;
+    if (!proMode || !active || active.id !== event.pointerId) return;
+    active.dx = event.clientX - active.x;
+    active.dy = event.clientY - active.y;
+    event.preventDefault();
+  }, [proMode]);
+
+  const finishProPointer = React.useCallback((event, cancelled = false) => {
+    const active = proPointerRef.current;
+    if (!proMode || !active || active.id !== event.pointerId) return;
+    proPointerRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (cancelled) return;
+    const distance = Math.hypot(active.dx, active.dy);
+    if (distance < 40 || casting || !castReady) return;
+    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h));
+  }, [castReady, casting, h, onCast, proMode, w]);
+
+  const handleProPointerUp = React.useCallback((event) => {
+    finishProPointer(event, false);
+  }, [finishProPointer]);
+
+  const handleProPointerCancel = React.useCallback((event) => {
+    finishProPointer(event, true);
+  }, [finishProPointer]);
 
   const rarityGlow = {
     common: 'rgba(255,255,255,0.5)',
@@ -508,28 +650,47 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-white/10" ref={stageRef}
-      style={{ height: stageHeight }}>
+    <div
+      className={`relative overflow-hidden ${proMode ? 'pro-fishing-stage rounded-none border-0' : 'rounded-2xl border border-white/10'}`}
+      ref={stageRef}
+      style={{ height: stageHeight }}
+      onPointerDown={handleProPointerDown}
+      onPointerMove={handleProPointerMove}
+      onPointerUp={handleProPointerUp}
+      onPointerCancel={handleProPointerCancel}
+    >
       <div
         className="absolute inset-0 transition-opacity duration-200"
         style={{ backgroundImage: bgUrl ? `url(${bgUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center bottom', opacity: bgLoaded ? 1 : 0 }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
-      <button
-        type="button"
-        onClick={onOpenQuests}
-        className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
-      >
-        {t('quests')}
-      </button>
-      <button
-        type="button"
-        onClick={onOpenClub}
-        className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
-      >
-        {t('clubShort')}
-      </button>
+      {proMode ? (
+        <ProFishingSetupBar
+          me={me}
+          enabled={!casting}
+          onOpenLocations={onOpenLocations}
+          onOpenBaits={onOpenBaits}
+          onOpenRods={onOpenRods}
+        />
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onOpenQuests}
+            className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+          >
+            {t('quests')}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenClub}
+            className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+          >
+            {t('clubShort')}
+          </button>
+        </>
+      )}
 
       <AssetImage
         src={rodImage}
@@ -594,10 +755,10 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </div>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
+      {!proMode && <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
         {!casting ? (
           castReady ? (
-            <button onClick={onCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
+            <button onClick={()=>onCast?.()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
             <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
               <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
@@ -620,11 +781,24 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
           </div>
         )}
-      </div>
+      </div>}
+      {proMode && (
+        <div data-pro-ui="true" className="absolute left-1/2 -translate-x-1/2 pro-safe-bottom-center z-20 pointer-events-none">
+          <div className="glass px-3 py-2 rounded-xl text-xs font-semibold bg-black/30 pointer-events-auto">
+            {fishingPhaseLabel({ casting, biting, tapping, castReady })}
+          </div>
+        </div>
+      )}
+      <FishingOverlayToggle
+        label="Pro"
+        checked={!!proMode}
+        onClick={onToggleProMode}
+        className={`absolute ${proMode ? 'pro-safe-bottom-left' : 'bottom-3 left-3'}`}
+      />
       {me.autoFish && (
-        <button
-          type="button"
-          className="absolute bottom-3 right-3 z-10 flex items-center gap-1 glass px-2 py-1 rounded-lg text-xs cursor-pointer"
+        <FishingOverlayToggle
+          label={t('autoCast')}
+          checked={!!autoCast}
           onClick={() => {
             const checked = !autoCastRef.current;
             autoCastRef.current = checked;
@@ -634,14 +808,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             }
             setAutoCast(checked);
           }}
-        >
-          <span className={"w-3 h-3 rounded-sm border border-white/50 bg-transparent flex items-center justify-center " + (autoCast ? "bg-emerald-500" : "")}>
-            <svg viewBox="0 0 14 14" className={"w-2 h-2 text-black " + (autoCast ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 7 6 10 11 4" />
-            </svg>
-          </span>
-          <span>{t('autoCast')}</span>
-        </button>
+          className={`absolute ${proMode ? 'pro-safe-bottom-right' : 'bottom-3 right-3'}`}
+        />
       )}
     </div>
   );
@@ -659,6 +827,9 @@ function FishingTab({
   onCast,
   onHook,
   onTap,
+  castSpot,
+  proMode,
+  onToggleProMode,
   result,
   error,
   autoCast,
@@ -669,11 +840,14 @@ function FishingTab({
   markCatchAnimationShown,
   onCatchClick,
   onOpenQuests,
-  onOpenClub
+  onOpenClub,
+  onOpenLocations,
+  onOpenBaits,
+  onOpenRods
 }) {
-  const handleCast = () => {
+  const handleCast = (visualSpot) => {
     window.Analytics?.track('cast_attempt');
-    if (onCast) onCast();
+    if (onCast) onCast(visualSpot);
   };
 
   const handleHook = () => {
@@ -694,7 +868,7 @@ function FishingTab({
 
   return (
     <>
-      <div className="mt-3 md:mt-4">
+      <div className={proMode ? 'h-full' : 'mt-3 md:mt-4'}>
         <FishingStage
           me={me}
           setMe={setMe}
@@ -708,6 +882,9 @@ function FishingTab({
           onCast={handleCast}
           onHook={handleHook}
           onTap={onTap}
+          castSpot={castSpot}
+          proMode={proMode}
+          onToggleProMode={onToggleProMode}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
           autoCastRef={autoCastRef}
@@ -717,13 +894,16 @@ function FishingTab({
           markCatchAnimationShown={markCatchAnimationShown}
           onOpenQuests={onOpenQuests}
           onOpenClub={onOpenClub}
+          onOpenLocations={onOpenLocations}
+          onOpenBaits={onOpenBaits}
+          onOpenRods={onOpenRods}
         />
       </div>
 
-      <div className="md:hidden mt-3">
+      {!proMode && <div className="md:hidden mt-3">
         {!casting ? (
           castReady ? (
-            <button onClick={handleCast} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
+            <button onClick={()=>handleCast()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
           ) : (
             <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
               <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
@@ -746,9 +926,9 @@ function FishingTab({
             <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
           </div>
         )}
-      </div>
+      </div>}
 
-      {result && (
+      {!proMode && result && (
         <button
           type="button"
           onClick={() => {
@@ -791,9 +971,9 @@ function FishingTab({
           </div>
         </button>
       )}
-      {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
+      {error && <div className={`${proMode ? 'fixed left-3 right-3 top-24 z-30 glass rounded-xl p-3 text-center' : 'mt-3'} text-sm text-red-300`}>{error}</div>}
 
-      <div className="mt-6">
+      {!proMode && <div className="mt-6">
         <div className="text-sm opacity-80 mb-2">{t('recentCatches')}</div>
         {(me.recent || []).length === 0 ? (
           <div className="text-sm opacity-60">{t('emptyCatches')}</div>
@@ -826,7 +1006,7 @@ function FishingTab({
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </>
   );
 }

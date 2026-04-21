@@ -1,5 +1,6 @@
 package com.riverking.mobile.ui
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
@@ -11,6 +12,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +34,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -115,10 +119,12 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -168,6 +174,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -221,6 +228,13 @@ private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
 private const val TG_CAST_MAX_DISTANCE_FROM_TIP = 0.20f
 private const val TG_CAST_MIN_WATER_DEPTH = 0.12f
 private const val TG_CAST_WATER_DEPTH_VARIANCE = 0.18f
+private const val PRO_CAST_MIN_X = 0.16f
+private const val PRO_CAST_MAX_X = 0.84f
+private const val PRO_CAST_FAR_Y = 0.56f
+private const val PRO_CAST_NEAR_Y = 0.84f
+private const val PRO_CAST_MIN_SWIPE_DP = 40f
+private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
+private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
 
 @Composable
 fun MainShell(
@@ -234,7 +248,7 @@ fun MainShell(
     onOpenAccountDeletionHelp: () -> Unit,
     onChangeLanguage: (String) -> Unit,
     onClaimDaily: () -> Unit,
-    onBeginCast: () -> Unit,
+    onBeginCast: (FishingCastSpot?) -> Unit,
     onHookFish: () -> Unit,
     onTapChallenge: () -> Unit,
     onToggleAutoCast: () -> Unit,
@@ -282,8 +296,15 @@ fun MainShell(
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
+    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
+    val proFishingPrefs = remember(context) {
+        context.getSharedPreferences(PRO_FISHING_PREFS, Context.MODE_PRIVATE)
+    }
+    var proFishingMode by rememberSaveable {
+        mutableStateOf(proFishingPrefs.getBoolean(KEY_PRO_FISHING_MODE, false))
+    }
     var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
@@ -296,6 +317,7 @@ fun MainShell(
     val clubBadge = state.tournaments.prizes.any(::isClubPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
+    val proFishingActive = selectedTab == MainTab.FISHING && proFishingMode
     val showReferralMenuItem =
         canShowTelegramReferral(state.authProvider, me) || canShowStoreReferral(state.authProvider, me)
     val tabLabels = remember(strings) {
@@ -308,94 +330,102 @@ fun MainShell(
         )
     }
 
+    LaunchedEffect(proFishingMode) {
+        proFishingPrefs.edit().putBoolean(KEY_PRO_FISHING_MODE, proFishingMode).apply()
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            HeaderBar(
-                me = me,
-                strings = strings,
-                onOpenDaily = { showDailyRewardSheet = true },
-                onLogout = onLogout,
-                onDeleteAccount = { showDeleteAccountDialog = true },
-                onOpenSupport = onOpenSupport,
-                onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                onChangeLanguage = onChangeLanguage,
-                onOpenNicknameChange = {
-                    onUpdateNickname(me.username ?: "")
-                    showNicknameDialog = true
-                },
-                onOpenTelegramAccount = {
-                    showTelegramAccountSheet = true
-                },
-                showReferralEntry = showReferralMenuItem,
-                onOpenReferrals = {
-                    showReferralSheet = true
-                    onLoadReferrals(false)
-                },
-                onOpenCatchStats = {
-                    showCatchStats = true
-                    onLoadCatchStats("all")
-                },
-            )
+            if (!proFishingActive) {
+                HeaderBar(
+                    me = me,
+                    strings = strings,
+                    onOpenDaily = { showDailyRewardSheet = true },
+                    onLogout = onLogout,
+                    onDeleteAccount = { showDeleteAccountDialog = true },
+                    onOpenSupport = onOpenSupport,
+                    onOpenPrivacyPolicy = onOpenPrivacyPolicy,
+                    onChangeLanguage = onChangeLanguage,
+                    onOpenNicknameChange = {
+                        onUpdateNickname(me.username ?: "")
+                        showNicknameDialog = true
+                    },
+                    onOpenTelegramAccount = {
+                        showTelegramAccountSheet = true
+                    },
+                    showReferralEntry = showReferralMenuItem,
+                    onOpenReferrals = {
+                        showReferralSheet = true
+                        onLoadReferrals(false)
+                    },
+                    onOpenCatchStats = {
+                        showCatchStats = true
+                        onLoadCatchStats("all")
+                    },
+                )
+            }
         },
         bottomBar = {
-            Surface(
-                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                color = RiverPanelRaised.copy(alpha = 0.97f),
-                border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
-                shadowElevation = 16.dp,
-            ) {
-                NavigationBar(
-                    tonalElevation = 0.dp,
-                    containerColor = Color.Transparent,
-                    windowInsets = WindowInsets(0, 0, 0, 0),
+            if (!proFishingActive) {
+                Surface(
+                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                    color = RiverPanelRaised.copy(alpha = 0.97f),
+                    border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
+                    shadowElevation = 16.dp,
                 ) {
-                    MainTab.entries.forEach { tab ->
-                        val showBadge = when (tab) {
-                            MainTab.LEADERS -> leadersBadge
-                            MainTab.CLUB -> clubBadge
-                            else -> false
-                        }
-                        NavigationBarItem(
-                            selected = selectedTab == tab,
-                            onClick = { selectedTab = tab },
-                            alwaysShowLabel = true,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                            icon = {
-                                BadgedBox(
-                                    badge = {
-                                        if (showBadge) {
-                                            Badge(
-                                                containerColor = RiverCoral,
-                                                contentColor = RiverMist,
-                                            )
+                    NavigationBar(
+                        tonalElevation = 0.dp,
+                        containerColor = Color.Transparent,
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                    ) {
+                        MainTab.entries.forEach { tab ->
+                            val showBadge = when (tab) {
+                                MainTab.LEADERS -> leadersBadge
+                                MainTab.CLUB -> clubBadge
+                                else -> false
+                            }
+                            NavigationBarItem(
+                                selected = selectedTab == tab,
+                                onClick = { selectedTab = tab },
+                                alwaysShowLabel = true,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                                icon = {
+                                    BadgedBox(
+                                        badge = {
+                                            if (showBadge) {
+                                                Badge(
+                                                    containerColor = RiverCoral,
+                                                    contentColor = RiverMist,
+                                                )
+                                            }
                                         }
+                                    ) {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tabLabels.getValue(tab),
+                                            modifier = Modifier.size(22.dp),
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        imageVector = tab.icon,
-                                        contentDescription = tabLabels.getValue(tab),
-                                        modifier = Modifier.size(22.dp),
+                                },
+                                label = {
+                                    Text(
+                                        text = tabLabels.getValue(tab),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelSmall,
                                     )
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = tabLabels.getValue(tab),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -406,7 +436,9 @@ fun MainShell(
                 MainTab.FISHING -> FishingScreen(
                     state = state,
                     strings = strings,
-                    modifier = Modifier.padding(padding),
+                    modifier = if (proFishingActive) Modifier else Modifier.padding(padding),
+                    proFishingMode = proFishingMode,
+                    onToggleProFishingMode = { proFishingMode = !proFishingMode },
                     onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
                     onHookFish = onHookFish,
@@ -1155,8 +1187,10 @@ private fun FishingScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
+    proFishingMode: Boolean,
+    onToggleProFishingMode: () -> Unit,
     onOpenDaily: () -> Unit,
-    onBeginCast: () -> Unit,
+    onBeginCast: (FishingCastSpot?) -> Unit,
     onHookFish: () -> Unit,
     onTapChallenge: () -> Unit,
     onToggleAutoCast: () -> Unit,
@@ -1190,105 +1224,125 @@ private fun FishingScreen(
         }
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            FishingSetupBar(
+    if (proFishingMode) {
+        Box(modifier = modifier.fillMaxSize()) {
+            FishingStageScene(
+                state = state,
                 strings = strings,
                 me = me,
-                enabled = setupEnabled,
+                backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+                modifier = Modifier.fillMaxSize(),
+                proMode = true,
+                setupEnabled = setupEnabled,
+                proFishingEnabled = proFishingMode,
+                autoCastEnabled = state.fishing.autoCastEnabled,
+                onToggleProFishingMode = onToggleProFishingMode,
+                onToggleAutoCast = onToggleAutoCast,
                 onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
                 onOpenLures = { activeSheet = FishingSheetType.LURES },
                 onOpenRods = { activeSheet = FishingSheetType.RODS },
-            )
-        }
-        item {
-            FishingStageScene(
-                state = state,
-                backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp),
-            )
-        }
-        item {
-            FishingActionCard(
-                state = state,
-                strings = strings,
                 onBeginCast = onBeginCast,
                 onHookFish = onHookFish,
                 onTapChallenge = onTapChallenge,
             )
         }
-        if (state.fishing.lastEscape || (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null)) {
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             item {
-                FishingOutcomeCard(
+                FishingSetupBar(
                     strings = strings,
                     me = me,
-                    fishing = state.fishing,
-                    achievements = state.guide.achievements,
-                    onOpenCatch = onOpenCatch,
+                    enabled = setupEnabled,
+                    onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
+                    onOpenLures = { activeSheet = FishingSheetType.LURES },
+                    onOpenRods = { activeSheet = FishingSheetType.RODS },
                 )
             }
-        }
-        if (me.autoFish) {
             item {
-                FishingRewardsCard(
+                FishingStageScene(
+                    state = state,
                     strings = strings,
                     me = me,
+                    backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    proFishingEnabled = proFishingMode,
                     autoCastEnabled = state.fishing.autoCastEnabled,
+                    onToggleProFishingMode = onToggleProFishingMode,
                     onToggleAutoCast = onToggleAutoCast,
                 )
             }
-        }
-        item {
-            if (state.guide.quests != null) {
-                QuestPreviewCard(
+            item {
+                FishingActionCard(
+                    state = state,
                     strings = strings,
-                    quests = state.guide.quests,
-                    isClubMember = state.club.club != null,
-                    clubMembershipKnown = state.club.loaded,
-                    onOpenQuests = { activeSheet = FishingSheetType.QUESTS },
+                    onBeginCast = { onBeginCast(null) },
+                    onHookFish = onHookFish,
+                    onTapChallenge = onTapChallenge,
                 )
-            } else {
-                InfoCard {
-                    Text(strings.quests, fontWeight = FontWeight.SemiBold)
-                    LoadingStatePanel(strings.loading)
-                    OutlinedButton(onClick = { onLoadGuide(true) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(strings.refresh)
+            }
+            if (state.fishing.lastEscape || (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null)) {
+                item {
+                    FishingOutcomeCard(
+                        strings = strings,
+                        me = me,
+                        fishing = state.fishing,
+                        achievements = state.guide.achievements,
+                        onOpenCatch = onOpenCatch,
+                    )
+                }
+            }
+            item {
+                if (state.guide.quests != null) {
+                    QuestPreviewCard(
+                        strings = strings,
+                        quests = state.guide.quests,
+                        isClubMember = state.club.club != null,
+                        clubMembershipKnown = state.club.loaded,
+                        onOpenQuests = { activeSheet = FishingSheetType.QUESTS },
+                    )
+                } else {
+                    InfoCard {
+                        Text(strings.quests, fontWeight = FontWeight.SemiBold)
+                        LoadingStatePanel(strings.loading)
+                        OutlinedButton(onClick = { onLoadGuide(true) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(strings.refresh)
+                        }
                     }
                 }
             }
-        }
-        if (me.recent.isNotEmpty()) {
-            item {
-                SectionCard(strings.recentCatches) {
-                    me.recent.forEachIndexed { index, recent ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        CatchRow(
-                            title = recent.fish,
-                            subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
-                            value = recent.weight.asKgCompact(strings),
-                            fishName = recent.fish,
-                            fishAccent = rarityColor(recent.rarity),
-                            onClick = {
-                                onOpenCatch(
-                                    CatchDto(
-                                        id = recent.id,
-                                        fish = recent.fish,
-                                        weight = recent.weight,
-                                        location = recent.location,
-                                        rarity = recent.rarity,
-                                        at = recent.at,
-                                        user = me.username,
-                                        userId = me.id,
+            if (me.recent.isNotEmpty()) {
+                item {
+                    SectionCard(strings.recentCatches) {
+                        me.recent.forEachIndexed { index, recent ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            CatchRow(
+                                title = recent.fish,
+                                subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
+                                value = recent.weight.asKgCompact(strings),
+                                fishName = recent.fish,
+                                fishAccent = rarityColor(recent.rarity),
+                                onClick = {
+                                    onOpenCatch(
+                                        CatchDto(
+                                            id = recent.id,
+                                            fish = recent.fish,
+                                            weight = recent.weight,
+                                            location = recent.location,
+                                            rarity = recent.rarity,
+                                            at = recent.at,
+                                            user = me.username,
+                                            userId = me.id,
+                                        )
                                     )
-                                )
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -2412,8 +2466,22 @@ private fun TelegramAccountSheet(
 @Composable
 private fun FishingStageScene(
     state: RiverKingUiState,
+    strings: RiverStrings,
+    me: MeResponseDto,
     backgroundUrl: String?,
     modifier: Modifier = Modifier,
+    proMode: Boolean = false,
+    setupEnabled: Boolean = false,
+    proFishingEnabled: Boolean = false,
+    autoCastEnabled: Boolean = false,
+    onToggleProFishingMode: () -> Unit = {},
+    onToggleAutoCast: () -> Unit = {},
+    onOpenLocations: () -> Unit = {},
+    onOpenLures: () -> Unit = {},
+    onOpenRods: () -> Unit = {},
+    onBeginCast: (FishingCastSpot?) -> Unit = {},
+    onHookFish: () -> Unit = {},
+    onTapChallenge: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val bobberBitmap = remember(context) {
@@ -2445,7 +2513,9 @@ private fun FishingStageScene(
         label = "ripple-progress",
     )
     var bobberVisual by remember { mutableStateOf(BobberVisualState()) }
-    val shoreSpot = remember { Offset(0.09f, TG_CAST_WATER_TOP - 0.03f) }
+    val shoreSpot = remember(proMode) {
+        if (proMode) Offset(0.5f, 0.88f) else Offset(0.09f, TG_CAST_WATER_TOP - 0.03f)
+    }
     var bobberRel by remember { mutableStateOf(shoreSpot) }
     var castLanded by remember { mutableStateOf(false) }
     val hasSplashed = inWater && (castLanded || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
@@ -2512,9 +2582,11 @@ private fun FishingStageScene(
 
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = RiverPanel.copy(alpha = 0.72f)),
-        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.55f)),
+        shape = if (proMode) RoundedCornerShape(0.dp) else RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (proMode) RiverDeepNight else RiverPanel.copy(alpha = 0.72f),
+        ),
+        border = if (proMode) null else BorderStroke(1.dp, RiverOutline.copy(alpha = 0.55f)),
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -2529,8 +2601,8 @@ private fun FishingStageScene(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(
-                            scaleX = 1.22f,
-                            scaleY = 1.08f,
+                            scaleX = if (proMode) 1.06f else 1.22f,
+                            scaleY = if (proMode) 1.02f else 1.08f,
                         ),
                 )
             }
@@ -2547,6 +2619,41 @@ private fun FishingStageScene(
                         )
                     )
             )
+
+            val density = LocalDensity.current
+            val sceneWidthPx = with(density) { maxWidth.toPx() }
+            val sceneHeightPx = with(density) { maxHeight.toPx() }
+            val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
+            val proGestureModifier = when {
+                !proMode -> Modifier
+                phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx) {
+                    var dragTotal = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = {
+                            dragTotal = Offset.Zero
+                        },
+                        onDrag = { _, dragAmount ->
+                            dragTotal += dragAmount
+                        },
+                        onDragEnd = {
+                            if (hypot(dragTotal.x, dragTotal.y) >= minSwipePx) {
+                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx))
+                            }
+                        },
+                        onDragCancel = {
+                            dragTotal = Offset.Zero
+                        },
+                    )
+                }
+                phase == FishingPhase.BITING -> Modifier.pointerInput(phase) {
+                    detectTapGestures(onTap = { onHookFish() })
+                }
+                phase == FishingPhase.TAP_CHALLENGE -> Modifier.pointerInput(phase) {
+                    detectTapGestures(onTap = { onTapChallenge() })
+                }
+                else -> Modifier
+            }
+            Box(modifier = Modifier.matchParentSize().then(proGestureModifier))
 
             val currentRodCode = state.me?.rods?.firstOrNull { it.id == state.me?.currentRodId }?.code
             val rodUrl = rodAsset(currentRodCode)
@@ -2584,7 +2691,9 @@ private fun FishingStageScene(
             } else {
                 0.25f
             }
-            val activeCastTarget = castSpot?.let { tgStyleCastTarget(it, rodTipRelX) }
+            val activeCastTarget = castSpot?.let {
+                if (proMode || it.proMode) proStyleCastTarget(it) else tgStyleCastTarget(it, rodTipRelX)
+            }
 
             LaunchedEffect(activeCastTarget) {
                 if (activeCastTarget == null) {
@@ -2769,6 +2878,48 @@ private fun FishingStageScene(
                     }
                 }
             }
+            if (proMode) {
+                FishingSetupBar(
+                    strings = strings,
+                    me = me,
+                    enabled = setupEnabled,
+                    onOpenLocations = onOpenLocations,
+                    onOpenLures = onOpenLures,
+                    onOpenRods = onOpenRods,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    panelAlpha = 0.68f,
+                )
+                FishingPhasePill(
+                    text = fishingPhaseLabel(strings, phase),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
+                        .padding(bottom = 58.dp),
+                )
+            }
+            FishingOverlayToggle(
+                label = "Pro",
+                checked = proFishingEnabled,
+                onClick = onToggleProFishingMode,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
+                    .padding(start = 12.dp, bottom = 12.dp),
+            )
+            if (me.autoFish) {
+                FishingOverlayToggle(
+                    label = strings.autoCast,
+                    checked = autoCastEnabled,
+                    onClick = onToggleAutoCast,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
+                        .padding(end = 12.dp, bottom = 12.dp),
+                )
+            }
         }
     }
 }
@@ -2782,6 +2933,28 @@ private fun tgStyleCastTarget(castSpot: FishingCastSpot, rodTipRelX: Float): Off
     )
 }
 
+private fun proStyleCastTarget(castSpot: FishingCastSpot): Offset =
+    Offset(
+        x = PRO_CAST_MIN_X + castSpot.xRoll.coerceIn(0f, 1f) * (PRO_CAST_MAX_X - PRO_CAST_MIN_X),
+        y = PRO_CAST_FAR_Y + castSpot.yRoll.coerceIn(0f, 1f) * (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y),
+    )
+
+private fun proFishingCastSpotFromSwipe(
+    swipe: Offset,
+    widthPx: Float,
+    heightPx: Float,
+): FishingCastSpot {
+    val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
+    val distance = hypot(swipe.x, swipe.y)
+    val horizontal = (swipe.x / (minSide * 1.1f)).coerceIn(-0.5f, 0.5f)
+    val forward = ((max(0f, -swipe.y) + distance * 0.2f) / (minSide * 0.8f)).coerceIn(0f, 1f)
+    return FishingCastSpot(
+        xRoll = (0.5f + horizontal).coerceIn(0f, 1f),
+        yRoll = (1f - forward).coerceIn(0f, 1f),
+        proMode = true,
+    )
+}
+
 private fun easeInOutCubic(progress: Float): Float =
     if (progress < 0.5f) {
         4f * progress * progress * progress
@@ -2792,6 +2965,81 @@ private fun easeInOutCubic(progress: Float): Float =
 
 private fun Offset.isFinite(): Boolean =
     !x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()
+
+private fun fishingPhaseLabel(strings: RiverStrings, phase: FishingPhase): String = when (phase) {
+    FishingPhase.READY -> strings.castRod
+    FishingPhase.BITING -> strings.hook
+    FishingPhase.TAP_CHALLENGE -> strings.tapFast
+    FishingPhase.RESOLVING -> strings.casting
+    FishingPhase.WAITING_BITE -> strings.waitingBite
+    FishingPhase.COOLDOWN -> strings.castCooldown
+}
+
+@Composable
+private fun FishingOverlayToggle(
+    label: String,
+    checked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        color = RiverPanelRaised.copy(alpha = 0.76f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.58f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(15.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (checked) RiverMoss else Color.Transparent)
+                    .then(
+                        Modifier.background(
+                            if (checked) RiverMoss else RiverPanelMuted.copy(alpha = 0.72f),
+                            RoundedCornerShape(4.dp),
+                        )
+                    ),
+            )
+            Text(
+                text = label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FishingPhasePill(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = RiverPanelRaised.copy(alpha = 0.64f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.42f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
 
 @Composable
 private fun SceneBadge(
@@ -3013,15 +3261,17 @@ private fun FishingSetupBar(
     onOpenLocations: () -> Unit,
     onOpenLures: () -> Unit,
     onOpenRods: () -> Unit,
+    modifier: Modifier = Modifier,
+    panelAlpha: Float = 0.94f,
 ) {
     val currentLocation = me.locations.firstOrNull { it.id == me.locationId }?.name ?: "—"
     val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }?.displayName ?: "—"
     val currentRod = me.rods.firstOrNull { it.id == me.currentRodId }?.name ?: "—"
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        color = RiverPanelMuted.copy(alpha = 0.94f),
+        color = RiverPanelMuted.copy(alpha = panelAlpha),
         border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
     ) {
         Row(

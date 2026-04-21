@@ -225,7 +225,7 @@ fun RiverKingApp(
                         onOpenAccountDeletionHelp = viewModel::openAccountDeletionHelp,
                         onChangeLanguage = viewModel::changeLanguage,
                         onClaimDaily = viewModel::claimDaily,
-                        onBeginCast = { viewModel.beginCast() },
+                        onBeginCast = { visualSpot -> viewModel.beginCast(visualSpot = visualSpot) },
                         onHookFish = viewModel::hookFish,
                         onTapChallenge = viewModel::registerTap,
                         onToggleAutoCast = viewModel::toggleAutoCast,
