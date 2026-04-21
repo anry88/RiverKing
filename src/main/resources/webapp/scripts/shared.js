@@ -223,10 +223,7 @@
 
     const plat = (tg?.platform || '').toLowerCase();
     const isMobileTG = plat === 'android' || plat === 'ios';
-    const sh = window.screen?.height || vh;
-    const bottomGapLegacyRaw = Math.max(0, Math.round(sh - vh));
-    const bottomGapLegacy = Math.min(bottomGapLegacyRaw, isMobileTG ? 48 : 96);
-    const bottomGap = Math.max(safeBottomFB, bottomGapLegacy);
+    const bottomGap = safeBottomFB;
     document.documentElement.style.setProperty('--bottom-gap', bottomGap + 'px');
 
     const isOverlay = (bottomGap >= 8) || (safeTopFB >= 8);

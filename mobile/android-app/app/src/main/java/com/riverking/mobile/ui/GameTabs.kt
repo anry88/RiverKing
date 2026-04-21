@@ -2514,7 +2514,7 @@ private fun FishingStageScene(
     )
     var bobberVisual by remember { mutableStateOf(BobberVisualState()) }
     val shoreSpot = remember(proMode) {
-        if (proMode) Offset(0.5f, 0.88f) else Offset(0.09f, TG_CAST_WATER_TOP - 0.03f)
+        if (proMode) Offset(0.44f, 0.56f) else Offset(0.09f, TG_CAST_WATER_TOP - 0.03f)
     }
     var bobberRel by remember { mutableStateOf(shoreSpot) }
     var castLanded by remember { mutableStateOf(false) }
@@ -2701,7 +2701,7 @@ private fun FishingStageScene(
                 if (proMode || it.proMode) proStyleCastTarget(it) else tgStyleCastTarget(it, rodTipRelX)
             }
 
-            LaunchedEffect(activeCastTarget) {
+            LaunchedEffect(activeCastTarget, shoreSpot) {
                 if (activeCastTarget == null) {
                     castLanded = false
                     bobberRel = shoreSpot
@@ -2734,16 +2734,6 @@ private fun FishingStageScene(
                 castLanded = true
             }
 
-            coil.compose.AsyncImage(
-                model = rodUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .offset(x = rodLeftDp, y = rodTopDp)
-                    .width(rodWidthDp)
-                    .height(rodHeightDp),
-                contentScale = ContentScale.FillBounds
-            )
-
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * TG_CAST_WATER_TOP
                 val bobberBase = Offset(size.width * bobberRel.x, size.height * bobberRel.y)
@@ -2772,22 +2762,34 @@ private fun FishingStageScene(
 
                 // Fishing line from last rod point to bobber with natural sag
                 val lineOrigin = rodLinePoints.lastOrNull() ?: rodTip
-                val dx = bobber.x - lineOrigin.x
-                val dy = bobber.y - lineOrigin.y
+                val rawDx = bobber.x - lineOrigin.x
+                val rawDy = bobber.y - lineOrigin.y
+                val rawDist = kotlin.math.hypot(rawDx, rawDy)
+                val endInset = if (hasSplashed && rawDist > 0f) {
+                    bobberRadius * if (proMode) 1.15f else 0.65f
+                } else {
+                    0f
+                }
+                val lineEnd = if (endInset > 0f && rawDist > endInset) {
+                    Offset(
+                        x = bobber.x - rawDx / rawDist * endInset,
+                        y = bobber.y - rawDy / rawDist * endInset,
+                    )
+                } else {
+                    bobber
+                }
+                val dx = lineEnd.x - lineOrigin.x
+                val dy = lineEnd.y - lineOrigin.y
                 val dist = kotlin.math.hypot(dx, dy)
                 val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
-                val rodLinePath = Path().apply {
-                    if (rodLinePoints.isNotEmpty()) {
-                        moveTo(rodLinePoints.first().x, rodLinePoints.first().y)
-                        for (i in 1 until rodLinePoints.size) {
-                            lineTo(rodLinePoints[i].x, rodLinePoints[i].y)
-                        }
-                    }
-                }
                 val waterLinePath = Path().apply {
                     moveTo(lineOrigin.x, lineOrigin.y)
                     if (shouldShowSlack) {
-                        val sag = min(size.height * 0.22f, max(16f, dist * 0.55f))
+                        val sag = if (proMode) {
+                            min(size.height * 0.06f, max(8f, dist * 0.2f))
+                        } else {
+                            min(size.height * 0.22f, max(16f, dist * 0.55f))
+                        }
                         val baseMidY = lineOrigin.y + dy * 0.5f
                         val control1 = Offset(
                             x = lineOrigin.x + dx * 0.35f,
@@ -2797,22 +2799,15 @@ private fun FishingStageScene(
                             x = lineOrigin.x + dx * 0.75f,
                             y = baseMidY + sag,
                         )
-                        cubicTo(control1.x, control1.y, control2.x, control2.y, bobber.x, bobber.y)
+                        cubicTo(control1.x, control1.y, control2.x, control2.y, lineEnd.x, lineEnd.y)
                     } else {
                         val gentleSag = min(size.height * 0.08f, dist * 0.12f)
                         val control = Offset(
                             x = lineOrigin.x + dx * 0.5f,
                             y = lineOrigin.y + dy * 0.5f + gentleSag,
                         )
-                        quadraticTo(control.x, control.y, bobber.x, bobber.y)
+                        quadraticTo(control.x, control.y, lineEnd.x, lineEnd.y)
                     }
-                }
-                if (rodLinePoints.isNotEmpty()) {
-                    drawPath(
-                        path = rodLinePath,
-                        color = Color.White.copy(alpha = 0.35f),
-                        style = Stroke(width = 2f, cap = StrokeCap.Round),
-                    )
                 }
                 if (hasSplashed && !proMode) {
                     clipRect(left = 0f, top = 0f, right = size.width, bottom = waterlineY) {
@@ -2882,6 +2877,36 @@ private fun FishingStageScene(
                             )
                         }
                     }
+                }
+            }
+            coil.compose.AsyncImage(
+                model = rodUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .offset(x = rodLeftDp, y = rodTopDp)
+                    .width(rodWidthDp)
+                    .height(rodHeightDp),
+                contentScale = ContentScale.FillBounds
+            )
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val rodLinePoints = rodLinePointsPercentage(currentRodCode).map {
+                    Offset(
+                        x = rodLeftDp.toPx() + rodWidthDp.toPx() * it.x,
+                        y = rodTopDp.toPx() + rodHeightDp.toPx() * it.y,
+                    )
+                }
+                if (rodLinePoints.isNotEmpty()) {
+                    val rodLinePath = Path().apply {
+                        moveTo(rodLinePoints.first().x, rodLinePoints.first().y)
+                        for (i in 1 until rodLinePoints.size) {
+                            lineTo(rodLinePoints[i].x, rodLinePoints[i].y)
+                        }
+                    }
+                    drawPath(
+                        path = rodLinePath,
+                        color = Color.White.copy(alpha = 0.35f),
+                        style = Stroke(width = 2f, cap = StrokeCap.Round),
+                    )
                 }
             }
             if (proMode) {

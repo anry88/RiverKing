@@ -117,7 +117,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
 
   const WATER_TOP_REL = 0.48;
   const shorePosRel = React.useMemo(() => (
-    proMode ? { x: 0.5, y: 0.88 } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
+    proMode ? { x: 0.44, y: 0.56 } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
   ), [proMode]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
   const [floatVisual, setFloatVisual] = React.useState({ offset: 0, tilt: 0, submerge: 0 });
@@ -305,12 +305,24 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       return { rodLinePath: rPath, waterLinePath: wPath };
     }
 
-    const dx = lineAttach.x - lastPoint.x;
-    const dy = lineAttach.y - lastPoint.y;
+    const rawDx = lineAttach.x - lastPoint.x;
+    const rawDy = lineAttach.y - lastPoint.y;
+    const rawDist = Math.hypot(rawDx, rawDy);
+    const endInset = isCastInWater && rawDist > 0 ? BOBBER_RADIUS * (proMode ? 1.15 : 0.65) : 0;
+    const lineEnd = endInset > 0 && rawDist > endInset
+      ? {
+        x: lineAttach.x - (rawDx / rawDist) * endInset,
+        y: lineAttach.y - (rawDy / rawDist) * endInset
+      }
+      : lineAttach;
+    const dx = lineEnd.x - lastPoint.x;
+    const dy = lineEnd.y - lastPoint.y;
     const dist = Math.hypot(dx, dy);
 
     if (shouldShowSlack) {
-      const sag = Math.min(h * 0.22, Math.max(16, dist * 0.55));
+      const sag = proMode
+        ? Math.min(h * 0.06, Math.max(8, dist * 0.2))
+        : Math.min(h * 0.22, Math.max(16, dist * 0.55));
       const baseMidY = lastPoint.y + dy * 0.5;
       const control1 = {
         x: lastPoint.x + dx * 0.35,
@@ -320,15 +332,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         x: lastPoint.x + dx * 0.75,
         y: baseMidY + sag
       };
-      wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineEnd.x},${lineEnd.y}`;
     } else {
       const gentleSag = Math.min(h * 0.08, dist * 0.12);
       const controlX = lastPoint.x + dx * 0.5;
       const controlY = lastPoint.y + dy * 0.5 + gentleSag;
-      wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineEnd.x},${lineEnd.y}`;
     }
     return { rodLinePath: rPath, waterLinePath: wPath };
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH]);
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, isCastInWater, proMode]);
 
   const catchTargetPx = React.useMemo(() => {
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -685,14 +697,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </>
       )}
 
-      <AssetImage
-        src={rodImage}
-        alt="rod"
-        className="absolute select-none pointer-events-none"
-        style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
-        loading="eager"
-        decoding="async"
-      />
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         {shouldClipLine && (
           <defs>
@@ -701,13 +705,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             </clipPath>
           </defs>
         )}
-        <path
-          d={rodLinePath}
-          stroke="rgba(255,255,255,0.3)"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          fill="none"
-        />
         <path
           d={waterLinePath}
           stroke="rgba(255,255,255,0.3)"
@@ -740,6 +737,24 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </div>
         {showRipple && <div className="absolute inset-0 rounded-full ripple"></div>}
       </div>
+
+      <AssetImage
+        src={rodImage}
+        alt="rod"
+        className="absolute select-none pointer-events-none"
+        style={{ left: rodLeft, top: rodTop, width: rodW, height: rodH }}
+        loading="eager"
+        decoding="async"
+      />
+      <svg className="absolute inset-0 pointer-events-none" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+        <path
+          d={rodLinePath}
+          stroke="rgba(255,255,255,0.3)"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </svg>
 
       {catchImage && catchStyle && (
         <div className="absolute pointer-events-none" style={catchStyle} aria-hidden="true">
