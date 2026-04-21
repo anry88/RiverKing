@@ -418,6 +418,11 @@ data class ClubChatMessageDto(
 )
 
 @Serializable
+data class ClubChatSendRequestDto(
+    val text: String,
+)
+
+@Serializable
 data class ClubSummaryDto(
     val id: Long,
     val name: String,

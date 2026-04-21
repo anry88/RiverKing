@@ -260,6 +260,8 @@ fun RiverKingApp(
                         onDismissAchievementReward = viewModel::dismissAchievementReward,
                         onLoadClub = viewModel::loadClub,
                         onLoadClubChat = viewModel::loadClubChat,
+                        onLoadOlderClubChat = viewModel::loadOlderClubChat,
+                        onSendClubChatMessage = viewModel::sendClubChatMessage,
                         onSearchClubs = viewModel::searchClubs,
                         onCreateClub = viewModel::createClub,
                         onJoinClub = viewModel::joinClub,

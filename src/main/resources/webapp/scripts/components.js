@@ -579,8 +579,16 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [chatOpen, setChatOpen] = React.useState(false);
   const [chatMessages, setChatMessages] = React.useState([]);
   const [chatLoading, setChatLoading] = React.useState(false);
+  const [chatOlderLoading, setChatOlderLoading] = React.useState(false);
+  const [chatHasMore, setChatHasMore] = React.useState(true);
+  const [chatSending, setChatSending] = React.useState(false);
+  const [chatDraft, setChatDraft] = React.useState('');
   const [chatError, setChatError] = React.useState(null);
   const chatScrollRef = React.useRef(null);
+  const chatMessagesRef = React.useRef([]);
+  const chatOlderLoadingRef = React.useRef(false);
+  const chatHasMoreRef = React.useRef(true);
+  const chatScrollModeRef = React.useRef(null);
   const [infoDraft, setInfoDraft] = React.useState('');
   const [infoSaving, setInfoSaving] = React.useState(false);
   const [infoError, setInfoError] = React.useState(null);
@@ -596,6 +604,14 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(role === 'veteran') return t('clubRoleVeteran');
     if(role === 'novice') return t('clubRoleNovice');
     return role;
+  }, []);
+
+  const roleColorClass = React.useCallback(role => {
+    if(role === 'president') return 'text-amber-300';
+    if(role === 'heir') return 'text-red-400';
+    if(role === 'veteran') return 'text-blue-400';
+    if(role === 'novice') return 'text-green-400';
+    return 'text-teal-200';
   }, []);
 
   const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
@@ -622,6 +638,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setChatOpen(false);
     setChatMessages([]);
     setChatLoading(false);
+    setChatOlderLoading(false);
+    setChatHasMore(true);
+    setChatSending(false);
+    setChatDraft('');
     setChatError(null);
     setInfoDraft('');
     setInfoSaving(false);
@@ -693,6 +713,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const loadChat = React.useCallback(async () => {
     setChatLoading(true);
     setChatError(null);
+    chatScrollModeRef.current = { type: 'bottom' };
     try{
       const resp = await fetch(`/api/club/chat`, {credentials:'include'});
       if(!resp.ok){
@@ -700,11 +721,48 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         throw new Error('chat_failed');
       }
       const data = await resp.json();
-      setChatMessages(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setChatMessages(list);
+      setChatHasMore(list.length >= 100);
     }catch(e){
       setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
     }finally{
       setChatLoading(false);
+    }
+  }, []);
+
+  const loadOlderChat = React.useCallback(async () => {
+    const current = chatMessagesRef.current;
+    if(chatOlderLoadingRef.current || !chatHasMoreRef.current || current.length === 0) return;
+    const oldestId = current[0]?.id;
+    if(!oldestId) return;
+    const node = chatScrollRef.current;
+    chatScrollModeRef.current = {
+      type: 'preserve',
+      scrollHeight: node?.scrollHeight || 0,
+      scrollTop: node?.scrollTop || 0,
+    };
+    setChatOlderLoading(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat?beforeId=${encodeURIComponent(oldestId)}&limit=20`, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('chat_failed');
+      }
+      const data = await resp.json();
+      const older = Array.isArray(data) ? data : [];
+      setChatHasMore(older.length >= 20);
+      if(older.length > 0){
+        setChatMessages(existing => {
+          const existingIds = new Set(existing.map(item => item.id));
+          return older.filter(item => !existingIds.has(item.id)).concat(existing);
+        });
+      }
+    }catch(e){
+      setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
+    }finally{
+      setChatOlderLoading(false);
     }
   }, []);
 
@@ -721,6 +779,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(code === 'name_empty') return t('clubNameEmpty');
     if(code === 'name_too_long') return t('clubNameTooLong');
     if(code === 'name_profanity') return t('clubNameProfanity');
+    if(code === 'message_empty') return t('clubChatMessageEmpty');
     if(code === 'not_found') return t('clubNotFound');
     if(code === 'info_too_long') return t('clubInfoTooLong');
     if(code === 'invalid_min_weight') return t('clubInvalidMinWeight');
@@ -859,13 +918,37 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, [mode, searchQuery, loadSearch]);
 
   React.useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
+
+  React.useEffect(() => {
+    chatOlderLoadingRef.current = chatOlderLoading;
+  }, [chatOlderLoading]);
+
+  React.useEffect(() => {
+    chatHasMoreRef.current = chatHasMore;
+  }, [chatHasMore]);
+
+  React.useEffect(() => {
     if(!chatOpen) return;
     const node = chatScrollRef.current;
     if(!node) return;
     requestAnimationFrame(() => {
-      node.scrollTop = node.scrollHeight;
+      const mode = chatScrollModeRef.current;
+      if(mode?.type === 'preserve'){
+        node.scrollTop = node.scrollHeight - mode.scrollHeight + mode.scrollTop;
+      }else if(mode?.type === 'bottom'){
+        node.scrollTop = node.scrollHeight;
+      }
+      chatScrollModeRef.current = null;
     });
-  }, [chatOpen, chatMessages, chatLoading]);
+  }, [chatOpen, chatMessages, chatLoading, chatOlderLoading]);
+
+  const handleChatScroll = React.useCallback(() => {
+    const node = chatScrollRef.current;
+    if(!node || node.scrollTop > 32) return;
+    loadOlderChat();
+  }, [loadOlderChat]);
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
   const questWeekData = clubTab === 'previous' ? club?.previousQuestWeek : club?.currentQuestWeek;
@@ -981,6 +1064,37 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
+  const handleSendChat = async () => {
+    const trimmed = chatDraft.trim();
+    if(!trimmed){
+      setChatError(t('clubChatMessageEmpty'));
+      return;
+    }
+    if(chatSending) return;
+    setChatSending(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text: trimmed}),
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'chat_failed');
+      }
+      const data = await resp.json();
+      chatScrollModeRef.current = { type: 'bottom' };
+      setChatMessages(existing => existing.some(item => item.id === data.id) ? existing : existing.concat(data));
+      setChatDraft('');
+    }catch(e){
+      setChatError(parseClubError(e.message, 'clubChatSendFailed'));
+    }finally{
+      setChatSending(false);
+    }
+  };
+
   const localizeChatMessage = (message) => {
     if(typeof message !== 'string') return message;
     const trimmed = message.trim();
@@ -995,7 +1109,37 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
-  const renderChatMessage = (message) => {
+  const parseChatPayload = (message) => {
+    if(typeof message !== 'string') return null;
+    const trimmed = message.trim();
+    if(!trimmed.startsWith('{')) return null;
+    try{
+      const payload = JSON.parse(trimmed);
+      if(!payload || typeof payload.key !== 'string') return null;
+      const params = payload.params && typeof payload.params === 'object' ? payload.params : {};
+      return { key: payload.key, params };
+    }catch(e){
+      return null;
+    }
+  };
+
+  const renderChatMessage = (item) => {
+    const message = typeof item === 'string' ? item : item?.message;
+    const payload = parseChatPayload(message);
+    if(payload?.key === 'clubChatMemberMessage'){
+      const rank = payload.params.rank || payload.params.role || '';
+      const sender = payload.params.sender || payload.params.name || t('you');
+      const text = payload.params.text || payload.params.message || '';
+      const colorClass = roleColorClass(rank);
+      return (
+        <span>
+          <span className={`font-semibold ${colorClass}`}>{sender}</span>
+          {' '}
+          <span className={`font-semibold ${colorClass}`}>({roleLabel(rank)})</span>
+          {`: ${text}`}
+        </span>
+      );
+    }
     const localizedMessage = localizeChatMessage(message);
     if(!localizedMessage) return localizedMessage;
     const rarityColorMap = window.rarityColors || {};
@@ -1059,25 +1203,49 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                 <button onClick={()=>setChatOpen(false)} className="px-3 py-1 rounded-xl glass">✕</button>
               </div>
             </div>
-            <div ref={chatScrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+            <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
               {chatLoading ? (
                 <div className="text-sm opacity-70">{t('loading')}</div>
-              ) : chatError ? (
-                <div className="text-sm opacity-70">{chatError}</div>
               ) : chatMessages.length === 0 ? (
                 <div className="text-sm opacity-70">{t('clubChatEmpty')}</div>
               ) : (
-                chatMessages.map(item => {
-                  const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
-                  return (
-                    <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
-                      <div className="text-xs opacity-70">{ts}</div>
-                      <div className="mt-1">{renderChatMessage(item.message)}</div>
-                    </div>
-                  );
-                })
+                <>
+                  {chatOlderLoading && <div className="text-xs opacity-70 text-center">{t('loading')}</div>}
+                  {chatMessages.map(item => {
+                    const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
+                    return (
+                      <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
+                        <div className="text-xs opacity-70">{ts}</div>
+                        <div className="mt-1">{renderChatMessage(item)}</div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </div>
+            {chatError && <div className="mt-2 text-xs text-red-300">{chatError}</div>}
+            <form
+              className="mt-3 flex items-end gap-2"
+              onSubmit={ev=>{
+                ev.preventDefault();
+                handleSendChat();
+              }}
+            >
+              <textarea
+                value={chatDraft}
+                onChange={ev=>setChatDraft(ev.target.value)}
+                placeholder={t('clubChatPlaceholder')}
+                maxLength={500}
+                rows={1}
+                className="flex-1 min-h-[42px] max-h-24 px-3 py-2 rounded-xl glass outline-none resize-none text-sm"
+                disabled={chatSending}
+              />
+              <button
+                type="submit"
+                className="px-3 py-2 rounded-xl glass text-sm font-semibold disabled:opacity-50"
+                disabled={chatSending || !chatDraft.trim()}
+              >{chatSending ? t('loading') : t('clubChatSend')}</button>
+            </form>
           </div>
         </div>
       )}

@@ -267,6 +267,11 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class ClubChatSendReq(
+        val text: String = "",
+    )
+
+    @Serializable
     data class ClubSummaryDTO(
         val id: Long,
         val name: String,
@@ -1025,8 +1030,10 @@ fun Application.apiRoutes(
 
         get("/api/club/chat") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val beforeId = call.request.queryParameters["beforeId"]?.toLongOrNull()
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()
             val messages = try {
-                clubs.clubChat(uid)
+                clubs.clubChat(uid, beforeId, limit)
             } catch (e: ClubService.ClubException) {
                 val status = when (e.code) {
                     "not_in_club" -> HttpStatusCode.Conflict
@@ -1035,6 +1042,22 @@ fun Application.apiRoutes(
                 return@get call.respond(status, mapOf("error" to e.code))
             }
             call.respond(messages.map { it.toDto() })
+        }
+
+        post("/api/club/chat") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val req = call.receive<ClubChatSendReq>()
+            val message = try {
+                clubs.sendChatMessage(uid, req.text)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    "message_empty" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(message.toDto())
         }
 
         get("/api/club/search") {

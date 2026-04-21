@@ -220,9 +220,22 @@ class AuthApi(
         return if (response.status == HttpStatusCode.NoContent) null else response.body()
     }
 
-    suspend fun clubChat(accessToken: String): List<ClubChatMessageDto> =
+    suspend fun clubChat(
+        accessToken: String,
+        beforeId: Long? = null,
+        limit: Int? = null,
+    ): List<ClubChatMessageDto> =
         client.get("$baseUrl/api/club/chat") {
             bearerAuth(accessToken)
+            if (beforeId != null) parameter("beforeId", beforeId)
+            if (limit != null) parameter("limit", limit)
+        }.body()
+
+    suspend fun sendClubChatMessage(accessToken: String, text: String): ClubChatMessageDto =
+        client.post("$baseUrl/api/club/chat") {
+            bearerAuth(accessToken)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(ClubChatSendRequestDto(text))
         }.body()
 
     suspend fun searchClubs(accessToken: String, query: String?): List<ClubSummaryDto> =

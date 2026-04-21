@@ -256,8 +256,11 @@ class AuthRepository(
     suspend fun loadClub(): ClubDetailsDto? =
         withFreshAccessToken { accessToken -> api.club(accessToken) }
 
-    suspend fun loadClubChat(): List<ClubChatMessageDto> =
-        withFreshAccessToken { accessToken -> api.clubChat(accessToken) }
+    suspend fun loadClubChat(beforeId: Long? = null, limit: Int? = null): List<ClubChatMessageDto> =
+        withFreshAccessToken { accessToken -> api.clubChat(accessToken, beforeId, limit) }
+
+    suspend fun sendClubChatMessage(text: String): ClubChatMessageDto =
+        withFreshAccessToken { accessToken -> api.sendClubChatMessage(accessToken, text) }
 
     suspend fun searchClubs(query: String?): List<ClubSummaryDto> =
         withFreshAccessToken { accessToken -> api.searchClubs(accessToken, query) }

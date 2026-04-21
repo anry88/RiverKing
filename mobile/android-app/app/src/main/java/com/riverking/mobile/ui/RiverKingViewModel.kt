@@ -143,6 +143,9 @@ data class ClubUiState(
     val searchLoading: Boolean = false,
     val chat: List<ClubChatMessageDto> = emptyList(),
     val chatLoading: Boolean = false,
+    val chatOlderLoading: Boolean = false,
+    val chatHasMore: Boolean = true,
+    val chatSending: Boolean = false,
 )
 
 data class ShopUiState(
@@ -938,12 +941,78 @@ class RiverKingViewModel(
             _state.update { it.copy(club = it.club.copy(chatLoading = true), error = null) }
             try {
                 val messages = repository.loadClubChat()
-                _state.update { it.copy(club = it.club.copy(chat = messages, chatLoading = false)) }
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(
+                            chat = messages,
+                            chatLoading = false,
+                            chatHasMore = messages.size >= 100,
+                        )
+                    )
+                }
             } catch (error: Throwable) {
                 val message = describeError(error)
                 _state.update {
                     it.copy(
                         club = it.club.copy(chatLoading = false),
+                        error = message,
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadOlderClubChat() {
+        val clubState = state.value.club
+        if (clubState.chatOlderLoading || clubState.chatLoading || !clubState.chatHasMore) return
+        val oldestId = clubState.chat.firstOrNull()?.id ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(club = it.club.copy(chatOlderLoading = true), error = null) }
+            try {
+                val older = repository.loadClubChat(beforeId = oldestId, limit = 20)
+                _state.update { current ->
+                    val existingIds = current.club.chat.map { it.id }.toSet()
+                    current.copy(
+                        club = current.club.copy(
+                            chat = older.filterNot { it.id in existingIds } + current.club.chat,
+                            chatOlderLoading = false,
+                            chatHasMore = older.size >= 20,
+                        )
+                    )
+                }
+            } catch (error: Throwable) {
+                val message = describeError(error)
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(chatOlderLoading = false),
+                        error = message,
+                    )
+                }
+            }
+        }
+    }
+
+    fun sendClubChatMessage(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || state.value.club.chatSending) return
+        viewModelScope.launch {
+            _state.update { it.copy(club = it.club.copy(chatSending = true), error = null) }
+            try {
+                val message = repository.sendClubChatMessage(trimmed)
+                _state.update { current ->
+                    val exists = current.club.chat.any { it.id == message.id }
+                    current.copy(
+                        club = current.club.copy(
+                            chat = if (exists) current.club.chat else current.club.chat + message,
+                            chatSending = false,
+                        )
+                    )
+                }
+            } catch (error: Throwable) {
+                val message = describeError(error)
+                _state.update {
+                    it.copy(
+                        club = it.club.copy(chatSending = false),
                         error = message,
                     )
                 }

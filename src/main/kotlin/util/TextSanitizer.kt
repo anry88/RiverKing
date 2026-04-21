@@ -7,3 +7,11 @@ fun sanitizeName(name: String, maxLen: Int = 30): String {
     val filtered = ProfanityFilter.mask(cleaned)
     return filtered.take(maxLen)
 }
+
+fun sanitizeChatMessage(text: String, maxLen: Int = 500): String {
+    val cleaned = BIDI_REGEX.replace(text, "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+    val filtered = ProfanityFilter.mask(cleaned)
+    return filtered.take(maxLen).trim()
+}

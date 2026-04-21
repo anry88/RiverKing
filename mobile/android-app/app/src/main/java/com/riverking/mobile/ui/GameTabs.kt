@@ -256,6 +256,8 @@ fun MainShell(
     onDismissAchievementReward: () -> Unit,
     onLoadClub: (Boolean) -> Unit,
     onLoadClubChat: () -> Unit,
+    onLoadOlderClubChat: () -> Unit,
+    onSendClubChatMessage: (String) -> Unit,
     onSearchClubs: (String?) -> Unit,
     onCreateClub: (String) -> Unit,
     onJoinClub: (Long) -> Unit,
@@ -443,6 +445,8 @@ fun MainShell(
                     modifier = Modifier.padding(padding),
                     onReloadClub = onLoadClub,
                     onLoadChat = onLoadClubChat,
+                    onLoadOlderChat = onLoadOlderClubChat,
+                    onSendChatMessage = onSendClubChatMessage,
                     onSearchClubs = onSearchClubs,
                     onCreateClub = onCreateClub,
                     onJoinClub = onJoinClub,
@@ -1839,6 +1843,8 @@ private fun ClubScreen(
     modifier: Modifier = Modifier,
     onReloadClub: (Boolean) -> Unit,
     onLoadChat: () -> Unit,
+    onLoadOlderChat: () -> Unit,
+    onSendChatMessage: (String) -> Unit,
     onSearchClubs: (String?) -> Unit,
     onCreateClub: (String) -> Unit,
     onJoinClub: (Long) -> Unit,
@@ -1872,11 +1878,48 @@ private fun ClubScreen(
     val hasCreateCoins = (me?.coins ?: 0L) >= createCostCoins
     val canCreateClub = hasCreateWeight && hasCreateCoins
     var chatOpen by rememberSaveable(club?.id) { mutableStateOf(false) }
+    var chatScrollAction by rememberSaveable(club?.id) { mutableStateOf("bottom") }
+    var chatSizeBeforeOlder by rememberSaveable(club?.id) { mutableStateOf(0) }
     val chatListState = rememberLazyListState()
 
-    LaunchedEffect(chatOpen, state.club.chat.size, state.club.chatLoading) {
-        if (chatOpen && !state.club.chatLoading && state.club.chat.isNotEmpty()) {
-            chatListState.scrollToItem(state.club.chat.lastIndex)
+    LaunchedEffect(chatOpen, state.club.chat.size, state.club.chatLoading, state.club.chatOlderLoading) {
+        if (!chatOpen || state.club.chatLoading || state.club.chat.isEmpty()) return@LaunchedEffect
+        when (chatScrollAction) {
+            "older" -> {
+                if (!state.club.chatOlderLoading && state.club.chat.size > chatSizeBeforeOlder) {
+                    val added = state.club.chat.size - chatSizeBeforeOlder
+                    chatListState.scrollToItem(added.coerceAtMost(state.club.chat.lastIndex))
+                    chatScrollAction = "idle"
+                }
+            }
+            "bottom" -> {
+                chatListState.scrollToItem(state.club.chat.lastIndex)
+                chatScrollAction = "idle"
+            }
+        }
+    }
+
+    LaunchedEffect(
+        chatOpen,
+        chatListState.firstVisibleItemIndex,
+        chatListState.firstVisibleItemScrollOffset,
+        state.club.chatHasMore,
+        state.club.chatOlderLoading,
+        state.club.chatLoading,
+    ) {
+        if (
+            chatOpen &&
+            state.club.chat.isNotEmpty() &&
+            state.club.chatHasMore &&
+            !state.club.chatOlderLoading &&
+            !state.club.chatLoading &&
+            chatScrollAction != "bottom" &&
+            chatListState.firstVisibleItemIndex == 0 &&
+            chatListState.firstVisibleItemScrollOffset < 24
+        ) {
+            chatSizeBeforeOlder = state.club.chat.size
+            chatScrollAction = "older"
+            onLoadOlderChat()
         }
     }
 
@@ -2222,6 +2265,7 @@ private fun ClubScreen(
             Button(
                 onClick = {
                     chatOpen = true
+                    chatScrollAction = "bottom"
                     onLoadChat()
                 },
                 modifier = Modifier
@@ -2243,8 +2287,17 @@ private fun ClubScreen(
             strings = strings,
             messages = state.club.chat,
             loading = state.club.chatLoading,
+            olderLoading = state.club.chatOlderLoading,
+            sending = state.club.chatSending,
             listState = chatListState,
-            onRefresh = onLoadChat,
+            onRefresh = {
+                chatScrollAction = "bottom"
+                onLoadChat()
+            },
+            onSendMessage = { text ->
+                chatScrollAction = "bottom"
+                onSendChatMessage(text)
+            },
             onDismiss = { chatOpen = false },
         )
     }
@@ -4780,10 +4833,15 @@ private fun ClubChatWindow(
     strings: RiverStrings,
     messages: List<ClubChatMessageDto>,
     loading: Boolean,
+    olderLoading: Boolean,
+    sending: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onRefresh: () -> Unit,
+    onSendMessage: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var draft by rememberSaveable { mutableStateOf("") }
+    val canSend = draft.trim().isNotEmpty() && !sending
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -4854,22 +4912,40 @@ private fun ClubChatWindow(
                     when {
                         loading && messages.isEmpty() -> {
                             Box(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             }
                         }
                         messages.isEmpty() -> {
-                            EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
+                            EmptyStatePanel(
+                                strings.noData,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth(),
+                            )
                         }
                         else -> {
                             LazyColumn(
                                 state = listState,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(bottom = 18.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
+                                if (olderLoading) {
+                                    item(key = "older-loading") {
+                                        Text(
+                                            strings.loading,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = TextAlign.Center,
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
+                                    }
+                                }
                                 items(messages, key = { it.id }) { item ->
                                     Card(
                                         shape = RoundedCornerShape(20.dp),
@@ -4895,6 +4971,43 @@ private fun ClubChatWindow(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        OutlinedTextField(
+                            value = draft,
+                            onValueChange = { draft = it.take(500) },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text(if (strings.login == "Логин") "Сообщение" else "Message") },
+                            minLines = 1,
+                            maxLines = 3,
+                            enabled = !sending,
+                        )
+                        Button(
+                            onClick = {
+                                val text = draft.trim()
+                                if (text.isNotEmpty()) {
+                                    draft = ""
+                                    onSendMessage(text)
+                                }
+                            },
+                            enabled = canSend,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RiverFoam,
+                                contentColor = RiverDeepNight,
+                            ),
+                        ) {
+                            Text(
+                                if (strings.login == "Логин") "Отправить" else "Send",
+                                maxLines = 1,
+                                softWrap = false,
+                            )
                         }
                     }
                 }
@@ -6581,6 +6694,15 @@ private fun buildClubChatPayloadMessage(
     }
 
     return when (key) {
+        "clubChatMemberMessage" -> buildAnnotatedString {
+            val rank = params["rank"] ?: params["role"]
+            val sender = params["sender"] ?: params["name"] ?: playerName("sender")
+            appendRoleHighlighted(sender, rank)
+            append(" ")
+            appendRoleHighlighted("(${strings.roleLabel(rank.orEmpty())})", rank)
+            append(": ")
+            append(params["text"] ?: params["message"].orEmpty())
+        }
         "clubChatMemberJoined" -> buildAnnotatedString {
             appendPlayerName(playerName("name"))
             append(if (isRussian) " вступил в клуб." else " joined the club.")
@@ -6680,6 +6802,10 @@ private fun AnnotatedString.Builder.appendPlayerName(name: String) {
     appendHighlighted(name, RiverFoam)
 }
 
+private fun AnnotatedString.Builder.appendRoleHighlighted(value: String, role: String?) {
+    appendHighlighted(value, clubRoleColor(role))
+}
+
 private fun AnnotatedString.Builder.appendHighlighted(value: String, color: Color) {
     withStyle(
         SpanStyle(
@@ -6689,6 +6815,14 @@ private fun AnnotatedString.Builder.appendHighlighted(value: String, color: Colo
     ) {
         append(value)
     }
+}
+
+private fun clubRoleColor(role: String?): Color = when (role) {
+    "president" -> Color(0xFFFFD76A)
+    "heir" -> Color(0xFFFF6B76)
+    "veteran" -> Color(0xFF58A9FF)
+    "novice" -> Color(0xFF74D77C)
+    else -> RiverFoam
 }
 
 private fun clubChatRarityPhrase(rarity: String?, strings: RiverStrings): String {
