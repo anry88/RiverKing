@@ -4868,8 +4868,8 @@ private fun ClubChatWindow(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.62f)
-                    .padding(horizontal = 16.dp, vertical = 28.dp),
+                    .fillMaxHeight(0.82f)
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
                 shape = RiverDialogShape,
                 colors = CardDefaults.cardColors(containerColor = RiverPanelRaised.copy(alpha = 0.98f)),
                 border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.82f)),
