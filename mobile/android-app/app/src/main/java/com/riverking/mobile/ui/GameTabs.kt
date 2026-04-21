@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Leaderboard
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.EmojiEvents
@@ -71,6 +73,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
@@ -4844,10 +4847,15 @@ private fun ClubChatWindow(
     val canSend = draft.trim().isNotEmpty() && !sending
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
             contentAlignment = Alignment.BottomEnd,
         ) {
             Box(
@@ -4976,8 +4984,8 @@ private fun ClubChatWindow(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         OutlinedTextField(
                             value = draft,
@@ -4988,7 +4996,7 @@ private fun ClubChatWindow(
                             maxLines = 3,
                             enabled = !sending,
                         )
-                        Button(
+                        IconButton(
                             onClick = {
                                 val text = draft.trim()
                                 if (text.isNotEmpty()) {
@@ -4997,16 +5005,16 @@ private fun ClubChatWindow(
                                 }
                             },
                             enabled = canSend,
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = RiverFoam,
-                                contentColor = RiverDeepNight,
-                            ),
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(if (canSend) RiverFoam else RiverPanelMuted)
+                                .padding(2.dp),
                         ) {
-                            Text(
-                                if (strings.login == "Логин") "Отправить" else "Send",
-                                maxLines = 1,
-                                softWrap = false,
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Send,
+                                contentDescription = if (strings.login == "Логин") "Отправить" else "Send",
+                                tint = if (canSend) RiverDeepNight else RiverFog,
                             )
                         }
                     }
