@@ -230,10 +230,12 @@ private const val TG_CAST_MIN_WATER_DEPTH = 0.12f
 private const val TG_CAST_WATER_DEPTH_VARIANCE = 0.18f
 private const val PRO_CAST_MIN_X = 0.14f
 private const val PRO_CAST_MAX_X = 0.86f
-private const val PRO_CAST_FAR_Y = 0.34f
-private const val PRO_CAST_NEAR_Y = 0.70f
+private const val PRO_CAST_FAR_Y = 0.47f
+private const val PRO_CAST_NEAR_Y = 0.78f
 private const val PRO_CAST_SHORE_X = 0.44f
 private const val PRO_CAST_SHORE_Y = 0.56f
+private const val PRO_CAST_CENTER_X = 0.5f
+private const val PRO_CAST_CENTER_Y = 0.63f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
 private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
 private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
@@ -319,7 +321,6 @@ fun MainShell(
     val clubBadge = state.tournaments.prizes.any(::isClubPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
     val leadersBadge = tournamentBadge || ratingBadge || achievementBadge
-    val proFishingActive = selectedTab == MainTab.FISHING && proFishingMode
     val showReferralMenuItem =
         canShowTelegramReferral(state.authProvider, me) || canShowStoreReferral(state.authProvider, me)
     val tabLabels = remember(strings) {
@@ -340,94 +341,90 @@ fun MainShell(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (!proFishingActive) {
-                HeaderBar(
-                    me = me,
-                    strings = strings,
-                    onOpenDaily = { showDailyRewardSheet = true },
-                    onLogout = onLogout,
-                    onDeleteAccount = { showDeleteAccountDialog = true },
-                    onOpenSupport = onOpenSupport,
-                    onOpenPrivacyPolicy = onOpenPrivacyPolicy,
-                    onChangeLanguage = onChangeLanguage,
-                    onOpenNicknameChange = {
-                        onUpdateNickname(me.username ?: "")
-                        showNicknameDialog = true
-                    },
-                    onOpenTelegramAccount = {
-                        showTelegramAccountSheet = true
-                    },
-                    showReferralEntry = showReferralMenuItem,
-                    onOpenReferrals = {
-                        showReferralSheet = true
-                        onLoadReferrals(false)
-                    },
-                    onOpenCatchStats = {
-                        showCatchStats = true
-                        onLoadCatchStats("all")
-                    },
-                )
-            }
+            HeaderBar(
+                me = me,
+                strings = strings,
+                onOpenDaily = { showDailyRewardSheet = true },
+                onLogout = onLogout,
+                onDeleteAccount = { showDeleteAccountDialog = true },
+                onOpenSupport = onOpenSupport,
+                onOpenPrivacyPolicy = onOpenPrivacyPolicy,
+                onChangeLanguage = onChangeLanguage,
+                onOpenNicknameChange = {
+                    onUpdateNickname(me.username ?: "")
+                    showNicknameDialog = true
+                },
+                onOpenTelegramAccount = {
+                    showTelegramAccountSheet = true
+                },
+                showReferralEntry = showReferralMenuItem,
+                onOpenReferrals = {
+                    showReferralSheet = true
+                    onLoadReferrals(false)
+                },
+                onOpenCatchStats = {
+                    showCatchStats = true
+                    onLoadCatchStats("all")
+                },
+            )
         },
         bottomBar = {
-            if (!proFishingActive) {
-                Surface(
-                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                    color = RiverPanelRaised.copy(alpha = 0.97f),
-                    border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
-                    shadowElevation = 16.dp,
+            Surface(
+                shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+                color = RiverPanelRaised.copy(alpha = 0.97f),
+                border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.72f)),
+                shadowElevation = 16.dp,
+            ) {
+                NavigationBar(
+                    tonalElevation = 0.dp,
+                    containerColor = Color.Transparent,
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                 ) {
-                    NavigationBar(
-                        tonalElevation = 0.dp,
-                        containerColor = Color.Transparent,
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                    ) {
-                        MainTab.entries.forEach { tab ->
-                            val showBadge = when (tab) {
-                                MainTab.LEADERS -> leadersBadge
-                                MainTab.CLUB -> clubBadge
-                                else -> false
-                            }
-                            NavigationBarItem(
-                                selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
-                                alwaysShowLabel = true,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                                icon = {
-                                    BadgedBox(
-                                        badge = {
-                                            if (showBadge) {
-                                                Badge(
-                                                    containerColor = RiverCoral,
-                                                    contentColor = RiverMist,
-                                                )
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tabLabels.getValue(tab),
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        text = tabLabels.getValue(tab),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                },
-                            )
+                    MainTab.entries.forEach { tab ->
+                        val showBadge = when (tab) {
+                            MainTab.LEADERS -> leadersBadge
+                            MainTab.CLUB -> clubBadge
+                            else -> false
                         }
+                        NavigationBarItem(
+                            selected = selectedTab == tab,
+                            onClick = { selectedTab = tab },
+                            alwaysShowLabel = true,
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            icon = {
+                                BadgedBox(
+                                    badge = {
+                                        if (showBadge) {
+                                            Badge(
+                                                containerColor = RiverCoral,
+                                                contentColor = RiverMist,
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = tabLabels.getValue(tab),
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = tabLabels.getValue(tab),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -438,7 +435,7 @@ fun MainShell(
                 MainTab.FISHING -> FishingScreen(
                     state = state,
                     strings = strings,
-                    modifier = if (proFishingActive) Modifier else Modifier.padding(padding),
+                    modifier = Modifier.padding(padding),
                     proFishingMode = proFishingMode,
                     onToggleProFishingMode = { proFishingMode = !proFishingMode },
                     onOpenDaily = { showDailyRewardSheet = true },
@@ -1243,6 +1240,12 @@ private fun FishingScreen(
                 onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
                 onOpenLures = { activeSheet = FishingSheetType.LURES },
                 onOpenRods = { activeSheet = FishingSheetType.RODS },
+                onOpenQuests = {
+                    activeSheet = FishingSheetType.QUESTS
+                    if (state.guide.quests == null) {
+                        onLoadGuide(true)
+                    }
+                },
                 onBeginCast = onBeginCast,
                 onHookFish = onHookFish,
                 onTapChallenge = onTapChallenge,
@@ -2481,6 +2484,7 @@ private fun FishingStageScene(
     onOpenLocations: () -> Unit = {},
     onOpenLures: () -> Unit = {},
     onOpenRods: () -> Unit = {},
+    onOpenQuests: () -> Unit = {},
     onBeginCast: (FishingCastSpot?) -> Unit = {},
     onHookFish: () -> Unit = {},
     onTapChallenge: () -> Unit = {},
@@ -2921,9 +2925,15 @@ private fun FishingStageScene(
                     onOpenRods = onOpenRods,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .statusBarsPadding()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     panelAlpha = 0.68f,
+                )
+                FishingOverlayAction(
+                    label = strings.quests,
+                    onClick = onOpenQuests,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 12.dp, top = 86.dp),
                 )
             }
             FishingOverlayToggle(
@@ -2971,10 +2981,12 @@ private fun proFishingCastSpotFromSwipe(
     heightPx: Float,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
-    val targetX = (PRO_CAST_SHORE_X + (swipe.x / (minSide * 0.9f)) * 0.42f)
-        .coerceIn(PRO_CAST_MIN_X, PRO_CAST_MAX_X)
-    val targetY = (PRO_CAST_SHORE_Y + (swipe.y / (minSide * 0.9f)) * 0.42f)
-        .coerceIn(PRO_CAST_FAR_Y, PRO_CAST_NEAR_Y)
+    val distance = hypot(swipe.x, swipe.y)
+    val strength = (distance / (minSide * 0.75f)).coerceIn(0f, 1f)
+    val nx = if (distance > 0f) swipe.x / distance else 0f
+    val ny = if (distance > 0f) swipe.y / distance else 0f
+    val targetX = (PRO_CAST_CENTER_X + nx * strength * 0.34f).coerceIn(PRO_CAST_MIN_X, PRO_CAST_MAX_X)
+    val targetY = (PRO_CAST_CENTER_Y + ny * strength * 0.21f).coerceIn(PRO_CAST_FAR_Y, PRO_CAST_NEAR_Y)
     return FishingCastSpot(
         xRoll = ((targetX - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)).coerceIn(0f, 1f),
         yRoll = ((targetY - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)).coerceIn(0f, 1f),
@@ -3034,6 +3046,32 @@ private fun FishingOverlayToggle(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+@Composable
+private fun FishingOverlayAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        color = RiverPanelRaised.copy(alpha = 0.76f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, RiverOutline.copy(alpha = 0.58f)),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

@@ -5,8 +5,10 @@ const PRO_SHORE_X = 0.44;
 const PRO_SHORE_Y = 0.56;
 const PRO_CAST_MIN_X = 0.14;
 const PRO_CAST_MAX_X = 0.86;
-const PRO_CAST_FAR_Y = 0.34;
-const PRO_CAST_NEAR_Y = 0.70;
+const PRO_CAST_FAR_Y = 0.47;
+const PRO_CAST_NEAR_Y = 0.78;
+const PRO_CAST_CENTER_X = 0.5;
+const PRO_CAST_CENTER_Y = 0.63;
 const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
@@ -24,9 +26,13 @@ function proCastTargetFromSpot(spot) {
 
 function proFishingCastSpotFromSwipe(dx, dy, w, h) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
+  const distance = Math.hypot(dx, dy);
+  const strength = clamp01(distance / (minSide * 0.75));
+  const nx = distance > 0 ? dx / distance : 0;
+  const ny = distance > 0 ? dy / distance : 0;
   const target = {
-    x: Math.max(PRO_CAST_MIN_X, Math.min(PRO_CAST_MAX_X, PRO_SHORE_X + (dx / (minSide * 0.9)) * 0.42)),
-    y: Math.max(PRO_CAST_FAR_Y, Math.min(PRO_CAST_NEAR_Y, PRO_SHORE_Y + (dy / (minSide * 0.9)) * 0.42)),
+    x: Math.max(PRO_CAST_MIN_X, Math.min(PRO_CAST_MAX_X, PRO_CAST_CENTER_X + nx * strength * 0.34)),
+    y: Math.max(PRO_CAST_FAR_Y, Math.min(PRO_CAST_NEAR_Y, PRO_CAST_CENTER_Y + ny * strength * 0.21)),
   };
   return {
     xRoll: clamp01((target.x - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)),
@@ -61,38 +67,6 @@ function TapChallengeButton({ count, goal, timeLeft, onTap, className = '' }) {
           </div>
         </button>
         <div className="tap-hint"></div>
-      </div>
-    </div>
-  );
-}
-
-function ProFishingSetupBar({ me, enabled, onOpenLocations, onOpenBaits, onOpenRods }) {
-  const currentLoc = (me.locations || []).find(x => Number(x.id) === Number(me.locationId))?.name || '—';
-  const currentRod = (me.rods || []).find(r => r.id === me.currentRodId);
-  const rodVal = currentRod ? currentRod.name : '—';
-  const curLure = (me.lures || []).find(l => l.id === me.currentLureId);
-  const lureName = curLure?.displayName || (curLure ? (window.translateLure?.(curLure.name) || curLure.name) : null);
-  const lureVal = curLure ? `${lureName} (${curLure.qty})` : '—';
-  const lureIconPath = curLure ? window.getLureIcon?.(curLure) : null;
-  const itemClass = `flex-1 min-w-0 px-2 py-2 rounded-xl text-center ${enabled ? 'hover:bg-white/10' : 'opacity-50 pointer-events-none'}`;
-  return (
-    <div data-pro-ui="true" className="absolute left-3 right-3 pro-safe-top z-20 glass rounded-2xl bg-black/30">
-      <div className="flex items-stretch divide-x divide-white/10">
-        <button type="button" className={itemClass} onClick={onOpenLocations} disabled={!enabled}>
-          <div className="text-[10px] uppercase opacity-70">{t('location')}</div>
-          <div className="text-sm font-semibold truncate">{currentLoc}</div>
-        </button>
-        <button type="button" className={itemClass} onClick={onOpenRods} disabled={!enabled}>
-          <div className="text-[10px] uppercase opacity-70">{t('rod')}</div>
-          <div className="text-sm font-semibold truncate">{rodVal}</div>
-        </button>
-        <button type="button" className={itemClass} onClick={onOpenBaits} disabled={!enabled}>
-          <div className="text-[10px] uppercase opacity-70">{t('baits')}</div>
-          <div className="text-sm font-semibold truncate flex items-center justify-center gap-1">
-            {lureIconPath && <AssetImage src={lureIconPath} alt="" className="w-4 h-4 object-contain shrink-0" />}
-            <span className="truncate">{lureVal}</span>
-          </div>
-        </button>
       </div>
     </div>
   );
@@ -249,7 +223,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
 
   const stageHeight = React.useMemo(() => {
     if (proMode) {
-      return 'var(--vh)';
+      return 'clamp(360px, calc(var(--vh) - 230px - max(var(--safe-bottom-max), var(--bottom-gap))), 720px)';
     }
     if (isSmall) {
       return 'clamp(220px, calc(var(--vh) * 0.48), 340px)';
@@ -679,32 +653,22 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
-      {proMode ? (
-        <ProFishingSetupBar
-          me={me}
-          enabled={!casting}
-          onOpenLocations={onOpenLocations}
-          onOpenBaits={onOpenBaits}
-          onOpenRods={onOpenRods}
-        />
-      ) : (
-        <>
-          <button
-            type="button"
-            onClick={onOpenQuests}
-            className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
-          >
-            {t('quests')}
-          </button>
-          <button
-            type="button"
-            onClick={onOpenClub}
-            className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
-          >
-            {t('clubShort')}
-          </button>
-        </>
-      )}
+      <button
+        type="button"
+        data-pro-ui="true"
+        onClick={onOpenQuests}
+        className="absolute top-3 left-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+      >
+        {t('quests')}
+      </button>
+      <button
+        type="button"
+        data-pro-ui="true"
+        onClick={onOpenClub}
+        className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-xl glass border border-white/10 text-sm"
+      >
+        {t('clubShort')}
+      </button>
 
       <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
         {shouldClipLine && (
@@ -878,7 +842,7 @@ function FishingTab({
 
   return (
     <>
-      <div className={proMode ? 'h-full' : 'mt-3 md:mt-4'}>
+      <div className="mt-3 md:mt-4">
         <FishingStage
           me={me}
           setMe={setMe}

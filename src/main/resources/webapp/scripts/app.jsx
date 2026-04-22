@@ -298,8 +298,8 @@ function App(){
     const active = proFishingMode && tab === 'fish';
     try{
       if(active){
-        if(typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
-        else if(typeof tg?.expand === 'function') tg.expand();
+        tg?.exitFullscreen?.();
+        tg?.expand?.();
         tg?.disableVerticalSwipes?.();
       }else{
         tg?.enableVerticalSwipes?.();
@@ -1244,14 +1244,12 @@ function App(){
     );
   }
 
-  const fishingProActive = tab === 'fish' && proFishingMode;
-
   return (
     <div
-      className={`app-content w-full ${fishingProActive ? 'px-0' : 'px-4 flex justify-center'}`}
+      className="app-content w-full px-4 flex justify-center"
       onClick={()=>setPrizeHint(null)}
     >
-      <div className={fishingProActive ? 'w-full min-h-full flex flex-col' : 'w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full'}>
+      <div className="w-full max-w-5xl xl:max-w-6xl flex flex-col min-h-full">
         {prize && (
           <div className="fixed inset-0 flex items-center justify-center bg-black/70 z-50" onClick={claimPrize}>
             <div className="glass p-6 rounded-xl text-center animate-pop">
@@ -1324,17 +1322,15 @@ function App(){
             </div>
           </div>
         )}
-        {!fishingProActive && (
-          <Header
-            me={me}
-            lang={me.language}
-            onEditNickname={()=>setNickOpen(true)}
-            onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
-            onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
-            onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
-            onToggleLanguage={toggleLanguage}
-          />
-        )}
+        <Header
+          me={me}
+          lang={me.language}
+          onEditNickname={()=>setNickOpen(true)}
+          onOpenLocations={!casting ? ()=>setDrawerOpen(true) : undefined}
+          onOpenBaits={!casting ? ()=>setBaitsOpen(true) : undefined}
+          onOpenRods={!casting ? ()=>setRodsOpen(true) : undefined}
+          onToggleLanguage={toggleLanguage}
+        />
         {nickOpen && <NicknameModal me={me} onClose={()=>setNickOpen(false)} onSave={saveNickname} />}
         {dailyOpen && <DailyModal streak={me.dailyStreak} available={me.dailyAvailable} rewards={me.dailyRewards} onClose={closeDailyModal} onClaim={claimDaily} />}
         {catchDetails && <CatchDetailsModal catchData={catchDetails} me={me} onClose={()=>setCatchDetails(null)} />}
@@ -1486,7 +1482,7 @@ function App(){
           )}
         </div>
 
-        {tab !== 'club' && !fishingProActive && (
+        {tab !== 'club' && (
           <BottomNav
             tab={tab}
             setTab={setTab}
