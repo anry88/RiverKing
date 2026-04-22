@@ -27,6 +27,7 @@ data class Env(
     val googleAuthClientId: String,
     val googlePlayPackageName: String,
     val googlePlayServiceAccountFile: String,
+    val eventAssetsDir: String,
 ) {
     companion object {
         private const val DEFAULT_ITCH_PROJECT_URL = "https://anry88.itch.io/river-king"
@@ -77,6 +78,7 @@ data class Env(
                 googleAuthClientId = configuredValue("GOOGLE_AUTH_CLIENT_ID") ?: "",
                 googlePlayPackageName = configuredValue("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
                 googlePlayServiceAccountFile = configuredValue("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
+                eventAssetsDir = configuredValue("EVENT_ASSETS_DIR") ?: "data/event-assets",
             )
         }
     }

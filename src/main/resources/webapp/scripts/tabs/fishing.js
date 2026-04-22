@@ -625,15 +625,16 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
   }, [me?.locations, me?.locationId]);
 
   const bgAsset = React.useMemo(() => {
+    if (currentLocation?.imageUrl) return null;
     const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
     if (byCurrent) return byCurrent;
     const byIdOnly = resolveLocationBg(me.locationId, null);
     if (byIdOnly) return byIdOnly;
     return LOCATION_BG[1];
-  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
+  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, currentLocation?.imageUrl, me.locationId]);
   const proCastArea = React.useMemo(
-    () => proCastAreaForLocation(currentLocation?.name, bgAsset),
-    [currentLocation?.name, bgAsset]
+    () => currentLocation?.castArea || proCastAreaForLocation(currentLocation?.name, bgAsset),
+    [currentLocation?.castArea, currentLocation?.name, bgAsset]
   );
 
   React.useEffect(() => {
@@ -691,7 +692,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       prevCastingRef.current = false;
     }
   }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode, proCastArea]);
-  const bgUrl = useAssetSrc(bgAsset);
+  const assetBgUrl = useAssetSrc(bgAsset);
+  const bgUrl = currentLocation?.imageUrl || assetBgUrl;
   const [bgLoaded, setBgLoaded] = React.useState(false);
   React.useEffect(() => {
     setBgLoaded(false);

@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.and
@@ -25,6 +26,11 @@ data class LocationDTO(
     val name: String,
     val unlockKg: Double,
     val unlocked: Boolean,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castArea: EventCastAreaDTO? = null,
+    val isEvent: Boolean = false,
+    val lockedReason: String? = null,
 )
 
 @Serializable
@@ -102,6 +108,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
     private val clubs = ClubService()
     private val clubQuests = ClubQuestService()
+    private val specialEvents = SpecialEventService()
 
     @Serializable
     data class StartCastResult(
@@ -493,9 +500,29 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .withDistinct().map { it[Catches.fishId].value }
     }
 
-    fun locations(userId: Long): List<LocationDTO> = transaction {
+    fun locations(
+        userId: Long,
+        language: String = "ru",
+        eventImageUrl: (String?) -> String? = { null },
+    ): List<LocationDTO> = transaction {
         val total = totalKg(userId)
-        Locations.selectAll().orderBy(Locations.unlockKg).map {
+        val eventLocation = specialEvents.currentEventLocationForUserTx(userId, language)?.let {
+            LocationDTO(
+                id = it.locationId,
+                name = it.name,
+                unlockKg = 0.0,
+                unlocked = it.unlocked,
+                eventId = it.eventId,
+                imageUrl = eventImageUrl(it.imagePath),
+                castArea = it.castArea,
+                isEvent = true,
+                lockedReason = it.lockedReason,
+            )
+        }
+        val regular = Locations
+            .select { Locations.specialEventId.isNull() }
+            .orderBy(Locations.unlockKg)
+            .map {
             val unlock = it[Locations.unlockKg]
             LocationDTO(
                 it[Locations.id].value,
@@ -503,7 +530,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 unlock,
                 unlock <= total,
             )
-        }
+            }
+        listOfNotNull(eventLocation) + regular
     }
 
     fun listRods(userId: Long): List<RodDTO> = transaction {
@@ -850,7 +878,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             val name: String,
         )
 
-        val locations = Locations.selectAll()
+        val locations = Locations.select { Locations.specialEventId.isNull() }
             .orderBy(Locations.unlockKg)
             .map { LocationData(it[Locations.id].value, I18n.location(it[Locations.name], lang)) }
         val locationOrder = locations.mapIndexed { index, loc -> loc.id to index }.toMap()
@@ -1491,15 +1519,118 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         require(!casting) { "casting" }
         val loc = Locations.selectAll().where { Locations.id eq locationId }.singleOrNull()
             ?: error("bad location")
-        val total = totalKg(userId)
-        require(loc[Locations.unlockKg] <= total) { "locked" }
-        Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
+        val eventId = loc[Locations.specialEventId]
+        if (eventId != null) {
+            val event = specialEvents.validateCanUseEventLocationTx(userId, locationId, Instant.now(clock))
+                ?: throw IllegalArgumentException("event_inactive")
+            Users.update({ Users.id eq userId }) {
+                it[currentLocationId] = locationId
+                it[currentEventId] = event.id
+            }
+        } else {
+            val total = totalKg(userId)
+            require(loc[Locations.unlockKg] <= total) { "locked" }
+            Users.update({ Users.id eq userId }) {
+                it[currentLocationId] = locationId
+                it[currentEventId] = null
+            }
+        }
     }
 
     /**
      * Consume a lure and validate that it can be used at the current location.
      * Returns the new current lure id if changed after consumption.
      */
+    private data class FishPoolEntry(
+        val fishId: Long,
+        val fishName: String,
+        val meanKg: Double,
+        val varKg: Double,
+        val rarity: String,
+        val predator: Boolean,
+        val water: String,
+        val poolWeight: Double,
+    )
+
+    private fun firstUnlockedRegularLocationIdTx(total: Double): Long =
+        Locations
+            .select { (Locations.unlockKg lessEq total) and Locations.specialEventId.isNull() }
+            .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+            .first()[Locations.id].value
+
+    private fun eventForLocationTx(userId: Long, locRow: ResultRow, now: Instant): SpecialEvent? {
+        if (locRow[Locations.specialEventId] == null) return null
+        return specialEvents.validateCanUseEventLocationTx(userId, locRow[Locations.id].value, now)
+            ?: throw IllegalArgumentException("event_inactive")
+    }
+
+    private fun fishPoolForLocationTx(
+        locId: Long,
+        lurePredator: Boolean,
+        lureWater: String,
+        event: SpecialEvent?,
+    ): List<FishPoolEntry> {
+        return if (event != null) {
+            (SpecialEventFish innerJoin Fish)
+                .slice(
+                    Fish.id,
+                    Fish.name,
+                    Fish.meanKg,
+                    Fish.varKg,
+                    Fish.rarity,
+                    Fish.predator,
+                    Fish.water,
+                    SpecialEventFish.weight,
+                )
+                .select {
+                    (SpecialEventFish.eventId eq event.id) and
+                        (Fish.predator eq lurePredator) and
+                        (Fish.water eq lureWater)
+                }
+                .map {
+                    FishPoolEntry(
+                        fishId = it[Fish.id].value,
+                        fishName = it[Fish.name],
+                        meanKg = it[Fish.meanKg],
+                        varKg = it[Fish.varKg],
+                        rarity = it[Fish.rarity],
+                        predator = it[Fish.predator],
+                        water = it[Fish.water],
+                        poolWeight = it[SpecialEventFish.weight],
+                    )
+                }
+        } else {
+            (LocationFishWeights innerJoin Fish)
+                .slice(
+                    Fish.id,
+                    Fish.name,
+                    Fish.meanKg,
+                    Fish.varKg,
+                    Fish.rarity,
+                    Fish.predator,
+                    Fish.water,
+                    LocationFishWeights.weight,
+                )
+                .select {
+                    (LocationFishWeights.locationId eq locId) and
+                        (Fish.predator eq lurePredator) and
+                        (Fish.water eq lureWater)
+                }
+                .map {
+                    FishPoolEntry(
+                        fishId = it[Fish.id].value,
+                        fishName = it[Fish.name],
+                        meanKg = it[Fish.meanKg],
+                        varKg = it[Fish.varKg],
+                        rarity = it[Fish.rarity],
+                        predator = it[Fish.predator],
+                        water = it[Fish.water],
+                        poolWeight = it[LocationFishWeights.weight],
+                    )
+                }
+        }
+    }
+
     fun startCast(userId: Long): StartCastResult = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(!userRow[Users.isCasting]) { "casting" }
@@ -1518,12 +1649,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ensureRodInventory(userId, total)
         ensureCurrentRod(userId, total)
         val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
         val locRow = Locations.select { Locations.id eq locId }.single()
-        require(locRow[Locations.unlockKg] <= total) { "locked" }
-        val hasFish = (LocationFishWeights innerJoin Fish)
-            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
-            .limit(1).any()
+        val event = eventForLocationTx(userId, locRow, Instant.now(clock))
+        if (event == null) require(locRow[Locations.unlockKg] <= total) { "locked" }
+        val hasFish = fishPoolForLocationTx(locId, lurePred, lureWater, event).isNotEmpty()
         require(hasFish) { "No suitable fish" }
 
         InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
@@ -1597,9 +1727,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val rodId = ensureCurrentRod(userId, total)
         val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
         val locId = userRow[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }
-                .orderBy(Locations.unlockKg)
-                .first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        eventForLocationTx(userId, locRow, Instant.now(clock))
         val lureId = userRow[Users.castLureId]?.value ?: userRow[Users.currentLureId]?.value
         val lureRow = lureId?.let { Lures.select { Lures.id eq it }.singleOrNull() }
         val bonus = if (lureRow != null) {
@@ -1691,9 +1821,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun locationTier(locId: Long): Int {
+        val isEventLocation = Locations
+            .slice(Locations.specialEventId)
+            .select { Locations.id eq locId }
+            .singleOrNull()
+            ?.get(Locations.specialEventId) != null
+        if (isEventLocation) return 0
         val ordered = Locations
             .slice(Locations.id, Locations.unlockKg)
-            .selectAll()
+            .select { Locations.specialEventId.isNull() }
             .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
             .mapIndexed { index, row -> row[Locations.id].value to index }
             .toMap()
@@ -1750,31 +1886,20 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
         val total = totalKg(userId)
         val locId = userRow[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
         val locRow = Locations.select { Locations.id eq locId }.single()
-        require(locRow[Locations.unlockKg] <= total) { "locked" }
-        val pool = (LocationFishWeights innerJoin Fish)
-            .slice(
-                Fish.id,
-                Fish.name,
-                Fish.meanKg,
-                Fish.varKg,
-                Fish.rarity,
-                Fish.predator,
-                Fish.water,
-                LocationFishWeights.weight,
-            )
-            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
-            .toList()
+        val event = eventForLocationTx(userId, locRow, Instant.now(clock))
+        if (event == null) require(locRow[Locations.unlockKg] <= total) { "locked" }
+        val pool = fishPoolForLocationTx(locId, lurePred, lureWater, event)
         require(pool.isNotEmpty()) { "No suitable fish" }
 
         val wait = waitSeconds.coerceIn(5, 30)
         val factor = ((wait - 5).toDouble() / 25.0 + rarityBonus).coerceIn(0.0, 1.0)
         val rnd = Rng.fast()
-        val totalWeight = pool.sumOf { it[LocationFishWeights.weight] * rarityModifier(it[Fish.rarity], factor) }
+        val totalWeight = pool.sumOf { it.poolWeight * rarityModifier(it.rarity, factor) }
         var roll = rnd.nextDouble() * totalWeight
         val picked = pool.first { row2 ->
-            roll -= row2[LocationFishWeights.weight] * rarityModifier(row2[Fish.rarity], factor)
+            roll -= row2.poolWeight * rarityModifier(row2.rarity, factor)
             roll <= 0.0
         }
 
@@ -1785,8 +1910,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
         val escapeChance = baseEscapeChance(locId) * rodBonusMultiplier(
             rodRow,
-            picked[Fish.water],
-            picked[Fish.predator],
+            picked.water,
+            picked.predator,
         ) + extraEscapeChance
 
         fun escape(): HookResultDTO {
@@ -1808,10 +1933,10 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
         if (!auto && !isBeginner && rnd.nextDouble() > catchChance) return@transaction escape()
 
-        val fishId = picked[Fish.id].value
-        val fishName = picked[Fish.name]
-        val rarity = picked[Fish.rarity]
-        val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
+        val fishId = picked.fishId
+        val fishName = picked.fishName
+        val rarity = picked.rarity
+        val weight = Rng.logNormalKg(picked.meanKg, picked.varKg) * locRow[Locations.sizeMultiplier]
         val locName = locRow[Locations.name]
         val challenge = hookChallengeFor(rarity, weight)
 
@@ -1918,7 +2043,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val totalAfter = totalBefore + weight
         val unlockedLocations = if (totalAfter > totalBefore) {
             Locations.select {
-                (Locations.unlockKg greater totalBefore) and (Locations.unlockKg lessEq totalAfter)
+                (Locations.unlockKg greater totalBefore) and
+                    (Locations.unlockKg lessEq totalAfter) and
+                    Locations.specialEventId.isNull()
             }.orderBy(Locations.unlockKg).map { it[Locations.name] }
         } else {
             emptyList()
@@ -1951,6 +2078,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.createdAt] = caughtAt
             it[Catches.coins] = coinsAwarded
         }
+        specialEvents.recordCatchTx(userId, catchId.value, fishId, rarity, weight, locId, caughtAt)
 
         val achievements = AchievementService.updateOnCatch(userId, fishId, locId)
         val questResult = QuestService.updateOnCatch(

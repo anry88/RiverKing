@@ -155,6 +155,7 @@ import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.ClubQuestDto
 import com.riverking.mobile.auth.ClubQuestMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
+import com.riverking.mobile.auth.EventCastAreaDto
 import com.riverking.mobile.auth.FishBriefDto
 import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.GuideLocationDto
@@ -169,6 +170,9 @@ import com.riverking.mobile.auth.QuestDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.RodDto
 import com.riverking.mobile.auth.ShopPackageDto
+import com.riverking.mobile.auth.SpecialEventClubEntryDto
+import com.riverking.mobile.auth.SpecialEventPersonalEntryDto
+import com.riverking.mobile.auth.SpecialEventResponseDto
 import com.riverking.mobile.auth.TournamentDto
 import java.time.Instant
 import java.time.LocalDate
@@ -346,7 +350,7 @@ fun MainShell(
     var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
     var proFishingNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
 
-    val tournamentBadge = state.tournaments.prizes.any(::isTournamentPrize)
+    val tournamentBadge = state.tournaments.prizes.any { isTournamentPrize(it) || isEventPrize(it) }
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
     val clubBadge = state.tournaments.prizes.any(::isClubPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
@@ -534,6 +538,7 @@ fun MainShell(
                     onLeaveClub = onLeaveClub,
                     onMemberAction = onClubMemberAction,
                     onClaimPrize = onClaimPrize,
+                    onOpenCatch = onOpenCatch,
                 )
                 MainTab.SHOP -> ShopScreen(
                     state = state,
@@ -702,7 +707,7 @@ private fun LeadersScreen(
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     var section by rememberSaveable { mutableStateOf(LeaderSection.TOURNAMENTS) }
-    val tournamentsBadge = state.tournaments.prizes.any(::isTournamentPrize)
+    val tournamentsBadge = state.tournaments.prizes.any { isTournamentPrize(it) || isEventPrize(it) }
     val ratingsBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementsBadge = state.guide.achievements.any { it.claimable }
 
@@ -1318,8 +1323,9 @@ private fun FishingScreen(
             state = state,
             strings = strings,
             me = me,
-            backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+            backgroundUrl = currentLocation?.imageUrl ?: locationBackgroundAsset(currentLocation?.name),
             locationName = currentLocation?.name,
+            eventCastArea = currentLocation?.castArea,
             modifier = Modifier.fillMaxSize(),
             proMode = true,
             setupEnabled = setupEnabled,
@@ -1393,12 +1399,33 @@ private fun TournamentsScreen(
 ) {
     val tournaments = state.tournaments
     val me = state.me
-    val visiblePrizes = tournaments.prizes.filter(::isTournamentPrize)
+    var tournamentMode by rememberSaveable { mutableStateOf("regular") }
+    var eventPeriod by rememberSaveable { mutableStateOf("current") }
+    val showingSpecial = tournamentMode == "special"
+    val visiblePrizes = tournaments.prizes.filter { prize ->
+        if (showingSpecial) isEventPrize(prize) else isTournamentPrize(prize)
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = !showingSpecial,
+                    onClick = { tournamentMode = "regular" },
+                    label = { Text(regularTournamentsLabel(strings)) },
+                    modifier = Modifier.weight(1f),
+                )
+                FilterChip(
+                    selected = showingSpecial,
+                    onClick = { tournamentMode = "special" },
+                    label = { Text(specialTournamentsLabel(strings)) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         if (visiblePrizes.isNotEmpty()) {
             item {
                 PendingPrizeCard(
@@ -1408,79 +1435,296 @@ private fun TournamentsScreen(
                 )
             }
         }
-        item {
-            SectionCard(strings.currentTournament) {
-                if (tournaments.current == null) {
-                    EmptyStatePanel(strings.noData)
-                } else {
-                    TournamentCard(
-                        strings = strings,
-                        tournament = tournaments.current.tournament,
-                        mine = tournaments.current.mine,
-                        onClick = { onOpenTournament(tournaments.current.tournament.id) },
-                    )
-                    if (tournaments.current.leaderboard.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        tournaments.current.leaderboard.take(5).forEachIndexed { index, entry ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            CatchRow(
-                                title = "#${entry.rank} ${entry.user ?: "Unknown"}",
-                                subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
-                                value = entry.value.asKgCompact(strings),
-                                fishName = entry.fish,
-                                fishDiscovered = me?.let {
-                                    isFishDiscovered(
-                                        fishId = entry.fishId,
-                                        fishName = entry.fish,
-                                        ownerUserId = entry.userId,
-                                        currentUserId = it.id,
-                                        caughtFishIds = it.caughtFishIds,
-                                        fishGuide = state.guide.guide?.fish,
-                                    )
-                                } == true,
-                                fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
-                                onClick = {
-                                    if (entry.catchId != null && entry.fish != null && entry.location != null) {
-                                        onOpenCatch(
-                                            CatchDto(
-                                                id = entry.catchId,
-                                                fish = entry.fish,
-                                                weight = entry.value,
-                                                location = entry.location,
-                                                rarity = tournaments.current.tournament.fishRarity.orEmpty(),
-                                                user = entry.user,
-                                                userId = entry.userId,
-                                                fishId = entry.fishId,
-                                            )
+        if (!showingSpecial) {
+            item {
+                SectionCard(strings.currentTournament) {
+                    if (tournaments.current == null) {
+                        EmptyStatePanel(strings.noData)
+                    } else {
+                        TournamentCard(
+                            strings = strings,
+                            tournament = tournaments.current.tournament,
+                            mine = tournaments.current.mine,
+                            onClick = { onOpenTournament(tournaments.current.tournament.id) },
+                        )
+                        if (tournaments.current.leaderboard.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            tournaments.current.leaderboard.take(5).forEachIndexed { index, entry ->
+                                if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                                CatchRow(
+                                    title = "#${entry.rank} ${entry.user ?: "Unknown"}",
+                                    subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
+                                    value = entry.value.asKgCompact(strings),
+                                    fishName = entry.fish,
+                                    fishDiscovered = me?.let {
+                                        isFishDiscovered(
+                                            fishId = entry.fishId,
+                                            fishName = entry.fish,
+                                            ownerUserId = entry.userId,
+                                            currentUserId = it.id,
+                                            caughtFishIds = it.caughtFishIds,
+                                            fishGuide = state.guide.guide?.fish,
                                         )
-                                    }
-                                },
-                            )
+                                    } == true,
+                                    fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
+                                    onClick = {
+                                        if (entry.catchId != null && entry.fish != null && entry.location != null) {
+                                            onOpenCatch(
+                                                CatchDto(
+                                                    id = entry.catchId,
+                                                    fish = entry.fish,
+                                                    weight = entry.value,
+                                                    location = entry.location,
+                                                    rarity = tournaments.current.tournament.fishRarity.orEmpty(),
+                                                    user = entry.user,
+                                                    userId = entry.userId,
+                                                    fishId = entry.fishId,
+                                                )
+                                            )
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        if (tournaments.upcoming.isNotEmpty()) {
-            item {
-                SectionCard(strings.upcomingTournaments) {
-                    tournaments.upcoming.forEachIndexed { index, tournament ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+            if (tournaments.upcoming.isNotEmpty()) {
+                item {
+                    SectionCard(strings.upcomingTournaments) {
+                        tournaments.upcoming.forEachIndexed { index, tournament ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        }
                     }
                 }
             }
-        }
-        if (tournaments.past.isNotEmpty()) {
-            item {
-                SectionCard(strings.pastTournaments) {
-                    tournaments.past.forEachIndexed { index, tournament ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+            if (tournaments.past.isNotEmpty()) {
+                item {
+                    SectionCard(strings.pastTournaments) {
+                        tournaments.past.forEachIndexed { index, tournament ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        }
                     }
                 }
             }
+        } else {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    FilterChip(
+                        selected = eventPeriod == "previous",
+                        onClick = { eventPeriod = "previous" },
+                        label = { Text(previousLabel(strings)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilterChip(
+                        selected = eventPeriod == "current",
+                        onClick = { eventPeriod = "current" },
+                        label = { Text(strings.currentLabel) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            item {
+                val event = if (eventPeriod == "previous") tournaments.previousEvent else tournaments.currentEvent
+                if (event == null) {
+                    EmptyStatePanel(eventsEmptyLabel(strings))
+                } else {
+                    SpecialEventCard(
+                        strings = strings,
+                        event = event,
+                        me = me,
+                        onOpenCatch = onOpenCatch,
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun SpecialEventCard(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    me: MeResponseDto?,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    SectionCard(event.event.name) {
+        event.event.imageUrl?.let { imageUrl ->
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = event.event.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        Text(
+            text = "${formatEpoch(event.event.startTime)} – ${formatEpoch(event.event.endTime)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SpecialEventClubSection(
+            strings = strings,
+            title = eventTotalWeightLabel(strings),
+            rows = event.leaderboards.totalWeight,
+            mine = event.leaderboards.mineTotalWeight,
+            countMode = false,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SpecialEventClubSection(
+            strings = strings,
+            title = eventTotalCountLabel(strings),
+            rows = event.leaderboards.totalCount,
+            mine = event.leaderboards.mineTotalCount,
+            countMode = true,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SpecialEventPersonalSection(
+            strings = strings,
+            event = event,
+            rows = event.leaderboards.personalFish,
+            mine = event.leaderboards.minePersonalFish,
+            me = me,
+            onOpenCatch = onOpenCatch,
+        )
+    }
+}
+
+@Composable
+private fun SpecialEventClubSection(
+    strings: RiverStrings,
+    title: String,
+    rows: List<SpecialEventClubEntryDto>,
+    mine: SpecialEventClubEntryDto?,
+    countMode: Boolean,
+) {
+    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Spacer(modifier = Modifier.height(6.dp))
+    if (rows.isEmpty()) {
+        EmptyStatePanel("—")
+    } else {
+        rows.take(10).forEachIndexed { index, row ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventClubRow(strings = strings, row = row, highlighted = mine?.rank == row.rank, countMode = countMode)
+        }
+        if (mine != null && rows.none { it.rank == mine.rank }) {
+            HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventClubRow(strings = strings, row = mine, highlighted = true, countMode = countMode)
+        }
+    }
+}
+
+@Composable
+private fun SpecialEventClubRow(
+    strings: RiverStrings,
+    row: SpecialEventClubEntryDto,
+    highlighted: Boolean,
+    countMode: Boolean,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (highlighted) Color(0xFF1F6F4A).copy(alpha = 0.22f) else Color.Transparent)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("#${row.rank} ${row.club}", modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (countMode) row.value.roundToInt().toString() else row.value.asKgCompact(strings))
+    }
+}
+
+@Composable
+private fun SpecialEventPersonalSection(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    rows: List<SpecialEventPersonalEntryDto>,
+    mine: SpecialEventPersonalEntryDto?,
+    me: MeResponseDto?,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    Text(eventTopFishLabel(strings), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Spacer(modifier = Modifier.height(6.dp))
+    if (rows.isEmpty()) {
+        EmptyStatePanel(strings.noData)
+    } else {
+        rows.take(10).forEachIndexed { index, row ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventPersonalRow(
+                strings = strings,
+                event = event,
+                row = row,
+                highlighted = mine?.rank == row.rank,
+                me = me,
+                onOpenCatch = onOpenCatch,
+            )
+        }
+        if (mine != null && rows.none { it.rank == mine.rank }) {
+            HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventPersonalRow(
+                strings = strings,
+                event = event,
+                row = mine,
+                highlighted = true,
+                me = me,
+                onOpenCatch = onOpenCatch,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpecialEventPersonalRow(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    row: SpecialEventPersonalEntryDto,
+    highlighted: Boolean,
+    me: MeResponseDto?,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    val discovered = me?.caughtFishIds?.contains(row.fishId) == true || me?.id == row.userId
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = row.catchId != null) {
+                row.catchId?.let {
+                    onOpenCatch(
+                        CatchDto(
+                            id = it,
+                            fish = row.fish,
+                            weight = row.weight,
+                            location = event.event.name,
+                            rarity = row.rarity,
+                            userId = row.userId,
+                            fishId = row.fishId,
+                            user = row.user,
+                            at = Instant.ofEpochSecond(row.at).toString(),
+                        )
+                    )
+                }
+            }
+            .background(if (highlighted) Color(0xFF1F6F4A).copy(alpha = 0.22f) else Color.Transparent)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("#${row.rank} ${row.user ?: youLabel(strings)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = if (discovered) "${row.fish} • ${row.weight.asKgCompact(strings)}" else "??? • ${row.weight.asKgCompact(strings)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(row.value.asKgCompact(strings))
     }
 }
 
@@ -1902,6 +2146,7 @@ private fun ClubScreen(
     onLeaveClub: () -> Unit,
     onMemberAction: (Long, String) -> Unit,
     onClaimPrize: (Long) -> Unit,
+    onOpenCatch: (CatchDto) -> Unit,
 ) {
     val me = state.me
     val questsSectionLabel = if (strings.login == "Логин") "Квесты" else "Quests"
@@ -1917,6 +2162,7 @@ private fun ClubScreen(
     val canManageClub = club?.role == "president" || club?.role == "heir"
     val weekData = if (selectedWeek == "previous") club?.previousWeek else club?.currentWeek
     val questWeekData = if (selectedWeek == "previous") club?.previousQuestWeek else club?.currentQuestWeek
+    val clubEvent = if (selectedWeek == "previous") state.club.previousEvent else state.club.currentEvent
     val selectedQuest = questWeekData?.quests
         ?.firstOrNull { it.code == selectedQuestCode }
         ?: questWeekData?.quests?.firstOrNull()
@@ -2056,7 +2302,13 @@ private fun ClubScreen(
                     }
                 }
                 item {
-                    SectionCard(if (selectedSection == "ratings") strings.ratings else questsSectionLabel) {
+                    SectionCard(
+                        when (selectedSection) {
+                            "ratings" -> strings.ratings
+                            "tournament" -> clubTournamentLabel(strings)
+                            else -> questsSectionLabel
+                        }
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2078,6 +2330,24 @@ private fun ClubScreen(
                                 border = riverOutlineBorder(),
                             ) {
                                 Text(strings.ratings)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    selectedSection = "tournament"
+                                    onReloadClub(true)
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = if (selectedSection == "tournament") {
+                                    ButtonDefaults.outlinedButtonColors(
+                                        containerColor = RiverMoss.copy(alpha = 0.24f),
+                                        contentColor = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                } else {
+                                    riverOutlinedButtonColors()
+                                },
+                                border = riverOutlineBorder(),
+                            ) {
+                                Text(clubTournamentLabel(strings))
                             }
                             OutlinedButton(
                                 onClick = {
@@ -2119,7 +2389,7 @@ private fun ClubScreen(
                                 },
                                 border = riverOutlineBorder(),
                             ) {
-                                Text(if (strings.login == "Логин") "Текущая неделя" else "This week")
+                                Text(if (selectedSection == "tournament") strings.currentLabel else if (strings.login == "Логин") "Текущая неделя" else "This week")
                             }
                             OutlinedButton(
                                 onClick = {
@@ -2137,13 +2407,17 @@ private fun ClubScreen(
                                 },
                                 border = riverOutlineBorder(),
                             ) {
-                                Text(if (strings.login == "Логин") "Прошлая неделя" else "Last week")
+                                Text(if (selectedSection == "tournament") previousLabel(strings) else if (strings.login == "Логин") "Прошлая неделя" else "Last week")
                             }
                         }
                         Text(
-                            (
-                                if (selectedSection == "quests") questWeekData?.weekStart else weekData?.weekStart
-                            )?.let { formatWeekRange(it, strings) }.orEmpty(),
+                            if (selectedSection == "tournament") {
+                                clubEvent?.event?.let { "${formatEpoch(it.startTime)} – ${formatEpoch(it.endTime)}" }.orEmpty()
+                            } else {
+                                (
+                                    if (selectedSection == "quests") questWeekData?.weekStart else weekData?.weekStart
+                                )?.let { formatWeekRange(it, strings) }.orEmpty()
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (selectedSection == "ratings") {
@@ -2169,6 +2443,35 @@ private fun ClubScreen(
                                 },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        } else if (selectedSection == "tournament") {
+                            if (clubEvent == null) {
+                                EmptyStatePanel(eventsEmptyLabel(strings), modifier = Modifier.fillMaxWidth())
+                            } else {
+                                SpecialEventClubSection(
+                                    strings = strings,
+                                    title = eventTotalWeightLabel(strings),
+                                    rows = clubEvent.leaderboards.totalWeight,
+                                    mine = clubEvent.leaderboards.mineTotalWeight,
+                                    countMode = false,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SpecialEventClubSection(
+                                    strings = strings,
+                                    title = eventTotalCountLabel(strings),
+                                    rows = clubEvent.leaderboards.totalCount,
+                                    mine = clubEvent.leaderboards.mineTotalCount,
+                                    countMode = true,
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SpecialEventPersonalSection(
+                                    strings = strings,
+                                    event = clubEvent,
+                                    rows = clubEvent.leaderboards.personalFish,
+                                    mine = clubEvent.leaderboards.minePersonalFish,
+                                    me = me,
+                                    onOpenCatch = onOpenCatch,
+                                )
+                            }
                         } else {
                             if (questWeekData == null || questWeekData.quests.isEmpty()) {
                                 EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
@@ -2462,6 +2765,7 @@ private fun FishingStageScene(
     me: MeResponseDto,
     backgroundUrl: String?,
     locationName: String?,
+    eventCastArea: EventCastAreaDto? = null,
     modifier: Modifier = Modifier,
     proMode: Boolean = true,
     setupEnabled: Boolean = false,
@@ -2489,7 +2793,16 @@ private fun FishingStageScene(
     val phase = state.fishing.phase
     val fightIntensity = state.fishing.struggleIntensity.toFloat().coerceIn(0f, 1f)
     val castSpot = state.fishing.castSpot
-    val proSceneSpec = remember(locationName) { proFishingSceneSpec(locationName) }
+    val proSceneSpec = remember(locationName, eventCastArea) {
+        eventCastArea?.let {
+            ProFishingSceneSpec(
+                minX = it.minX.toFloat(),
+                maxX = it.maxX.toFloat(),
+                farY = it.farY.toFloat(),
+                nearY = it.nearY.toFloat(),
+            )
+        } ?: proFishingSceneSpec(locationName)
+    }
     val inWater = when (phase) {
         FishingPhase.WAITING_BITE,
         FishingPhase.BITING,
@@ -4365,12 +4678,13 @@ private fun LocationPickerSheet(
                 title = location.name,
                 subtitle = if (location.unlocked) {
                     strings.currentLabel.takeIf { me.locationId == location.id }
-                        ?: location.unlockKg.asKgCompact(strings)
+                        ?: if (location.isEvent) specialTournamentsLabel(strings) else location.unlockKg.asKgCompact(strings)
                 } else {
-                    location.unlockKg.asKgCompact(strings)
+                    location.lockedReason ?: if (location.isEvent) eventsEmptyLabel(strings) else location.unlockKg.asKgCompact(strings)
                 },
                 enabled = location.unlocked,
                 selected = me.locationId == location.id,
+                special = location.isEvent,
                 onClick = { onSelect(location.id) },
             )
         }
@@ -4461,6 +4775,7 @@ private fun PickerRow(
     subtitle: String,
     enabled: Boolean,
     selected: Boolean,
+    special: Boolean = false,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -4469,10 +4784,18 @@ private fun PickerRow(
             .clip(RoundedCornerShape(20.dp))
             .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else RiverPanelSoft.copy(alpha = 0.88f),
+        color = when {
+            selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            special -> RiverAmber.copy(alpha = 0.16f)
+            else -> RiverPanelSoft.copy(alpha = 0.88f)
+        },
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.46f) else RiverOutline.copy(alpha = 0.72f),
+            when {
+                selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.46f)
+                special -> RiverAmber.copy(alpha = 0.72f)
+                else -> RiverOutline.copy(alpha = 0.72f)
+            },
         ),
     ) {
         Row(
@@ -6964,6 +7287,33 @@ private fun anyFishLabel(strings: RiverStrings): String =
 private fun unknownUserLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Неизвестно" else "Unknown"
 
+private fun youLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Ты" else "You"
+
+private fun regularTournamentsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Регулярные" else "Regular"
+
+private fun specialTournamentsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Специальные" else "Special"
+
+private fun clubTournamentLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Турнир" else "Tournament"
+
+private fun previousLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Прошлый" else "Previous"
+
+private fun eventsEmptyLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Нет специального события" else "No special event"
+
+private fun eventTotalWeightLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Клубы: суммарный вес" else "Clubs: total weight"
+
+private fun eventTotalCountLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Клубы: количество рыб" else "Clubs: fish count"
+
+private fun eventTopFishLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Игроки: редкая крупная рыба" else "Players: rare heavy fish"
+
 private fun achievementNameForCatch(
     strings: RiverStrings,
     achievements: List<AchievementDto>,
@@ -7151,6 +7501,8 @@ private fun isTournamentPrize(prize: PrizeDto): Boolean = prize.source == "tourn
 private fun isRatingPrize(prize: PrizeDto): Boolean = prize.source == "rating"
 
 private fun isClubPrize(prize: PrizeDto): Boolean = prize.source == "club"
+
+private fun isEventPrize(prize: PrizeDto): Boolean = prize.source == "event"
 
 private fun achievementRewardTitle(
     strings: RiverStrings,

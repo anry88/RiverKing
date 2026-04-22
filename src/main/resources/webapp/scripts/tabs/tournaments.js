@@ -15,9 +15,13 @@ function TournamentsTab({
   me,
   tournamentTab,
   setTournamentTab,
+  tournamentKind = 'regular',
+  setTournamentKind,
   currentTournament,
   upcomingTournaments,
   pastTournaments,
+  currentEvent,
+  previousEvent,
   pastResult,
   openPast,
   setPastResult,
@@ -109,9 +113,141 @@ function TournamentsTab({
 
   const currentPrizeCount = currentPrizeLeaderboard.length;
   const pastPrizeCount = pastPrizeLeaderboard.length;
+  const specialPeriod = tournamentTab === 'past' ? 'past' : 'current';
+  const selectedEvent = specialPeriod === 'past' ? previousEvent : currentEvent;
+
+  const renderEventPrizeButton = (hintKey, prize) => {
+    if(!prize) return null;
+    return (
+      <button
+        type="button"
+        onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===hintKey ? null : {rank:hintKey, prize});}}
+        className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
+        aria-label={t('prizes')}
+      >
+        <span className="w-5 h-5 flex items-center justify-center">{renderPrizeIcon(prize)}</span>
+      </button>
+    );
+  };
+
+  const renderEventSection = (key, title, rows, mine, mode) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const mineOutside = mine && !list.some(row => Number(row.rank) === Number(mine.rank));
+    const valueText = row => {
+      const value = Number(row.value || 0);
+      return mode === 'count' ? value.toFixed(0) : value.toFixed(2);
+    };
+    const renderRow = (row, isMine = false) => {
+      const hintKey = `${key}:${row.rank}`;
+      const isPersonal = mode === 'fish';
+      const catchData = isPersonal && row.catchId ? {
+        id: row.catchId,
+        fish: row.fish,
+        fishId: row.fishId,
+        rarity: row.rarity,
+        weight: row.weight,
+        location: selectedEvent?.event?.name,
+        locationBg: selectedEvent?.event?.imageUrl,
+        at: row.at ? new Date(row.at*1000).toISOString() : null,
+        user: row.user || t('you'),
+        userId: row.userId,
+      } : null;
+      return (
+        <div
+          key={`${hintKey}:${isMine ? 'mine' : 'row'}`}
+          className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===hintKey ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
+          onClick={()=>{ if(catchData && onCatchClick){ onCatchClick(catchData); } }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+              <span>{row.rank}</span>
+              {renderEventPrizeButton(hintKey, row.prize)}
+            </div>
+            {isPersonal && (
+              row.fish && (me.caughtFishIds||[]).includes(row.fishId) ? (
+                <AssetImage src={FISH_IMG[row.fish]} alt={row.fish} className="w-8 h-8 object-contain shrink-0" onError={ev=>{ if(ev?.currentTarget) ev.currentTarget.style.display='none'; }} />
+              ) : (
+                <div className="w-8 h-8 bg-gray-800 rounded flex items-center justify-center relative shrink-0">
+                  <span className="text-lg opacity-20">🐟</span>
+                  <span className="absolute">?</span>
+                </div>
+              )
+            )}
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{isPersonal ? (row.user || t('you')) : row.club}</div>
+              {isPersonal && (
+                <div className="text-xs opacity-70 truncate">
+                  {row.fish} — {Number(row.weight || 0).toFixed(2)} {t('kg')} — {row.at ? new Date(row.at*1000).toLocaleString() : ''}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="w-16 text-right shrink-0">
+            <div>{valueText(row)}</div>
+            {mode !== 'count' && <div className="text-xs">{t('kg')}</div>}
+          </div>
+          {renderPrizeHint(hintKey, row.prize)}
+        </div>
+      );
+    };
+    return (
+      <div className="space-y-2">
+        <div className="text-sm font-semibold opacity-90">{title}</div>
+        {list.length === 0 ? (
+          <div className="p-3 rounded-xl glass text-sm opacity-70">{t('noData')}</div>
+        ) : (
+          list.map(row => renderRow(row, mine && Number(row.rank) === Number(mine.rank)))
+        )}
+        {mineOutside && renderRow(mine, true)}
+      </div>
+    );
+  };
 
   return (
     <div className="mt-6">
+      <div className="flex mb-3 p-1 rounded-xl glass gap-1">
+        <button
+          onClick={()=>setTournamentKind?.('regular')}
+          className={`flex-1 py-2 rounded-lg ${tournamentKind==='regular'?'bg-emerald-600':'hover:bg-white/5'}`}
+        >
+          {t('regular')}
+        </button>
+        <button
+          onClick={()=>setTournamentKind?.('special')}
+          className={`flex-1 py-2 rounded-lg ${tournamentKind==='special'?'bg-emerald-600':'hover:bg-white/5'}`}
+        >
+          {t('special')}
+        </button>
+      </div>
+      {tournamentKind === 'special' ? (
+        <div>
+          <div className="flex mb-4">
+            <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${specialPeriod==='past'?'text-emerald-400':''}`}>{t('previous')}</button>
+            <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${specialPeriod==='current'?'text-emerald-400':''}`}>{t('current')}</button>
+          </div>
+          {selectedEvent ? (
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-xl glass text-left">
+                {selectedEvent.event.imageUrl && (
+                  <img src={selectedEvent.event.imageUrl} alt="" className="w-full h-28 object-cover" />
+                )}
+                <div className="p-4">
+                  <div className="text-base font-semibold mb-1">{selectedEvent.event.name}</div>
+                  <div className="text-xs opacity-70">
+                    {new Date(selectedEvent.event.startTime*1000).toLocaleString()} — {new Date(selectedEvent.event.endTime*1000).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              {renderEventSection('weight', t('eventTotalWeight'), selectedEvent.leaderboards?.totalWeight, selectedEvent.leaderboards?.mineTotalWeight, 'weight')}
+              {renderEventSection('count', t('eventTotalCount'), selectedEvent.leaderboards?.totalCount, selectedEvent.leaderboards?.mineTotalCount, 'count')}
+              {renderEventSection('fish', t('eventTopFish'), selectedEvent.leaderboards?.personalFish, selectedEvent.leaderboards?.minePersonalFish, 'fish')}
+            </div>
+          ) : (
+            <div className="text-center opacity-70">{t('eventsEmpty')}</div>
+          )}
+        </div>
+      ) : (
+      <>
       <div className="flex mb-4">
         <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${tournamentTab==='past'?'text-emerald-400':''}`}>{t('past')}</button>
         <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${tournamentTab==='current'?'text-emerald-400':''}`}>{t('current')}</button>
@@ -466,6 +602,8 @@ function TournamentsTab({
             </div>
           )
         )
+      )}
+      </>
       )}
     </div>
   );

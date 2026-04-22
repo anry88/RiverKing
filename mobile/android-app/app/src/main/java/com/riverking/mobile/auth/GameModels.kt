@@ -20,6 +20,19 @@ data class LocationDto(
     val name: String,
     val unlockKg: Double,
     val unlocked: Boolean,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castArea: EventCastAreaDto? = null,
+    val isEvent: Boolean = false,
+    val lockedReason: String? = null,
+)
+
+@Serializable
+data class EventCastAreaDto(
+    val minX: Double,
+    val maxX: Double,
+    val farY: Double,
+    val nearY: Double,
 )
 
 @Serializable
@@ -197,6 +210,56 @@ data class CurrentTournamentDto(
     val tournament: TournamentDto,
     val leaderboard: List<LeaderboardEntryDto>,
     val mine: LeaderboardEntryDto? = null,
+)
+
+@Serializable
+data class SpecialEventDto(
+    val id: Long,
+    val name: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imageUrl: String? = null,
+    val castArea: EventCastAreaDto,
+)
+
+@Serializable
+data class SpecialEventClubEntryDto(
+    val rank: Int,
+    val clubId: Long,
+    val club: String,
+    val value: Double,
+    val prize: PrizeSpecDto? = null,
+)
+
+@Serializable
+data class SpecialEventPersonalEntryDto(
+    val rank: Int,
+    val userId: Long,
+    val user: String? = null,
+    val value: Double,
+    val catchId: Long? = null,
+    val fish: String,
+    val fishId: Long,
+    val rarity: String,
+    val weight: Double,
+    val at: Long,
+    val prize: PrizeSpecDto? = null,
+)
+
+@Serializable
+data class SpecialEventLeaderboardsDto(
+    val totalWeight: List<SpecialEventClubEntryDto> = emptyList(),
+    val totalCount: List<SpecialEventClubEntryDto> = emptyList(),
+    val personalFish: List<SpecialEventPersonalEntryDto> = emptyList(),
+    val mineTotalWeight: SpecialEventClubEntryDto? = null,
+    val mineTotalCount: SpecialEventClubEntryDto? = null,
+    val minePersonalFish: SpecialEventPersonalEntryDto? = null,
+)
+
+@Serializable
+data class SpecialEventResponseDto(
+    val event: SpecialEventDto,
+    val leaderboards: SpecialEventLeaderboardsDto,
 )
 
 @Serializable

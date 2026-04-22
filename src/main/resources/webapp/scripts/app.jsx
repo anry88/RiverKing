@@ -72,6 +72,9 @@ function App(){
   const [pastTournaments,setPastTournaments] = React.useState([]);
   const [pastResult,setPastResult] = React.useState(null);
   const [tournamentTab,setTournamentTab] = React.useState('current');
+  const [tournamentKind,setTournamentKind] = React.useState('regular');
+  const [currentEvent,setCurrentEvent] = React.useState(null);
+  const [previousEvent,setPreviousEvent] = React.useState(null);
   const [nickOpen,setNickOpen] = React.useState(false);
   const [prize,setPrize] = React.useState(null);
   const [prizeHint,setPrizeHint] = React.useState(null);
@@ -510,6 +513,18 @@ function App(){
           } else if(!cancelled){
             setPastTournaments([]);
           }
+          const ce = await fetch(`/api/events/current`,{credentials:'include'});
+          if(ce.status===200){
+            if(!cancelled) setCurrentEvent(await ce.json());
+          } else if(!cancelled){
+            setCurrentEvent(null);
+          }
+          const pe = await fetch(`/api/events/previous`,{credentials:'include'});
+          if(pe.status===200){
+            if(!cancelled) setPreviousEvent(await pe.json());
+          } else if(!cancelled){
+            setPreviousEvent(null);
+          }
           const pr = await fetch(`/api/prizes`,{credentials:'include'});
           if(pr.ok){
             const list = await pr.json();
@@ -529,6 +544,8 @@ function App(){
             if(!cancelled) setCurrentTournament(null);
             if(!cancelled) setUpcomingTournaments([]);
             if(!cancelled) setPastTournaments([]);
+            if(!cancelled) setCurrentEvent(null);
+            if(!cancelled) setPreviousEvent(null);
           }
         }
       }catch(e){
@@ -947,6 +964,10 @@ function App(){
       } else {
         setPastTournaments([]);
       }
+      const ce = await fetch(`/api/events/current`,{credentials:'include'});
+      if(ce.status===200){ setCurrentEvent(await ce.json()); } else { setCurrentEvent(null); }
+      const pe = await fetch(`/api/events/previous`,{credentials:'include'});
+      if(pe.status===200){ setPreviousEvent(await pe.json()); } else { setPreviousEvent(null); }
     }catch(e){}
   }
 
@@ -1000,7 +1021,7 @@ function App(){
         const c = d.catch;
         const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
         const newTotal = (me.totalWeight||0)+c.weight;
-        const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
+        const newLocs = me.locations.filter(l=>!l.isEvent && !l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const achievementUnlocks = Array.isArray(d.achievements)
           ? d.achievements.map(a => ({
@@ -1031,7 +1052,7 @@ function App(){
                 todayWeight:(p.todayWeight||0)+c.weight,
                 coins: totalCoins,
                 todayCoins: todayCoins,
-                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                locations:p.locations.map(l=> l.isEvent ? l : (l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l)),
                 rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
                 recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
@@ -1049,6 +1070,12 @@ function App(){
             setCurrentTournament(await ct.json());
           } else {
             setCurrentTournament(null);
+          }
+          const ce = await fetch(`/api/events/current`,{credentials:'include'});
+          if(ce.status===200){
+            setCurrentEvent(await ce.json());
+          } else {
+            setCurrentEvent(null);
           }
         }catch(e){}
       } else {
@@ -1456,9 +1483,13 @@ function App(){
               me={me}
               tournamentTab={tournamentTab}
               setTournamentTab={setTournamentTab}
+              tournamentKind={tournamentKind}
+              setTournamentKind={setTournamentKind}
               currentTournament={currentTournament}
               upcomingTournaments={upcomingTournaments}
               pastTournaments={pastTournaments}
+              currentEvent={currentEvent}
+              previousEvent={previousEvent}
               pastResult={pastResult}
               openPast={openPast}
               setPastResult={setPastResult}

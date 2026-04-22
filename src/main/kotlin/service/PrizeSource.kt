@@ -4,4 +4,5 @@ enum class PrizeSource {
     TOURNAMENT,
     RATING,
     CLUB,
+    EVENT,
 }

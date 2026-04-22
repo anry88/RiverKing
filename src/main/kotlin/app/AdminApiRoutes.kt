@@ -4,6 +4,7 @@ import db.Fish
 import db.Locations
 import db.Users
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -12,17 +13,26 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import service.COIN_PRIZE_ID
+import service.EventCastAreaDTO
 import service.FishingService
+import service.SpecialEvent
+import service.SpecialEventFishSpec
+import service.SpecialEventPrizeConfig
+import service.SpecialEventService
 import service.TournamentService
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val adminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
@@ -120,15 +130,87 @@ data class AdminDiscountPackageResp(
 data class AdminCatalogResp(
     val metrics: List<AdminCatalogOptionResp>,
     val fish: List<AdminCatalogOptionResp>,
+    val eventFish: List<AdminCatalogOptionResp> = emptyList(),
     val locations: List<AdminCatalogOptionResp>,
     val tournamentPrizes: List<AdminPrizeOptionResp>,
     val discountPackages: List<AdminDiscountPackageResp>
 )
 
+@Serializable
+data class AdminEventFishReq(
+    val fishId: Long,
+    val weight: Double
+)
+
+@Serializable
+data class AdminEventPrizeReq(
+    val prizePlaces: Int,
+    val prizesJson: String
+)
+
+@Serializable
+data class AdminSpecialEventReq(
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imagePath: String? = null,
+    val castArea: EventCastAreaDTO,
+    val fish: List<AdminEventFishReq>,
+    val weightPrizes: AdminEventPrizeReq,
+    val countPrizes: AdminEventPrizeReq,
+    val fishPrizes: AdminEventPrizeReq
+)
+
+@Serializable
+data class AdminSpecialEventResp(
+    val id: Long,
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imagePath: String? = null,
+    val castArea: EventCastAreaDTO,
+    val fish: List<AdminEventFishReq>,
+    val weightPrizes: AdminEventPrizeReq,
+    val countPrizes: AdminEventPrizeReq,
+    val fishPrizes: AdminEventPrizeReq
+)
+
+@Serializable
+data class AdminImageUploadResp(val imagePath: String)
+
 fun Application.adminApiRoutes(env: Env) {
     val tournaments = TournamentService()
     val fishing = FishingService()
+    val events = SpecialEventService()
     val bot = TelegramBot(env.botToken)
+
+    fun AdminSpecialEventReq.fishSpecs(): List<SpecialEventFishSpec> =
+        fish.map { SpecialEventFishSpec(it.fishId, it.weight) }
+
+    fun AdminEventPrizeReq.toConfig(): SpecialEventPrizeConfig =
+        SpecialEventPrizeConfig(prizePlaces, prizesJson)
+
+    fun SpecialEvent.toAdminResp(): AdminSpecialEventResp =
+        AdminSpecialEventResp(
+            id = id,
+            nameRu = nameRu,
+            nameEn = nameEn,
+            startTime = startTime.toEpochMilli(),
+            endTime = endTime.toEpochMilli(),
+            imagePath = imagePath,
+            castArea = castArea,
+            fish = events.fishSpecs(id).map { AdminEventFishReq(it.fishId, it.weight) },
+            weightPrizes = AdminEventPrizeReq(weightPrizePlaces, weightPrizesJson),
+            countPrizes = AdminEventPrizeReq(countPrizePlaces, countPrizesJson),
+            fishPrizes = AdminEventPrizeReq(fishPrizePlaces, fishPrizesJson),
+        )
+
+    suspend fun ApplicationCall.respondEventError(e: SpecialEventService.SpecialEventException) {
+        val status = if (e.code == "event_overlap") HttpStatusCode.Conflict else HttpStatusCode.BadRequest
+        respond(status, mapOf("error" to e.code))
+    }
 
     routing {
         route("/api/admin") {
@@ -208,6 +290,98 @@ fun Application.adminApiRoutes(env: Env) {
                 call.respond(HttpStatusCode.NoContent)
             }
 
+            // ── Special Events ──
+
+            get("/events") {
+                val offset = call.request.queryParameters["offset"]?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 50)
+                call.respond(events.listEvents(limit = limit, offset = offset).map { it.toAdminResp() })
+            }
+
+            post("/events") {
+                val req = call.receive<AdminSpecialEventReq>()
+                try {
+                    val id = events.createEvent(
+                        nameRu = req.nameRu,
+                        nameEn = req.nameEn,
+                        start = Instant.ofEpochMilli(req.startTime),
+                        end = Instant.ofEpochMilli(req.endTime),
+                        imagePath = req.imagePath,
+                        castArea = req.castArea,
+                        fish = req.fishSpecs(),
+                        weightPrizes = req.weightPrizes.toConfig(),
+                        countPrizes = req.countPrizes.toConfig(),
+                        fishPrizes = req.fishPrizes.toConfig(),
+                    )
+                    call.respond(HttpStatusCode.Created, mapOf("id" to id))
+                } catch (e: SpecialEventService.SpecialEventException) {
+                    call.respondEventError(e)
+                }
+            }
+
+            put("/events/{id}") {
+                val id = call.parameters["id"]?.toLongOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
+                val req = call.receive<AdminSpecialEventReq>()
+                try {
+                    events.updateEvent(
+                        id = id,
+                        nameRu = req.nameRu,
+                        nameEn = req.nameEn,
+                        start = Instant.ofEpochMilli(req.startTime),
+                        end = Instant.ofEpochMilli(req.endTime),
+                        imagePath = req.imagePath,
+                        castArea = req.castArea,
+                        fish = req.fishSpecs(),
+                        weightPrizes = req.weightPrizes.toConfig(),
+                        countPrizes = req.countPrizes.toConfig(),
+                        fishPrizes = req.fishPrizes.toConfig(),
+                    )
+                    call.respond(HttpStatusCode.OK)
+                } catch (e: SpecialEventService.SpecialEventException) {
+                    call.respondEventError(e)
+                }
+            }
+
+            delete("/events/{id}") {
+                val id = call.parameters["id"]?.toLongOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
+                events.deleteEvent(id)
+                call.respond(HttpStatusCode.NoContent)
+            }
+
+            post("/events/image") {
+                val root = File(env.eventAssetsDir).canonicalFile
+                withContext(Dispatchers.IO) { root.mkdirs() }
+                var savedName: String? = null
+                val multipart = call.receiveMultipart()
+                multipart.forEachPart { part ->
+                    try {
+                        if (part is PartData.FileItem && savedName == null) {
+                            val original = part.originalFileName.orEmpty()
+                            val ext = original.substringAfterLast('.', "")
+                                .lowercase()
+                                .takeIf { it in setOf("png", "jpg", "jpeg", "webp") }
+                                ?.let { ".$it" }
+                                ?: ".webp"
+                            val fileName = "event-${UUID.randomUUID()}$ext"
+                            val target = File(root, fileName).canonicalFile
+                            if (!target.path.startsWith(root.path)) {
+                                return@forEachPart
+                            }
+                            withContext(Dispatchers.IO) {
+                                part.streamProvider().use { input ->
+                                    target.outputStream().use { output -> input.copyTo(output) }
+                                }
+                            }
+                            savedName = fileName
+                        }
+                    } finally {
+                        part.dispose()
+                    }
+                }
+                val imagePath = savedName ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "file_required"))
+                call.respond(AdminImageUploadResp(imagePath))
+            }
+
             // ── Discounts ──
 
             get("/discounts") {
@@ -261,8 +435,17 @@ fun Application.adminApiRoutes(env: Env) {
                             AdminCatalogOptionResp(name, "$name (${row[Fish.rarity]})")
                         }
                 }
+                val eventFishOptions = transaction {
+                    Fish.selectAll()
+                        .orderBy(Fish.name, SortOrder.ASC)
+                        .map { row ->
+                            val id = row[Fish.id].value
+                            val name = row[Fish.name]
+                            AdminCatalogOptionResp(id.toString(), "$name (${row[Fish.rarity]})")
+                        }
+                }
                 val locationOptions = transaction {
-                    Locations.selectAll()
+                    Locations.select { Locations.specialEventId.isNull() }
                         .orderBy(Locations.unlockKg, SortOrder.ASC)
                         .map { row ->
                             val name = row[Locations.name]
@@ -305,6 +488,7 @@ fun Application.adminApiRoutes(env: Env) {
                     AdminCatalogResp(
                         metrics = metrics,
                         fish = rarityOptions + fishOptions,
+                        eventFish = eventFishOptions,
                         locations = locationOptions,
                         tournamentPrizes = prizeOptions,
                         discountPackages = discountPackages,

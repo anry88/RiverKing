@@ -33,5 +33,8 @@ fun testEnv(name: String): Env {
     googleAuthClientId = "",
     googlePlayPackageName = "",
     googlePlayServiceAccountFile = "",
+    eventAssetsDir = Files.createTempDirectory("riverking-$name-event-assets-").toFile().apply {
+        deleteOnExit()
+    }.absolutePath,
 )
 }

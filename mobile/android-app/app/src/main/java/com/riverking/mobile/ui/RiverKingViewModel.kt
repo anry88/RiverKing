@@ -24,6 +24,7 @@ import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.ReferralInfoDto
 import com.riverking.mobile.auth.ReferralRewardDto
 import com.riverking.mobile.auth.ShopCategoryDto
+import com.riverking.mobile.auth.SpecialEventResponseDto
 import com.riverking.mobile.auth.StartCastResultDto
 import com.riverking.mobile.auth.TelegramLinkPollResult
 import com.riverking.mobile.auth.TelegramLinkStartDto
@@ -116,6 +117,8 @@ data class TournamentsUiState(
     val current: CurrentTournamentDto? = null,
     val upcoming: List<TournamentDto> = emptyList(),
     val past: List<TournamentDto> = emptyList(),
+    val currentEvent: SpecialEventResponseDto? = null,
+    val previousEvent: SpecialEventResponseDto? = null,
     val prizes: List<PrizeDto> = emptyList(),
     val selectedTournamentId: Long? = null,
     val selectedTournament: CurrentTournamentDto? = null,
@@ -146,6 +149,8 @@ data class ClubUiState(
     val loaded: Boolean = false,
     val loading: Boolean = false,
     val club: ClubDetailsDto? = null,
+    val currentEvent: SpecialEventResponseDto? = null,
+    val previousEvent: SpecialEventResponseDto? = null,
     val searchResults: List<ClubSummaryDto> = emptyList(),
     val searchLoading: Boolean = false,
     val chat: List<ClubChatMessageDto> = emptyList(),
@@ -628,6 +633,8 @@ class RiverKingViewModel(
                     val current = async { repository.loadCurrentTournament() }
                     val upcoming = async { repository.loadUpcomingTournaments() }
                     val past = async { repository.loadPastTournaments() }
+                    val currentEvent = async { repository.loadCurrentEvent() }
+                    val previousEvent = async { repository.loadPreviousEvent() }
                     val prizes = async { repository.loadPendingPrizes() }
                     TournamentsUiState(
                         loaded = true,
@@ -635,6 +642,8 @@ class RiverKingViewModel(
                         current = current.await(),
                         upcoming = upcoming.await(),
                         past = past.await(),
+                        currentEvent = currentEvent.await(),
+                        previousEvent = previousEvent.await(),
                         prizes = prizes.await(),
                         selectedTournamentId = state.value.tournaments.selectedTournamentId,
                         selectedTournament = state.value.tournaments.selectedTournament,
@@ -925,13 +934,20 @@ class RiverKingViewModel(
         viewModelScope.launch {
             _state.update { it.copy(club = it.club.copy(loading = true), error = null) }
             try {
-                val club = repository.loadClub()
+                val data = coroutineScope {
+                    val club = async { repository.loadClub() }
+                    val currentEvent = async { repository.loadCurrentEvent() }
+                    val previousEvent = async { repository.loadPreviousEvent() }
+                    Triple(club.await(), currentEvent.await(), previousEvent.await())
+                }
                 _state.update {
                     it.copy(
                         club = it.club.copy(
                             loaded = true,
                             loading = false,
-                            club = club,
+                            club = data.first,
+                            currentEvent = data.second,
+                            previousEvent = data.third,
                         )
                     )
                 }
@@ -1866,6 +1882,8 @@ class RiverKingViewModel(
                         refreshQuests = cast.questProgressChanged || cast.questUpdates.isNotEmpty(),
                         refreshAchievements = cast.achievements.isNotEmpty(),
                     )
+                    loadTournaments(force = true)
+                    if (state.value.club.loaded) loadClub(force = true)
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
                 val caught = cast.catch

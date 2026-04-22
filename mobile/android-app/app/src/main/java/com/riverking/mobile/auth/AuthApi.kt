@@ -168,6 +168,25 @@ class AuthApi(
             bearerAuth(accessToken)
         }.body()
 
+    suspend fun currentEvent(accessToken: String): SpecialEventResponseDto? {
+        val response = client.get("$baseUrl/api/events/current") {
+            bearerAuth(accessToken)
+        }
+        return if (response.status == HttpStatusCode.NoContent) null else response.body()
+    }
+
+    suspend fun previousEvent(accessToken: String): SpecialEventResponseDto? {
+        val response = client.get("$baseUrl/api/events/previous") {
+            bearerAuth(accessToken)
+        }
+        return if (response.status == HttpStatusCode.NoContent) null else response.body()
+    }
+
+    suspend fun event(accessToken: String, eventId: Long): SpecialEventResponseDto =
+        client.get("$baseUrl/api/events/$eventId") {
+            bearerAuth(accessToken)
+        }.body()
+
     suspend fun prizes(accessToken: String): List<PrizeDto> =
         client.get("$baseUrl/api/prizes") {
             bearerAuth(accessToken)

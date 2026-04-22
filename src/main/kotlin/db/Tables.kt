@@ -64,6 +64,13 @@ object DB {
                 PaySupportRequests,
                 AccountDeletionRequests,
                 Tournaments,
+                SpecialEvents,
+                SpecialEventFish,
+                SpecialEventUserProgress,
+                SpecialEventClubProgress,
+                SpecialEventCatches,
+                SpecialEventPrizes,
+                SpecialEventRewardRuns,
                 UserPrizes,
                 RatingPrizes,
                 ReferralLinks,
@@ -135,6 +142,7 @@ object DB {
                     last_daily_at TIMESTAMP,
                     daily_streak INTEGER NOT NULL DEFAULT 0,
                     current_location_id BIGINT REFERENCES ${Locations.tableName}(id),
+                    current_event_id BIGINT REFERENCES ${SpecialEvents.tableName}(id),
                     current_lure_id BIGINT REFERENCES ${Lures.tableName}(id),
                     current_rod_id BIGINT REFERENCES ${Rods.tableName}(id),
                     cast_lure_id BIGINT REFERENCES ${Lures.tableName}(id),
@@ -164,6 +172,7 @@ object DB {
                     last_daily_at,
                     daily_streak,
                     current_location_id,
+                    current_event_id,
                     current_lure_id,
                     current_rod_id,
                     cast_lure_id,
@@ -189,6 +198,7 @@ object DB {
                     last_daily_at,
                     daily_streak,
                     current_location_id,
+                    NULL,
                     current_lure_id,
                     current_rod_id,
                     cast_lure_id,
@@ -1470,6 +1480,7 @@ object Users : LongIdTable() {
     val lastDailyAt = timestamp("last_daily_at").nullable()
     val dailyStreak = integer("daily_streak").default(0)
     val currentLocationId = reference("current_location_id", Locations).nullable()
+    val currentEventId = reference("current_event_id", SpecialEvents).nullable()
     val currentLureId = reference("current_lure_id", Lures).nullable()
     val currentRodId = reference("current_rod_id", Rods).nullable()
     val castLureId = reference("cast_lure_id", Lures).nullable()
@@ -1546,6 +1557,7 @@ object Locations : LongIdTable() {
     val name = varchar("name", 100)
     val unlockKg = double("unlock_kg").default(0.0)
     val sizeMultiplier = double("size_multiplier").default(1.0)
+    val specialEventId = long("special_event_id").nullable().index()
 }
 
 object Fish : LongIdTable() {
@@ -1659,6 +1671,86 @@ object Tournaments : LongIdTable() {
     val metric = varchar("metric", 20)
     val prizePlaces = integer("prize_places")
     val prizesJson = text("prizes_json")
+}
+
+object SpecialEvents : LongIdTable() {
+    val nameRu = varchar("name_ru", 100)
+    val nameEn = varchar("name_en", 100)
+    val startTime = timestamp("start_time")
+    val endTime = timestamp("end_time")
+    val imagePath = varchar("image_path", 255).nullable()
+    val castMinX = double("cast_min_x").default(0.14)
+    val castMaxX = double("cast_max_x").default(0.86)
+    val castFarY = double("cast_far_y").default(0.47)
+    val castNearY = double("cast_near_y").default(0.78)
+    val weightPrizePlaces = integer("weight_prize_places").default(0)
+    val countPrizePlaces = integer("count_prize_places").default(0)
+    val fishPrizePlaces = integer("fish_prize_places").default(0)
+    val weightPrizesJson = text("weight_prizes_json").default("[]")
+    val countPrizesJson = text("count_prizes_json").default("[]")
+    val fishPrizesJson = text("fish_prizes_json").default("[]")
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object SpecialEventFish : Table() {
+    val eventId = reference("event_id", SpecialEvents)
+    val fishId = reference("fish_id", Fish)
+    val weight = double("weight")
+
+    override val primaryKey = PrimaryKey(eventId, fishId)
+}
+
+object SpecialEventUserProgress : LongIdTable() {
+    val eventId = reference("event_id", SpecialEvents)
+    val userId = reference("user_id", Users)
+    val clubId = reference("club_id", Clubs)
+    val totalWeight = double("total_weight").default(0.0)
+    val totalCount = integer("total_count").default(0)
+    val active = bool("active").default(true)
+    val startedAt = timestamp("started_at").clientDefault { Instant.now() }
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+}
+
+object SpecialEventClubProgress : Table() {
+    val eventId = reference("event_id", SpecialEvents)
+    val clubId = reference("club_id", Clubs)
+    val totalWeight = double("total_weight").default(0.0)
+    val totalCount = integer("total_count").default(0)
+    val updatedAt = timestamp("updated_at").clientDefault { Instant.now() }
+
+    override val primaryKey = PrimaryKey(eventId, clubId)
+}
+
+object SpecialEventCatches : LongIdTable() {
+    val eventId = reference("event_id", SpecialEvents)
+    val progressId = reference("progress_id", SpecialEventUserProgress).nullable()
+    val userId = reference("user_id", Users)
+    val clubId = reference("club_id", Clubs).nullable()
+    val catchId = reference("catch_id", Catches).nullable()
+    val fishId = reference("fish_id", Fish)
+    val weight = double("weight")
+    val rarity = varchar("rarity", 50)
+    val rarityRank = integer("rarity_rank").default(0)
+    val createdAt = timestamp("created_at")
+}
+
+object SpecialEventPrizes : LongIdTable() {
+    val eventId = reference("event_id", SpecialEvents)
+    val userId = reference("user_id", Users)
+    val category = varchar("category", 20)
+    val rank = integer("rank")
+    val packageId = varchar("package_id", 100)
+    val qty = integer("qty").default(1)
+    val claimed = bool("claimed").default(false)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+}
+
+object SpecialEventRewardRuns : Table() {
+    val eventId = reference("event_id", SpecialEvents)
+    val category = varchar("category", 20)
+    val createdAt = timestamp("created_at").clientDefault { Instant.now() }
+
+    override val primaryKey = PrimaryKey(eventId, category)
 }
 
 object UserPrizes : LongIdTable() {

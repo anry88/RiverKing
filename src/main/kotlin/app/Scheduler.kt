@@ -16,7 +16,8 @@ object Scheduler {
         val tournaments = TournamentService()
         val ratingPrizes = RatingPrizeService()
         val clubs = ClubService()
-        val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
+        val events = SpecialEventService()
+        val prizeService = PrizeService(tournaments, ratingPrizes, clubs, events)
 
         val env = Env.fromConfig()
         val bot = TelegramBot(env.botToken)

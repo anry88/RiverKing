@@ -15,12 +15,12 @@ AI-oriented repository guide for coding assistants and code-review tools.
 ## Repository Map
 
 - `src/main/kotlin/app/`: Ktor bootstrap, API routes, sessions, Telegram auth, bot webhook, scheduler.
-- `src/main/kotlin/service/`: gameplay systems, tournaments, shop, referrals, clubs, achievements, quests, payments.
+- `src/main/kotlin/service/`: gameplay systems, tournaments, special events, shop, referrals, clubs, achievements, quests, payments.
 - `src/main/kotlin/db/`: Exposed tables, schema creation, seed and migration helpers.
 - `src/main/kotlin/util/`: metrics, RNG helpers, profanity filtering, text sanitization, coin math.
 - `src/main/resources/webapp/`: Telegram Mini App frontend and shipped game assets.
 - `mobile/android-app/`: nested Android project with its own Gradle setup, mobile auth flows, and shared-backend client shell.
-- `mobile/admin-app/`: nested internal Android admin project with saved server profiles, admin API access, tournaments, discounts, and broadcasts.
+- `mobile/admin-app/`: nested internal Android admin project with saved server profiles, admin API access, tournaments, special events, discounts, and broadcasts.
 - `src/test/kotlin/`: service and route tests.
 - `docs/`: product-facing repository materials and showcase assets.
 
@@ -34,7 +34,8 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
 - Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, a nested Android player client project, and an internal Android admin app.
 - Fishing contract: `/api/hook` reveals the hooked fish and returns `challenge.tapGoal`, `challenge.durationMs`, and `challenge.struggleIntensity`; Telegram Mini App and Android both use the always-on immersive fishing scene rather than a user-selectable Pro mode.
-- Admin API: `mobile/admin-app` calls protected `/api/admin/*` endpoints with `ADMIN_API_TOKEN`; `/api/admin/catalog` supplies selectable metrics, fish, locations, tournament prizes, and discountable shop items for admin forms.
+- Admin API: `mobile/admin-app` calls protected `/api/admin/*` endpoints with `ADMIN_API_TOKEN`; `/api/admin/catalog` supplies selectable metrics, fish, event fish, locations, tournament/event prizes, and discountable shop items for admin forms.
+- Special events: `/api/events/current`, `/api/events/previous`, and `/api/events/{id}` expose Mini App/Android-only club events with temporary event locations, club total-weight/count leaderboards, personal top-fish leaderboards, and `EVENT` prizes. Bot flows do not expose special events.
 - Android distribution contract: `direct` and `play` share one canonical `applicationId`, one monotonic `versionCode` line, and should be signed with the same release key so users can move from itch.io APK installs to Google Play without reinstalling.
 - Android update policy: the backend serves `GET /api/mobile/update` from `src/main/resources/android-update-policy.json`, and mobile API calls can receive `426 Upgrade Required` when `minSupportedVersionCode` or `requireVersionHeaders` makes the installed build unusable.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.

@@ -34,6 +34,7 @@ import java.time.temporal.TemporalAdjusters
 
 class ClubService {
     private val clubQuests = ClubQuestService()
+    private val specialEvents = SpecialEventService()
 
     data class ClubSummary(
         val id: Long,
@@ -254,6 +255,7 @@ class ClubService {
             finalizeCompletedWeekSnapshotTx(clubId)
             val role = membership[ClubMembers.role]
             val memberName = displayNameByUserId(userId)
+            specialEvents.deactivateActiveProgressForUserTx(userId)
             ClubMembers.deleteWhere { ClubMembers.userId eq userId }
             if (role == ROLE_PRESIDENT) {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
@@ -297,6 +299,7 @@ class ClubService {
             val (actor, target) = loadActorAndTarget(actorId, targetId)
             finalizeCompletedWeekSnapshotTx(actor.clubId)
             ensureCanManage(actor.role, target.role)
+            specialEvents.deactivateActiveProgressForUserTx(target.userId)
             ClubMembers.deleteWhere {
                 (ClubMembers.clubId eq actor.clubId) and (ClubMembers.userId eq target.userId)
             }

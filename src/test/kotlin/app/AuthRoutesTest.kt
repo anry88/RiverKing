@@ -37,9 +37,13 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import service.AndroidUpdateService
 import service.ClubService
 import service.ClubQuestService
+import service.EventCastAreaDTO
 import service.FishingService
 import service.PlayPurchaseVerificationResult
 import service.PlayPurchaseVerifier
+import service.SpecialEventFishSpec
+import service.SpecialEventPrizeConfig
+import service.SpecialEventService
 import service.TournamentService
 import service.VerifiedPlayLineItem
 import service.VerifiedPlayPurchase
@@ -329,9 +333,9 @@ class AuthRoutesTest {
         val directBody = json.decodeFromString<UpdateResponse>(directUpdate.bodyAsText())
         assertEquals(AndroidUpdateService.STATUS_UPDATE_REQUIRED, directBody.status)
         assertEquals(true, directBody.mandatory)
-        assertEquals(3, directBody.latestVersionCode)
-        assertEquals("0.3.0", directBody.latestVersionName)
-        assertEquals(3, directBody.minSupportedVersionCode)
+        assertEquals(4, directBody.latestVersionCode)
+        assertEquals("0.4.0", directBody.latestVersionName)
+        assertEquals(4, directBody.minSupportedVersionCode)
         assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
         assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
         assertEquals("https://itch.example/riverking", directBody.fallbackUrl)
@@ -397,6 +401,51 @@ class AuthRoutesTest {
         assertEquals(tournamentId, tournament.getValue("id").jsonPrimitive.content.toLong())
         assertEquals("тест", tournament.getValue("name").jsonPrimitive.content)
         assertEquals("Карась", tournament.getValue("fish").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `me shows event location locked until user joins a club`() = testApplication {
+        val env = testEnv("event-location-in-me").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            publicBaseUrl = "https://riverking.example",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+        val registered = registerPasswordUser(client, "angler.event.location", "password123")
+        val eventId = createCurrentSpecialEvent()
+
+        val withoutClub = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, withoutClub.status)
+        val withoutClubBody = json.parseToJsonElement(withoutClub.bodyAsText()).jsonObject
+        val lockedEventLocation = withoutClubBody.getValue("locations").jsonArray.first().jsonObject
+        assertEquals(eventId, lockedEventLocation.getValue("eventId").jsonPrimitive.content.toLong())
+        assertEquals(true, lockedEventLocation.getValue("isEvent").jsonPrimitive.boolean)
+        assertEquals(false, lockedEventLocation.getValue("unlocked").jsonPrimitive.boolean)
+        assertTrue(lockedEventLocation.getValue("lockedReason").jsonPrimitive.content.contains("Join a club"))
+
+        val fishing = FishingService()
+        fishing.addCoins(registered.user.id, ClubService.CREATE_COST_COINS.toInt())
+        addProgressWeight(registered.user.id, ClubService.MIN_CREATE_WEIGHT_KG + 25.0)
+        ClubService().createClub(registered.user.id, "Event Club")
+
+        val withClub = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, withClub.status)
+        val withClubBody = json.parseToJsonElement(withClub.bodyAsText()).jsonObject
+        val unlockedEventLocation = withClubBody.getValue("locations").jsonArray.first().jsonObject
+        assertEquals(eventId, unlockedEventLocation.getValue("eventId").jsonPrimitive.content.toLong())
+        assertEquals(true, unlockedEventLocation.getValue("isEvent").jsonPrimitive.boolean)
+        assertEquals(true, unlockedEventLocation.getValue("unlocked").jsonPrimitive.boolean)
+        assertEquals(
+            unlockedEventLocation.getValue("id").jsonPrimitive.content.toLong(),
+            withClubBody.getValue("locationId").jsonPrimitive.content.toLong(),
+        )
     }
 
     @Test
@@ -666,8 +715,8 @@ class AuthRoutesTest {
     }
 
     private fun HttpRequestBuilder.androidClientHeaders(
-        versionCode: Int = 3,
-        versionName: String = "0.3.0",
+        versionCode: Int = 4,
+        versionName: String = "0.4.0",
         channel: String = AndroidUpdateService.CHANNEL_DIRECT,
     ) {
         header(AndroidUpdateService.HEADER_PLATFORM, AndroidUpdateService.PLATFORM_ANDROID)
@@ -728,6 +777,23 @@ class AuthRoutesTest {
                 it[Catches.coins] = null
             }
         }
+    }
+
+    private fun createCurrentSpecialEvent(): Long {
+        val fishId = transaction { Fish.select { Fish.name eq "Плотва" }.single()[Fish.id].value }
+        val now = Instant.now()
+        return SpecialEventService().createEvent(
+            nameRu = "Ивентовая бухта",
+            nameEn = "Event Bay",
+            start = now.minusSeconds(3_600),
+            end = now.plusSeconds(3_600),
+            imagePath = "event-bay.webp",
+            castArea = EventCastAreaDTO(0.12, 0.88, 0.42, 0.78),
+            fish = listOf(SpecialEventFishSpec(fishId, 1.0)),
+            weightPrizes = SpecialEventPrizeConfig(0, "[]"),
+            countPrizes = SpecialEventPrizeConfig(0, "[]"),
+            fishPrizes = SpecialEventPrizeConfig(0, "[]"),
+        )
     }
 
     private data class ClubQuestScenario(

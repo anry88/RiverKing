@@ -88,7 +88,7 @@ The backend controls Android update prompts through:
 - `RIVERKING_PLAY_STORE_URL`
 - `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`
 
-Keep `requireVersionHeaders=false` for normal releases. Set it to `true` only for a fatal rollout that must also block legacy Android builds without version headers; version `0.3.0` does this because the fishing scene requires the new hooked-fish challenge contract.
+Keep `requireVersionHeaders=false` for normal releases. Set it to `true` only for a fatal rollout that must also block legacy Android builds without version headers; version `0.4.0` does this because special club events add new location, tournament, and prize contracts.
 
 Example:
 

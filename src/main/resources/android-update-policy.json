@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 3,
-  "latestVersionName": "0.3.0",
-  "minSupportedVersionCode": 3,
+  "latestVersionCode": 4,
+  "latestVersionName": "0.4.0",
+  "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Mandatory update: fishing now uses the new hooked-fish challenge contract.",
-      "The immersive fishing scene is now the default mode with dynamic tap goals, timers, and stronger fish struggle animations."
+      "Mandatory update: special club events add temporary event locations, club leaderboards, and event prizes.",
+      "Tournaments now have Regular and Special sections, and club screens include a Tournament tab for current and previous events."
     ],
     "ru": [
-      "Обязательное обновление: рыбалка теперь использует новый контракт испытания после подсечки.",
-      "Иммерсивная сцена рыбалки стала основным режимом с динамическими тапами, таймером и более сильной борьбой рыбы."
+      "Обязательное обновление: специальные клубные события добавляют временные локации, клубные рейтинги и event-награды.",
+      "В турнирах появились разделы Регулярные и Специальные, а в клубах добавлена вкладка Турнир для текущих и прошлых событий."
     ]
   }
 }

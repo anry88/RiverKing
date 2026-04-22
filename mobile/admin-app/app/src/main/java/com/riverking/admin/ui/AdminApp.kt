@@ -36,6 +36,7 @@ fun AdminApp() {
             DashboardScreen(
                 serverName = connectedServerName.value,
                 onNavigateToTournaments = { navController.navigate("tournaments") },
+                onNavigateToEvents = { navController.navigate("events") },
                 onNavigateToDiscounts = { navController.navigate("discounts") },
                 onNavigateToBroadcast = { navController.navigate("broadcast") },
                 onSwitchServer = {
@@ -56,6 +57,12 @@ fun AdminApp() {
         }
         composable("tournaments") {
             TournamentsScreen(
+                apiClient = apiClient,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("events") {
+            EventsScreen(
                 apiClient = apiClient,
                 onBack = { navController.popBackStack() }
             )
