@@ -827,16 +827,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             <path d="M10.1 20.2 6.4 18" fill="none" stroke="#f4ead6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M15.2 3.9 19 2.2" fill="none" stroke="#c8d8d4" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          <div
-            className="absolute rounded-full bg-amber-300/90 blur-[0.2px]"
-            style={{
-              left: rigCenterX - baitSize * 0.38,
-              top: rigLineHeight + hookSize * 0.34,
-              width: baitSize * 0.76,
-              height: baitSize * 0.44,
-              zIndex: 2
-            }}
-          ></div>
           {currentLureIcon && (
             <AssetImage
               src={currentLureIcon}
@@ -844,8 +834,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
               className="absolute object-contain drop-shadow"
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
-                left: rigCenterX - baitSize * 0.45,
-                top: rigLineHeight + hookSize * 0.28,
+                left: rigCenterX - baitSize * 0.38,
+                top: rigLineHeight + hookSize * 0.34,
                 width: baitSize,
                 height: baitSize,
                 zIndex: 3
