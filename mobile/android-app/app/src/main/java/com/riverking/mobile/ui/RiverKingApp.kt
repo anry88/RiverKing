@@ -143,7 +143,8 @@ fun RiverKingApp(
         }
     }
 
-    LaunchedEffect(state.error) {
+    LaunchedEffect(state.error, currentMe) {
+        if (currentMe != null) return@LaunchedEffect
         val message = state.error ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
         viewModel.consumeError()
@@ -288,6 +289,8 @@ fun RiverKingApp(
                         onUpdateNickname = viewModel::updateNickname,
                         onSaveNickname = viewModel::saveNickname,
                         onLoadCatchStats = viewModel::loadCatchStats,
+                        onShowErrorMessage = { message -> snackbarHostState.showSnackbar(message) },
+                        onConsumeError = viewModel::consumeError,
                     )
                 }
                 if (appUpdate != null && !appUpdate.isMandatory) {

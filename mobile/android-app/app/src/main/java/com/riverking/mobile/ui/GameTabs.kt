@@ -4,12 +4,14 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -125,6 +127,7 @@ import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -140,6 +143,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.riverking.mobile.BuildConfig
+import com.riverking.mobile.R
 import com.riverking.mobile.auth.AchievementClaimDto
 import com.riverking.mobile.auth.AchievementDto
 import com.riverking.mobile.auth.AchievementRewardDto
@@ -260,6 +264,12 @@ private const val CATCH_LIFT_ANIMATION_MILLIS = 900
 private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
 private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
 
+private data class ProFishingNotice(
+    val token: Long,
+    val text: String,
+    val visible: Boolean,
+)
+
 @Composable
 fun MainShell(
     state: RiverKingUiState,
@@ -317,6 +327,8 @@ fun MainShell(
     onUpdateNickname: (String) -> Unit,
     onSaveNickname: () -> Unit,
     onLoadCatchStats: (String) -> Unit,
+    onShowErrorMessage: suspend (String) -> Unit,
+    onConsumeError: () -> Unit,
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
@@ -335,6 +347,7 @@ fun MainShell(
     var showTelegramAccountSheet by rememberSaveable { mutableStateOf(false) }
     var showReferralSheet by rememberSaveable { mutableStateOf(false) }
     var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
+    var proFishingNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
 
     val tournamentBadge = state.tournaments.prizes.any(::isTournamentPrize)
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
@@ -355,6 +368,27 @@ fun MainShell(
 
     LaunchedEffect(proFishingMode) {
         proFishingPrefs.edit().putBoolean(KEY_PRO_FISHING_MODE, proFishingMode).apply()
+    }
+
+    LaunchedEffect(state.error, selectedTab, proFishingMode, strings) {
+        val rawMessage = state.error ?: return@LaunchedEffect
+        val message = localizedAppError(strings, rawMessage)
+        if (selectedTab == MainTab.FISHING && proFishingMode) {
+            val token = System.nanoTime()
+            proFishingNotice = ProFishingNotice(token = token, text = message, visible = true)
+            delay(2500L)
+            if (proFishingNotice?.token == token) {
+                proFishingNotice = proFishingNotice?.copy(visible = false)
+            }
+            delay(500L)
+            if (proFishingNotice?.token == token) {
+                proFishingNotice = null
+            }
+            onConsumeError()
+        } else {
+            onShowErrorMessage(message)
+            onConsumeError()
+        }
     }
 
     Scaffold(
@@ -457,6 +491,7 @@ fun MainShell(
                     strings = strings,
                     modifier = Modifier.padding(padding),
                     proFishingMode = proFishingMode,
+                    proNotice = proFishingNotice,
                     onToggleProFishingMode = { proFishingMode = !proFishingMode },
                     onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
@@ -1207,6 +1242,7 @@ private fun FishingScreen(
     strings: RiverStrings,
     modifier: Modifier = Modifier,
     proFishingMode: Boolean,
+    proNotice: ProFishingNotice?,
     onToggleProFishingMode: () -> Unit,
     onOpenDaily: () -> Unit,
     onBeginCast: (FishingCastSpot?) -> Unit,
@@ -1223,6 +1259,7 @@ private fun FishingScreen(
     val currentLocation = me.locations.firstOrNull { it.id == me.locationId }
     var activeSheet by rememberSaveable { mutableStateOf<FishingSheetType?>(null) }
     var lastDailyPromptToken by rememberSaveable(me.id) { mutableStateOf<String?>(null) }
+    var escapeNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
     val setupEnabled = !isFishingCastActive(state.fishing.phase)
     val dailyPromptToken = remember(me.dailyAvailable, me.dailyStreak, me.dailyRewards) {
         if (!me.dailyAvailable) {
@@ -1243,6 +1280,25 @@ private fun FishingScreen(
         }
     }
 
+    LaunchedEffect(proFishingMode, state.fishing.lastEscape) {
+        if (!proFishingMode || !state.fishing.lastEscape) {
+            if (!state.fishing.lastEscape) {
+                escapeNotice = null
+            }
+            return@LaunchedEffect
+        }
+        val token = System.nanoTime()
+        escapeNotice = ProFishingNotice(token = token, text = strings.fishEscaped, visible = true)
+        delay(2500L)
+        if (escapeNotice?.token == token) {
+            escapeNotice = escapeNotice?.copy(visible = false)
+        }
+        delay(500L)
+        if (escapeNotice?.token == token) {
+            escapeNotice = null
+        }
+    }
+
     if (proFishingMode) {
         Box(modifier = modifier.fillMaxSize()) {
             FishingStageScene(
@@ -1256,6 +1312,7 @@ private fun FishingScreen(
                 setupEnabled = setupEnabled,
                 proFishingEnabled = proFishingMode,
                 autoCastEnabled = state.fishing.autoCastEnabled,
+                proNotice = proNotice ?: escapeNotice,
                 onToggleProFishingMode = onToggleProFishingMode,
                 onToggleAutoCast = onToggleAutoCast,
                 onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
@@ -2502,6 +2559,7 @@ private fun FishingStageScene(
     setupEnabled: Boolean = false,
     proFishingEnabled: Boolean = false,
     autoCastEnabled: Boolean = false,
+    proNotice: ProFishingNotice? = null,
     onToggleProFishingMode: () -> Unit = {},
     onToggleAutoCast: () -> Unit = {},
     onOpenLocations: () -> Unit = {},
@@ -2558,6 +2616,11 @@ private fun FishingStageScene(
     } else {
         hasSplashed
     }
+    val proNoticeAlpha by animateFloatAsState(
+        targetValue = if (proNotice?.visible == true) 1f else 0f,
+        animationSpec = tween(durationMillis = if (proNotice?.visible == true) 180 else 500),
+        label = "pro-fishing-notice-alpha",
+    )
 
     LaunchedEffect(shouldAnimateFloat, phase, proMode) {
         if (!shouldAnimateFloat) {
@@ -2750,6 +2813,20 @@ private fun FishingStageScene(
             val activeCastTarget = activeCastSpot?.let {
                 if (proMode || it.proMode) proStyleCastTarget(it, proSceneSpec) else tgStyleCastTarget(it, rodTipRelX)
             }
+            val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }
+            val currentLureAsset = lureAsset(currentLure?.name, currentLure?.displayName)
+            val bobberRectSizePx = sceneWidthPx * if (proMode) 0.105f else 0.08f
+            val bobberRadiusPx = bobberRectSizePx / 2f
+            val bobberPx = Offset(
+                x = sceneWidthPx * bobberRel.x,
+                y = sceneHeightPx * bobberRel.y + bobberVisual.offset,
+            )
+            val rigLineHeightPx = with(density) { (if (proMode) 24.dp else 18.dp).toPx() }
+            val rigHookSizeDp = if (proMode) 18.dp else 14.dp
+            val rigBaitSizeDp = if (proMode) 16.dp else 13.dp
+            val rigHookSizePx = with(density) { rigHookSizeDp.toPx() }
+            val rigBaitSizePx = with(density) { rigBaitSizeDp.toPx() }
+            val showRig = !hasSplashed && sceneWidthPx > 0f && sceneHeightPx > 0f
 
             LaunchedEffect(activeCastTarget, activeCastSpot?.castDurationMillis, shoreSpot) {
                 if (activeCastTarget == null) {
@@ -2905,6 +2982,16 @@ private fun FishingStageScene(
                     )
                 }
 
+                if (!hasSplashed) {
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.35f),
+                        start = Offset(bobber.x, bobber.y + bobberRadius * 0.44f),
+                        end = Offset(bobber.x, bobber.y + bobberRadius * 0.44f + rigLineHeightPx),
+                        strokeWidth = 2f,
+                        cap = StrokeCap.Round,
+                    )
+                }
+
                 // Ripple circles around bobber
                 if (showRipple) {
                     repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
@@ -2957,6 +3044,37 @@ private fun FishingStageScene(
                             )
                         }
                     }
+                }
+            }
+            if (showRig) {
+                val rigTopPx = bobberPx.y + bobberRadiusPx * 0.44f + rigLineHeightPx - rigHookSizePx * 0.18f
+                Image(
+                    painter = painterResource(R.drawable.fishing_hook),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color(0xFFF4EAD6)),
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (bobberPx.x - rigHookSizePx * 0.42f).roundToInt(),
+                                rigTopPx.roundToInt(),
+                            )
+                        }
+                        .size(rigHookSizeDp),
+                )
+                if (currentLureAsset != null) {
+                    AsyncImage(
+                        model = currentLureAsset,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (bobberPx.x + rigBaitSizePx * 0.05f).roundToInt(),
+                                    (rigTopPx + rigHookSizePx * 0.56f).roundToInt(),
+                                )
+                            }
+                            .size(rigBaitSizeDp),
+                    )
                 }
             }
             coil.compose.AsyncImage(
@@ -3065,6 +3183,21 @@ private fun FishingStageScene(
                         .align(Alignment.TopStart)
                         .padding(start = 12.dp, top = 86.dp),
                 )
+                if (proNotice != null && proNoticeAlpha > 0.01f) {
+                    Text(
+                        text = proNotice.text,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 28.dp)
+                            .padding(bottom = 74.dp)
+                            .graphicsLayer(alpha = proNoticeAlpha),
+                        color = Color(0xFFFFD7D0),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             FishingOverlayToggle(
                 label = "Pro",
@@ -7311,6 +7444,35 @@ private fun rodAsset(code: String?): String {
         else -> "rods/yellow_rod.webp"
     }
     return localAsset(path)
+}
+
+private fun lureAsset(name: String?, displayName: String?): String? {
+    val keys = listOfNotNull(name, displayName)
+    val path = keys.firstNotNullOfOrNull { key ->
+        when (key) {
+            "Пресная мирная", "Зерновая крошка", "Grain Crumble" -> "baits/grain_crumble.webp"
+            "Пресная хищная", "Ручейный малек", "Brook Minnow" -> "baits/brook_minnow.webp"
+            "Морская мирная", "Морская водоросль", "Seaweed Strand" -> "baits/seaweed_strand.webp"
+            "Морская хищная", "Кольца кальмара", "Squid Rings" -> "baits/squid_rings.webp"
+            "Пресная мирная+", "Луговой червь", "Meadow Worm" -> "baits/meadow_worm.webp"
+            "Пресная хищная+", "Серебряный живец", "Silver Shiner" -> "baits/silver_shiner.webp"
+            "Морская мирная+", "Неоновый планктон", "Neon Plankton" -> "baits/neon_plankton.webp"
+            "Морская хищная+", "Королевская креветка", "Royal Shrimp" -> "baits/royal_shrimp.webp"
+            else -> null
+        }
+    }
+    return path?.let(::localAsset)
+}
+
+private fun localizedAppError(strings: RiverStrings, message: String): String {
+    val ru = strings.login == "Логин"
+    return when (message) {
+        "No bait available" -> if (ru) "Нет приманок. Забери ежедневные или купи в магазине." else "No baits. Claim daily ones or buy in the shop."
+        "No suitable fish" -> if (ru) "Нет подходящей рыбы на эту наживку." else "No suitable fish for this bait."
+        "casting" -> if (ru) "Заброс уже выполняется." else "Cast in progress already."
+        "failed" -> if (ru) "Не удалось выполнить действие." else "Action failed."
+        else -> message
+    }
 }
 
 private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.Offset {

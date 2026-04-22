@@ -165,6 +165,10 @@ function App(){
     setCatchDetails({...data});
   }, []);
 
+  const clearFishingError = React.useCallback(message => {
+    setError(current => (current === message ? null : current));
+  }, []);
+
   const achievementNameByCode = React.useCallback(code => {
     if(!code) return '';
     return achievementsRef.current.find(a => a.code === code)?.name || code;
@@ -1408,6 +1412,7 @@ function App(){
               onToggleProMode={()=>setProFishingMode(v=>!v)}
               result={result}
               error={error}
+              onClearError={clearFishingError}
               autoCast={autoCast}
               setAutoCast={setAutoCast}
               autoCastRef={autoCastRef}

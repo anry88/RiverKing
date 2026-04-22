@@ -171,10 +171,11 @@ function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
+  const hookIcon = window.FISHING_HOOK_ICON || '/app/assets/menu/fishing_hook.svg';
   const bobberSize = proMode ? PRO_BOBBER_SIZE : BOBBER_SIZE;
   const bobberRadius = bobberSize / 2;
   const bobberVisibleAboveWater = Math.round(bobberRadius * 0.75);
@@ -225,6 +226,37 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const lineClipId = React.useMemo(() => `line-clip-${Math.random().toString(36).slice(2, 9)}`, []);
   const lineClipHeight = Math.max(0, Math.min(h, waterlineY));
   const shouldClipLine = !proMode && isCastInWater && lineClipHeight > 0 && w > 0;
+  const currentLure = React.useMemo(() => (
+    Array.isArray(me?.lures) ? me.lures.find(l => l.id === me.currentLureId) : null
+  ), [me?.lures, me?.currentLureId]);
+  const currentLureIcon = React.useMemo(() => {
+    if (!currentLure || typeof window.getLureIcon !== 'function') return null;
+    return window.getLureIcon(currentLure);
+  }, [currentLure]);
+  const rigLineHeight = Math.round(proMode ? bobberSize * 1.15 : bobberSize * 0.95);
+  const hookSize = proMode ? 17 : 14;
+  const baitSize = proMode ? 16 : 13;
+  const shouldShowRig = !isCastInWater && w > 0 && h > 0;
+  const rigStyle = React.useMemo(() => ({
+    left: floatPx.x,
+    top: floatPx.y + bobberRadius * 0.44,
+    height: rigLineHeight + hookSize + 4
+  }), [floatPx.x, floatPx.y, bobberRadius, rigLineHeight, hookSize]);
+  const [proMessage, setProMessage] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!proMode || !error) return undefined;
+    const id = Date.now();
+    setProMessage({ id, text: error });
+    const timer = setTimeout(() => {
+      setProMessage(prev => (prev?.id === id ? null : prev));
+      if (typeof onClearError === 'function') {
+        onClearError(error);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [error, proMode, onClearError]);
+
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
     return {
@@ -768,6 +800,43 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         />
       </svg>
 
+      {shouldShowRig && (
+        <div
+          className="absolute pointer-events-none z-[5]"
+          style={rigStyle}
+          aria-hidden="true"
+        >
+          <div
+            className="absolute left-1/2 top-0 w-px -translate-x-1/2 rounded-full bg-white/35"
+            style={{ height: rigLineHeight }}
+          ></div>
+          <AssetImage
+            src={hookIcon}
+            alt=""
+            className="absolute object-contain drop-shadow"
+            style={{
+              left: -hookSize * 0.42,
+              top: rigLineHeight - hookSize * 0.18,
+              width: hookSize,
+              height: hookSize
+            }}
+          />
+          {currentLureIcon && (
+            <AssetImage
+              src={currentLureIcon}
+              alt=""
+              className="absolute object-contain drop-shadow"
+              style={{
+                left: baitSize * 0.05,
+                top: rigLineHeight + hookSize * 0.35,
+                width: baitSize,
+                height: baitSize
+              }}
+            />
+          )}
+        </div>
+      )}
+
       <div
         className="absolute"
         style={{
@@ -843,6 +912,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
           </div>
         )}
       </div>}
+      {proMode && proMessage && (
+        <div
+          key={proMessage.id}
+          className="absolute left-1/2 pro-safe-bottom-center z-30 w-[min(86%,420px)] px-3 py-2 text-center text-sm font-semibold text-red-100 pointer-events-none pro-message-toast"
+          aria-live="polite"
+        >
+          {proMessage.text}
+        </div>
+      )}
       <FishingOverlayToggle
         label="Pro"
         checked={!!proMode}
@@ -886,6 +964,7 @@ function FishingTab({
   onToggleProMode,
   result,
   error,
+  onClearError,
   autoCast,
   setAutoCast,
   autoCastRef,
@@ -960,6 +1039,8 @@ function FishingTab({
           autoCastRef={autoCastRef}
           autoCastTimeoutRef={autoCastTimeoutRef}
           result={result}
+          error={error}
+          onClearError={onClearError}
           hasCatchAnimationBeenShown={hasCatchAnimationBeenShown}
           markCatchAnimationShown={markCatchAnimationShown}
           onOpenQuests={onOpenQuests}
@@ -1041,7 +1122,7 @@ function FishingTab({
           </div>
         </button>
       )}
-      {error && <div className={`${proMode ? 'fixed left-3 right-3 top-24 z-30 glass rounded-xl p-3 text-center' : 'mt-3'} text-sm text-red-300`}>{error}</div>}
+      {!proMode && error && <div className="mt-3 text-sm text-red-300">{error}</div>}
 
       {!proMode && <div className="mt-6">
         <div className="text-sm opacity-80 mb-2">{t('recentCatches')}</div>
