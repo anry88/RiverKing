@@ -1857,7 +1857,7 @@ class RiverKingViewModel(
                         fishing = it.fishing.copy(
                             lastCast = cast,
                             lastCatchWasNewFish = isNewFish,
-                            lastEscape = false,
+                            lastEscape = !cast.caught,
                         ),
                     )
                 }

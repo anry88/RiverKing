@@ -262,10 +262,16 @@ private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
 private const val CATCH_LIFT_ANIMATION_MILLIS = 900
 
+private enum class ProFishingNoticeTone {
+    ERROR,
+    INFO,
+}
+
 private data class ProFishingNotice(
     val token: Long,
     val text: String,
     val visible: Boolean,
+    val tone: ProFishingNoticeTone = ProFishingNoticeTone.ERROR,
 )
 
 @Composable
@@ -1241,6 +1247,7 @@ private fun FishingScreen(
     var activeSheet by rememberSaveable { mutableStateOf<FishingSheetType?>(null) }
     var lastDailyPromptToken by rememberSaveable(me.id) { mutableStateOf<String?>(null) }
     var escapeNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
+    var outcomeNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
     val setupEnabled = !isFishingCastActive(state.fishing.phase)
     val dailyPromptToken = remember(me.dailyAvailable, me.dailyStreak, me.dailyRewards) {
         if (!me.dailyAvailable) {
@@ -1266,6 +1273,7 @@ private fun FishingScreen(
             escapeNotice = null
             return@LaunchedEffect
         }
+        outcomeNotice = null
         val token = System.nanoTime()
         escapeNotice = ProFishingNotice(token = token, text = strings.fishEscaped, visible = true)
         delay(2500L)
@@ -1275,6 +1283,33 @@ private fun FishingScreen(
         delay(500L)
         if (escapeNotice?.token == token) {
             escapeNotice = null
+        }
+    }
+
+    LaunchedEffect(state.fishing.lastCast?.catch?.id) {
+        val text = fishingOutcomeNoticeText(
+            strings = strings,
+            fishing = state.fishing,
+            achievements = state.guide.achievements,
+        ) ?: run {
+            outcomeNotice = null
+            return@LaunchedEffect
+        }
+        escapeNotice = null
+        val token = System.nanoTime()
+        outcomeNotice = ProFishingNotice(
+            token = token,
+            text = text,
+            visible = true,
+            tone = ProFishingNoticeTone.INFO,
+        )
+        delay(5200L)
+        if (outcomeNotice?.token == token) {
+            outcomeNotice = outcomeNotice?.copy(visible = false)
+        }
+        delay(500L)
+        if (outcomeNotice?.token == token) {
+            outcomeNotice = null
         }
     }
 
@@ -1289,7 +1324,7 @@ private fun FishingScreen(
             proMode = true,
             setupEnabled = setupEnabled,
             autoCastEnabled = state.fishing.autoCastEnabled,
-            proNotice = proNotice ?: escapeNotice,
+            proNotice = proNotice ?: escapeNotice ?: outcomeNotice,
             onToggleAutoCast = onToggleAutoCast,
             onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
             onOpenLures = { activeSheet = FishingSheetType.LURES },
@@ -3049,57 +3084,6 @@ private fun FishingStageScene(
                     }
                 }
             }
-            if (phase == FishingPhase.TAP_CHALLENGE) {
-                state.fishing.hookedFish?.let { hooked ->
-                    val timeLabel = String.format(
-                        Locale.US,
-                        "%.1f",
-                        (state.fishing.phaseTimeLeftMillis / 1000.0).coerceAtLeast(0.0),
-                    )
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(start = 24.dp, end = 24.dp, bottom = 86.dp)
-                            .widthIn(max = 340.dp),
-                        color = RiverPanelRaised.copy(alpha = 0.88f),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, rarityColor(hooked.rarity).copy(alpha = 0.55f)),
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                text = hooked.fish,
-                                color = rarityColor(hooked.rarity),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = "${strings.rarityLabel(hooked.rarity)} • ${hooked.weight.asKgCompact(strings)}",
-                                color = Color.White.copy(alpha = 0.86f),
-                                style = MaterialTheme.typography.labelLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = if (strings.login == "Логин") {
-                                    "${state.fishing.tapCount}/${state.fishing.tapGoal} • $timeLabel с"
-                                } else {
-                                    "${state.fishing.tapCount}/${state.fishing.tapGoal} • ${timeLabel}s"
-                                },
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                }
-            }
             if (proMode) {
                 FishingSetupBar(
                     strings = strings,
@@ -3129,8 +3113,12 @@ private fun FishingStageScene(
                             .padding(horizontal = 28.dp)
                             .padding(bottom = 74.dp)
                             .graphicsLayer(alpha = proNoticeAlpha),
-                        color = Color(0xFFFFD7D0),
-                        style = MaterialTheme.typography.titleMedium,
+                        color = if (proNotice.tone == ProFishingNoticeTone.ERROR) {
+                            Color(0xFFFFD7D0)
+                        } else {
+                            Color(0xFFC9FBD8)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                     )
@@ -3518,6 +3506,44 @@ private fun FishingOutcomeCard(
             }
         }
     }
+}
+
+private fun fishingOutcomeNoticeText(
+    strings: RiverStrings,
+    fishing: FishingUiState,
+    achievements: List<AchievementDto>,
+): String? {
+    if (fishing.lastEscape) return strings.fishEscaped
+    val cast = fishing.lastCast ?: return null
+    val catch = cast.catch ?: return null
+    val lines = mutableListOf(
+        "${strings.catchResultTitle()}: ${catch.fish} • ${catch.weight.asKgCompact(strings)}"
+    )
+    if (fishing.lastCatchWasNewFish) {
+        lines += strings.newFishLabel()
+    }
+    if (cast.coins > 0) {
+        lines += strings.coinsEarnedLine(cast.coins)
+    }
+    cast.unlockedLocations.forEach { location ->
+        lines += strings.locationUnlockedLine(location)
+    }
+    cast.unlockedRods.forEach { rod ->
+        lines += strings.rodUnlockedLine(rod)
+    }
+    cast.achievements.forEach { unlock ->
+        lines += strings.achievementUnlockedLine(
+            name = achievementNameForCatch(strings, achievements, unlock.code),
+            level = strings.achievementLevelLabel(unlock.newLevelIndex),
+        )
+    }
+    cast.questUpdates.forEach { quest ->
+        lines += strings.questCompletedLine(
+            name = quest.name.ifBlank { quest.code },
+            coins = quest.rewardCoins,
+        )
+    }
+    return lines.take(7).joinToString("\n")
 }
 
 @Composable

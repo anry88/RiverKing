@@ -171,7 +171,29 @@ function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, hookedFish, struggleIntensity = 0, castReady, onCast, onHook, onTap, castSpot, proMode = true, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
+function buildFishingOutcomeLines(result) {
+  if (!result) return [];
+  const lines = [
+    `${t('catch')} ${result.fish} — ${Number(result.weight || 0).toFixed(2)} ${t('kg')}`
+  ];
+  if (result.newFish) lines.push(t('new'));
+  if (typeof result.coins === 'number') {
+    lines.push(result.coins > 0 ? t('coinsEarned', result.coins) : t('coinsCapReached'));
+  }
+  (result.newLocations || []).forEach(name => lines.push(`${t('newLocation')} ${name}`));
+  if ((result.newRods || []).length > 0) {
+    lines.push(`${result.newRods.length > 1 ? t('newRodPlural') : t('newRod')} ${result.newRods.join(', ')}`);
+  }
+  (result.achievements || []).forEach(a => {
+    lines.push(t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex }));
+  });
+  (result.questUpdates || []).forEach(q => {
+    lines.push(t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 }));
+  });
+  return lines.slice(0, 7);
+}
+
+function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity = 0, castReady, onCast, onHook, onTap, castSpot, proMode = true, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -249,7 +271,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   React.useEffect(() => {
     if (!proMode || !error) return undefined;
     const id = Date.now();
-    setProMessage({ id, text: error });
+    setProMessage({ id, lines: [error], tone: 'error' });
     const timer = setTimeout(() => {
       setProMessage(prev => (prev?.id === id ? null : prev));
       if (typeof onClearError === 'function') {
@@ -258,6 +280,18 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     }, 3000);
     return () => clearTimeout(timer);
   }, [error, proMode, onClearError]);
+
+  React.useEffect(() => {
+    if (!proMode || !result) return undefined;
+    const lines = buildFishingOutcomeLines(result);
+    if (lines.length === 0) return undefined;
+    const id = result.animationId || result.id || Date.now();
+    setProMessage({ id, lines, tone: 'success' });
+    const timer = setTimeout(() => {
+      setProMessage(prev => (prev?.id === id ? null : prev));
+    }, 5200);
+    return () => clearTimeout(timer);
+  }, [result, proMode]);
 
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
@@ -758,10 +792,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       catchImage = img;
     }
   }
-  const hookedRarityLabel = hookedFish
-    ? (window.rarityNames?.[me.language || 'ru']?.[hookedFish.rarity] || hookedFish.rarity)
-    : '';
-
   return (
     <div
       className={`relative overflow-hidden ${proMode ? 'pro-fishing-stage rounded-none border-0' : 'rounded-2xl border border-white/10'}`}
@@ -904,27 +934,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </div>
       )}
 
-      {tapping && hookedFish && (
-        <div
-          className="pointer-events-none absolute left-1/2 z-30 w-[min(88%,420px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center shadow-2xl backdrop-blur"
-          style={{ bottom: 'calc(max(var(--safe-bottom-max), var(--bottom-gap)) + 86px)' }}
-          aria-live="polite"
-        >
-          <div className={`text-lg font-extrabold ${rarityColors[hookedFish.rarity] || 'text-white'}`}>{hookedFish.fish}</div>
-          <div className="mt-0.5 text-sm text-white/85">{hookedRarityLabel} • {Number(hookedFish.weight || 0).toFixed(2)} {t('kg')}</div>
-          <div className="mt-2 flex items-center justify-center gap-3 text-xs font-semibold text-white/80">
-            <span>{t('tapCount', { count: tapCount, goal: tapGoal })}</span>
-            <span>{t('tapCountdown', Math.max(0, tapTimeLeft).toFixed(1))}</span>
-          </div>
-        </div>
-      )}
       {proMessage && (
         <div
           key={proMessage.id}
-          className="absolute left-1/2 pro-safe-bottom-center z-30 w-[min(86%,420px)] px-3 py-2 text-center text-sm font-semibold text-red-100 pointer-events-none pro-message-toast"
+          className={`absolute left-1/2 pro-safe-bottom-center z-30 w-[min(88%,460px)] px-3 py-2 text-center text-sm font-semibold pointer-events-none pro-message-toast ${proMessage.tone === 'error' ? 'text-red-100' : 'text-emerald-100'}`}
           aria-live="polite"
         >
-          {proMessage.text}
+          {(proMessage.lines || [proMessage.text]).map((line, index) => (
+            <div key={index}>{line}</div>
+          ))}
         </div>
       )}
       {me.autoFish && (
@@ -953,10 +971,6 @@ function FishingTab({
   casting,
   biting,
   tapActive,
-  tapCount,
-  tapGoal,
-  tapTimeLeft,
-  hookedFish,
   struggleIntensity,
   castReady,
   onCast,
@@ -1026,10 +1040,6 @@ function FishingTab({
           casting={casting}
           biting={biting}
           tapping={tapActive}
-          tapCount={tapCount}
-          tapGoal={tapGoal}
-          tapTimeLeft={tapTimeLeft}
-          hookedFish={hookedFish}
           struggleIntensity={struggleIntensity}
           castReady={castReady}
           onCast={handleCast}

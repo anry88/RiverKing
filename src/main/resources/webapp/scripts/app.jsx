@@ -1415,10 +1415,6 @@ function App(){
               casting={casting}
               biting={biting}
               tapActive={tapActive}
-              tapCount={tapCount}
-              tapGoal={tapGoal}
-              tapTimeLeft={tapTimeLeft}
-              hookedFish={hookedFish}
               struggleIntensity={struggleIntensity}
               castReady={castReady}
               onCast={(visualSpot)=>cast(false, visualSpot)}
