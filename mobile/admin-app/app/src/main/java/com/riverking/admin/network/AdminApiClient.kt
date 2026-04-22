@@ -3,6 +3,7 @@ package com.riverking.admin.network
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.accept
@@ -15,9 +16,11 @@ import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.Headers
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -168,6 +171,23 @@ data class SpecialEventReq(
 @Serializable
 data class ImageUploadResp(val imagePath: String)
 
+@Serializable
+data class AppUpdateInfoDTO(
+    val status: String = "",
+    val latestVersionCode: Int = 0,
+    val latestVersionName: String = "",
+    val minSupportedVersionCode: Int = 0,
+    val mandatory: Boolean = false,
+    val releaseNotes: List<String> = emptyList(),
+    val installMode: String = "",
+    val installUrl: String = "",
+)
+
+class AppUpgradeRequiredException(
+    val update: AppUpdateInfoDTO,
+    cause: Throwable? = null,
+) : Exception("App upgrade required to version ${update.latestVersionName}", cause)
+
 class AdminApiClient(
     var baseUrl: String = "",
     var token: String = ""
@@ -177,6 +197,16 @@ class AdminApiClient(
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(json)
+        }
+        HttpResponseValidator {
+            validateResponse { response ->
+                if (response.status == HttpStatusCode.UpgradeRequired) {
+                    val update = runCatching {
+                        json.decodeFromString<AppUpdateInfoDTO>(response.bodyAsText())
+                    }.getOrNull() ?: AppUpdateInfoDTO(status = "update_required", mandatory = true)
+                    throw AppUpgradeRequiredException(update)
+                }
+            }
         }
         defaultRequest {
             accept(ContentType.Application.Json)

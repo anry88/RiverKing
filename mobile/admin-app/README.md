@@ -2,9 +2,9 @@
 
 Internal Jetpack Compose Android app for RiverKing operators.
 
-This project is separate from the public player app in `mobile/android-app`. It is not part of the player `direct` / `play` release flow and does not use the public Android update policy. The backend explicitly excludes `/api/admin/` routes from the mobile version guard so that the admin app is never blocked by `minSupportedVersionCode` checks intended for the player client. Operators add one or more backend server profiles inside the app, then authenticate admin calls with `ADMIN_API_TOKEN`.
+This project is separate from the public player app in `mobile/android-app`. It is not part of the player `direct` / `play` release flow, but it shares the same backend version guard — admin API calls receive `426 Upgrade Required` when the app's `versionCode` falls below `minSupportedVersionCode` in the update policy. This ensures backend changes that affect admin endpoints (e.g. new event features) are not used with stale clients. Operators add one or more backend server profiles inside the app, then authenticate admin calls with `ADMIN_API_TOKEN`.
 
-Both mobile projects share a single `version.properties` versioning scheme (`RIVERKING_VERSION_CODE` / `RIVERKING_VERSION_NAME`). When either app's `versionCode` is bumped, the other should follow to keep the version line monotonic and aligned.
+Both mobile projects share a single `version.properties` versioning scheme (`RIVERKING_VERSION_CODE` / `RIVERKING_VERSION_NAME`). When either app's `versionCode` is bumped, the other **must** follow to keep the version line monotonic and aligned with `android-update-policy.json`.
 
 ## Scope
 
@@ -36,7 +36,7 @@ X-RiverKing-App-Version-Code: <versionCode>
 X-RiverKing-App-Version-Name: <versionName>
 ```
 
-The version headers match the player app's convention and provide observability in backend logs. They do not trigger the mobile version guard for admin routes.
+The version headers follow the player app's convention. The backend uses `X-RiverKing-App-Version-Code` to enforce the update policy — when it is below `minSupportedVersionCode`, the server replies `426 Upgrade Required` and the client shows an upgrade prompt.
 
 Key endpoints:
 

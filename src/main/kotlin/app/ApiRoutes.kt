@@ -104,7 +104,6 @@ fun Application.apiRoutes(
         if (
             path.startsWith("/api/") &&
             path != "/api/mobile/update" &&
-            !path.startsWith("/api/admin/") &&
             call.isAndroidOrMobileApiCall(path)
         ) {
             val update = androidUpdates.checkFromHeaders(call.request.headers)
