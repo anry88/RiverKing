@@ -171,7 +171,7 @@ function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
+function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, hookedFish, struggleIntensity = 0, castReady, onCast, onHook, onTap, castSpot, proMode = true, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -184,7 +184,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     proMode ? { x: PRO_SHORE_X, y: PRO_SHORE_Y } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
   ), [proMode]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
-  const [floatVisual, setFloatVisual] = React.useState({ offset: 0, tilt: 0, submerge: 0 });
+  const [floatVisual, setFloatVisual] = React.useState({ offset: 0, xOffset: 0, tilt: 0, submerge: 0 });
   const floatPxRef = React.useRef({ x: 0, y: 0 });
   const floatRelRef = React.useRef(floatRel);
   const [castLanded, setCastLanded] = React.useState(false);
@@ -203,9 +203,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const toPx = (rel) => ({ x: rel.x * w, y: rel.y * h });
   const floatBasePx = toPx(floatRel);
   const floatPx = React.useMemo(() => ({
-    x: floatBasePx.x,
+    x: floatBasePx.x + (floatVisual.xOffset || 0),
     y: floatBasePx.y + floatVisual.offset
-  }), [floatBasePx.x, floatBasePx.y, floatVisual.offset]);
+  }), [floatBasePx.x, floatBasePx.y, floatVisual.offset, floatVisual.xOffset]);
   React.useEffect(() => { floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
 
   const waterlineY = React.useMemo(() => {
@@ -268,14 +268,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }, [bobberClipPath]);
 
   const shouldAnimateFloat = proMode ? (biting || tapping) : ((casting && castLanded) || biting || tapping);
+  const fightIntensity = Math.max(0, Math.min(1, Number(struggleIntensity) || 0));
   React.useEffect(() => {
     let frame;
     if (!shouldAnimateFloat) {
       setFloatVisual(prev => {
-        if (prev.offset === 0 && prev.tilt === 0 && prev.submerge === 0) {
+        if (prev.offset === 0 && (prev.xOffset || 0) === 0 && prev.tilt === 0 && prev.submerge === 0) {
           return prev;
         }
-        return { offset: 0, tilt: 0, submerge: 0 };
+        return { offset: 0, xOffset: 0, tilt: 0, submerge: 0 };
       });
       return;
     }
@@ -287,6 +288,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       const basePeriod = state === 'biting' ? 0.8 : (state === 'tapping' ? 0.65 : 3);
       const mainWave = Math.sin((t * Math.PI * 2) / basePeriod);
       let offset;
+      let xOffset = 0;
       let tilt;
       let submerge;
       if (state === 'biting') {
@@ -297,24 +299,29 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         submerge = offset > 0 ? Math.min(1, offset / 11) : 0;
       } else if (state === 'tapping') {
         const quickWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.85));
-        offset = mainWave * 4.2 + quickWave * 1.1;
-        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.95)) * 5;
-        submerge = offset > 0 ? Math.min(1, offset / 9) : 0;
+        const pullWave = Math.sin((t * Math.PI * 2) / (basePeriod * 1.45));
+        const snapWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.42));
+        offset = 5 + fightIntensity * 18 + mainWave * (4.2 + fightIntensity * 9) + quickWave * (1.1 + fightIntensity * 5);
+        xOffset = pullWave * (5 + fightIntensity * 22) + snapWave * fightIntensity * 7;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.95)) * (5 + fightIntensity * 18);
+        submerge = offset > 0 ? Math.min(1, offset / (9 + fightIntensity * 14)) : 0;
       } else {
         offset = mainWave * 4;
         tilt = mainWave * 2.5;
         submerge = offset > 0 ? Math.min(1, offset / 6) : 0;
       }
-      const nextState = { offset, tilt, submerge };
+      const nextState = { offset, xOffset, tilt, submerge };
       setFloatVisual(prev => {
         const lerp = (prevValue, targetValue) => prevValue + (targetValue - prevValue) * 0.18;
         const smoothed = {
           offset: lerp(prev.offset, nextState.offset),
+          xOffset: lerp(prev.xOffset || 0, nextState.xOffset || 0),
           tilt: lerp(prev.tilt, nextState.tilt),
           submerge: lerp(prev.submerge, nextState.submerge)
         };
         if (
           Math.abs(smoothed.offset - prev.offset) < 0.01 &&
+          Math.abs(smoothed.xOffset - (prev.xOffset || 0)) < 0.01 &&
           Math.abs(smoothed.tilt - prev.tilt) < 0.01 &&
           Math.abs(smoothed.submerge - prev.submerge) < 0.01
         ) {
@@ -328,7 +335,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     return () => {
       if (frame) { cancelAnimationFrame(frame); }
     };
-  }, [shouldAnimateFloat, biting, tapping, proMode]);
+  }, [shouldAnimateFloat, biting, tapping, proMode, fightIntensity]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
@@ -423,12 +430,13 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
     } else {
       const gentleSag = Math.min(h * 0.08, dist * 0.12);
-      const controlX = lastPoint.x + dx * 0.5;
-      const controlY = lastPoint.y + dy * 0.5 + gentleSag;
+      const fightPull = tapping ? (floatVisual.xOffset || 0) * (0.4 + fightIntensity * 0.75) : 0;
+      const controlX = lastPoint.x + dx * 0.5 + fightPull;
+      const controlY = lastPoint.y + dy * 0.5 + gentleSag + (tapping ? h * 0.03 * fightIntensity : 0);
       wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
     }
     return { rodLinePath: rPath, waterLinePath: wPath };
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, proMode]);
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, proMode, tapping, fightIntensity, floatVisual.xOffset]);
 
   const catchTargetPx = React.useMemo(() => {
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -750,6 +758,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       catchImage = img;
     }
   }
+  const hookedRarityLabel = hookedFish
+    ? (window.rarityNames?.[me.language || 'ru']?.[hookedFish.rarity] || hookedFish.rarity)
+    : '';
 
   return (
     <div
@@ -893,34 +904,21 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </div>
       )}
 
-      {!proMode && <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
-        {!casting ? (
-          castReady ? (
-            <button onClick={()=>onCast?.()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
-          ) : (
-            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
-              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
-            </div>
-          )
-        ) : tapping ? (
-          <TapChallengeButton
-            count={tapCount}
-            goal={tapGoal}
-            timeLeft={tapTimeLeft}
-            onTap={onTap}
-            className="w-full md:w-1/2"
-          />
-        ) : biting ? (
-          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
-        ) : (
-          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
-            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
+      {tapping && hookedFish && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-30 w-[min(88%,420px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center shadow-2xl backdrop-blur"
+          style={{ bottom: 'calc(max(var(--safe-bottom-max), var(--bottom-gap)) + 86px)' }}
+          aria-live="polite"
+        >
+          <div className={`text-lg font-extrabold ${rarityColors[hookedFish.rarity] || 'text-white'}`}>{hookedFish.fish}</div>
+          <div className="mt-0.5 text-sm text-white/85">{hookedRarityLabel} • {Number(hookedFish.weight || 0).toFixed(2)} {t('kg')}</div>
+          <div className="mt-2 flex items-center justify-center gap-3 text-xs font-semibold text-white/80">
+            <span>{t('tapCount', { count: tapCount, goal: tapGoal })}</span>
+            <span>{t('tapCountdown', Math.max(0, tapTimeLeft).toFixed(1))}</span>
           </div>
-        )}
-      </div>}
-      {proMode && proMessage && (
+        </div>
+      )}
+      {proMessage && (
         <div
           key={proMessage.id}
           className="absolute left-1/2 pro-safe-bottom-center z-30 w-[min(86%,420px)] px-3 py-2 text-center text-sm font-semibold text-red-100 pointer-events-none pro-message-toast"
@@ -929,12 +927,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
           {proMessage.text}
         </div>
       )}
-      <FishingOverlayToggle
-        label="Pro"
-        checked={!!proMode}
-        onClick={onToggleProMode}
-        className={`absolute ${proMode ? 'pro-safe-bottom-left' : 'bottom-3 left-3'}`}
-      />
       {me.autoFish && (
         <FishingOverlayToggle
           label={t('autoCast')}
@@ -948,7 +940,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             }
             setAutoCast(checked);
           }}
-          className={`absolute ${proMode ? 'pro-safe-bottom-right' : 'bottom-3 right-3'}`}
+          className="absolute pro-safe-bottom-right"
         />
       )}
     </div>
@@ -962,14 +954,16 @@ function FishingTab({
   biting,
   tapActive,
   tapCount,
+  tapGoal,
   tapTimeLeft,
+  hookedFish,
+  struggleIntensity,
   castReady,
   onCast,
   onHook,
   onTap,
   castSpot,
   proMode,
-  onToggleProMode,
   result,
   error,
   onClearError,
@@ -1033,15 +1027,16 @@ function FishingTab({
           biting={biting}
           tapping={tapActive}
           tapCount={tapCount}
-          tapGoal={TAP_CHALLENGE_GOAL}
+          tapGoal={tapGoal}
           tapTimeLeft={tapTimeLeft}
+          hookedFish={hookedFish}
+          struggleIntensity={struggleIntensity}
           castReady={castReady}
           onCast={handleCast}
           onHook={handleHook}
           onTap={onTap}
           castSpot={castSpot}
           proMode={proMode}
-          onToggleProMode={onToggleProMode}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
           autoCastRef={autoCastRef}
@@ -1058,114 +1053,6 @@ function FishingTab({
           onOpenRods={onOpenRods}
         />
       </div>
-
-      {!proMode && <div className="md:hidden mt-3">
-        {!casting ? (
-          castReady ? (
-            <button onClick={()=>handleCast()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
-          ) : (
-            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
-              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
-            </div>
-          )
-        ) : tapActive ? (
-          <TapChallengeButton
-            count={tapCount}
-            goal={TAP_CHALLENGE_GOAL}
-            timeLeft={tapTimeLeft}
-            onTap={onTap}
-            className="w-full"
-          />
-        ) : biting ? (
-          <button onClick={handleHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
-        ) : (
-          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
-            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
-          </div>
-        )}
-      </div>}
-
-      {!proMode && result && (
-        <button
-          type="button"
-          onClick={() => {
-            if (onCatchClick && result.id) {
-              onCatchClick({
-                ...result,
-                userId: result.userId ?? me.id,
-                user: result.user || me.username || t('you')
-              });
-            }
-          }}
-          className="mt-4 w-full text-left p-4 rounded-xl glass flex items-center gap-4"
-        >
-          <AssetImage src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }} />
-          <div>
-            <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
-            <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity] || ''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} {t('kg')}</div>
-            <div className="text-xs opacity-70">{t('locationLabel')} {result.location}</div>
-            {typeof result.coins === 'number' && (
-              result.coins > 0
-                ? <div className="text-xs text-yellow-300">{t('coinsEarned', result.coins)}</div>
-                : <div className="text-xs opacity-70">{t('coinsCapReached')}</div>
-            )}
-            {result.newLocations && result.newLocations.map((n, i) => (
-              <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
-            ))}
-            {result.newRods && result.newRods.length > 0 && (
-              <div className="text-xs text-emerald-400">{(result.newRods.length > 1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
-            )}
-            {Array.isArray(result.achievements) && result.achievements.map((a, i) => (
-              <div key={`ach-${i}`} className="text-xs text-amber-300">
-                {t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex })}
-              </div>
-            ))}
-            {Array.isArray(result.questUpdates) && result.questUpdates.map((q, i) => (
-              <div key={`quest-${i}`} className="text-xs text-emerald-300">
-                {t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 })}
-              </div>
-            ))}
-          </div>
-        </button>
-      )}
-      {!proMode && error && <div className="mt-3 text-sm text-red-300">{error}</div>}
-
-      {!proMode && <div className="mt-6">
-        <div className="text-sm opacity-80 mb-2">{t('recentCatches')}</div>
-        {(me.recent || []).length === 0 ? (
-          <div className="text-sm opacity-60">{t('emptyCatches')}</div>
-        ) : (
-          <div className="space-y-2">
-            {me.recent.map((c, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  if (onCatchClick && c.id) {
-                    onCatchClick({
-                      ...c,
-                      userId: c.userId ?? me.id,
-                      user: c.user || me.username || t('you')
-                    });
-                  }
-                }}
-                className="w-full p-3 rounded--xl border border-white/10 flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <AssetImage src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }} />
-                  <div>
-                    <div className={`font-medium ${rarityColors[c.rarity] || ''}`}>{c.fish}</div>
-                    <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
-                  </div>
-                </div>
-                <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>}
     </>
   );
 }

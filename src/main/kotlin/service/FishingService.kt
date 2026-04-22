@@ -54,6 +54,48 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
         private const val BEGINNER_CATCH_THRESHOLD = 6
+        private const val MIN_CHALLENGE_TAPS = 3
+        private const val MAX_CHALLENGE_TAPS = 22
+
+        internal fun rarityTapCount(rarity: String): Int = when (rarity) {
+            "common" -> 2
+            "uncommon" -> 4
+            "rare" -> 6
+            "epic" -> 8
+            "mythic" -> 10
+            "legendary" -> 12
+            else -> 2
+        }
+
+        internal fun weightTapCount(weight: Double): Int = when {
+            weight < 1.0 -> 1
+            weight < 5.0 -> 2
+            weight < 10.0 -> 3
+            weight < 30.0 -> 4
+            weight < 60.0 -> 5
+            weight < 100.0 -> 6
+            weight < 150.0 -> 7
+            weight < 250.0 -> 8
+            weight < 400.0 -> 9
+            else -> 10
+        }
+
+        internal fun hookChallengeFor(rarity: String, weight: Double): HookChallengeDTO {
+            val tapGoal = rarityTapCount(rarity) + weightTapCount(weight)
+            val durationMs = when {
+                tapGoal > 15 -> 15_000
+                tapGoal > 10 -> 10_000
+                else -> 5_000
+            }
+            val struggleIntensity = ((tapGoal - MIN_CHALLENGE_TAPS).toDouble() /
+                (MAX_CHALLENGE_TAPS - MIN_CHALLENGE_TAPS).toDouble())
+                .coerceIn(0.0, 1.0)
+            return HookChallengeDTO(
+                tapGoal = tapGoal,
+                durationMs = durationMs,
+                struggleIntensity = struggleIntensity,
+            )
+        }
     }
     data class DailyReward(val name: String, val qty: Int)
 
@@ -1600,7 +1642,28 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     @Serializable
-    data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
+    data class HookedFishDTO(
+        val fishId: Long,
+        val fish: String,
+        val weight: Double,
+        val location: String,
+        val rarity: String,
+    )
+
+    @Serializable
+    data class HookChallengeDTO(
+        val tapGoal: Int,
+        val durationMs: Int,
+        val struggleIntensity: Double,
+    )
+
+    @Serializable
+    data class HookResultDTO(
+        val success: Boolean,
+        val autoFish: Boolean,
+        val hookedFish: HookedFishDTO? = null,
+        val challenge: HookChallengeDTO? = null,
+    )
 
     @Serializable
     data class CastResultDTO(
@@ -1693,6 +1756,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val pool = (LocationFishWeights innerJoin Fish)
             .slice(
                 Fish.id,
+                Fish.name,
                 Fish.meanKg,
                 Fish.varKg,
                 Fish.rarity,
@@ -1745,7 +1809,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         if (!auto && !isBeginner && rnd.nextDouble() > catchChance) return@transaction escape()
 
         val fishId = picked[Fish.id].value
+        val fishName = picked[Fish.name]
+        val rarity = picked[Fish.rarity]
         val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
+        val locName = locRow[Locations.name]
+        val challenge = hookChallengeFor(rarity, weight)
 
         val now = Instant.now()
         val updated = PendingCatches.update({ PendingCatches.userId eq userId }) {
@@ -1772,7 +1840,18 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             }
         }
 
-        HookResultDTO(true, auto)
+        HookResultDTO(
+            success = true,
+            autoFish = auto,
+            hookedFish = HookedFishDTO(
+                fishId = fishId,
+                fish = fishName,
+                weight = weight,
+                location = locName,
+                rarity = rarity,
+            ),
+            challenge = challenge,
+        )
     }
 
     fun cast(

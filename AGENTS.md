@@ -33,11 +33,13 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Account deletion: `POST /api/account/delete` deletes the authenticated profile, and the backend also serves public compliance pages at `/privacy`, `/terms`, `/support`, and `/account/delete`.
 - Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
 - Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, a nested Android player client project, and an internal Android admin app.
+- Fishing contract: `/api/hook` reveals the hooked fish and returns `challenge.tapGoal`, `challenge.durationMs`, and `challenge.struggleIntensity`; Telegram Mini App and Android both use the always-on immersive fishing scene rather than a user-selectable Pro mode.
 - Admin API: `mobile/admin-app` calls protected `/api/admin/*` endpoints with `ADMIN_API_TOKEN`; `/api/admin/catalog` supplies selectable metrics, fish, locations, tournament prizes, and discountable shop items for admin forms.
 - Android distribution contract: `direct` and `play` share one canonical `applicationId`, one monotonic `versionCode` line, and should be signed with the same release key so users can move from itch.io APK installs to Google Play without reinstalling.
 - Android update policy: the backend serves `GET /api/mobile/update` from `src/main/resources/android-update-policy.json`, and mobile API calls can receive `426 Upgrade Required` when `minSupportedVersionCode` or `requireVersionHeaders` makes the installed build unusable.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
 - Quests: `GET /api/quests` now returns personal `daily` / `weekly` lists plus a `club` section; club quests are shared across the whole club and are rendered in the bot, Mini App, and Android client.
+- Club chat: `/api/club/chat` stores messages and system events in `ClubChatMessages` and is rendered by the Mini App and Android club screens.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.

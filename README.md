@@ -6,10 +6,10 @@ It is built as a working product rather than a thin game prototype: the reposito
 
 **What it does**
 
-- Delivers a Telegram Mini App fishing experience with cast, hook, and catch gameplay.
+- Delivers an always-on immersive fishing scene in the Telegram Mini App and Android, with cast, hook, revealed hooked fish, and dynamic tap-to-land challenges.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
 - Ships daily and weekly personal quests plus weekly club quests with pooled progress and split coin rewards for current club members.
-- Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings and weekly club quests, with per-member contribution views for each active club quest.
+- Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings, weekly club quests, and a shared club chat feed, with per-member contribution views for each active club quest.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
 - Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
 - Includes an internal Jetpack Compose admin app under `mobile/admin-app` for token-protected tournament, discount, and broadcast operations.
@@ -80,7 +80,7 @@ flowchart LR
 
 ## Core Systems
 
-- `Fishing loop`: cast -> hook -> catch with timing, catch presentation, and recent catch history.
+- `Fishing loop`: cast -> hook -> revealed fish -> dynamic tap challenge -> catch with timing, aggressive fish struggle animation, catch presentation, and recent catch history.
 - `Progression`: locations, rods, lures, fish discovery, unlocks, and recommendation logic.
 - `Retention`: daily rewards, location-aware quest pools, achievements, daily ratings, and tournament participation.
 - `Social loops`: clubs, member roles, weekly contribution boards, shared club quests, and club chat feed.

@@ -32,6 +32,46 @@ class FishingServiceTest {
     }
 
     @Test
+    fun hookChallengeUsesRarityAndWeightTapFormula() {
+        assertEquals(2, FishingService.rarityTapCount("common"))
+        assertEquals(4, FishingService.rarityTapCount("uncommon"))
+        assertEquals(6, FishingService.rarityTapCount("rare"))
+        assertEquals(8, FishingService.rarityTapCount("epic"))
+        assertEquals(10, FishingService.rarityTapCount("mythic"))
+        assertEquals(12, FishingService.rarityTapCount("legendary"))
+        assertEquals(2, FishingService.rarityTapCount("unknown"))
+
+        assertEquals(1, FishingService.weightTapCount(0.99))
+        assertEquals(2, FishingService.weightTapCount(1.0))
+        assertEquals(3, FishingService.weightTapCount(5.0))
+        assertEquals(4, FishingService.weightTapCount(10.0))
+        assertEquals(5, FishingService.weightTapCount(30.0))
+        assertEquals(6, FishingService.weightTapCount(60.0))
+        assertEquals(7, FishingService.weightTapCount(100.0))
+        assertEquals(8, FishingService.weightTapCount(150.0))
+        assertEquals(9, FishingService.weightTapCount(250.0))
+        assertEquals(10, FishingService.weightTapCount(400.0))
+    }
+
+    @Test
+    fun hookChallengeDurationAndIntensityScaleWithTapGoal() {
+        val easy = FishingService.hookChallengeFor("common", 0.5)
+        assertEquals(3, easy.tapGoal)
+        assertEquals(5_000, easy.durationMs)
+        assertEquals(0.0, easy.struggleIntensity, 0.0000001)
+
+        val medium = FishingService.hookChallengeFor("rare", 60.0)
+        assertEquals(12, medium.tapGoal)
+        assertEquals(10_000, medium.durationMs)
+        assertEquals((12.0 - 3.0) / (22.0 - 3.0), medium.struggleIntensity, 0.0000001)
+
+        val hard = FishingService.hookChallengeFor("legendary", 400.0)
+        assertEquals(22, hard.tapGoal)
+        assertEquals(15_000, hard.durationMs)
+        assertEquals(1.0, hard.struggleIntensity, 0.0000001)
+    }
+
+    @Test
     fun baseEscapeChanceProgressesByLocation() {
         val svc = newService("testdb_fish_escape")
         transaction {

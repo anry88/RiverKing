@@ -1,6 +1,5 @@
 package com.riverking.mobile.ui
 
-import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.animation.core.LinearEasing
@@ -224,6 +223,7 @@ private enum class FishingSheetType {
 
 private data class BobberVisualState(
     val offset: Float = 0f,
+    val xOffset: Float = 0f,
     val tilt: Float = 0f,
     val submerge: Float = 0f,
 )
@@ -261,8 +261,6 @@ private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
 private const val CATCH_LIFT_ANIMATION_MILLIS = 900
-private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
-private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
 
 private data class ProFishingNotice(
     val token: Long,
@@ -332,15 +330,8 @@ fun MainShell(
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
-    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
-    val proFishingPrefs = remember(context) {
-        context.getSharedPreferences(PRO_FISHING_PREFS, Context.MODE_PRIVATE)
-    }
-    var proFishingMode by rememberSaveable {
-        mutableStateOf(proFishingPrefs.getBoolean(KEY_PRO_FISHING_MODE, false))
-    }
     var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
@@ -366,14 +357,10 @@ fun MainShell(
         )
     }
 
-    LaunchedEffect(proFishingMode) {
-        proFishingPrefs.edit().putBoolean(KEY_PRO_FISHING_MODE, proFishingMode).apply()
-    }
-
-    LaunchedEffect(state.error, selectedTab, proFishingMode, strings) {
+    LaunchedEffect(state.error, selectedTab, strings) {
         val rawMessage = state.error ?: return@LaunchedEffect
         val message = localizedAppError(strings, rawMessage)
-        if (selectedTab == MainTab.FISHING && proFishingMode) {
+        if (selectedTab == MainTab.FISHING) {
             val token = System.nanoTime()
             proFishingNotice = ProFishingNotice(token = token, text = message, visible = true)
             delay(2500L)
@@ -490,9 +477,7 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    proFishingMode = proFishingMode,
                     proNotice = proFishingNotice,
-                    onToggleProFishingMode = { proFishingMode = !proFishingMode },
                     onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
                     onHookFish = onHookFish,
@@ -501,7 +486,6 @@ fun MainShell(
                     onSelectLocation = onSelectLocation,
                     onSelectLure = onSelectLure,
                     onSelectRod = onSelectRod,
-                    onOpenCatch = onOpenCatch,
                     onLoadGuide = onLoadGuide,
                 )
                 MainTab.LEADERS -> LeadersScreen(
@@ -1241,9 +1225,7 @@ private fun FishingScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    proFishingMode: Boolean,
     proNotice: ProFishingNotice?,
-    onToggleProFishingMode: () -> Unit,
     onOpenDaily: () -> Unit,
     onBeginCast: (FishingCastSpot?) -> Unit,
     onHookFish: () -> Unit,
@@ -1252,7 +1234,6 @@ private fun FishingScreen(
     onSelectLocation: (Long) -> Unit,
     onSelectLure: (Long) -> Unit,
     onSelectRod: (Long) -> Unit,
-    onOpenCatch: (CatchDto) -> Unit,
     onLoadGuide: (Boolean) -> Unit,
 ) {
     val me = state.me ?: return
@@ -1280,11 +1261,9 @@ private fun FishingScreen(
         }
     }
 
-    LaunchedEffect(proFishingMode, state.fishing.lastEscape) {
-        if (!proFishingMode || !state.fishing.lastEscape) {
-            if (!state.fishing.lastEscape) {
-                escapeNotice = null
-            }
+    LaunchedEffect(state.fishing.lastEscape) {
+        if (!state.fishing.lastEscape) {
+            escapeNotice = null
             return@LaunchedEffect
         }
         val token = System.nanoTime()
@@ -1299,138 +1278,32 @@ private fun FishingScreen(
         }
     }
 
-    if (proFishingMode) {
-        Box(modifier = modifier.fillMaxSize()) {
-            FishingStageScene(
-                state = state,
-                strings = strings,
-                me = me,
-                backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                locationName = currentLocation?.name,
-                modifier = Modifier.fillMaxSize(),
-                proMode = true,
-                setupEnabled = setupEnabled,
-                proFishingEnabled = proFishingMode,
-                autoCastEnabled = state.fishing.autoCastEnabled,
-                proNotice = proNotice ?: escapeNotice,
-                onToggleProFishingMode = onToggleProFishingMode,
-                onToggleAutoCast = onToggleAutoCast,
-                onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
-                onOpenLures = { activeSheet = FishingSheetType.LURES },
-                onOpenRods = { activeSheet = FishingSheetType.RODS },
-                onOpenQuests = {
-                    activeSheet = FishingSheetType.QUESTS
-                    if (state.guide.quests == null) {
-                        onLoadGuide(true)
-                    }
-                },
-                onBeginCast = onBeginCast,
-                onHookFish = onHookFish,
-                onTapChallenge = onTapChallenge,
-            )
-        }
-    } else {
-        LazyColumn(
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                FishingSetupBar(
-                    strings = strings,
-                    me = me,
-                    enabled = setupEnabled,
-                    onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
-                    onOpenLures = { activeSheet = FishingSheetType.LURES },
-                    onOpenRods = { activeSheet = FishingSheetType.RODS },
-                )
-            }
-            item {
-                FishingStageScene(
-                    state = state,
-                    strings = strings,
-                    me = me,
-                    backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                    locationName = currentLocation?.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    proFishingEnabled = proFishingMode,
-                    autoCastEnabled = state.fishing.autoCastEnabled,
-                    onToggleProFishingMode = onToggleProFishingMode,
-                    onToggleAutoCast = onToggleAutoCast,
-                )
-            }
-            item {
-                FishingActionCard(
-                    state = state,
-                    strings = strings,
-                    onBeginCast = { onBeginCast(null) },
-                    onHookFish = onHookFish,
-                    onTapChallenge = onTapChallenge,
-                )
-            }
-            if (state.fishing.lastEscape || (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null)) {
-                item {
-                    FishingOutcomeCard(
-                        strings = strings,
-                        me = me,
-                        fishing = state.fishing,
-                        achievements = state.guide.achievements,
-                        onOpenCatch = onOpenCatch,
-                    )
+    Box(modifier = modifier.fillMaxSize()) {
+        FishingStageScene(
+            state = state,
+            strings = strings,
+            me = me,
+            backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+            locationName = currentLocation?.name,
+            modifier = Modifier.fillMaxSize(),
+            proMode = true,
+            setupEnabled = setupEnabled,
+            autoCastEnabled = state.fishing.autoCastEnabled,
+            proNotice = proNotice ?: escapeNotice,
+            onToggleAutoCast = onToggleAutoCast,
+            onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
+            onOpenLures = { activeSheet = FishingSheetType.LURES },
+            onOpenRods = { activeSheet = FishingSheetType.RODS },
+            onOpenQuests = {
+                activeSheet = FishingSheetType.QUESTS
+                if (state.guide.quests == null) {
+                    onLoadGuide(true)
                 }
-            }
-            item {
-                if (state.guide.quests != null) {
-                    QuestPreviewCard(
-                        strings = strings,
-                        quests = state.guide.quests,
-                        isClubMember = state.club.club != null,
-                        clubMembershipKnown = state.club.loaded,
-                        onOpenQuests = { activeSheet = FishingSheetType.QUESTS },
-                    )
-                } else {
-                    InfoCard {
-                        Text(strings.quests, fontWeight = FontWeight.SemiBold)
-                        LoadingStatePanel(strings.loading)
-                        OutlinedButton(onClick = { onLoadGuide(true) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(strings.refresh)
-                        }
-                    }
-                }
-            }
-            if (me.recent.isNotEmpty()) {
-                item {
-                    SectionCard(strings.recentCatches) {
-                        me.recent.forEachIndexed { index, recent ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            CatchRow(
-                                title = recent.fish,
-                                subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
-                                value = recent.weight.asKgCompact(strings),
-                                fishName = recent.fish,
-                                fishAccent = rarityColor(recent.rarity),
-                                onClick = {
-                                    onOpenCatch(
-                                        CatchDto(
-                                            id = recent.id,
-                                            fish = recent.fish,
-                                            weight = recent.weight,
-                                            location = recent.location,
-                                            rarity = recent.rarity,
-                                            at = recent.at,
-                                            user = me.username,
-                                            userId = me.id,
-                                        )
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
+            },
+            onBeginCast = onBeginCast,
+            onHookFish = onHookFish,
+            onTapChallenge = onTapChallenge,
+        )
     }
 
     when (activeSheet) {
@@ -2555,12 +2428,10 @@ private fun FishingStageScene(
     backgroundUrl: String?,
     locationName: String?,
     modifier: Modifier = Modifier,
-    proMode: Boolean = false,
+    proMode: Boolean = true,
     setupEnabled: Boolean = false,
-    proFishingEnabled: Boolean = false,
     autoCastEnabled: Boolean = false,
     proNotice: ProFishingNotice? = null,
-    onToggleProFishingMode: () -> Unit = {},
     onToggleAutoCast: () -> Unit = {},
     onOpenLocations: () -> Unit = {},
     onOpenLures: () -> Unit = {},
@@ -2581,6 +2452,7 @@ private fun FishingStageScene(
         }
     }
     val phase = state.fishing.phase
+    val fightIntensity = state.fishing.struggleIntensity.toFloat().coerceIn(0f, 1f)
     val castSpot = state.fishing.castSpot
     val proSceneSpec = remember(locationName) { proFishingSceneSpec(locationName) }
     val inWater = when (phase) {
@@ -2622,7 +2494,7 @@ private fun FishingStageScene(
         label = "pro-fishing-notice-alpha",
     )
 
-    LaunchedEffect(shouldAnimateFloat, phase, proMode) {
+    LaunchedEffect(shouldAnimateFloat, phase, proMode, fightIntensity) {
         if (!shouldAnimateFloat) {
             bobberVisual = BobberVisualState()
             return@LaunchedEffect
@@ -2658,11 +2530,18 @@ private fun FishingStageScene(
                 }
                 "tapping" -> {
                     val quickWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.85f))
-                    val offset = mainWave * 4.2f + quickWave * 1.1f
+                    val pullWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 1.45f))
+                    val snapWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.42f))
+                    val offset = 5f +
+                        fightIntensity * 18f +
+                        mainWave * (4.2f + fightIntensity * 9f) +
+                        quickWave * (1.1f + fightIntensity * 5f)
                     BobberVisualState(
                         offset = offset,
-                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.95f)) * 5f,
-                        submerge = if (offset > 0f) min(1f, offset / 9f) else 0f,
+                        xOffset = pullWave * (5f + fightIntensity * 22f) + snapWave * fightIntensity * 7f,
+                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.95f)) *
+                            (6f + fightIntensity * 15f),
+                        submerge = if (offset > 0f) min(1f, offset / (9f + fightIntensity * 9f)) else 0f,
                     )
                 }
                 else -> {
@@ -2676,6 +2555,7 @@ private fun FishingStageScene(
             }
             bobberVisual = BobberVisualState(
                 offset = bobberVisual.offset + (nextVisual.offset - bobberVisual.offset) * 0.18f,
+                xOffset = bobberVisual.xOffset + (nextVisual.xOffset - bobberVisual.xOffset) * 0.18f,
                 tilt = bobberVisual.tilt + (nextVisual.tilt - bobberVisual.tilt) * 0.18f,
                 submerge = bobberVisual.submerge + (nextVisual.submerge - bobberVisual.submerge) * 0.18f,
             )
@@ -2818,7 +2698,7 @@ private fun FishingStageScene(
             val bobberRectSizePx = sceneWidthPx * if (proMode) 0.105f else 0.08f
             val bobberRadiusPx = bobberRectSizePx / 2f
             val bobberPx = Offset(
-                x = sceneWidthPx * bobberRel.x,
+                x = sceneWidthPx * bobberRel.x + bobberVisual.xOffset,
                 y = sceneHeightPx * bobberRel.y + bobberVisual.offset,
             )
             val rigLineHeightPx = with(density) { (if (proMode) 36.dp else 27.dp).toPx() }
@@ -2906,7 +2786,7 @@ private fun FishingStageScene(
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * TG_CAST_WATER_TOP
-                val bobberBase = Offset(size.width * bobberRel.x, size.height * bobberRel.y)
+                val bobberBase = Offset(size.width * bobberRel.x + bobberVisual.xOffset, size.height * bobberRel.y)
                 val bobberRectSize = size.width * if (proMode) 0.105f else 0.08f
                 val bobberRadius = bobberRectSize / 2f
                 val visibleAboveWater = bobberRadius * 0.75f
@@ -2959,9 +2839,15 @@ private fun FishingStageScene(
                         cubicTo(control1.x, control1.y, control2.x, control2.y, lineAttach.x, lineAttach.y)
                     } else {
                         val gentleSag = min(size.height * 0.08f, dist * 0.12f)
+                        val fightPull = if (phase == FishingPhase.TAP_CHALLENGE) {
+                            bobberVisual.xOffset * 0.5f + size.width * 0.035f * fightIntensity *
+                                sin((rippleProgress + 0.2f) * 2f * PI.toFloat())
+                        } else {
+                            0f
+                        }
                         val control = Offset(
-                            x = lineOrigin.x + dx * 0.5f,
-                            y = lineOrigin.y + dy * 0.5f + gentleSag,
+                            x = lineOrigin.x + dx * 0.5f + fightPull,
+                            y = lineOrigin.y + dy * 0.5f + gentleSag + fightIntensity * 18f,
                         )
                         quadraticTo(control.x, control.y, lineAttach.x, lineAttach.y)
                     }
@@ -2996,9 +2882,9 @@ private fun FishingStageScene(
                 if (showRipple) {
                     repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
                         val progress = ((rippleProgress + index * 0.35f) % 1f)
-                        val radius = size.width * (0.04f + progress * 0.08f)
+                        val radius = size.width * (0.04f + progress * (0.08f + fightIntensity * 0.06f))
                         drawCircle(
-                            color = Color.White.copy(alpha = (0.4f - progress * 0.25f).coerceAtLeast(0f)),
+                            color = Color.White.copy(alpha = (0.4f + fightIntensity * 0.18f - progress * 0.28f).coerceAtLeast(0f)),
                             radius = radius,
                             center = Offset(bobber.x, max(waterTop + 8f, bobber.y + size.height * 0.02f)),
                             style = Stroke(width = 3f),
@@ -3163,6 +3049,57 @@ private fun FishingStageScene(
                     }
                 }
             }
+            if (phase == FishingPhase.TAP_CHALLENGE) {
+                state.fishing.hookedFish?.let { hooked ->
+                    val timeLabel = String.format(
+                        Locale.US,
+                        "%.1f",
+                        (state.fishing.phaseTimeLeftMillis / 1000.0).coerceAtLeast(0.0),
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .padding(start = 24.dp, end = 24.dp, bottom = 86.dp)
+                            .widthIn(max = 340.dp),
+                        color = RiverPanelRaised.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, rarityColor(hooked.rarity).copy(alpha = 0.55f)),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = hooked.fish,
+                                color = rarityColor(hooked.rarity),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = "${strings.rarityLabel(hooked.rarity)} • ${hooked.weight.asKgCompact(strings)}",
+                                color = Color.White.copy(alpha = 0.86f),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = if (strings.login == "Логин") {
+                                    "${state.fishing.tapCount}/${state.fishing.tapGoal} • $timeLabel с"
+                                } else {
+                                    "${state.fishing.tapCount}/${state.fishing.tapGoal} • ${timeLabel}s"
+                                },
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
             if (proMode) {
                 FishingSetupBar(
                     strings = strings,
@@ -3199,15 +3136,6 @@ private fun FishingStageScene(
                     )
                 }
             }
-            FishingOverlayToggle(
-                label = "Pro",
-                checked = proFishingEnabled,
-                onClick = onToggleProFishingMode,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
-                    .padding(start = 12.dp, bottom = 12.dp),
-            )
             if (me.autoFish) {
                 FishingOverlayToggle(
                     label = strings.autoCast,

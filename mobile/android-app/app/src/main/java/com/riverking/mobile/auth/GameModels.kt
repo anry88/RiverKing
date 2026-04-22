@@ -80,6 +80,24 @@ data class HookRequestDto(
 data class HookResultDto(
     val success: Boolean,
     val autoFish: Boolean,
+    val hookedFish: HookedFishDto? = null,
+    val challenge: HookChallengeDto? = null,
+)
+
+@Serializable
+data class HookedFishDto(
+    val fishId: Long,
+    val fish: String,
+    val weight: Double,
+    val location: String,
+    val rarity: String,
+)
+
+@Serializable
+data class HookChallengeDto(
+    val tapGoal: Int,
+    val durationMs: Int,
+    val struggleIntensity: Double,
 )
 
 @Serializable

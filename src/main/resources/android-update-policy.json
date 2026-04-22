@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 2,
-  "latestVersionName": "0.2.2",
-  "minSupportedVersionCode": 1,
-  "requireVersionHeaders": false,
+  "latestVersionCode": 3,
+  "latestVersionName": "0.3.0",
+  "minSupportedVersionCode": 3,
+  "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added Pro fishing mode with fullscreen casting gestures.",
-      "Improved the Android fishing screen with in-scene auto-fishing and Pro mode controls."
+      "Mandatory update: fishing now uses the new hooked-fish challenge contract.",
+      "The immersive fishing scene is now the default mode with dynamic tap goals, timers, and stronger fish struggle animations."
     ],
     "ru": [
-      "Добавлен Pro-режим рыбалки с полноэкранным забросом жестом.",
-      "Улучшен экран рыбалки на Android: автоловля и Pro-режим теперь доступны прямо на сцене."
+      "Обязательное обновление: рыбалка теперь использует новый контракт испытания после подсечки.",
+      "Иммерсивная сцена рыбалки стала основным режимом с динамическими тапами, таймером и более сильной борьбой рыбы."
     ]
   }
 }

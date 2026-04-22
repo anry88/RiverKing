@@ -1653,6 +1653,7 @@ fun Application.apiRoutes(
         // Hook result: determine if fish can be caught
         post("/api/hook") {
             val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<HookReq>()
             val res = try {
                 fishing.hook(uid, req.wait, req.reaction, applyBeginnerProtection = false)
@@ -1673,7 +1674,13 @@ fun Application.apiRoutes(
                 "hook_total",
                 mapOf("result" to if (res.success) "caught" else "escaped")
             )
-            call.respond(res)
+            val localizedHookedFish = res.hookedFish?.let { fish ->
+                fish.copy(
+                    fish = I18n.fish(fish.fish, language),
+                    location = I18n.location(fish.location, language),
+                )
+            }
+            call.respond(res.copy(hookedFish = localizedHookedFish))
         }
 
         // Cast result / finalize catch

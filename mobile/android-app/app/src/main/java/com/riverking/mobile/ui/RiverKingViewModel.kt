@@ -16,6 +16,8 @@ import com.riverking.mobile.auth.ClubSummaryDto
 import com.riverking.mobile.auth.CurrentTournamentDto
 import com.riverking.mobile.auth.GuideDto
 import com.riverking.mobile.auth.GuideFishDto
+import com.riverking.mobile.auth.HookResultDto
+import com.riverking.mobile.auth.HookedFishDto
 import com.riverking.mobile.auth.MeResponseDto
 import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.QuestListDto
@@ -96,6 +98,9 @@ data class FishingUiState(
     val phaseTimeLeftMillis: Long = 0L,
     val tapCount: Int = 0,
     val tapGoal: Int = TAP_CHALLENGE_GOAL,
+    val tapDurationMillis: Long = TAP_CHALLENGE_MILLIS,
+    val hookedFish: HookedFishDto? = null,
+    val struggleIntensity: Double = 0.0,
     val autoCastEnabled: Boolean = false,
     val castWaitSeconds: Int = 0,
     val castSpot: FishingCastSpot? = null,
@@ -499,6 +504,11 @@ class RiverKingViewModel(
                         castSpot = castSpot,
                         lastCast = null,
                         lastEscape = false,
+                        tapCount = 0,
+                        hookedFish = null,
+                        tapGoal = TAP_CHALLENGE_GOAL,
+                        tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                        struggleIntensity = 0.0,
                     ),
                     error = null,
                 )
@@ -559,7 +569,7 @@ class RiverKingViewModel(
         if (state.value.fishing.phase != FishingPhase.TAP_CHALLENGE) return
         val nextCount = state.value.fishing.tapCount + 1
         _state.update { it.copy(fishing = it.fishing.copy(tapCount = nextCount)) }
-        if (nextCount >= TAP_CHALLENGE_GOAL) {
+        if (nextCount >= state.value.fishing.tapGoal) {
             finalizeCatch(success = true)
         }
     }
@@ -1786,7 +1796,7 @@ class RiverKingViewModel(
                     return@launch
                 }
                 hookReactionSeconds = reaction
-                startTapChallenge()
+                startTapChallenge(result)
             } catch (error: Throwable) {
                 val message = describeError(error)
                 _state.update { it.copy(error = message) }
@@ -1795,14 +1805,22 @@ class RiverKingViewModel(
         }
     }
 
-    private fun startTapChallenge() {
+    private fun startTapChallenge(result: HookResultDto) {
+        val challenge = result.challenge
+        val tapGoal = challenge?.tapGoal?.coerceAtLeast(1) ?: TAP_CHALLENGE_GOAL
+        val durationMillis = challenge?.durationMs?.coerceAtLeast(1_000)?.toLong() ?: TAP_CHALLENGE_MILLIS
+        val intensity = challenge?.struggleIntensity?.coerceIn(0.0, 1.0) ?: 0.0
         tapJob?.cancel()
         _state.update {
             it.copy(
                 fishing = it.fishing.copy(
                     phase = FishingPhase.TAP_CHALLENGE,
-                    phaseTimeLeftMillis = TAP_CHALLENGE_MILLIS,
+                    phaseTimeLeftMillis = durationMillis,
                     tapCount = 0,
+                    tapGoal = tapGoal,
+                    tapDurationMillis = durationMillis,
+                    hookedFish = result.hookedFish,
+                    struggleIntensity = intensity,
                 )
             )
         }
@@ -1810,7 +1828,7 @@ class RiverKingViewModel(
         tapJob = viewModelScope.launch {
             while (isActive) {
                 val elapsed = System.currentTimeMillis() - startedAt
-                val remaining = (TAP_CHALLENGE_MILLIS - elapsed).coerceAtLeast(0L)
+                val remaining = (durationMillis - elapsed).coerceAtLeast(0L)
                 _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
                 if (remaining <= 0L) break
                 delay(50L)
@@ -1906,6 +1924,10 @@ class RiverKingViewModel(
                     phase = FishingPhase.COOLDOWN,
                     phaseTimeLeftMillis = CAST_READY_DELAY_MILLIS,
                     tapCount = 0,
+                    tapGoal = TAP_CHALLENGE_GOAL,
+                    tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                    hookedFish = null,
+                    struggleIntensity = 0.0,
                     castSpot = null,
                 )
             )
@@ -1925,6 +1947,10 @@ class RiverKingViewModel(
                         phase = FishingPhase.READY,
                         phaseTimeLeftMillis = 0L,
                         tapCount = 0,
+                        tapGoal = TAP_CHALLENGE_GOAL,
+                        tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                        hookedFish = null,
+                        struggleIntensity = 0.0,
                     )
                 )
             }

@@ -22,12 +22,12 @@ Nested Android project for the RiverKing mobile client.
 - Android shell now mirrors the TG client much more closely:
   - five-tab layout: fishing, leaders, catalog, club, shop
   - custom dark game-theme with header stats, language toggle, and badgeable bottom navigation
-  - full staged fishing flow over shared `/api/start-cast`, `/api/hook`, `/api/cast`
+  - always-on immersive fishing scene over shared `/api/start-cast`, `/api/hook`, `/api/cast`, including hooked-fish reveal and backend-provided tap goal, timer, and struggle intensity
   - quick-cast removed from the public Android UX
   - catch details dialog plus native Android share sheet backed by `/api/catches/{id}/card`
   - tournaments, ratings, guide, achievements, quests, club, referrals, and shop surfaces running on shared backend contracts
   - quest sheet now mirrors the shared backend quest payload with daily, weekly, and club sections, plus a localized "join a club" info block when the player has no club
-  - club tab now has `Ratings` / `Club` modes, current-vs-previous week switching, and a per-quest selector that shows shared quest progress plus each member's contribution for the selected week
+  - club tab now has `Ratings` / `Club` modes, current-vs-previous week switching, club chat through `/api/club/chat`, and a per-quest selector that shows shared quest progress plus each member's contribution for the selected week
 - `direct` keeps the shop visible but disables real-money packs.
 - `play` uses real `BillingClient` / `ProductDetails` purchase flow and hands the purchase token to the backend for Google Play verification before entitlement delivery.
 - Android Telegram account linking and referral actions live in the profile menu opened from the nickname, not inside the shop tab.
@@ -88,7 +88,7 @@ The backend controls Android update prompts through:
 - `RIVERKING_PLAY_STORE_URL`
 - `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`
 
-Keep `requireVersionHeaders=false` for normal releases. Set it to `true` only for a fatal rollout that must also block legacy Android builds without version headers.
+Keep `requireVersionHeaders=false` for normal releases. Set it to `true` only for a fatal rollout that must also block legacy Android builds without version headers; version `0.3.0` does this because the fishing scene requires the new hooked-fish challenge contract.
 
 Example:
 

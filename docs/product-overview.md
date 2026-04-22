@@ -10,7 +10,7 @@ The shipped product includes:
 
 - Telegram Mini App authentication and session handling through Telegram `initData`
 - provider-neutral account storage with Telegram identities, mobile password credentials, mobile refresh sessions, and shared player IDs
-- interactive fishing flow with cast, hook, catch, reaction timing, and catch presentation
+- always-on immersive fishing flow with cast, hook, hooked-fish reveal, dynamic tap challenge, reaction timing, and catch presentation
 - progression through locations, rods, lure inventory, and fish discovery
 - tournaments with multiple ranking metrics and prize distribution
 - daily rewards, daily and weekly quests, weekly club quests, achievements, and daily ratings
@@ -20,7 +20,7 @@ The shipped product includes:
 - bot-side commands, auto-casting, admin tooling, payment-support flows, and a protected Android admin app for operators
 - profanity filtering, metrics, and TG Analytics support
 
-The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, staged fishing actions against the shared backend, achievements and quests, weekly club-page views for ratings and club quests, club quest visibility in the quest sheet, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
+The Android code in `mobile/android-app/` is now a parity-oriented second client surface rather than only an auth shell. It includes the five-tab fishing / leaders / catalog / club / shop layout, the same immersive fishing scene and dynamic hooked-fish challenge used by the Mini App, achievements and quests, weekly club-page views for ratings and club quests, club quest visibility in the quest sheet, club chat, referral flows, Telegram account linking, and `direct` / `play` distribution variants with real Google Play Billing on the `play` flavor.
 
 The admin Android code in `mobile/admin-app/` is an internal operations surface. It connects to the protected admin API with a saved server URL and `ADMIN_API_TOKEN`, then manages tournaments, shop discounts, and broadcast messages without exposing those controls in the public player clients.
 
@@ -30,7 +30,7 @@ RiverKing is built around a short-session loop:
 
 1. Enter the Mini App from Telegram.
 2. Pick a location, rod, and lure.
-3. Start a cast, react to the bite, and land a fish.
+3. Start a cast, react to the bite, reveal the hooked fish, and land it through a tap challenge whose goal, timer, and struggle animation scale by rarity and weight.
 4. Convert catches into progression:
    - new fish discovered
    - location unlock progress
@@ -50,7 +50,7 @@ Several systems in the repository are clearly aimed at repeat engagement rather 
 - `achievements` convert collection and milestone play into visible progression
 - `tournaments` add time-boxed competition and prize tension
 - `daily ratings` provide lightweight leaderboard pressure even outside tournaments
-- `clubs` create social stickiness through weekly contribution, member roles, and shared weekly quests that pool the whole club's catches into one reward target
+- `clubs` create social stickiness through weekly contribution, member roles, shared weekly quests that pool the whole club's catches into one reward target, and club chat on the Mini App and Android client
 - `club quest analytics` let players inspect the current or previous club week, choose a specific shared quest, and compare each member's contribution to that quest on both Telegram Mini App and Android
 - `auto-casting` extends utility for subscribed or advanced users and connects the bot to the core gameplay loop
 
