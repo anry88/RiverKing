@@ -298,12 +298,12 @@ function App(){
     const active = proFishingMode && tab === 'fish';
     try{
       if(active){
-        tg?.exitFullscreen?.();
+        if(typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+        else if(typeof tg?.expand === 'function') tg.expand();
         tg?.expand?.();
         tg?.disableVerticalSwipes?.();
       }else{
         tg?.enableVerticalSwipes?.();
-        tg?.exitFullscreen?.();
         tg?.expand?.();
       }
     }catch(e){}

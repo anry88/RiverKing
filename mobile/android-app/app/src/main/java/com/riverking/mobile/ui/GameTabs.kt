@@ -2768,24 +2768,8 @@ private fun FishingStageScene(
 
                 // Fishing line from last rod point to bobber with natural sag
                 val lineOrigin = rodLinePoints.lastOrNull() ?: rodTip
-                val rawDx = bobber.x - lineOrigin.x
-                val rawDy = bobber.y - lineOrigin.y
-                val rawDist = kotlin.math.hypot(rawDx, rawDy)
-                val endInset = if (hasSplashed && rawDist > 0f) {
-                    bobberRadius * if (proMode) 1.15f else 0.65f
-                } else {
-                    0f
-                }
-                val lineEnd = if (endInset > 0f && rawDist > endInset) {
-                    Offset(
-                        x = bobber.x - rawDx / rawDist * endInset,
-                        y = bobber.y - rawDy / rawDist * endInset,
-                    )
-                } else {
-                    bobber
-                }
-                val dx = lineEnd.x - lineOrigin.x
-                val dy = lineEnd.y - lineOrigin.y
+                val dx = bobber.x - lineOrigin.x
+                val dy = bobber.y - lineOrigin.y
                 val dist = kotlin.math.hypot(dx, dy)
                 val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
                 val waterLinePath = Path().apply {
@@ -2805,14 +2789,14 @@ private fun FishingStageScene(
                             x = lineOrigin.x + dx * 0.75f,
                             y = baseMidY + sag,
                         )
-                        cubicTo(control1.x, control1.y, control2.x, control2.y, lineEnd.x, lineEnd.y)
+                        cubicTo(control1.x, control1.y, control2.x, control2.y, bobber.x, bobber.y)
                     } else {
                         val gentleSag = min(size.height * 0.08f, dist * 0.12f)
                         val control = Offset(
                             x = lineOrigin.x + dx * 0.5f,
                             y = lineOrigin.y + dy * 0.5f + gentleSag,
                         )
-                        quadraticTo(control.x, control.y, lineEnd.x, lineEnd.y)
+                        quadraticTo(control.x, control.y, bobber.x, bobber.y)
                     }
                 }
                 if (hasSplashed && !proMode) {

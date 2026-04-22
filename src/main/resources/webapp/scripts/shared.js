@@ -235,7 +235,8 @@
       : 0;
     document.documentElement.style.setProperty('--tg-topbar', tgTopbarGuess + 'px');
 
-    if (typeof tg?.expand === 'function') tg.expand();
+    if (typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+    else if (typeof tg?.expand === 'function') tg.expand();
   }
 
   tg?.ready?.();

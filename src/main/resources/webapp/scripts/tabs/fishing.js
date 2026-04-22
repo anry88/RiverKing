@@ -288,18 +288,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       return { rodLinePath: rPath, waterLinePath: wPath };
     }
 
-    const rawDx = lineAttach.x - lastPoint.x;
-    const rawDy = lineAttach.y - lastPoint.y;
-    const rawDist = Math.hypot(rawDx, rawDy);
-    const endInset = isCastInWater && rawDist > 0 ? bobberRadius * (proMode ? 1.15 : 0.65) : 0;
-    const lineEnd = endInset > 0 && rawDist > endInset
-      ? {
-        x: lineAttach.x - (rawDx / rawDist) * endInset,
-        y: lineAttach.y - (rawDy / rawDist) * endInset
-      }
-      : lineAttach;
-    const dx = lineEnd.x - lastPoint.x;
-    const dy = lineEnd.y - lastPoint.y;
+    const dx = lineAttach.x - lastPoint.x;
+    const dy = lineAttach.y - lastPoint.y;
     const dist = Math.hypot(dx, dy);
 
     if (shouldShowSlack) {
@@ -315,15 +305,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         x: lastPoint.x + dx * 0.75,
         y: baseMidY + sag
       };
-      wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineEnd.x},${lineEnd.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
     } else {
       const gentleSag = Math.min(h * 0.08, dist * 0.12);
       const controlX = lastPoint.x + dx * 0.5;
       const controlY = lastPoint.y + dy * 0.5 + gentleSag;
-      wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineEnd.x},${lineEnd.y}`;
+      wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
     }
     return { rodLinePath: rPath, waterLinePath: wPath };
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, isCastInWater, proMode, bobberRadius]);
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, proMode]);
 
   const catchTargetPx = React.useMemo(() => {
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
