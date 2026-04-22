@@ -835,7 +835,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
                 left: rigCenterX - baitSize * 0.38,
-                top: rigLineHeight + hookSize * 0.34,
+                top: rigLineHeight + hookSize * 0.16,
                 width: baitSize,
                 height: baitSize,
                 zIndex: 3
