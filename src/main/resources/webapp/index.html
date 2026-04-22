@@ -34,6 +34,7 @@
       --safe-top-max: max(env(safe-area-inset-top, 0px), var(--safe-top-fb));
       --safe-bottom-max: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-fb));
       --safe-top-ui: calc(var(--safe-top-max) + var(--tg-topbar));
+      --safe-top-overlay: calc(var(--safe-top-max) + var(--tg-topbar));
     }
 
     /* старый iOS (constant) — на всякий случай */
@@ -268,17 +269,16 @@
     }
 
     .app-footer {
-      padding-bottom: calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
       height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
-      padding: 8px calc(16px * var(--ui-scale));
-      padding-top: 5px;
+      box-sizing: border-box;
+      padding: 5px calc(16px * var(--ui-scale)) calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
       display: flex;
       align-items: stretch;
       gap: 12px;
     }
 
     .app-footer-placeholder {
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift));
+      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
       background: var(--tg-bg);
     }
 
@@ -286,6 +286,55 @@
       flex: 1;
       min-height: 0;
       overflow: auto;
+    }
+
+    .pro-fishing-stage {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    .pro-safe-top {
+      top: calc(12px + var(--safe-top-overlay));
+    }
+
+    .pro-safe-bottom-left {
+      left: 12px;
+      bottom: calc(28px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
+    .pro-safe-bottom-right {
+      right: 12px;
+      bottom: calc(28px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
+    .pro-safe-bottom-center {
+      bottom: calc(56px + max(var(--safe-bottom-max), var(--bottom-gap)));
+    }
+
+    @keyframes pro-message-fade {
+      0% {
+        opacity: 0;
+        transform: translate3d(-50%, 8px, 0);
+      }
+      10% {
+        opacity: 1;
+        transform: translate3d(-50%, 0, 0);
+      }
+      82% {
+        opacity: 1;
+        transform: translate3d(-50%, 0, 0);
+      }
+      100% {
+        opacity: 0;
+        transform: translate3d(-50%, -6px, 0);
+      }
+    }
+
+    .pro-message-toast {
+      animation: pro-message-fade 3s ease forwards;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
     }
 
     .btn-lg {

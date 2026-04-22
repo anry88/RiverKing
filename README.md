@@ -1,26 +1,29 @@
 # RiverKing
 
-RiverKing is a Telegram-first fishing game with a Kotlin/Ktor backend, a shipped Telegram Mini App frontend, Telegram bot flows, progression systems, tournaments, quests, clubs, referrals, and Stars-based monetization. The repository now also includes an Android client subtree that reuses the same backend and player data model.
+RiverKing is a Telegram-first fishing game with a Kotlin/Ktor backend, a shipped Telegram Mini App frontend, Telegram bot flows, progression systems, tournaments, personal and club quests, clubs, referrals, and Stars-based monetization. The repository now also includes Android subtrees for the player client and an internal admin app.
 
-It is built as a working product rather than a thin game prototype: the repository already includes session-authenticated Mini App flows, real gameplay systems, persistent progression, background jobs, operational metrics, moderation rules, and admin-side bot tooling.
+It is built as a working product rather than a thin game prototype: the repository already includes session-authenticated Mini App flows, real gameplay systems, persistent progression, background jobs, operational metrics, moderation rules, admin-side bot tooling, and a protected mobile admin surface.
 
 **What it does**
 
 - Delivers a Telegram Mini App fishing experience with cast, hook, and catch gameplay.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
+- Ships daily and weekly personal quests plus weekly club quests with pooled progress and split coin rewards for current club members.
+- Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings and weekly club quests, with per-member contribution views for each active club quest.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
 - Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
+- Includes an internal Jetpack Compose admin app under `mobile/admin-app` for token-protected tournament, discount, and broadcast operations.
 
 **Why it is technically interesting**
 
-- Hybrid Telegram product surface: Mini App frontend plus bot commands and admin flows in one codebase.
+- Hybrid product surface: Mini App frontend, bot commands, Android player client, and internal admin flows in one codebase.
 - Shared identity foundation: Telegram cookie sessions for the Mini App plus bearer-token mobile auth with Telegram sign-in/linking against the same gameplay API.
 - Product-minded backend, not only a game loop: progression, retention systems, economy, moderation, payments, analytics, and scheduling.
 - Clear Kotlin layers for Ktor routes, gameplay services, Exposed persistence, shipped frontend assets, and an isolated Android project.
 
 **Stack**
 
-`Kotlin` `Ktor` `Netty` `Exposed` `SQLite` `Telegram Mini App` `Telegram Bot API` `Android` `Jetpack Compose` `TG Analytics` `Gradle`
+`Kotlin` `Ktor` `Netty` `Exposed` `SQLite` `Telegram Mini App` `Telegram Bot API` `Android` `Jetpack Compose` `Admin API` `TG Analytics` `Gradle`
 
 **Quick links**
 
@@ -47,7 +50,8 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Product systems for progression, achievements, quests, tournament prize logic, club competition, referral rewards, and in-game economy.
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
-- A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, and real Google Play Billing verification for the `play` flavor.
+- A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, update prompts/mandatory upgrade blocking, and real Google Play Billing verification for the `play` flavor.
+- A separate internal admin Android project with saved server profiles, bearer-token admin API access, tournament creation/deletion, shop discount management, and broadcast sending.
 - Public Android-compliance surfaces for privacy, support, terms, and account deletion, plus an authenticated account deletion endpoint for mobile users.
 
 ## Architecture
@@ -57,6 +61,7 @@ flowchart LR
     A["Telegram client"] --> B["Mini App frontend"]
     A --> C["Telegram bot / admin flows"]
     I["Android app"] --> D
+    K["Admin Android app"] --> D
     B --> D["Ktor API"]
     C --> D
     D --> E["Gameplay services"]
@@ -71,22 +76,24 @@ flowchart LR
 - `src/main/kotlin/db/` defines tables, schema creation, seed data, and data migrations.
 - `src/main/resources/webapp/` contains the shipped Mini App frontend and visual assets.
 - `mobile/android-app/` contains the nested Android client project and its separate Gradle build.
+- `mobile/admin-app/` contains the internal Android admin project and its separate Gradle build.
 
 ## Core Systems
 
 - `Fishing loop`: cast -> hook -> catch with timing, catch presentation, and recent catch history.
 - `Progression`: locations, rods, lures, fish discovery, unlocks, and recommendation logic.
-- `Retention`: daily rewards, quests, achievements, daily ratings, and tournament participation.
-- `Social loops`: clubs, member roles, weekly contribution boards, and club chat feed.
+- `Retention`: daily rewards, location-aware quest pools, achievements, daily ratings, and tournament participation.
+- `Social loops`: clubs, member roles, weekly contribution boards, shared club quests, and club chat feed.
 - `Economy`: Stars purchases, coin purchases, referral rewards, and prize distribution.
 - `Operations`: profanity filtering, metrics, TG Analytics hooks, startup recovery, and scheduled background jobs.
-- `Bot automation`: command flows, auto-casting, admin tournament tooling, and payment-support operations.
+- `Admin operations`: bot-side admin commands plus the internal admin Android app for tournaments, discounts, and broadcasts.
 
 ## Documentation Map
 
 - [docs/product-overview.md](docs/product-overview.md): product-facing overview of game loops, economy, and operating model.
 - [DOCUMENTATION.md](DOCUMENTATION.md): engineering architecture and package map.
 - [AGENTS.md](AGENTS.md): repo-level guide for coding agents and review tools.
+- [mobile/admin-app/README.md](mobile/admin-app/README.md): internal Android admin app setup and scope.
 - Package READMEs:
   - [src/main/kotlin/app/README.md](src/main/kotlin/app/README.md)
   - [src/main/kotlin/service/README.md](src/main/kotlin/service/README.md)
@@ -123,7 +130,7 @@ flowchart LR
 
 ![RiverKing bot flow](docs/screenshots/07-bot-flow.png)
 
-Admin-side tooling exists in the codebase and bot flows, but it is intentionally excluded from the public screenshot set.
+Admin-side tooling exists in bot flows and the internal Android admin app, but it is intentionally excluded from the public screenshot set.
 
 ## Setup
 
@@ -132,7 +139,8 @@ Admin-side tooling exists in the codebase and bot flows, but it is intentionally
 - JDK 17+
 - Telegram bot token for real Telegram integration
 - A writable SQLite path or another configured database target
-- Android SDK, if you want to build the nested Android client
+- Android SDK, if you want to build the nested Android player client or admin app
+- `ADMIN_API_TOKEN`, if you want to use the internal admin Android app
 
 ### Quick start
 
@@ -164,7 +172,7 @@ Admin-side tooling exists in the codebase and bot flows, but it is intentionally
 With `DEV_MODE=true`, the Mini App can boot without a real Telegram session and the API falls back to the local development user.
 With `DEV_MODE=false`, opening `/app` in a regular browser keeps the Mini App blocked until valid Telegram `initData` is present.
 
-To work on the Android client, use the nested project described in [mobile/android-app/README.md](mobile/android-app/README.md).
+To work on the Android player client, use [mobile/android-app/README.md](mobile/android-app/README.md). To work on the internal admin app, use [mobile/admin-app/README.md](mobile/admin-app/README.md).
 
 ## Configuration
 
@@ -173,6 +181,9 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `BOT_TOKEN`
 - `BOT_NAME`
 - `PUBLIC_BASE_URL`
+- `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`
 - `DATABASE_URL`
 - `DATABASE_USER`
 - `DATABASE_PASSWORD`
@@ -184,6 +195,7 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `AUTH_TOKEN_SECRET`
 - `AUTH_ACCESS_TOKEN_TTL_MINUTES`
 - `AUTH_REFRESH_TOKEN_TTL_DAYS`
+- `ADMIN_API_TOKEN`
 - `GOOGLE_AUTH_CLIENT_ID`
 - `GOOGLE_PLAY_PACKAGE_NAME`
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`

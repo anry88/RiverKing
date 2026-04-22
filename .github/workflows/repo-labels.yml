@@ -1,0 +1,72 @@
+name: Repo Labels
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - .github/workflows/repo-labels.yml
+      - .github/labeler.yml
+      - .github/release.yml
+      - .github/pull_request_template.md
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync repository labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'release', color: 'B60205', description: 'Release PRs and release train changes.' },
+              { name: 'breaking-change', color: 'D93F0B', description: 'User-facing or API-breaking changes.' },
+              { name: 'android-force-update', color: 'B60205', description: 'Android release requires users to update before continuing.' },
+              { name: 'feature', color: '1D76DB', description: 'New functionality for users or operators.' },
+              { name: 'fix', color: '0E8A16', description: 'Bug fixes and behavior corrections.' },
+              { name: 'docs', color: '5319E7', description: 'Documentation-only changes.' },
+              { name: 'ci', color: 'FBCA04', description: 'GitHub Actions, CI, or release automation changes.' },
+              { name: 'chore', color: '7057FF', description: 'Non-user-facing maintenance work.' },
+              { name: 'refactor', color: 'C2E0C6', description: 'Internal structure improvements without intended behavior change.' },
+              { name: 'android', color: '0A7EA4', description: 'Android project scope.' },
+              { name: 'backend', color: '0052CC', description: 'Ktor backend, services, or persistence scope.' },
+              { name: 'webapp', color: 'A2EEEF', description: 'Telegram Mini App frontend scope.' },
+              { name: 'ignore-for-release', color: 'BFD4F2', description: 'Exclude this PR from generated GitHub release notes.' }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  new_name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+              }
+            }

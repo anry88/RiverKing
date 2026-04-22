@@ -9,6 +9,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `docs/github-about.md` is the source of truth for GitHub About description, topics, and website.
 - `docs/android-release.md` is the Android distribution and compliance checklist for the itch.io-first / Google Play-second rollout.
 - `DOCUMENTATION.md` is the engineering architecture overview.
+- `mobile/admin-app/README.md` is the internal Android admin app setup and scope note.
 - `src/main/kotlin/**/README.md` files are the low-level code navigation layer for agents working inside a package.
 
 ## Repository Map
@@ -19,6 +20,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `src/main/kotlin/util/`: metrics, RNG helpers, profanity filtering, text sanitization, coin math.
 - `src/main/resources/webapp/`: Telegram Mini App frontend and shipped game assets.
 - `mobile/android-app/`: nested Android project with its own Gradle setup, mobile auth flows, and shared-backend client shell.
+- `mobile/admin-app/`: nested internal Android admin project with saved server profiles, admin API access, tournaments, discounts, and broadcasts.
 - `src/test/kotlin/`: service and route tests.
 - `docs/`: product-facing repository materials and showcase assets.
 
@@ -30,12 +32,16 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Mobile auth: password, Google, and Telegram sign-in can create bearer tokens plus refresh sessions for the Android client, and an authenticated Android profile can link a Telegram account for shared progression across mobile and Telegram surfaces.
 - Account deletion: `POST /api/account/delete` deletes the authenticated profile, and the backend also serves public compliance pages at `/privacy`, `/terms`, `/support`, and `/account/delete`.
 - Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
-- Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, and a nested Android client project.
+- Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, a nested Android player client project, and an internal Android admin app.
+- Admin API: `mobile/admin-app` calls protected `/api/admin/*` endpoints with `ADMIN_API_TOKEN`; `/api/admin/catalog` supplies selectable metrics, fish, locations, tournament prizes, and discountable shop items for admin forms.
 - Android distribution contract: `direct` and `play` share one canonical `applicationId`, one monotonic `versionCode` line, and should be signed with the same release key so users can move from itch.io APK installs to Google Play without reinstalling.
+- Android update policy: the backend serves `GET /api/mobile/update` from `src/main/resources/android-update-policy.json`, and mobile API calls can receive `426 Upgrade Required` when `minSupportedVersionCode` or `requireVersionHeaders` makes the installed build unusable.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
+- Quests: `GET /api/quests` now returns personal `daily` / `weekly` lists plus a `club` section; club quests are shared across the whole club and are rendered in the bot, Mini App, and Android client.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.
+- GitHub release automation creates or updates a draft `develop -> main` Android release PR after pushes to `develop`, validates the Android update policy, and GitHub Release notes are label-driven through `.github/release.yml`; use `android-force-update` when a release raises `minSupportedVersionCode`.
 
 ## First Pass For Any Agent
 
@@ -46,10 +52,11 @@ AI-oriented repository guide for coding assistants and code-review tools.
    - [src/main/kotlin/service/README.md](src/main/kotlin/service/README.md)
    - [src/main/kotlin/db/README.md](src/main/kotlin/db/README.md)
    - [src/main/kotlin/util/README.md](src/main/kotlin/util/README.md)
-4. If the task touches Android, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
-5. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
-6. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
-7. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
+4. If the task touches the Android player client, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
+5. If the task touches the internal Android admin app, inspect `mobile/admin-app/README.md` plus the relevant files under `mobile/admin-app/app/src/main/`.
+6. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
+7. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
+8. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
 
 ## Common Change Paths
 
@@ -88,12 +95,21 @@ You usually need to touch:
 - `mobile/android-app/app/build.gradle.kts`
 - `mobile/android-app/README.md`
 
+### Android admin app
+
+You usually need to touch:
+
+- `mobile/admin-app/app/src/main/java/com/riverking/admin/ui/`
+- `mobile/admin-app/app/src/main/java/com/riverking/admin/network/AdminApiClient.kt`
+- `src/main/kotlin/app/AdminApiRoutes.kt`
+- `mobile/admin-app/README.md`
+
 ### Game systems
 
 You usually need to touch:
 
 - `src/main/kotlin/service/FishingService.kt`
-- a specialized service such as `TournamentService.kt`, `QuestService.kt`, `ClubService.kt`, `AchievementService.kt`, or `ReferralService.kt`
+- a specialized service such as `TournamentService.kt`, `QuestService.kt`, `ClubQuestService.kt`, `ClubService.kt`, `AchievementService.kt`, or `ReferralService.kt`
 - possibly `src/main/kotlin/db/Tables.kt`
 
 ### Bot or admin flows
@@ -120,6 +136,8 @@ Seed data and schema compatibility matter because the Mini App and bot both depe
 - If you change the product scope or operating model, update `docs/product-overview.md`.
 - If you change package structure or runtime surfaces, update `AGENTS.md` and the nearest package README.
 - If you change a server API contract, verify compatibility across Telegram bot flows, the Telegram Mini App, and the Android client before closing the task. Prefer additive response changes over breaking field changes.
+- If you change backend or Android code that can affect the Android client, explicitly check whether the new code remains compatible with the previous released Android version. If the old Android client cannot safely keep using the backend, update `src/main/resources/android-update-policy.json` in the same block of work: raise `minSupportedVersionCode`, set `requireVersionHeaders` when legacy clients without version headers must also be blocked, and write player-facing release notes. Do this immediately rather than leaving the decision to a later human release step.
+- If you change GitHub release automation or PR labeling rules, update `docs/android-release.md`, the relevant `.github/workflows/*.yml`, and `.github/release.yml` / `.github/labeler.yml` as needed so the documented release flow stays current.
 - After each completed block of work, create a separate commit if there are changes to save so the history remains complete and incremental. Do not batch multiple finished tasks into one opaque commit.
 - Keep public claims honest: do not describe flows, admin tooling, or analytics that the code does not actually support.
 - Treat `docs/screenshots/` as showcase assets. Refresh them when the visible product surface changes in a meaningful way.

@@ -1,0 +1,31 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Mandatory Android Updates
+      labels:
+        - android-force-update
+    - title: Breaking Changes
+      labels:
+        - breaking-change
+    - title: Features
+      labels:
+        - feature
+    - title: Fixes
+      labels:
+        - fix
+    - title: Documentation
+      labels:
+        - docs
+    - title: CI and Maintenance
+      labels:
+        - ci
+        - chore
+        - refactor
+    - title: Releases
+      labels:
+        - release
+    - title: Other Changes
+      labels:
+        - "*"

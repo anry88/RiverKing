@@ -102,6 +102,39 @@ class TournamentServiceTest {
     }
 
     @Test
+    fun currentTournamentChoosesNewestActiveTournament() {
+        val env = testEnv("testdb-current-overlap")
+        DB.init(env)
+        val svc = TournamentService()
+        val now = Instant.parse("2026-04-20T12:00:00Z")
+        svc.createTournament(
+            nameRu = "Старый",
+            nameEn = "Old",
+            start = now.minusSeconds(7200),
+            end = now.plusSeconds(7200),
+            fish = null,
+            location = null,
+            metric = "largest",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+        svc.createTournament(
+            nameRu = "Новый",
+            nameEn = "New",
+            start = now.minusSeconds(3600),
+            end = now.plusSeconds(7200),
+            fish = null,
+            location = null,
+            metric = "largest",
+            prizePlaces = 1,
+            prizes = "[]",
+        )
+
+        val current = svc.currentTournament(now)
+        assertEquals("Новый", current?.nameRu)
+    }
+
+    @Test
     fun leaderboardCountShowsFish() {
         val env = testEnv("testdb4")
         DB.init(env)

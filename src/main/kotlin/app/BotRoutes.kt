@@ -36,6 +36,7 @@ import service.COIN_PRIZE_ID
 import service.AchievementService
 import service.QuestService
 import service.ClubService
+import service.ClubQuestService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -184,6 +185,7 @@ fun Application.botRoutes(env: Env) {
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
+    val clubQuests = ClubQuestService()
     val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
@@ -1185,7 +1187,6 @@ fun Application.botRoutes(env: Env) {
                     return
                 }
                 val buttons = unlocked
-                    .sortedBy { I18n.location(it.name, lang) }
                     .map { loc ->
                         val label = buildString {
                             append(I18n.location(loc.name, lang))
@@ -1363,9 +1364,9 @@ fun Application.botRoutes(env: Env) {
                 lang: String,
                 replyToMessageId: Long? = null,
             ) {
-                val quests = QuestService.list(uid, lang)
+                val quests = QuestService.list(uid, lang, club = clubQuests.list(uid, lang))
                 val header = if (lang == "ru") "Задания" else "Quests"
-                fun formatSection(title: String, items: List<QuestService.QuestDTO>): String {
+                fun formatSection(title: String, items: List<QuestService.QuestDTO>, isClub: Boolean = false): String {
                     if (items.isEmpty()) {
                         val emptyText = if (lang == "ru") "Нет активных заданий." else "No active quests."
                         return "$title\n$emptyText"
@@ -1378,10 +1379,12 @@ fun Application.botRoutes(env: Env) {
                             "Progress ${quest.progress}/${quest.target}"
                         }
                         val reward = if (lang == "ru") {
-                            "Награда: ${quest.rewardCoins} монет"
+                            if (isClub) "Общая награда клуба: ${quest.rewardCoins} монет"
+                            else "Награда: ${quest.rewardCoins} монет"
                         } else {
                             val suffix = if (quest.rewardCoins == 1) "" else "s"
-                            "Reward: ${quest.rewardCoins} coin$suffix"
+                            if (isClub) "Club reward: ${quest.rewardCoins} coin$suffix"
+                            else "Reward: ${quest.rewardCoins} coin$suffix"
                         }
                         "$status ${quest.name}\n${quest.description}\n$progress\n$reward"
                     }
@@ -1389,12 +1392,27 @@ fun Application.botRoutes(env: Env) {
                 }
                 val dailyTitle = if (lang == "ru") "Ежедневные задания" else "Daily quests"
                 val weeklyTitle = if (lang == "ru") "Еженедельные задания" else "Weekly quests"
+                val clubTitle = if (lang == "ru") "Клубные задания" else "Club quests"
                 val text = buildString {
                     append(header)
                     append(":\n\n")
                     append(formatSection(dailyTitle, quests.daily))
                     append("\n\n")
                     append(formatSection(weeklyTitle, quests.weekly))
+                    append("\n\n")
+                    if (quests.club.available) {
+                        append(formatSection(clubTitle, quests.club.quests, isClub = true))
+                    } else {
+                        append(clubTitle)
+                        append("\n")
+                        append(
+                            quests.club.message ?: if (lang == "ru") {
+                                "Вступи в клуб, чтобы открыть клубные задания."
+                            } else {
+                                "Join a club to unlock club quests."
+                            }
+                        )
+                    }
                 }
                 trySend(chatId, text, replyToMessageId = replyToMessageId)
             }
@@ -1809,10 +1827,24 @@ fun Application.botRoutes(env: Env) {
                         }
                         val uid = ensureUserId(from) ?: return false
                         val lang = fishing.userLanguage(uid)
+                        val androidLine = if (lang == "ru") {
+                            if (env.itchProjectUrl.isNotBlank()) {
+                                "Есть и Android-версия — ссылка на itch.io ниже."
+                            } else {
+                                "Есть и Android-версия игры."
+                            }
+                        } else {
+                            if (env.itchProjectUrl.isNotBlank()) {
+                                "There is also an Android version — the itch.io link is below."
+                            } else {
+                                "There is also an Android version of the game."
+                            }
+                        }
                         val message = if (lang == "ru") {
-                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
+                            """🎣 Привет! Это River King — игра про рыбалку. Играй через приложение или с помощью команд бота. $androidLine Команды работают и в групповых чатах, если добавить туда бота и дать ему доступ к сообщениям.
 
 Доступные команды:
+/start — список команд и ссылки запуска
 /cast — забросить снасть
 /autocast — запустить автоловлю
 /stop_autocast — остановить автоловлю
@@ -1832,9 +1864,10 @@ fun Application.botRoutes(env: Env) {
 /language — выбрать язык
 /nickname — сменить ник""".trimIndent()
                         } else {
-                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands. Bot commands also work in group chats if you add the bot and allow it to access messages.
+                            """🎣 Welcome to River King, a fishing game you can play in the app or via bot commands. $androidLine Bot commands also work in group chats if you add the bot and allow it to access messages.
 
 Available commands:
+/start — command list and launch links
 /cast — cast your line
 /autocast — start auto casting
 /stop_autocast — stop auto casting
@@ -1855,6 +1888,7 @@ Available commands:
 /nickname — change your nickname""".trimIndent()
                         }
                         val openButtonText = if (lang == "ru") "Открыть игру" else "Open game"
+                        val itchButtonText = if (lang == "ru") "Страница на itch.io" else "itch.io page"
                         val channelButtonText = if (lang == "ru") "Присоединиться к каналу" else "Join the channel"
                         val gameLink = "https://t.me/${env.botName}?startapp"
                         val channelLink = if (lang == "ru") {
@@ -1862,14 +1896,15 @@ Available commands:
                         } else {
                             "https://t.me/riverking_en"
                         }
-                        val markup = Json.encodeToString(
-                            mapOf(
-                                "inline_keyboard" to listOf(
-                                    listOf(mapOf("text" to openButtonText, "url" to gameLink)),
-                                    listOf(mapOf("text" to channelButtonText, "url" to channelLink)),
-                                )
-                            )
-                        )
+                        val keyboardRows = mutableListOf(
+                            listOf(mapOf("text" to openButtonText, "url" to gameLink))
+                        ).apply {
+                            env.itchProjectUrl.takeIf { it.isNotBlank() }?.let { itchUrl ->
+                                add(listOf(mapOf("text" to itchButtonText, "url" to itchUrl)))
+                            }
+                            add(listOf(mapOf("text" to channelButtonText, "url" to channelLink)))
+                        }
+                        val markup = Json.encodeToString(mapOf("inline_keyboard" to keyboardRows))
                         trySend(chatId, message, markup, replyTo)
                         return true
                     }

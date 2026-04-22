@@ -4,6 +4,9 @@ import db.Catches
 import db.Clubs
 import db.ClubChatMessages
 import db.ClubMembers
+import db.ClubQuestMemberProgress
+import db.ClubQuestProgress
+import db.ClubQuestRewardRecipients
 import db.ClubWeeklyContributions
 import db.ClubWeeklySnapshots
 import db.ClubWeeklyRewards
@@ -14,11 +17,13 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.Metrics
+import util.sanitizeChatMessage
 import util.sanitizeName
 import java.time.DayOfWeek
 import java.time.Instant
@@ -28,6 +33,8 @@ import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
 class ClubService {
+    private val clubQuests = ClubQuestService()
+
     data class ClubSummary(
         val id: Long,
         val name: String,
@@ -51,6 +58,29 @@ class ClubService {
         val members: List<ClubMemberContribution>,
     )
 
+    data class ClubQuestMemberView(
+        val userId: Long,
+        val name: String?,
+        val role: String,
+        val progress: Int,
+    )
+
+    data class ClubQuestView(
+        val code: String,
+        val name: String,
+        val description: String,
+        val progress: Int,
+        val target: Int,
+        val rewardCoins: Int,
+        val completed: Boolean,
+        val members: List<ClubQuestMemberView>,
+    )
+
+    data class ClubQuestWeekView(
+        val weekStart: LocalDate,
+        val quests: List<ClubQuestView>,
+    )
+
     data class ClubDetails(
         val id: Long,
         val name: String,
@@ -62,6 +92,8 @@ class ClubService {
         val recruitingOpen: Boolean,
         val currentWeek: ClubWeekView,
         val previousWeek: ClubWeekView,
+        val currentQuestWeek: ClubQuestWeekView,
+        val previousQuestWeek: ClubQuestWeekView,
     )
 
     data class ClubChatMessage(
@@ -83,12 +115,18 @@ class ClubService {
         val clubId = membership[ClubMembers.clubId].value
         val club = Clubs.select { Clubs.id eq clubId }.singleOrNull() ?: return@transaction null
         val role = membership[ClubMembers.role]
+        val lang = Users
+            .slice(Users.language)
+            .select { Users.id eq userId }
+            .single()[Users.language]
         val currentWeekStart = weekStart(LocalDate.now(CLUB_ZONE))
         val previousWeekStart = currentWeekStart.minusWeeks(1)
         finalizeCompletedWeekSnapshotTx(clubId, currentWeekStart)
         val members = loadMembers(clubId)
         val currentWeek = buildWeekView(clubId, members, currentWeekStart)
         val previousWeek = buildHistoricalWeekView(clubId, previousWeekStart)
+        val currentQuestWeek = clubQuests.weekView(clubId, currentWeekStart, lang, members, ensureAssigned = true)
+        val previousQuestWeek = clubQuests.weekView(clubId, previousWeekStart, lang, previousWeek.members, ensureAssigned = false)
         ClubDetails(
             id = clubId,
             name = club[Clubs.name],
@@ -100,6 +138,8 @@ class ClubService {
             recruitingOpen = club[Clubs.recruitingOpen],
             currentWeek = currentWeek,
             previousWeek = previousWeek,
+            currentQuestWeek = currentQuestWeek,
+            previousQuestWeek = previousQuestWeek,
         )
     }
 
@@ -218,6 +258,9 @@ class ClubService {
             if (role == ROLE_PRESIDENT) {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
+                    ClubQuestRewardRecipients.deleteWhere { ClubQuestRewardRecipients.clubId eq clubId }
+                    ClubQuestMemberProgress.deleteWhere { ClubQuestMemberProgress.clubId eq clubId }
+                    ClubQuestProgress.deleteWhere { ClubQuestProgress.clubId eq clubId }
                     ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
                     ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.clubId eq clubId }
                     ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
@@ -345,14 +388,27 @@ class ClubService {
         }
     }
 
-    fun clubChat(userId: Long): List<ClubChatMessage> = transaction {
+    fun clubChat(
+        userId: Long,
+        beforeId: Long? = null,
+        limit: Int? = null,
+    ): List<ClubChatMessage> = transaction {
         val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
             ?: throw ClubException("not_in_club")
         val clubId = membership[ClubMembers.clubId].value
-        ClubChatMessages
-            .select { ClubChatMessages.clubId eq clubId }
-            .orderBy(ClubChatMessages.createdAt, SortOrder.DESC)
-            .limit(CHAT_LIMIT)
+        val pageLimit = (limit ?: if (beforeId != null) CHAT_PAGE_LIMIT else CHAT_LIMIT)
+            .coerceIn(1, CHAT_LIMIT)
+        val query = ClubChatMessages.select {
+            val clubFilter = ClubChatMessages.clubId eq clubId
+            if (beforeId != null) {
+                clubFilter and (ClubChatMessages.id less EntityID(beforeId, ClubChatMessages))
+            } else {
+                clubFilter
+            }
+        }
+        query
+            .orderBy(ClubChatMessages.id, SortOrder.DESC)
+            .limit(pageLimit)
             .map { row ->
                 ClubChatMessage(
                     id = row[ClubChatMessages.id].value,
@@ -361,6 +417,29 @@ class ClubService {
                 )
             }
             .reversed()
+    }
+
+    fun sendChatMessage(userId: Long, text: String): ClubChatMessage = transaction {
+        val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
+            ?: throw ClubException("not_in_club")
+        val cleanText = sanitizeChatMessage(text, CHAT_MESSAGE_MAX_LENGTH)
+        if (cleanText.isBlank()) throw ClubException("message_empty")
+        val clubId = membership[ClubMembers.clubId].value
+        val role = membership[ClubMembers.role]
+        val sender = displayNameByUserId(userId)
+        val payload = memberChatPayload(sender, role, cleanText)
+        val now = Instant.now()
+        val id = ClubChatMessages.insertAndGetId {
+            it[ClubChatMessages.clubId] = clubId
+            it[message] = payload
+            it[createdAt] = now
+        }.value
+        trimChatTx(clubId)
+        ClubChatMessage(
+            id = id,
+            message = payload,
+            createdAt = now,
+        )
     }
 
     fun updateClubInfo(userId: Long, info: String): ClubDetails {
@@ -777,14 +856,39 @@ class ClubService {
         return Json.encodeToString(ClubChatPayload(key, params))
     }
 
+    private fun memberChatPayload(sender: String, role: String, text: String): String {
+        var clippedText = text
+        var payload = chatPayload(
+            "clubChatMemberMessage",
+            mapOf(
+                "sender" to sender,
+                "rank" to role,
+                "text" to clippedText,
+            ),
+        )
+        while (payload.length > CHAT_MESSAGE_MAX_LENGTH && clippedText.isNotEmpty()) {
+            val overflow = payload.length - CHAT_MESSAGE_MAX_LENGTH
+            clippedText = clippedText.dropLast(overflow.coerceAtLeast(1)).trimEnd()
+            payload = chatPayload(
+                "clubChatMemberMessage",
+                mapOf(
+                    "sender" to sender,
+                    "rank" to role,
+                    "text" to clippedText,
+                ),
+            )
+        }
+        return payload
+    }
+
     private fun trimChatTx(clubId: Long) {
         val keepIds = ClubChatMessages
             .slice(ClubChatMessages.id)
             .select { ClubChatMessages.clubId eq clubId }
-            .orderBy(ClubChatMessages.createdAt, SortOrder.DESC)
-            .limit(CHAT_LIMIT)
+            .orderBy(ClubChatMessages.id, SortOrder.DESC)
+            .limit(CHAT_HISTORY_LIMIT)
             .map { it[ClubChatMessages.id].value }
-        if (keepIds.size < CHAT_LIMIT) return
+        if (keepIds.size < CHAT_HISTORY_LIMIT) return
         val keepEntityIds = keepIds.map { EntityID(it, ClubChatMessages) }
         ClubChatMessages.deleteWhere {
             (ClubChatMessages.clubId eq clubId) and (ClubChatMessages.id notInList keepEntityIds)
@@ -803,6 +907,8 @@ class ClubService {
         const val ROLE_VETERAN = "veteran"
         const val ROLE_NOVICE = "novice"
         const val CHAT_LIMIT = 100
+        const val CHAT_PAGE_LIMIT = 20
+        const val CHAT_HISTORY_LIMIT = 1000
         const val CHAT_MESSAGE_MAX_LENGTH = 500
         private val CLUB_ZONE: ZoneId = ZoneId.of("Europe/Belgrade")
     }

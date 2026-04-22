@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -65,6 +66,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.riverking.mobile.auth.AppUpdateInfoDto
 import com.riverking.mobile.auth.CatchDto
 import com.riverking.mobile.auth.GoogleSignInManager
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +87,7 @@ fun RiverKingApp(
     val scope = rememberCoroutineScope()
     val latestStrings = rememberUpdatedState(strings)
     val latestViewModel = rememberUpdatedState(viewModel)
+    val appUpdateInstaller = remember(activity) { AppUpdateInstaller(activity) }
     val playBillingManager = remember(activity, scope) {
         if (viewModel.isPlayFlavor()) {
             PlayBillingManager(
@@ -119,26 +122,29 @@ fun RiverKingApp(
         }
     }
 
-    DisposableEffect(activity, playBillingManager) {
+    DisposableEffect(activity, playBillingManager, appUpdateInstaller) {
         val manager = playBillingManager
-        if (manager == null) {
-            onDispose { }
-        } else {
-            manager.start()
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    manager.syncPurchases()
-                }
+        manager?.start()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                manager?.syncPurchases()
+                appUpdateInstaller.resumePendingInstall(
+                    strings = latestStrings.value,
+                    onError = latestViewModel.value::showError,
+                )
+                latestViewModel.value.refreshAppUpdateStatus()
             }
-            activity.lifecycle.addObserver(observer)
-            onDispose {
-                activity.lifecycle.removeObserver(observer)
-                manager.stop()
-            }
+        }
+        activity.lifecycle.addObserver(observer)
+        onDispose {
+            activity.lifecycle.removeObserver(observer)
+            manager?.stop()
+            appUpdateInstaller.dispose()
         }
     }
 
-    LaunchedEffect(state.error) {
+    LaunchedEffect(state.error, currentMe) {
+        if (currentMe != null) return@LaunchedEffect
         val message = state.error ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
         viewModel.consumeError()
@@ -164,8 +170,22 @@ fun RiverKingApp(
                     .fillMaxSize()
                     .padding(padding),
             ) {
+                val appUpdate = state.appUpdate
+                val startUpdate: () -> Unit = startUpdate@{
+                    val update = state.appUpdate ?: return@startUpdate
+                    appUpdateInstaller.startUpdate(
+                        update = update,
+                        strings = strings,
+                        onError = viewModel::showError,
+                    )
+                }
                 when {
                     state.loading -> LoadingScreen(strings)
+                    appUpdate?.isMandatory == true -> UpdateGateScreen(
+                        update = appUpdate,
+                        strings = strings,
+                        onUpdate = startUpdate,
+                    )
                     currentMe == null -> AuthScreen(
                         state = state,
                         strings = strings,
@@ -206,7 +226,7 @@ fun RiverKingApp(
                         onOpenAccountDeletionHelp = viewModel::openAccountDeletionHelp,
                         onChangeLanguage = viewModel::changeLanguage,
                         onClaimDaily = viewModel::claimDaily,
-                        onBeginCast = { viewModel.beginCast() },
+                        onBeginCast = { visualSpot -> viewModel.beginCast(visualSpot = visualSpot) },
                         onHookFish = viewModel::hookFish,
                         onTapChallenge = viewModel::registerTap,
                         onToggleAutoCast = viewModel::toggleAutoCast,
@@ -241,6 +261,8 @@ fun RiverKingApp(
                         onDismissAchievementReward = viewModel::dismissAchievementReward,
                         onLoadClub = viewModel::loadClub,
                         onLoadClubChat = viewModel::loadClubChat,
+                        onLoadOlderClubChat = viewModel::loadOlderClubChat,
+                        onSendClubChatMessage = viewModel::sendClubChatMessage,
                         onSearchClubs = viewModel::searchClubs,
                         onCreateClub = viewModel::createClub,
                         onJoinClub = viewModel::joinClub,
@@ -267,6 +289,16 @@ fun RiverKingApp(
                         onUpdateNickname = viewModel::updateNickname,
                         onSaveNickname = viewModel::saveNickname,
                         onLoadCatchStats = viewModel::loadCatchStats,
+                        onShowErrorMessage = { message -> snackbarHostState.showSnackbar(message) },
+                        onConsumeError = viewModel::consumeError,
+                    )
+                }
+                if (appUpdate != null && !appUpdate.isMandatory) {
+                    AppUpdateDialog(
+                        update = appUpdate,
+                        strings = strings,
+                        onUpdate = startUpdate,
+                        onDismiss = viewModel::dismissAppUpdate,
                     )
                 }
             }
@@ -278,6 +310,94 @@ fun RiverKingApp(
 private fun LoadingScreen(strings: RiverStrings) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(strings.appTitle, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun UpdateGateScreen(
+    update: AppUpdateInfoDto,
+    strings: RiverStrings,
+    onUpdate: () -> Unit,
+) {
+    AuthBackdrop {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Top,
+        ) {
+            Text(
+                text = strings.updateRequiredTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = strings.updateRequiredMessage(update.latestVersionName),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            ReleaseNotes(update.releaseNotes, strings)
+            Spacer(modifier = Modifier.height(22.dp))
+            Button(
+                onClick = onUpdate,
+                modifier = Modifier.fillMaxWidth(),
+                colors = riverPrimaryButtonColors(),
+            ) {
+                Text(strings.updateActionLabel(update))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppUpdateDialog(
+    update: AppUpdateInfoDto,
+    strings: RiverStrings,
+    onUpdate: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.updateAvailableTitle) },
+        text = {
+            Column {
+                Text(strings.updateAvailableMessage(update.latestVersionName))
+                ReleaseNotes(update.releaseNotes, strings)
+            }
+        },
+        confirmButton = {
+            Button(onClick = onUpdate, colors = riverPrimaryButtonColors()) {
+                Text(strings.updateActionLabel(update))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.later)
+            }
+        },
+    )
+}
+
+@Composable
+private fun ReleaseNotes(
+    notes: List<String>,
+    strings: RiverStrings,
+) {
+    if (notes.isEmpty()) return
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = strings.releaseNotesTitle,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    notes.forEach { note ->
+        Text(
+            text = "- $note",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -577,7 +697,7 @@ private fun shareText(
     activity.startActivity(Intent.createChooser(sendIntent, null))
 }
 
-private fun openExternalUrl(
+internal fun openExternalUrl(
     activity: ComponentActivity,
     url: String,
 ) {

@@ -1,0 +1,37 @@
+name: PR Required Labels
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - labeled
+      - unlabeled
+      - ready_for_review
+
+permissions:
+  pull-requests: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check change-type labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = new Set((context.payload.pull_request.labels || []).map((label) => label.name));
+            const required = ['feature', 'fix', 'docs', 'ci', 'chore', 'refactor', 'breaking-change', 'release'];
+            const matched = required.filter((label) => labels.has(label));
+
+            if (matched.length === 0) {
+              core.setFailed(
+                `Add one change-type label to this PR: ${required.join(', ')}.`
+              );
+              return;
+            }
+
+            core.info(`Matched required labels: ${matched.join(', ')}`);

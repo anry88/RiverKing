@@ -79,37 +79,38 @@ function BottomNav({tab,setTab,dailyAvailable,achievementsAvailable}){
     ...item,
     label: typeof item.label === 'function' ? item.label() : item.label,
   }));
-  const isAndroid = (window.Telegram?.WebApp?.platform || '').toLowerCase() === 'android';
   return (
-    <div className="-mx-4 sticky bottom-0 z-20">
-      <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2" aria-label={t('menu')}>
-        {items.map(item=>(
-          <button
-            key={item.id}
-            type="button"
-            onClick={()=>setTab(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
-            aria-current={tab===item.id ? 'page' : undefined}
-          >
-            <div className="relative">
-              <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
-              {dailyAvailable && item.id==='shop' && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  !
-                </span>
-              )}
-              {achievementsAvailable && item.id==='guide' && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  !
-                </span>
-              )}
-            </div>
-            <span className="leading-tight text-center">{item.label}</span>
-          </button>
-        ))}
-      </nav>
-      {isAndroid && <div className="app-footer-placeholder" aria-hidden="true"></div>}
-    </div>
+    <>
+      <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+        <nav className="app-footer backdrop-blur bg-black/30 border-t border-white/10 flex gap-2 max-w-5xl xl:max-w-6xl mx-auto pointer-events-auto" aria-label={t('menu')}>
+          {items.map(item=>(
+            <button
+              key={item.id}
+              type="button"
+              onClick={()=>setTab(item.id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors ${tab===item.id ? 'bg-white/10 text-emerald-400' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+              aria-current={tab===item.id ? 'page' : undefined}
+            >
+              <div className="relative">
+                <AssetImage src={item.icon} alt="" className={`w-6 h-6 ${tab===item.id ? '' : 'opacity-80'}`} />
+                {dailyAvailable && item.id==='shop' && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    !
+                  </span>
+                )}
+                {achievementsAvailable && item.id==='guide' && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    !
+                  </span>
+                )}
+              </div>
+              <span className="leading-tight text-center">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div className="app-footer-placeholder" aria-hidden="true"></div>
+    </>
   );
 }
 
@@ -144,7 +145,7 @@ function LocationsDrawer({open, onClose, me, onSelect}){
   );
 }
 
-function QuestCard({quest}){
+function QuestCard({quest, isClub = false}){
   if(!quest) return null;
   const progress = Math.max(0, Number(quest.progress) || 0);
   const target = Math.max(1, Number(quest.target) || 1);
@@ -165,7 +166,9 @@ function QuestCard({quest}){
           style={{width:`${Math.round(ratio*100)}%`}}
         ></div>
       </div>
-      <div className="text-xs mt-2 text-yellow-300">{t('questRewardCoins', quest.rewardCoins)}</div>
+      <div className="text-xs mt-2 text-yellow-300">
+        {isClub ? t('clubQuestRewardCoins', quest.rewardCoins) : t('questRewardCoins', quest.rewardCoins)}
+      </div>
     </div>
   );
 }
@@ -173,6 +176,8 @@ function QuestCard({quest}){
 function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
   const daily = quests?.daily || [];
   const weekly = quests?.weekly || [];
+  const club = quests?.club || { available:false, message:null, quests:[] };
+  const clubQuests = club?.quests || [];
   return (
     <div className={`fixed inset-0 z-50 ${open?'' :'pointer-events-none'}`}>
       <div onClick={onClose} className={`absolute inset-0 transition-opacity ${open? 'opacity-100':'opacity-0'} bg-black/60`}></div>
@@ -213,6 +218,20 @@ function QuestsDrawer({open, onClose, quests, loading, error, onReload}){
               ) : (
                 <div className="space-y-2">
                   {weekly.map(q => <QuestCard key={q.code} quest={q} />)}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-2">{t('clubQuests')}</div>
+              {!club.available ? (
+                <div className="text-sm opacity-70 glass rounded-xl px-3 py-3">
+                  {club.message || t('clubQuestsLocked')}
+                </div>
+              ) : clubQuests.length === 0 ? (
+                <div className="text-sm opacity-60">{t('questsEmpty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {clubQuests.map(q => <QuestCard key={q.code} quest={q} isClub />)}
                 </div>
               )}
             </div>
@@ -542,7 +561,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const CLUB_MIN_WEIGHT = 1000;
   const [mode, setMode] = React.useState('hub');
   const [club, setClub] = React.useState(null);
+  const [clubView, setClubView] = React.useState('ratings');
   const [clubTab, setClubTab] = React.useState('current');
+  const [selectedQuestCode, setSelectedQuestCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const [search, setSearch] = React.useState([]);
@@ -559,8 +580,16 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [chatOpen, setChatOpen] = React.useState(false);
   const [chatMessages, setChatMessages] = React.useState([]);
   const [chatLoading, setChatLoading] = React.useState(false);
+  const [chatOlderLoading, setChatOlderLoading] = React.useState(false);
+  const [chatHasMore, setChatHasMore] = React.useState(true);
+  const [chatSending, setChatSending] = React.useState(false);
+  const [chatDraft, setChatDraft] = React.useState('');
   const [chatError, setChatError] = React.useState(null);
   const chatScrollRef = React.useRef(null);
+  const chatMessagesRef = React.useRef([]);
+  const chatOlderLoadingRef = React.useRef(false);
+  const chatHasMoreRef = React.useRef(true);
+  const chatScrollModeRef = React.useRef(null);
   const [infoDraft, setInfoDraft] = React.useState('');
   const [infoSaving, setInfoSaving] = React.useState(false);
   const [infoError, setInfoError] = React.useState(null);
@@ -578,12 +607,22 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     return role;
   }, []);
 
+  const roleColorClass = React.useCallback(role => {
+    if(role === 'president') return 'text-amber-300';
+    if(role === 'heir') return 'text-red-400';
+    if(role === 'veteran') return 'text-blue-400';
+    if(role === 'novice') return 'text-green-400';
+    return 'text-teal-200';
+  }, []);
+
   const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
 
   const resetState = React.useCallback(() => {
     setMode('hub');
     setClub(null);
+    setClubView('ratings');
     setClubTab('current');
+    setSelectedQuestCode('');
     setLoading(false);
     setError(null);
     setSearch([]);
@@ -600,6 +639,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     setChatOpen(false);
     setChatMessages([]);
     setChatLoading(false);
+    setChatOlderLoading(false);
+    setChatHasMore(true);
+    setChatSending(false);
+    setChatDraft('');
     setChatError(null);
     setInfoDraft('');
     setInfoSaving(false);
@@ -626,7 +669,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       }
       const data = await resp.json();
       setClub(data);
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setMode('club');
     }catch(e){
       setError(e.message==='unauthorized' ? t('authRequired') : t('clubLoadFailed'));
@@ -669,6 +714,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const loadChat = React.useCallback(async () => {
     setChatLoading(true);
     setChatError(null);
+    chatScrollModeRef.current = { type: 'bottom' };
     try{
       const resp = await fetch(`/api/club/chat`, {credentials:'include'});
       if(!resp.ok){
@@ -676,11 +722,48 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
         throw new Error('chat_failed');
       }
       const data = await resp.json();
-      setChatMessages(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setChatMessages(list);
+      setChatHasMore(list.length >= 100);
     }catch(e){
       setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
     }finally{
       setChatLoading(false);
+    }
+  }, []);
+
+  const loadOlderChat = React.useCallback(async () => {
+    const current = chatMessagesRef.current;
+    if(chatOlderLoadingRef.current || !chatHasMoreRef.current || current.length === 0) return;
+    const oldestId = current[0]?.id;
+    if(!oldestId) return;
+    const node = chatScrollRef.current;
+    chatScrollModeRef.current = {
+      type: 'preserve',
+      scrollHeight: node?.scrollHeight || 0,
+      scrollTop: node?.scrollTop || 0,
+    };
+    setChatOlderLoading(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat?beforeId=${encodeURIComponent(oldestId)}&limit=20`, {credentials:'include'});
+      if(!resp.ok){
+        if(resp.status===401) throw new Error('unauthorized');
+        throw new Error('chat_failed');
+      }
+      const data = await resp.json();
+      const older = Array.isArray(data) ? data : [];
+      setChatHasMore(older.length >= 20);
+      if(older.length > 0){
+        setChatMessages(existing => {
+          const existingIds = new Set(existing.map(item => item.id));
+          return older.filter(item => !existingIds.has(item.id)).concat(existing);
+        });
+      }
+    }catch(e){
+      setChatError(e.message==='unauthorized' ? t('authRequired') : t('clubChatFailed'));
+    }finally{
+      setChatOlderLoading(false);
     }
   }, []);
 
@@ -697,6 +780,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(code === 'name_empty') return t('clubNameEmpty');
     if(code === 'name_too_long') return t('clubNameTooLong');
     if(code === 'name_profanity') return t('clubNameProfanity');
+    if(code === 'message_empty') return t('clubChatMessageEmpty');
     if(code === 'not_found') return t('clubNotFound');
     if(code === 'info_too_long') return t('clubInfoTooLong');
     if(code === 'invalid_min_weight') return t('clubInvalidMinWeight');
@@ -729,7 +813,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       const data = await resp.json();
       setClub(data);
       setMode('club');
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setName('');
       setConfirming(false);
       onReloadProfile?.();
@@ -753,7 +839,9 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       const data = await resp.json();
       setClub(data);
       setMode('club');
+      setClubView('ratings');
       setClubTab('current');
+      setSelectedQuestCode('');
       setSelectedClubId(null);
       onReloadProfile?.();
     }catch(e){
@@ -831,17 +919,42 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, [mode, searchQuery, loadSearch]);
 
   React.useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
+
+  React.useEffect(() => {
+    chatOlderLoadingRef.current = chatOlderLoading;
+  }, [chatOlderLoading]);
+
+  React.useEffect(() => {
+    chatHasMoreRef.current = chatHasMore;
+  }, [chatHasMore]);
+
+  React.useEffect(() => {
     if(!chatOpen) return;
     const node = chatScrollRef.current;
     if(!node) return;
     requestAnimationFrame(() => {
-      node.scrollTop = node.scrollHeight;
+      const mode = chatScrollModeRef.current;
+      if(mode?.type === 'preserve'){
+        node.scrollTop = node.scrollHeight - mode.scrollHeight + mode.scrollTop;
+      }else if(mode?.type === 'bottom'){
+        node.scrollTop = node.scrollHeight;
+      }
+      chatScrollModeRef.current = null;
     });
-  }, [chatOpen, chatMessages, chatLoading]);
+  }, [chatOpen, chatMessages, chatLoading, chatOlderLoading]);
 
-  if(!active) return null;
+  const handleChatScroll = React.useCallback(() => {
+    const node = chatScrollRef.current;
+    if(!node || node.scrollTop > 32) return;
+    loadOlderChat();
+  }, [loadOlderChat]);
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
+  const questWeekData = clubTab === 'previous' ? club?.previousQuestWeek : club?.currentQuestWeek;
+  const questList = Array.isArray(questWeekData?.quests) ? questWeekData.quests : [];
+  const selectedQuest = questList.find(quest => quest.code === selectedQuestCode) || questList[0] || null;
   const viewingPreviousWeek = clubTab === 'previous';
   const formatWeekRange = (weekStartValue) => {
     if(!weekStartValue) return '';
@@ -852,6 +965,17 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     const formatter = new Intl.DateTimeFormat(coinLocale, { day:'2-digit', month:'2-digit' });
     return `${formatter.format(start)}–${formatter.format(end)}`;
   };
+
+  React.useEffect(() => {
+    if(!questList.length){
+      setSelectedQuestCode('');
+      return;
+    }
+    if(questList.some(quest => quest.code === selectedQuestCode)) return;
+    setSelectedQuestCode(questList[0].code);
+  }, [club?.id, clubTab, questWeekData?.weekStart, selectedQuestCode, questList]);
+
+  if(!active) return null;
 
   const handleLeave = async () => {
     if(!window.confirm(t('clubConfirmLeave'))) return;
@@ -941,6 +1065,37 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
+  const handleSendChat = async () => {
+    const trimmed = chatDraft.trim();
+    if(!trimmed){
+      setChatError(t('clubChatMessageEmpty'));
+      return;
+    }
+    if(chatSending) return;
+    setChatSending(true);
+    setChatError(null);
+    try{
+      const resp = await fetch(`/api/club/chat`, {
+        method:'POST',
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({text: trimmed}),
+      });
+      if(!resp.ok){
+        const data = await resp.json().catch(()=> ({}));
+        throw new Error(data.error || 'chat_failed');
+      }
+      const data = await resp.json();
+      chatScrollModeRef.current = { type: 'bottom' };
+      setChatMessages(existing => existing.some(item => item.id === data.id) ? existing : existing.concat(data));
+      setChatDraft('');
+    }catch(e){
+      setChatError(parseClubError(e.message, 'clubChatSendFailed'));
+    }finally{
+      setChatSending(false);
+    }
+  };
+
   const localizeChatMessage = (message) => {
     if(typeof message !== 'string') return message;
     const trimmed = message.trim();
@@ -955,7 +1110,37 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     }
   };
 
-  const renderChatMessage = (message) => {
+  const parseChatPayload = (message) => {
+    if(typeof message !== 'string') return null;
+    const trimmed = message.trim();
+    if(!trimmed.startsWith('{')) return null;
+    try{
+      const payload = JSON.parse(trimmed);
+      if(!payload || typeof payload.key !== 'string') return null;
+      const params = payload.params && typeof payload.params === 'object' ? payload.params : {};
+      return { key: payload.key, params };
+    }catch(e){
+      return null;
+    }
+  };
+
+  const renderChatMessage = (item) => {
+    const message = typeof item === 'string' ? item : item?.message;
+    const payload = parseChatPayload(message);
+    if(payload?.key === 'clubChatMemberMessage'){
+      const rank = payload.params.rank || payload.params.role || '';
+      const sender = payload.params.sender || payload.params.name || t('you');
+      const text = payload.params.text || payload.params.message || '';
+      const colorClass = roleColorClass(rank);
+      return (
+        <span>
+          <span className={`font-semibold ${colorClass}`}>{sender}</span>
+          {' '}
+          <span className={`font-semibold ${colorClass}`}>({roleLabel(rank)})</span>
+          {`: ${text}`}
+        </span>
+      );
+    }
     const localizedMessage = localizeChatMessage(message);
     if(!localizedMessage) return localizedMessage;
     const rarityColorMap = window.rarityColors || {};
@@ -1019,25 +1204,49 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                 <button onClick={()=>setChatOpen(false)} className="px-3 py-1 rounded-xl glass">✕</button>
               </div>
             </div>
-            <div ref={chatScrollRef} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+            <div ref={chatScrollRef} onScroll={handleChatScroll} className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
               {chatLoading ? (
                 <div className="text-sm opacity-70">{t('loading')}</div>
-              ) : chatError ? (
-                <div className="text-sm opacity-70">{chatError}</div>
               ) : chatMessages.length === 0 ? (
                 <div className="text-sm opacity-70">{t('clubChatEmpty')}</div>
               ) : (
-                chatMessages.map(item => {
-                  const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
-                  return (
-                    <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
-                      <div className="text-xs opacity-70">{ts}</div>
-                      <div className="mt-1">{renderChatMessage(item.message)}</div>
-                    </div>
-                  );
-                })
+                <>
+                  {chatOlderLoading && <div className="text-xs opacity-70 text-center">{t('loading')}</div>}
+                  {chatMessages.map(item => {
+                    const ts = item.createdAt ? new Date(item.createdAt).toLocaleString(coinLocale) : '';
+                    return (
+                      <div key={item.id || item.createdAt} className="p-2 rounded-xl border border-white/10">
+                        <div className="text-xs opacity-70">{ts}</div>
+                        <div className="mt-1">{renderChatMessage(item)}</div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </div>
+            {chatError && <div className="mt-2 text-xs text-red-300">{chatError}</div>}
+            <form
+              className="mt-3 flex items-end gap-2"
+              onSubmit={ev=>{
+                ev.preventDefault();
+                handleSendChat();
+              }}
+            >
+              <textarea
+                value={chatDraft}
+                onChange={ev=>setChatDraft(ev.target.value)}
+                placeholder={t('clubChatPlaceholder')}
+                maxLength={500}
+                rows={1}
+                className="flex-1 min-h-[42px] max-h-24 px-3 py-2 rounded-xl glass outline-none resize-none text-sm"
+                disabled={chatSending}
+              />
+              <button
+                type="submit"
+                className="px-3 py-2 rounded-xl glass text-sm font-semibold disabled:opacity-50"
+                disabled={chatSending || !chatDraft.trim()}
+              >{chatSending ? t('loading') : t('clubChatSend')}</button>
+            </form>
           </div>
         </div>
       )}
@@ -1120,6 +1329,18 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
           <div className="flex gap-2 text-sm">
             <button
               type="button"
+              onClick={()=>setClubView('ratings')}
+              className={`flex-1 py-2 rounded-xl ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('ratings')}</button>
+            <button
+              type="button"
+              onClick={()=>setClubView('quests')}
+              className={`flex-1 py-2 rounded-xl ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('clubQuests')}</button>
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
               onClick={()=>setClubTab('current')}
               className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
             >{t('clubCurrentWeek')}</button>
@@ -1130,62 +1351,123 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             >{t('clubPreviousWeek')}</button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            <div className="text-xs opacity-70">{formatWeekRange(weekData?.weekStart)}</div>
-            {(weekData?.members || []).length === 0 ? (
-              <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
-            ) : (
-              weekData.members.map(member => (
-                <div key={member.userId} className="p-2 rounded-xl border border-white/10 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-sm">
-                        <bdi>{member.name || '—'}</bdi>
+            <div className="text-xs opacity-70">
+              {formatWeekRange((clubView === 'quests' ? questWeekData?.weekStart : weekData?.weekStart))}
+            </div>
+            {clubView === 'ratings' ? (
+              (weekData?.members || []).length === 0 ? (
+                <div className="text-sm opacity-70">{t('clubNoContributions')}</div>
+              ) : (
+                weekData.members.map(member => (
+                  <div key={member.userId} className="p-2 rounded-xl border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-sm">
+                          <bdi>{member.name || '—'}</bdi>
+                        </div>
+                        <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
                       </div>
-                      <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                      <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
                     </div>
-                    <div className="text-sm text-yellow-300">🪙 {Number(member.coins || 0).toLocaleString(coinLocale)}</div>
+                    {!viewingPreviousWeek && canManageMembers && canActOnMember(member) && (
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {member.role !== 'heir' && member.role !== 'president' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg glass"
+                            onClick={()=>handleMemberAction(member.userId, 'promote')}
+                          >{t('clubPromote')}</button>
+                        )}
+                        {member.role !== 'novice' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg glass"
+                            onClick={()=>handleMemberAction(member.userId, 'demote')}
+                          >{t('clubDemote')}</button>
+                        )}
+                        <button
+                          type="button"
+                          className="px-2 py-1 rounded-lg glass text-red-300"
+                          onClick={()=>{
+                            if(window.confirm(t('clubConfirmKick', member.name || '—'))){
+                              handleMemberAction(member.userId, 'kick');
+                            }
+                          }}
+                        >{t('clubKick')}</button>
+                        {club.role === 'president' && member.role === 'heir' && (
+                          <button
+                            type="button"
+                            className="px-2 py-1 rounded-lg bg-yellow-400 text-black"
+                            onClick={()=>handleMemberAction(member.userId, 'appoint-president')}
+                          >{t('clubAppointPresident')}</button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {!viewingPreviousWeek && canManageMembers && canActOnMember(member) && (
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {member.role !== 'heir' && member.role !== 'president' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg glass"
-                          onClick={()=>handleMemberAction(member.userId, 'promote')}
-                        >{t('clubPromote')}</button>
-                      )}
-                      {member.role !== 'novice' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg glass"
-                          onClick={()=>handleMemberAction(member.userId, 'demote')}
-                        >{t('clubDemote')}</button>
-                      )}
-                      <button
-                        type="button"
-                        className="px-2 py-1 rounded-lg glass text-red-300"
-                        onClick={()=>{
-                          if(window.confirm(t('clubConfirmKick', member.name || '—'))){
-                            handleMemberAction(member.userId, 'kick');
-                          }
-                        }}
-                      >{t('clubKick')}</button>
-                      {club.role === 'president' && member.role === 'heir' && (
-                        <button
-                          type="button"
-                          className="px-2 py-1 rounded-lg bg-yellow-400 text-black"
-                          onClick={()=>handleMemberAction(member.userId, 'appoint-president')}
-                        >{t('clubAppointPresident')}</button>
-                      )}
-                    </div>
-                  )}
+                ))
+              )
+            ) : !questList.length ? (
+              <div className="text-sm opacity-70">{t('noData')}</div>
+            ) : (
+              <>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {questList.map(quest => (
+                    <button
+                      key={quest.code}
+                      type="button"
+                      onClick={()=>setSelectedQuestCode(quest.code)}
+                      className={`px-3 py-2 rounded-xl whitespace-nowrap ${selectedQuest?.code===quest.code ? 'bg-emerald-600' : 'glass'}`}
+                    >{quest.name}</button>
+                  ))}
                 </div>
-              ))
+                {selectedQuest && (
+                  <>
+                    <div className={`p-3 rounded-xl border ${selectedQuest.completed ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-white/10'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">{selectedQuest.name}</div>
+                          <div className="text-xs opacity-70 mt-1">{selectedQuest.description}</div>
+                        </div>
+                        {selectedQuest.completed && <div className="text-emerald-300 text-xs font-semibold uppercase">{t('questCompleted')}</div>}
+                      </div>
+                      <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full ${selectedQuest.completed ? 'bg-emerald-400' : 'bg-emerald-600'}`}
+                          style={{width:`${Math.round(Math.min(1, (Math.max(0, Number(selectedQuest.progress) || 0) / Math.max(1, Number(selectedQuest.target) || 1))) * 100)}%`}}
+                        ></div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                        <div className="opacity-70">{`${Number(selectedQuest.progress) || 0}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                        <div className="text-yellow-300">{t('clubQuestRewardCoins', selectedQuest.rewardCoins)}</div>
+                      </div>
+                    </div>
+                    {(selectedQuest.members || []).length === 0 ? (
+                      <div className="text-sm opacity-70">{t('noData')}</div>
+                    ) : (
+                      selectedQuest.members.map(member => (
+                        <div key={member.userId} className="p-2 rounded-xl border border-white/10">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="font-semibold text-sm">
+                                <bdi>{member.name || '—'}</bdi>
+                              </div>
+                              <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
+                            </div>
+                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
-          <div className="text-sm opacity-80 text-right">
-            {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
-          </div>
+          {clubView === 'ratings' && (
+            <div className="text-sm opacity-80 text-right">
+              {t('clubWeeklyTotal', Number(weekData?.totalCoins || 0).toLocaleString(coinLocale))}
+            </div>
+          )}
           <button
             type="button"
             className="w-full px-3 py-2 rounded-xl glass text-red-300"

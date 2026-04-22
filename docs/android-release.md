@@ -5,6 +5,8 @@ RiverKing ships Android in two channels:
 - `directRelease` APK for `itch.io`
 - `playRelease` AAB for `Google Play`
 
+This guide covers the public player app in `mobile/android-app`. The internal operator app in `mobile/admin-app` is a separate Android project with its own README and is not part of the itch.io / Google Play release contract below.
+
 The rollout order is deliberate: publish and validate the itch.io APK first, then ship the Google Play bundle on the same product identity.
 
 For local Android Studio work, the project deliberately keeps flavor-specific package IDs so debug and ad-hoc release installs do not collide with the canonical store package on the same device:
@@ -51,6 +53,12 @@ If Google Play App Signing is enabled, do not let Play create a different produc
 ## GitHub Release Automation
 
 The repository now includes [`.github/workflows/android-release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/android-release.yml).
+It also now includes:
+
+- [`.github/workflows/release-pr.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/release-pr.yml) to create or update the `develop -> main` draft release PR after every push to `develop`
+- [`.github/workflows/pr-labeler.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/pr-labeler.yml) to apply scope labels automatically
+- [`.github/workflows/pr-required-labels.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/workflows/pr-required-labels.yml) to fail PRs that do not carry a required change-type label
+- [`.github/release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/release.yml) to shape GitHub auto-generated release notes
 
 It runs in two modes:
 
@@ -61,6 +69,7 @@ What it does:
 
 - checks out the pushed `main` commit
 - reads the prod version from `mobile/android-app/version.properties`
+- validates `src/main/resources/android-update-policy.json` against that version
 - builds `--profile prod release-artifacts`
 - uploads the APK/AAB as workflow artifacts
 - creates or updates a **draft** GitHub Release with the built files attached
@@ -69,8 +78,93 @@ What it does:
 Current version behavior is intentional:
 
 - production builds use `RIVERKING_VERSION_NAME` and `RIVERKING_VERSION_CODE` from `mobile/android-app/version.properties`
-- if that file still says `0.1.0`, the release build will also be `0.1.0`
+- the release build uses whatever value is currently tracked in that file
 - bump `version.properties` in the release PR before merging into `main` whenever you want the shipped version to change
+
+## Android Update Policy
+
+The backend controls Android app freshness through [src/main/resources/android-update-policy.json](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/src/main/resources/android-update-policy.json). The Android client calls `GET /api/mobile/update` at startup/resume and sends these headers on API calls:
+
+- `X-RiverKing-App-Platform: android`
+- `X-RiverKing-App-Channel: direct` or `play`
+- `X-RiverKing-App-Version-Code`
+- `X-RiverKing-App-Version-Name`
+
+Policy fields:
+
+- `latestVersionCode` / `latestVersionName` describe the newest shipped Android release.
+- `minSupportedVersionCode` is the hard floor. If a mobile request is below it, the API returns `426 Upgrade Required` and the Android client shows a blocking update screen.
+- `requireVersionHeaders` should stay `false` during normal rollout. Set it to `true` only when a fatal change must also block legacy Android builds that do not send version headers yet.
+- `releaseNotes.en` and `releaseNotes.ru` feed the optional/mandatory update UI and generated release context.
+
+Normal release bump:
+
+1. Update `mobile/android-app/version.properties`.
+2. Update `src/main/resources/android-update-policy.json` `latestVersionCode`, `latestVersionName`, and release notes.
+3. Keep `minSupportedVersionCode` unchanged unless older clients truly cannot keep using the backend.
+4. Run `python3 mobile/android-app/scripts/check-update-policy.py`.
+
+Mandatory/fatal release bump:
+
+1. Raise `minSupportedVersionCode` to the first version that can safely use the current backend contract.
+2. If the incompatible clients predate Android version headers, set `requireVersionHeaders` to `true`; otherwise keep it `false` and let `minSupportedVersionCode` do the blocking.
+3. Add the `android-force-update` label to the release-bound PR, and also use `breaking-change` when the server/client contract is incompatible.
+4. Put the forced update reason in the PR release notes and `android-update-policy.json` notes.
+5. Publish the new APK/store artifact and install URL first, then deploy the backend policy so stale clients receive a clear upgrade response instead of a dead-end block.
+
+Install targets:
+
+- `direct` opens the itch.io page unless the backend has `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL`; with that URL it downloads the APK in-app through Android `DownloadManager` and opens the system package installer.
+- `play` opens `RIVERKING_PLAY_STORE_URL`, or a Google Play URL built from `GOOGLE_PLAY_PACKAGE_NAME`, falling back to itch.io/support only if no store URL is available.
+
+## GitHub PR Rules
+
+After every push to `develop`, GitHub can now create or update a single draft release PR from `develop` into `main`.
+
+The release PR:
+
+- is titled `Release Android <version>`
+- reads `<version>` from `mobile/android-app/version.properties`
+- carries the `release` label automatically
+- stays reusable as the running release train until you merge or close it
+
+Regular PRs should carry:
+
+- one required change-type label: `feature`, `fix`, `docs`, `ci`, `chore`, `refactor`, `breaking-change`, or `release`
+- any scope labels that GitHub applies automatically from changed paths, such as `android`, `backend`, `webapp`, `docs`, or `ci`
+
+To make the rule actually blocking in GitHub, add the `PR Required Labels` workflow as a required status check in your branch protection rule or ruleset for `develop` and `main`.
+
+To let the release PR workflow create PRs with `GITHUB_TOKEN`, enable this repository setting:
+
+- `Settings -> Actions -> General -> Workflow permissions -> Read and write permissions`
+- `Allow GitHub Actions to create and approve pull requests`
+
+Without that repository setting, GitHub can run the workflow file but will reject the PR creation request.
+
+## GitHub Release Notes
+
+GitHub release notes now use [`.github/release.yml`](/Users/hq-k14lcdcq7d/Documents/IdeaProjects/RiverKing/.github/release.yml).
+
+Generated categories are:
+
+- `Mandatory Android Updates`
+- `Breaking Changes`
+- `Features`
+- `Fixes`
+- `Documentation`
+- `CI and Maintenance`
+- `Releases`
+- `Other Changes`
+
+The practical flow is:
+
+1. Push release-bound work into `develop`.
+2. Let GitHub update the draft `develop -> main` release PR.
+3. Keep PR labels accurate so generated release notes stay readable.
+4. Merge that PR into `main`.
+5. Let `android-release.yml` build artifacts and create the draft GitHub Release with auto-generated notes.
+6. Review the draft release body, add a short manual preface if needed, then publish.
 
 Required GitHub repository secrets:
 
@@ -95,6 +189,12 @@ Optional GitHub repository variables for the prod profile:
 
 The workflow writes `mobile/android-app/profiles/prod.properties` on the runner from those GitHub variables before calling `build-android.sh`.
 If you prefer, the same names can be stored as repository secrets instead; the workflow uses variables first and secrets as fallback.
+
+Backend deploys should also set these runtime values for Android update/install prompts:
+
+- `RIVERKING_ITCH_PROJECT_URL`
+- `RIVERKING_PLAY_STORE_URL`
+- `RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL` when the direct APK should install from an in-app download instead of only opening itch.io
 
 Suggested keystore preparation for the secret:
 

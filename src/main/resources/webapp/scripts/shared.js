@@ -221,16 +221,14 @@
     document.documentElement.style.setProperty('--safe-top-fb', safeTopFB + 'px');
     document.documentElement.style.setProperty('--safe-bottom-fb', safeBottomFB + 'px');
 
-    const sh = window.screen?.height || vh;
-    const bottomGapLegacy = Math.max(0, Math.round(sh - vh));
-    const bottomGap = Math.max(safeBottomFB, bottomGapLegacy);
+    const plat = (tg?.platform || '').toLowerCase();
+    const isMobileTG = plat === 'android' || plat === 'ios';
+    const bottomGap = safeBottomFB;
     document.documentElement.style.setProperty('--bottom-gap', bottomGap + 'px');
 
     const isOverlay = (bottomGap >= 8) || (safeTopFB >= 8);
     document.documentElement.style.setProperty('--overlay', isOverlay ? '1' : '0');
 
-    const plat = (tg?.platform || '').toLowerCase();
-    const isMobileTG = plat === 'android' || plat === 'ios';
     const needTGTopbarFallback = isMobileTG && safeTopFB < 4;
     const tgTopbarGuess = needTGTopbarFallback
       ? (plat === 'ios' ? 54 : 48)
@@ -1151,11 +1149,14 @@
       quests: 'Задания',
       dailyQuests: 'Ежедневные задания',
       weeklyQuests: 'Еженедельные задания',
+      clubQuests: 'Клубные задания',
       questsEmpty: 'Пока нет активных заданий.',
       questsUnavailable: 'Не удалось загрузить задания',
       questsRefresh: 'Обновить',
       questCompleted: 'Выполнено',
       questRewardCoins: coins => `🪙 +${coins} монет`,
+      clubQuestRewardCoins: coins => `🪙 Награда клуба: ${coins} монет`,
+      clubQuestsLocked: 'Вступи в клуб, чтобы открыть клубные задания.',
       questCompletedLine: ({ name, coins }) => `Квест выполнен: ${name} (+${coins} монет)`,
       club: 'Рыболовный клуб',
       clubShort: 'Клуб',
@@ -1165,6 +1166,10 @@
       clubChatEmpty: 'Сообщений пока нет.',
       clubChatFailed: 'Не удалось загрузить чат.',
       clubChatRefresh: 'Обновить',
+      clubChatPlaceholder: 'Сообщение',
+      clubChatSend: 'Отправить',
+      clubChatSendFailed: 'Не удалось отправить сообщение.',
+      clubChatMessageEmpty: 'Введите сообщение.',
       clubChatMemberJoined: ({ name }) => `${name} вступил в клуб.`,
       clubChatMemberLeft: ({ name }) => `${name} покинул клуб.`,
       clubChatMemberKicked: ({ actor, target }) => `${actor} исключил ${target} из клуба.`,
@@ -1405,11 +1410,14 @@
       quests: 'Quests',
       dailyQuests: 'Daily quests',
       weeklyQuests: 'Weekly quests',
+      clubQuests: 'Club quests',
       questsEmpty: 'No active quests yet.',
       questsUnavailable: 'Failed to load quests',
       questsRefresh: 'Refresh',
       questCompleted: 'Completed',
       questRewardCoins: coins => `🪙 +${coins} coins`,
+      clubQuestRewardCoins: coins => `🪙 Club reward: ${coins} coins`,
+      clubQuestsLocked: 'Join a club to unlock club quests.',
       questCompletedLine: ({ name, coins }) => `Quest completed: ${name} (+${coins} coins)`,
       club: 'Fishing club',
       clubShort: 'Club',
@@ -1419,6 +1427,10 @@
       clubChatEmpty: 'No messages yet.',
       clubChatFailed: 'Failed to load chat.',
       clubChatRefresh: 'Refresh',
+      clubChatPlaceholder: 'Message',
+      clubChatSend: 'Send',
+      clubChatSendFailed: 'Failed to send message.',
+      clubChatMessageEmpty: 'Enter a message.',
       clubChatMemberJoined: ({ name }) => `${name} joined the club.`,
       clubChatMemberLeft: ({ name }) => `${name} left the club.`,
       clubChatMemberKicked: ({ actor, target }) => `${actor} kicked ${target} from the club.`,

@@ -2,6 +2,7 @@ package com.riverking.mobile.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.riverking.mobile.auth.AppUpdateInfoDto
 
 data class RiverStrings(
     val appTitle: String,
@@ -62,7 +63,6 @@ data class RiverStrings(
     val refresh: String,
     val fishEscaped: String,
     val noBait: String,
-    val shopDisabledDirect: String,
     val playPurchaseUnavailable: String,
     val playPurchasePending: String,
     val playPurchaseCancelled: String,
@@ -103,6 +103,8 @@ data class RiverStrings(
     val chooseBait: String,
     val dailyQuestsLabel: String,
     val weeklyQuestsLabel: String,
+    val clubQuestsLabel: String,
+    val clubQuestsLockedMessage: String,
     val changeNickname: String,
     val statistics: String,
     val totalWeight: String,
@@ -116,6 +118,17 @@ data class RiverStrings(
     val deleteAccountConfirm: String,
     val deleteAccountWeb: String,
     val deleteAccountDone: String,
+    val updateRequiredTitle: String,
+    val updateAvailableTitle: String,
+    val updateNow: String,
+    val downloadUpdate: String,
+    val later: String,
+    val releaseNotesTitle: String,
+    val updateDownloadDescription: String,
+    val updateDownloadFailed: String,
+    val updateDownloadedUnavailable: String,
+    val updateInstallerPermissionUnavailable: String,
+    val updateInstallerUnavailable: String,
 )
 
 @Composable
@@ -180,7 +193,6 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             refresh = "Обновить",
             fishEscaped = "Рыба сорвалась",
             noBait = "Нет наживки",
-            shopDisabledDirect = "Платные наборы недоступны в direct-сборке",
             playPurchaseUnavailable = "Play-покупка пока недоступна в этой конфигурации",
             playPurchasePending = "Покупка в Google Play ещё ожидает подтверждения",
             playPurchaseCancelled = "Покупка отменена",
@@ -221,6 +233,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Выбор наживки",
             dailyQuestsLabel = "Ежедневные",
             weeklyQuestsLabel = "Недельные",
+            clubQuestsLabel = "Клубные",
+            clubQuestsLockedMessage = "Вступи в клуб, чтобы открыть клубные задания.",
             changeNickname = "Изменить никнейм",
             statistics = "Статистика",
             totalWeight = "Общий вес",
@@ -234,6 +248,17 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             deleteAccountConfirm = "Удалить навсегда",
             deleteAccountWeb = "Открыть веб-инструкции",
             deleteAccountDone = "Аккаунт удалён",
+            updateRequiredTitle = "Нужно обновить RiverKing",
+            updateAvailableTitle = "Доступно обновление",
+            updateNow = "Обновить",
+            downloadUpdate = "Скачать APK",
+            later = "Позже",
+            releaseNotesTitle = "Что изменилось",
+            updateDownloadDescription = "Загрузка обновления RiverKing",
+            updateDownloadFailed = "Не удалось загрузить обновление",
+            updateDownloadedUnavailable = "Загруженный APK недоступен",
+            updateInstallerPermissionUnavailable = "Разрешите установку из RiverKing и вернитесь в приложение",
+            updateInstallerUnavailable = "Установщик APK недоступен",
         )
     } else {
         RiverStrings(
@@ -295,7 +320,6 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             refresh = "Refresh",
             fishEscaped = "The fish got away",
             noBait = "No bait available",
-            shopDisabledDirect = "Paid packs are unavailable in the direct build",
             playPurchaseUnavailable = "Play purchase is unavailable in this configuration",
             playPurchasePending = "Google Play is still waiting to finalize this purchase",
             playPurchaseCancelled = "Purchase cancelled",
@@ -336,6 +360,8 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             chooseBait = "Choose bait",
             dailyQuestsLabel = "Daily",
             weeklyQuestsLabel = "Weekly",
+            clubQuestsLabel = "Club",
+            clubQuestsLockedMessage = "Join a club to unlock club quests.",
             changeNickname = "Change nickname",
             statistics = "Statistics",
             totalWeight = "Total weight",
@@ -349,9 +375,37 @@ fun rememberRiverStrings(language: String?): RiverStrings = remember(language) {
             deleteAccountConfirm = "Delete forever",
             deleteAccountWeb = "Open web instructions",
             deleteAccountDone = "Account deleted",
+            updateRequiredTitle = "Update RiverKing to continue",
+            updateAvailableTitle = "Update available",
+            updateNow = "Update",
+            downloadUpdate = "Download APK",
+            later = "Later",
+            releaseNotesTitle = "What's new",
+            updateDownloadDescription = "Downloading the RiverKing update",
+            updateDownloadFailed = "Update download failed",
+            updateDownloadedUnavailable = "Downloaded APK is unavailable",
+            updateInstallerPermissionUnavailable = "Allow installs from RiverKing, then return to the app",
+            updateInstallerUnavailable = "APK installer is unavailable",
         )
     }
 }
+
+fun RiverStrings.updateRequiredMessage(version: String): String =
+    if (login == "Логин") {
+        "Эта версия больше не поддерживается. Установите ${version.ifBlank { "последнюю версию" }}, чтобы продолжить игру."
+    } else {
+        "This build is no longer supported. Install ${version.ifBlank { "the latest version" }} to continue playing."
+    }
+
+fun RiverStrings.updateAvailableMessage(version: String): String =
+    if (login == "Логин") {
+        "Можно установить ${version.ifBlank { "новую версию" }}. Пока это не обязательно, но обновление уже доступно."
+    } else {
+        "${version.ifBlank { "A new version" }} is available. You can keep playing for now, but updating is recommended."
+    }
+
+fun RiverStrings.updateActionLabel(update: AppUpdateInfoDto): String =
+    if (update.usesApkDownload) downloadUpdate else updateNow
 
 fun RiverStrings.periodLabel(period: RatingsPeriod): String = when (period) {
     RatingsPeriod.TODAY -> if (login == "Логин") "Сегодня" else "Today"
@@ -395,8 +449,12 @@ fun RiverStrings.rarityLabel(rarity: String?): String = when (rarity) {
 fun RiverStrings.dayLabel(day: Int): String =
     if (login == "Логин") "День $day" else "Day $day"
 
-fun RiverStrings.questRewardLabel(coins: Int): String =
-    if (login == "Логин") "Награда: $coins монет" else "Reward: $coins coins"
+fun RiverStrings.questRewardLabel(coins: Int, isClub: Boolean = false): String =
+    if (login == "Логин") {
+        if (isClub) "Награда клуба: $coins монет" else "Награда: $coins монет"
+    } else {
+        if (isClub) "Club reward: $coins coins" else "Reward: $coins coins"
+    }
 
 fun RiverStrings.catchResultTitle(): String =
     if (login == "Логин") "Улов" else "Catch"

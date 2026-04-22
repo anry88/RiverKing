@@ -6,6 +6,9 @@ data class Env(
     val botToken: String,
     val telegramWebhookSecret: String,
     val publicBaseUrl: String,
+    val itchProjectUrl: String,
+    val playStoreUrl: String,
+    val androidDirectDownloadUrl: String,
     val dbUrl: String,
     val dbUser: String,
     val dbPass: String,
@@ -20,41 +23,60 @@ data class Env(
     val authTokenSecret: String,
     val authAccessTokenTtlMinutes: Long,
     val authRefreshTokenTtlDays: Long,
+    val adminApiToken: String,
     val googleAuthClientId: String,
     val googlePlayPackageName: String,
     val googlePlayServiceAccountFile: String,
 ) {
     companion object {
+        private const val DEFAULT_ITCH_PROJECT_URL = "https://anry88.itch.io/river-king"
+
         fun fromConfig(path: String = "config.properties"): Env {
             val props = Properties()
             Env::class.java.classLoader.getResourceAsStream(path)?.use { props.load(it) }
                 ?: error("config file $path not found")
+            fun configuredValue(vararg names: String): String? {
+                names.forEach { name ->
+                    props.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+                }
+                names.forEach { name ->
+                    System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+                }
+                return null
+            }
             return Env(
-                botToken = props.getProperty("BOT_TOKEN") ?: error("BOT_TOKEN required"),
+                botToken = configuredValue("BOT_TOKEN") ?: error("BOT_TOKEN required"),
                 telegramWebhookSecret =
-                    props.getProperty("TELEGRAM_WEBHOOK_SECRET")
-                        ?: props.getProperty("WEBHOOK_SECRET")
+                    configuredValue("TELEGRAM_WEBHOOK_SECRET", "WEBHOOK_SECRET")
                         ?: "dev-secret",
-                publicBaseUrl = props.getProperty("PUBLIC_BASE_URL") ?: error("PUBLIC_BASE_URL required"),
-                dbUrl = props.getProperty("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
-                dbUser = props.getProperty("DATABASE_USER") ?: "postgres",
-                dbPass = props.getProperty("DATABASE_PASSWORD") ?: "postgres",
-                port = props.getProperty("PORT")?.toIntOrNull() ?: 8080,
-                devMode = props.getProperty("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
-                adminTgId = props.getProperty("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,
-                providerToken = props.getProperty("PROVIDER_TOKEN") ?: "stars",
-                botName = props.getProperty("BOT_NAME") ?: error("BOT_NAME required"),
-                tgAnalyticsToken = props.getProperty("TG_ANALYTICS_TOKEN") ?: "",
-                tgAnalyticsScriptUrl = props.getProperty("TG_ANALYTICS_SCRIPT_URL") ?: "",
-                tgAnalyticsAppName = props.getProperty("TG_ANALYTICS_APP_NAME") ?: "",
-                authTokenSecret = props.getProperty("AUTH_TOKEN_SECRET")
-                    ?: props.getProperty("BOT_TOKEN")
+                publicBaseUrl = configuredValue("PUBLIC_BASE_URL") ?: error("PUBLIC_BASE_URL required"),
+                itchProjectUrl =
+                    configuredValue("RIVERKING_ITCH_PROJECT_URL", "ITCH_PROJECT_URL")
+                        ?: DEFAULT_ITCH_PROJECT_URL,
+                playStoreUrl = configuredValue("RIVERKING_PLAY_STORE_URL", "PLAY_STORE_URL") ?: "",
+                androidDirectDownloadUrl =
+                    configuredValue("RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL", "ANDROID_DIRECT_DOWNLOAD_URL")
+                        ?: "",
+                dbUrl = configuredValue("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
+                dbUser = configuredValue("DATABASE_USER") ?: "postgres",
+                dbPass = configuredValue("DATABASE_PASSWORD") ?: "postgres",
+                port = configuredValue("PORT")?.toIntOrNull() ?: 8080,
+                devMode = configuredValue("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
+                adminTgId = configuredValue("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,
+                providerToken = configuredValue("PROVIDER_TOKEN") ?: "stars",
+                botName = configuredValue("BOT_NAME") ?: error("BOT_NAME required"),
+                tgAnalyticsToken = configuredValue("TG_ANALYTICS_TOKEN") ?: "",
+                tgAnalyticsScriptUrl = configuredValue("TG_ANALYTICS_SCRIPT_URL") ?: "",
+                tgAnalyticsAppName = configuredValue("TG_ANALYTICS_APP_NAME") ?: "",
+                authTokenSecret = configuredValue("AUTH_TOKEN_SECRET")
+                    ?: configuredValue("BOT_TOKEN")
                     ?: error("AUTH_TOKEN_SECRET required"),
-                authAccessTokenTtlMinutes = props.getProperty("AUTH_ACCESS_TOKEN_TTL_MINUTES")?.toLongOrNull() ?: 60L,
-                authRefreshTokenTtlDays = props.getProperty("AUTH_REFRESH_TOKEN_TTL_DAYS")?.toLongOrNull() ?: 30L,
-                googleAuthClientId = props.getProperty("GOOGLE_AUTH_CLIENT_ID") ?: "",
-                googlePlayPackageName = props.getProperty("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
-                googlePlayServiceAccountFile = props.getProperty("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
+                authAccessTokenTtlMinutes = configuredValue("AUTH_ACCESS_TOKEN_TTL_MINUTES")?.toLongOrNull() ?: 60L,
+                authRefreshTokenTtlDays = configuredValue("AUTH_REFRESH_TOKEN_TTL_DAYS")?.toLongOrNull() ?: 30L,
+                adminApiToken = configuredValue("ADMIN_API_TOKEN") ?: "",
+                googleAuthClientId = configuredValue("GOOGLE_AUTH_CLIENT_ID") ?: "",
+                googlePlayPackageName = configuredValue("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
+                googlePlayServiceAccountFile = configuredValue("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
             )
         }
     }

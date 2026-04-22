@@ -1,0 +1,16 @@
+{
+  "latestVersionCode": 1,
+  "latestVersionName": "0.1.2",
+  "minSupportedVersionCode": 1,
+  "requireVersionHeaders": false,
+  "releaseNotes": {
+    "en": [
+      "This version improves app compatibility with the RiverKing server.",
+      "Fixed issues that could interrupt sign-in or gameplay."
+    ],
+    "ru": [
+      "В новой версии улучшена совместимость приложения с сервером RiverKing.",
+      "Исправлены проблемы, которые могли мешать входу или продолжению игры."
+    ]
+  }
+}

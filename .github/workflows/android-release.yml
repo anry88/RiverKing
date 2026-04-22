@@ -63,6 +63,10 @@ jobs:
           echo "release_tag=android-v${RIVERKING_VERSION_NAME}" >> "$GITHUB_OUTPUT"
           echo "release_name=Android ${RIVERKING_VERSION_NAME} (${RIVERKING_VERSION_CODE})" >> "$GITHUB_OUTPUT"
 
+      - name: Validate Android update policy
+        shell: bash
+        run: python3 mobile/android-app/scripts/check-update-policy.py
+
       - name: Prepare signing secrets
         shell: bash
         env:
@@ -163,9 +167,13 @@ jobs:
       - name: Write release metadata
         shell: bash
         run: |
+          MIN_SUPPORTED_VERSION_CODE="$(python3 -c 'import json; print(json.load(open("src/main/resources/android-update-policy.json"))["minSupportedVersionCode"])')"
+          REQUIRE_VERSION_HEADERS="$(python3 -c 'import json; print(str(json.load(open("src/main/resources/android-update-policy.json")).get("requireVersionHeaders", False)).lower())')"
           cat > mobile/android-app/dist/prod/release-metadata.txt <<EOF
           version_name=${{ steps.version.outputs.version_name }}
           version_code=${{ steps.version.outputs.version_code }}
+          min_supported_version_code=$MIN_SUPPORTED_VERSION_CODE
+          require_version_headers=$REQUIRE_VERSION_HEADERS
           git_sha=${{ github.sha }}
           source_event=${{ github.event_name }}
           workflow_run=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -180,6 +188,7 @@ jobs:
             mobile/android-app/dist/prod/app-riverking-${{ steps.version.outputs.version_name }}.apk
             mobile/android-app/dist/prod/app-riverking-${{ steps.version.outputs.version_name }}.aab
             mobile/android-app/dist/prod/release-metadata.txt
+            src/main/resources/android-update-policy.json
 
       - name: Create or update draft GitHub release
         uses: softprops/action-gh-release@v2
@@ -192,3 +201,4 @@ jobs:
             mobile/android-app/dist/prod/app-riverking-${{ steps.version.outputs.version_name }}.apk
             mobile/android-app/dist/prod/app-riverking-${{ steps.version.outputs.version_name }}.aab
             mobile/android-app/dist/prod/release-metadata.txt
+            src/main/resources/android-update-policy.json

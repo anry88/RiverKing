@@ -13,7 +13,16 @@ import service.AccountDeletionService
 
 fun Application.publicPagesRoutes(env: Env) {
     val deletionService = AccountDeletionService()
+    val publicBaseUrl = env.publicBaseUrl.trimEnd('/')
     val supportBotUrl = "https://t.me/${env.botName}"
+    val russianChannelUrl = "https://t.me/riverking_ru"
+    val englishChannelUrl = "https://t.me/riverking_en"
+    fun publicUrl(path: String): String = "$publicBaseUrl$path"
+    val privacyUrl = publicUrl("/privacy")
+    val termsUrl = publicUrl("/terms")
+    val supportUrl = publicUrl("/support")
+    val accountDeletionUrl = publicUrl("/account/delete")
+    val accountDeletionRequestUrl = publicUrl("/account/delete/request")
 
     routing {
         get("/privacy") {
@@ -29,7 +38,7 @@ fun Application.publicPagesRoutes(env: Env) {
                             <li>Operational data: request logs, anti-abuse signals, and support requests required to operate the service.</li>
                         </ul>
                         <p>RiverKing does not use in-app ads. Paid Android entitlements in the Google Play build are verified against Google Play before rewards are granted.</p>
-                        <p>You can request account deletion in-app or through the public <a href="/account/delete">account deletion page</a>.</p>
+                        <p>You can request account deletion in-app or through the public <a href="$accountDeletionUrl">account deletion page</a>.</p>
                     """.trimIndent(),
                 ),
                 ContentType.Text.Html,
@@ -44,7 +53,7 @@ fun Application.publicPagesRoutes(env: Env) {
                         <h1>RiverKing Terms of Use</h1>
                         <p>RiverKing is an online game service. By using the service, you agree not to abuse the game economy, impersonate other players, exploit automated access beyond the provided flows, or interfere with other players’ access.</p>
                         <p>Gameplay balances, reward rules, tournaments, and store offers may change over time. We may suspend or limit access for fraud, abuse, chargeback abuse, or attempts to manipulate game systems.</p>
-                        <p>If you no longer want to use the service, you can delete your account in-app or through the public <a href="/account/delete">account deletion page</a>.</p>
+                        <p>If you no longer want to use the service, you can delete your account in-app or through the public <a href="$accountDeletionUrl">account deletion page</a>.</p>
                     """.trimIndent(),
                 ),
                 ContentType.Text.Html,
@@ -59,10 +68,12 @@ fun Application.publicPagesRoutes(env: Env) {
                         <h1>RiverKing Support</h1>
                         <p>For gameplay and account help, use the official RiverKing bot or the public account deletion request form.</p>
                         <ul>
-                            <li>Bot: <a href="$supportBotUrl">$supportBotUrl</a></li>
-                            <li>Privacy policy: <a href="/privacy">/privacy</a></li>
-                            <li>Terms of use: <a href="/terms">/terms</a></li>
-                            <li>Account deletion: <a href="/account/delete">/account/delete</a></li>
+                            <li>Support bot: <a href="$supportBotUrl">$supportBotUrl</a></li>
+                            <li>Russian Telegram channel: <a href="$russianChannelUrl">$russianChannelUrl</a></li>
+                            <li>English Telegram channel: <a href="$englishChannelUrl">$englishChannelUrl</a></li>
+                            <li>Privacy policy: <a href="$privacyUrl">RiverKing Privacy Policy</a></li>
+                            <li>Terms of use: <a href="$termsUrl">RiverKing Terms of Use</a></li>
+                            <li>Account deletion: <a href="$accountDeletionUrl">Account deletion request</a></li>
                         </ul>
                     """.trimIndent(),
                 ),
@@ -78,7 +89,7 @@ fun Application.publicPagesRoutes(env: Env) {
                         <h1>Delete a RiverKing account</h1>
                         <p>You can delete your account immediately from the Android app profile menu. If you cannot access the app, submit the request form below and we will review it manually.</p>
                         <p>Deleting an account removes the linked gameplay profile, auth sessions, catches, progression, clubs, referrals, and account-linked purchase records from the game backend.</p>
-                        <form method="post" action="/account/delete/request">
+                        <form method="post" action="$accountDeletionRequestUrl">
                             <label>Login or account name</label>
                             <input type="text" name="login" maxlength="100" placeholder="angler.one" />
                             <label>Auth provider</label>
@@ -94,7 +105,7 @@ fun Application.publicPagesRoutes(env: Env) {
                             <textarea name="note" rows="5" maxlength="2000" placeholder="Optional: linked Telegram username, purchase date, or any information that helps identify the account."></textarea>
                             <button type="submit">Submit deletion request</button>
                         </form>
-                        <p class="muted">Need help first? Visit <a href="/support">/support</a>.</p>
+                        <p class="muted">Need help first? Visit <a href="$supportUrl">RiverKing Support</a>.</p>
                     """.trimIndent(),
                 ),
                 ContentType.Text.Html,
@@ -115,7 +126,7 @@ fun Application.publicPagesRoutes(env: Env) {
                         body = """
                             <h1>Delete a RiverKing account</h1>
                             <p>Contact information is required so we can verify and process the request.</p>
-                            <p><a href="/account/delete">Go back to the deletion form</a></p>
+                            <p><a href="$accountDeletionUrl">Go back to the deletion form</a></p>
                         """.trimIndent(),
                     ),
                     ContentType.Text.Html,
@@ -154,7 +165,7 @@ fun Application.publicPagesRoutes(env: Env) {
                         <h1>Deletion request submitted</h1>
                         <p>Your request was recorded as #$requestId. Keep your contact available so we can verify ownership if needed.</p>
                         <p>If you still have access to the Android app, you can also delete the account immediately from the profile menu.</p>
-                        <p><a href="/support">Open support links</a></p>
+                        <p><a href="$supportUrl">Open support links</a></p>
                     """.trimIndent(),
                 ),
                 ContentType.Text.Html,

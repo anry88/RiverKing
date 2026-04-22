@@ -30,11 +30,13 @@ import service.AchievementService
 import service.AchievementRewardDTO
 import service.QuestService
 import service.ClubService
+import service.ClubQuestService
 import service.PrizeSource
 import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
 import service.AccountDeletionService
+import service.AndroidUpdateService
 import db.AuthIdentities
 import db.Payments
 import db.Users
@@ -61,10 +63,29 @@ fun Application.apiRoutes(
     val tournaments = TournamentService()
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
+    val clubQuests = ClubQuestService()
     val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
     val bot = TelegramBot(env.botToken)
     val accountDeletion = AccountDeletionService(clubs)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
+    val androidUpdates = AndroidUpdateService(env)
+    val mobileVersionGuardPrefixes = listOf(
+        "/api/auth/password/",
+        "/api/auth/google",
+        "/api/auth/refresh",
+        "/api/auth/logout",
+        "/api/auth/telegram/mobile/",
+        "/api/auth/telegram/link/",
+    )
+
+    fun ApplicationCall.isAndroidOrMobileApiCall(path: String): Boolean {
+        val explicitAndroid = request.headers[AndroidUpdateService.HEADER_PLATFORM]
+            ?.equals(AndroidUpdateService.PLATFORM_ANDROID, ignoreCase = true) == true
+        val bearerAuth = request.headers[HttpHeaders.Authorization]
+            ?.startsWith("Bearer ", ignoreCase = true) == true
+        val mobileAuthFlow = mobileVersionGuardPrefixes.any { path.startsWith(it) }
+        return explicitAndroid || bearerAuth || mobileAuthFlow
+    }
 
     // Use the Plugins phase so that sessions are already available
     // when logging each incoming request. Intercepting earlier can
@@ -72,6 +93,18 @@ fun Application.apiRoutes(
     // that are served before the Sessions plugin runs.
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
+        if (
+            path.startsWith("/api/") &&
+            path != "/api/mobile/update" &&
+            call.isAndroidOrMobileApiCall(path)
+        ) {
+            val update = androidUpdates.checkFromHeaders(call.request.headers)
+            if (update.mandatory) {
+                call.respond(HttpStatusCode.UpgradeRequired, update)
+                finish()
+                return@intercept
+            }
+        }
         if (path != "/metrics") {
             val session = call.sessions.get<AppSession>()
             val userId = session?.userId
@@ -185,6 +218,32 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class ClubQuestMemberDTO(
+        val userId: Long,
+        val name: String?,
+        val role: String,
+        val progress: Int,
+    )
+
+    @Serializable
+    data class ClubQuestDTO(
+        val code: String,
+        val name: String,
+        val description: String,
+        val progress: Int,
+        val target: Int,
+        val rewardCoins: Int,
+        val completed: Boolean,
+        val members: List<ClubQuestMemberDTO>,
+    )
+
+    @Serializable
+    data class ClubQuestWeekDTO(
+        val weekStart: String,
+        val quests: List<ClubQuestDTO>,
+    )
+
+    @Serializable
     data class ClubDetailsDTO(
         val id: Long,
         val name: String,
@@ -196,6 +255,8 @@ fun Application.apiRoutes(
         val recruitingOpen: Boolean,
         val currentWeek: ClubWeekDTO,
         val previousWeek: ClubWeekDTO,
+        val currentQuestWeek: ClubQuestWeekDTO,
+        val previousQuestWeek: ClubQuestWeekDTO,
     )
 
     @Serializable
@@ -203,6 +264,11 @@ fun Application.apiRoutes(
         val id: Long,
         val message: String,
         val createdAt: String,
+    )
+
+    @Serializable
+    data class ClubChatSendReq(
+        val text: String = "",
     )
 
     @Serializable
@@ -229,6 +295,29 @@ fun Application.apiRoutes(
         },
     )
 
+    fun ClubService.ClubQuestWeekView.toDto(): ClubQuestWeekDTO = ClubQuestWeekDTO(
+        weekStart = weekStart.toString(),
+        quests = quests.map { quest ->
+            ClubQuestDTO(
+                code = quest.code,
+                name = quest.name,
+                description = quest.description,
+                progress = quest.progress,
+                target = quest.target,
+                rewardCoins = quest.rewardCoins,
+                completed = quest.completed,
+                members = quest.members.map { member ->
+                    ClubQuestMemberDTO(
+                        userId = member.userId,
+                        name = member.name,
+                        role = member.role,
+                        progress = member.progress,
+                    )
+                },
+            )
+        },
+    )
+
     fun ClubService.ClubDetails.toDto(): ClubDetailsDTO = ClubDetailsDTO(
         id = id,
         name = name,
@@ -240,6 +329,8 @@ fun Application.apiRoutes(
         recruitingOpen = recruitingOpen,
         currentWeek = currentWeek.toDto(),
         previousWeek = previousWeek.toDto(),
+        currentQuestWeek = currentQuestWeek.toDto(),
+        previousQuestWeek = previousQuestWeek.toDto(),
     )
 
     fun ClubService.ClubChatMessage.toDto(): ClubChatMessageDTO = ClubChatMessageDTO(
@@ -389,6 +480,22 @@ fun Application.apiRoutes(
     }
 
     routing {
+        get("/api/mobile/update") {
+            val headers = call.request.headers
+            call.respond(
+                androidUpdates.check(
+                    versionCode = call.request.queryParameters["versionCode"]?.toIntOrNull()
+                        ?: headers[AndroidUpdateService.HEADER_VERSION_CODE]?.toIntOrNull(),
+                    versionName = call.request.queryParameters["versionName"]
+                        ?: headers[AndroidUpdateService.HEADER_VERSION_NAME],
+                    channel = call.request.queryParameters["channel"]
+                        ?: headers[AndroidUpdateService.HEADER_CHANNEL],
+                    localeHint = call.request.queryParameters["lang"]
+                        ?: headers[HttpHeaders.AcceptLanguage],
+                )
+            )
+        }
+
         get("/api/assets/{path...}") {
             call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val segments = call.parameters.getAll("path")?.takeIf { it.isNotEmpty() }
@@ -761,7 +868,7 @@ fun Application.apiRoutes(
         get("/api/quests") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            val list = QuestService.list(uid, language)
+            val list = QuestService.list(uid, language, club = clubQuests.list(uid, language))
             Metrics.counter("quests_view_total", mapOf("source" to "app"))
             call.respond(list)
         }
@@ -923,8 +1030,10 @@ fun Application.apiRoutes(
 
         get("/api/club/chat") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val beforeId = call.request.queryParameters["beforeId"]?.toLongOrNull()
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()
             val messages = try {
-                clubs.clubChat(uid)
+                clubs.clubChat(uid, beforeId, limit)
             } catch (e: ClubService.ClubException) {
                 val status = when (e.code) {
                     "not_in_club" -> HttpStatusCode.Conflict
@@ -933,6 +1042,22 @@ fun Application.apiRoutes(
                 return@get call.respond(status, mapOf("error" to e.code))
             }
             call.respond(messages.map { it.toDto() })
+        }
+
+        post("/api/club/chat") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val req = call.receive<ClubChatSendReq>()
+            val message = try {
+                clubs.sendChatMessage(uid, req.text)
+            } catch (e: ClubService.ClubException) {
+                val status = when (e.code) {
+                    "not_in_club" -> HttpStatusCode.Conflict
+                    "message_empty" -> HttpStatusCode.BadRequest
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to e.code))
+            }
+            call.respond(message.toDto())
         }
 
         get("/api/club/search") {
