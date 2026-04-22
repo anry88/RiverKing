@@ -2768,8 +2768,11 @@ private fun FishingStageScene(
 
                 // Fishing line from last rod point to bobber with natural sag
                 val lineOrigin = rodLinePoints.lastOrNull() ?: rodTip
-                val dx = bobber.x - lineOrigin.x
-                val dy = bobber.y - lineOrigin.y
+                val lineAttach = bobber.copy(
+                    y = if (hasSplashed) min(bobber.y, (waterlineY - 1f).coerceAtLeast(0f)) else bobber.y,
+                )
+                val dx = lineAttach.x - lineOrigin.x
+                val dy = lineAttach.y - lineOrigin.y
                 val dist = kotlin.math.hypot(dx, dy)
                 val shouldShowSlack = phase == FishingPhase.READY || phase == FishingPhase.COOLDOWN
                 val waterLinePath = Path().apply {
@@ -2789,14 +2792,14 @@ private fun FishingStageScene(
                             x = lineOrigin.x + dx * 0.75f,
                             y = baseMidY + sag,
                         )
-                        cubicTo(control1.x, control1.y, control2.x, control2.y, bobber.x, bobber.y)
+                        cubicTo(control1.x, control1.y, control2.x, control2.y, lineAttach.x, lineAttach.y)
                     } else {
                         val gentleSag = min(size.height * 0.08f, dist * 0.12f)
                         val control = Offset(
                             x = lineOrigin.x + dx * 0.5f,
                             y = lineOrigin.y + dy * 0.5f + gentleSag,
                         )
-                        quadraticTo(control.x, control.y, bobber.x, bobber.y)
+                        quadraticTo(control.x, control.y, lineAttach.x, lineAttach.y)
                     }
                 }
                 if (hasSplashed && !proMode) {

@@ -139,8 +139,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     : null;
   const lineAttach = React.useMemo(() => ({
     x: floatPx.x,
-    y: floatPx.y
-  }), [floatPx.x, floatPx.y]);
+    y: isCastInWater ? Math.min(floatPx.y, Math.max(0, waterlineY - 1)) : floatPx.y
+  }), [floatPx.x, floatPx.y, isCastInWater, waterlineY]);
   const lineClipId = React.useMemo(() => `line-clip-${Math.random().toString(36).slice(2, 9)}`, []);
   const lineClipHeight = Math.max(0, Math.min(h, waterlineY));
   const shouldClipLine = !proMode && isCastInWater && lineClipHeight > 0 && w > 0;
