@@ -233,9 +233,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     if (!currentLure || typeof window.getLureIcon !== 'function') return null;
     return window.getLureIcon(currentLure);
   }, [currentLure]);
-  const rigLineHeight = Math.round(proMode ? bobberSize * 1.15 : bobberSize * 0.95);
+  const rigLineHeight = Math.round((proMode ? bobberSize * 1.15 : bobberSize * 0.95) * 1.5);
   const hookSize = proMode ? 17 : 14;
-  const baitSize = proMode ? 16 : 13;
+  const baitSize = proMode ? 18 : 15;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
   const rigStyle = React.useMemo(() => ({
     left: floatPx.x,
@@ -827,8 +827,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
               alt=""
               className="absolute object-contain drop-shadow"
               style={{
-                left: baitSize * 0.05,
-                top: rigLineHeight + hookSize * 0.35,
+                left: -baitSize * 0.45,
+                top: rigLineHeight + hookSize * 0.28,
                 width: baitSize,
                 height: baitSize
               }}
