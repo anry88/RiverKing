@@ -233,6 +233,13 @@ private data class CatchLiftAnimationState(
     val progress: Float = 0f,
 )
 
+private data class ProFishingSceneSpec(
+    val minX: Float = PRO_CAST_MIN_X,
+    val maxX: Float = PRO_CAST_MAX_X,
+    val farY: Float = PRO_CAST_FAR_Y,
+    val nearY: Float = PRO_CAST_NEAR_Y,
+)
+
 private const val TG_CAST_WATER_TOP = 0.48f
 private const val TG_CAST_LEFT_MARGIN = 0.05f
 private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
@@ -245,8 +252,6 @@ private const val PRO_CAST_FAR_Y = 0.47f
 private const val PRO_CAST_NEAR_Y = 0.78f
 private const val PRO_CAST_SHORE_X = 0.44f
 private const val PRO_CAST_SHORE_Y = 0.56f
-private const val PRO_CAST_CENTER_X = 0.5f
-private const val PRO_CAST_CENTER_Y = 0.63f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
 private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
@@ -1245,6 +1250,7 @@ private fun FishingScreen(
                 strings = strings,
                 me = me,
                 backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+                locationName = currentLocation?.name,
                 modifier = Modifier.fillMaxSize(),
                 proMode = true,
                 setupEnabled = setupEnabled,
@@ -1288,6 +1294,7 @@ private fun FishingScreen(
                     strings = strings,
                     me = me,
                     backgroundUrl = locationBackgroundAsset(currentLocation?.name),
+                    locationName = currentLocation?.name,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp),
@@ -2489,6 +2496,7 @@ private fun FishingStageScene(
     strings: RiverStrings,
     me: MeResponseDto,
     backgroundUrl: String?,
+    locationName: String?,
     modifier: Modifier = Modifier,
     proMode: Boolean = false,
     setupEnabled: Boolean = false,
@@ -2516,6 +2524,7 @@ private fun FishingStageScene(
     }
     val phase = state.fishing.phase
     val castSpot = state.fishing.castSpot
+    val proSceneSpec = remember(locationName) { proFishingSceneSpec(locationName) }
     val inWater = when (phase) {
         FishingPhase.WAITING_BITE,
         FishingPhase.BITING,
@@ -2656,7 +2665,7 @@ private fun FishingStageScene(
             val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
             val proGestureModifier = when {
                 !proMode -> Modifier
-                phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx) {
+                phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx, proSceneSpec) {
                     var dragTotal = Offset.Zero
                     var dragStartedAtMillis = 0L
                     detectDragGestures(
@@ -2670,7 +2679,7 @@ private fun FishingStageScene(
                         onDragEnd = {
                             if (hypot(dragTotal.x, dragTotal.y) >= minSwipePx) {
                                 val elapsedMillis = (System.currentTimeMillis() - dragStartedAtMillis).coerceAtLeast(16L)
-                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx, elapsedMillis))
+                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx, elapsedMillis, proSceneSpec))
                             }
                         },
                         onDragCancel = {
@@ -2739,7 +2748,7 @@ private fun FishingStageScene(
             }
             val activeCastSpot = castSpot
             val activeCastTarget = activeCastSpot?.let {
-                if (proMode || it.proMode) proStyleCastTarget(it) else tgStyleCastTarget(it, rodTipRelX)
+                if (proMode || it.proMode) proStyleCastTarget(it, proSceneSpec) else tgStyleCastTarget(it, rodTipRelX)
             }
 
             LaunchedEffect(activeCastTarget, activeCastSpot?.castDurationMillis, shoreSpot) {
@@ -3090,10 +3099,10 @@ private fun tgStyleCastTarget(castSpot: FishingCastSpot, rodTipRelX: Float): Off
     )
 }
 
-private fun proStyleCastTarget(castSpot: FishingCastSpot): Offset =
+private fun proStyleCastTarget(castSpot: FishingCastSpot, sceneSpec: ProFishingSceneSpec): Offset =
     Offset(
-        x = PRO_CAST_MIN_X + castSpot.xRoll.coerceIn(0f, 1f) * (PRO_CAST_MAX_X - PRO_CAST_MIN_X),
-        y = PRO_CAST_FAR_Y + castSpot.yRoll.coerceIn(0f, 1f) * (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y),
+        x = sceneSpec.minX + castSpot.xRoll.coerceIn(0f, 1f) * (sceneSpec.maxX - sceneSpec.minX),
+        y = sceneSpec.farY + castSpot.yRoll.coerceIn(0f, 1f) * (sceneSpec.nearY - sceneSpec.farY),
     )
 
 private fun proFishingCastSpotFromSwipe(
@@ -3101,20 +3110,43 @@ private fun proFishingCastSpotFromSwipe(
     widthPx: Float,
     heightPx: Float,
     elapsedMillis: Long,
+    sceneSpec: ProFishingSceneSpec,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
     val distance = hypot(swipe.x, swipe.y)
     val strength = (distance / (minSide * 0.75f)).coerceIn(0f, 1f)
     val nx = if (distance > 0f) swipe.x / distance else 0f
     val ny = if (distance > 0f) swipe.y / distance else 0f
-    val targetX = (PRO_CAST_CENTER_X + nx * strength * 0.34f).coerceIn(PRO_CAST_MIN_X, PRO_CAST_MAX_X)
-    val targetY = (PRO_CAST_CENTER_Y + ny * strength * 0.21f).coerceIn(PRO_CAST_FAR_Y, PRO_CAST_NEAR_Y)
+    val centerX = (sceneSpec.minX + sceneSpec.maxX) / 2f
+    val centerY = (sceneSpec.farY + sceneSpec.nearY) / 2f
+    val reachX = (sceneSpec.maxX - sceneSpec.minX) / 2f
+    val reachY = (sceneSpec.nearY - sceneSpec.farY) / 2f
+    val targetX = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX)
+    val targetY = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY)
     return FishingCastSpot(
-        xRoll = ((targetX - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)).coerceIn(0f, 1f),
-        yRoll = ((targetY - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)).coerceIn(0f, 1f),
+        xRoll = ((targetX - sceneSpec.minX) / (sceneSpec.maxX - sceneSpec.minX)).coerceIn(0f, 1f),
+        yRoll = ((targetY - sceneSpec.farY) / (sceneSpec.nearY - sceneSpec.farY)).coerceIn(0f, 1f),
         proMode = true,
         castDurationMillis = castDurationFromSwipe(distance, elapsedMillis),
     )
+}
+
+private fun proFishingSceneSpec(location: String?): ProFishingSceneSpec = when (location) {
+    "Пруд", "Pond" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
+    "Болото", "Swamp" -> ProFishingSceneSpec(minX = 0.20f, maxX = 0.70f, farY = 0.57f, nearY = 0.72f)
+    "Река", "River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.76f, farY = 0.50f, nearY = 0.69f)
+    "Озеро", "Lake" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
+    "Водохранилище", "Reservoir" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
+    "Горная река", "Mountain River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.58f, farY = 0.54f, nearY = 0.70f)
+    "Дельта реки", "River Delta" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.66f, farY = 0.51f, nearY = 0.68f)
+    "Прибрежье моря", "Sea Coast" -> ProFishingSceneSpec(minX = 0.18f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
+    "Русло Амазонки", "Amazon Riverbed" -> ProFishingSceneSpec(minX = 0.32f, maxX = 0.82f, farY = 0.54f, nearY = 0.70f)
+    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> ProFishingSceneSpec(minX = 0.24f, maxX = 0.78f, farY = 0.52f, nearY = 0.70f)
+    "Мангровые заросли", "Mangroves" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.58f, farY = 0.54f, nearY = 0.70f)
+    "Коралловые отмели", "Coral Flats" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.50f, farY = 0.52f, nearY = 0.68f)
+    "Фьорд", "Fjord" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.72f, farY = 0.53f, nearY = 0.70f)
+    "Открытый океан", "Open Ocean" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.62f, farY = 0.46f, nearY = 0.62f)
+    else -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
 }
 
 private fun castDurationFromSwipe(distancePx: Float, elapsedMillis: Long): Int {
@@ -7358,7 +7390,7 @@ private fun locationBackgroundAsset(location: String?): String? {
         "Фьорд", "Fjord" -> "backgrounds/fjord.webp"
         "Открытый океан", "Open Ocean" -> "backgrounds/open_ocean.webp"
         "Русло Амазонки", "Amazon Riverbed" -> "backgrounds/amazon_riverbed.webp"
-        "Игапо, затопленный лес", "Flooded Forest" -> "backgrounds/flooded_forest.webp"
+        "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> "backgrounds/flooded_forest.webp"
         "Мангровые заросли", "Mangroves" -> "backgrounds/mangroves.webp"
         "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
         else -> null

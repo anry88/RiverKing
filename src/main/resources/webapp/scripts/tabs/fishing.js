@@ -7,8 +7,28 @@ const PRO_CAST_MIN_X = 0.14;
 const PRO_CAST_MAX_X = 0.86;
 const PRO_CAST_FAR_Y = 0.47;
 const PRO_CAST_NEAR_Y = 0.78;
-const PRO_CAST_CENTER_X = 0.5;
-const PRO_CAST_CENTER_Y = 0.63;
+const DEFAULT_PRO_CAST_AREA = Object.freeze({
+  minX: PRO_CAST_MIN_X,
+  maxX: PRO_CAST_MAX_X,
+  farY: PRO_CAST_FAR_Y,
+  nearY: PRO_CAST_NEAR_Y
+});
+const PRO_CAST_AREAS = Object.freeze({
+  pond: { minX: 0.16, maxX: 0.80, farY: 0.50, nearY: 0.70 },
+  swamp: { minX: 0.20, maxX: 0.70, farY: 0.57, nearY: 0.72 },
+  river: { minX: 0.14, maxX: 0.76, farY: 0.50, nearY: 0.69 },
+  lake: { minX: 0.16, maxX: 0.78, farY: 0.50, nearY: 0.70 },
+  reservoir: { minX: 0.14, maxX: 0.80, farY: 0.50, nearY: 0.70 },
+  mountain_river: { minX: 0.14, maxX: 0.58, farY: 0.54, nearY: 0.70 },
+  river_delta: { minX: 0.14, maxX: 0.66, farY: 0.51, nearY: 0.68 },
+  sea_coast: { minX: 0.18, maxX: 0.78, farY: 0.50, nearY: 0.70 },
+  amazon_riverbed: { minX: 0.32, maxX: 0.82, farY: 0.54, nearY: 0.70 },
+  flooded_forest: { minX: 0.24, maxX: 0.78, farY: 0.52, nearY: 0.70 },
+  mangroves: { minX: 0.16, maxX: 0.58, farY: 0.54, nearY: 0.70 },
+  coral_flats: { minX: 0.14, maxX: 0.50, farY: 0.52, nearY: 0.68 },
+  fjord: { minX: 0.16, maxX: 0.72, farY: 0.53, nearY: 0.70 },
+  open_ocean: { minX: 0.14, maxX: 0.62, farY: 0.46, nearY: 0.62 }
+});
 const CAST_ANIMATION_MIN_MS = 280;
 const CAST_ANIMATION_MAX_MS = 760;
 const CAST_ANIMATION_DEFAULT_MS = 560;
@@ -21,10 +41,52 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
 
-function proCastTargetFromSpot(spot) {
+function proLocationKey(value) {
+  if (!value && value !== 0) return '';
+  const raw = String(value).trim().toLowerCase();
+  const assetMatch = raw.match(/backgrounds\/([^/.?#]+)/);
+  if (assetMatch) return assetMatch[1];
+  return ({
+    'пруд': 'pond',
+    'pond': 'pond',
+    'болото': 'swamp',
+    'swamp': 'swamp',
+    'река': 'river',
+    'river': 'river',
+    'озеро': 'lake',
+    'lake': 'lake',
+    'водохранилище': 'reservoir',
+    'reservoir': 'reservoir',
+    'горная река': 'mountain_river',
+    'mountain river': 'mountain_river',
+    'дельта реки': 'river_delta',
+    'river delta': 'river_delta',
+    'прибрежье моря': 'sea_coast',
+    'sea coast': 'sea_coast',
+    'русло амазонки': 'amazon_riverbed',
+    'amazon riverbed': 'amazon_riverbed',
+    'игапо, затопленный лес': 'flooded_forest',
+    'igapo flooded forest': 'flooded_forest',
+    'flooded forest': 'flooded_forest',
+    'мангровые заросли': 'mangroves',
+    'mangroves': 'mangroves',
+    'коралловые отмели': 'coral_flats',
+    'coral flats': 'coral_flats',
+    'фьорд': 'fjord',
+    'fjord': 'fjord',
+    'открытый океан': 'open_ocean',
+    'open ocean': 'open_ocean'
+  })[raw] || raw;
+}
+
+function proCastAreaForLocation(location, bgAsset) {
+  return PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA;
+}
+
+function proCastTargetFromSpot(spot, area = DEFAULT_PRO_CAST_AREA) {
   return {
-    x: PRO_CAST_MIN_X + clamp01(Number(spot?.xRoll) || 0) * (PRO_CAST_MAX_X - PRO_CAST_MIN_X),
-    y: PRO_CAST_FAR_Y + clamp01(Number(spot?.yRoll) || 0) * (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y),
+    x: area.minX + clamp01(Number(spot?.xRoll) || 0) * (area.maxX - area.minX),
+    y: area.farY + clamp01(Number(spot?.yRoll) || 0) * (area.nearY - area.farY),
   };
 }
 
@@ -38,19 +100,23 @@ function castDurationFromSwipe(distance, elapsedMs) {
   return Math.round(CAST_ANIMATION_MAX_MS - speed * (CAST_ANIMATION_MAX_MS - CAST_ANIMATION_MIN_MS));
 }
 
-function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0) {
+function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT_PRO_CAST_AREA) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
   const distance = Math.hypot(dx, dy);
   const strength = clamp01(distance / (minSide * 0.75));
   const nx = distance > 0 ? dx / distance : 0;
   const ny = distance > 0 ? dy / distance : 0;
+  const centerX = (area.minX + area.maxX) / 2;
+  const centerY = (area.farY + area.nearY) / 2;
+  const reachX = (area.maxX - area.minX) / 2;
+  const reachY = (area.nearY - area.farY) / 2;
   const target = {
-    x: Math.max(PRO_CAST_MIN_X, Math.min(PRO_CAST_MAX_X, PRO_CAST_CENTER_X + nx * strength * 0.34)),
-    y: Math.max(PRO_CAST_FAR_Y, Math.min(PRO_CAST_NEAR_Y, PRO_CAST_CENTER_Y + ny * strength * 0.21)),
+    x: Math.max(area.minX, Math.min(area.maxX, centerX + nx * strength * reachX)),
+    y: Math.max(area.farY, Math.min(area.nearY, centerY + ny * strength * reachY)),
   };
   return {
-    xRoll: clamp01((target.x - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)),
-    yRoll: clamp01((target.y - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)),
+    xRoll: clamp01((target.x - area.minX) / (area.maxX - area.minX)),
+    yRoll: clamp01((target.y - area.farY) / (area.nearY - area.farY)),
     proMode: true,
     castDurationMs: castDurationFromSwipe(distance, elapsedMs),
   };
@@ -460,6 +526,40 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     };
   }, []);
 
+  const resolveLocationBg = React.useCallback((id, name) => {
+    if (typeof window.getLocationBackground === 'function') {
+      const bg = window.getLocationBackground(id, name);
+      if (bg) return bg;
+    }
+    const normalized = typeof name === 'string' ? name.trim().toLowerCase() : '';
+    if (normalized && window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]) {
+      return window.LOCATION_BG_BY_NAME[normalized];
+    }
+    const numId = Number(id);
+    if (Number.isFinite(numId) && window.LOCATION_BG && window.LOCATION_BG[numId]) {
+      return window.LOCATION_BG[numId];
+    }
+    return null;
+  }, []);
+
+  const currentLocation = React.useMemo(() => {
+    if (!Array.isArray(me?.locations)) return null;
+    const targetId = Number(me?.locationId);
+    return me.locations.find(loc => Number(loc.id) === targetId) || null;
+  }, [me?.locations, me?.locationId]);
+
+  const bgAsset = React.useMemo(() => {
+    const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
+    if (byCurrent) return byCurrent;
+    const byIdOnly = resolveLocationBg(me.locationId, null);
+    if (byIdOnly) return byIdOnly;
+    return LOCATION_BG[1];
+  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
+  const proCastArea = React.useMemo(
+    () => proCastAreaForLocation(currentLocation?.name, bgAsset),
+    [currentLocation?.name, bgAsset]
+  );
+
   React.useEffect(() => {
     if (casting) {
       if (!prevCastingRef.current) {
@@ -479,7 +579,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         }
         let target;
         if (castSpot?.proMode || proMode) {
-          target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() });
+          target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, proCastArea);
         } else {
           const minX = Math.max(0.05, tipRelX - 0.20);
           const maxX = Math.max(minX, tipRelX - 0.05);
@@ -514,37 +614,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       setFloatRel(shorePosRel);
       prevCastingRef.current = false;
     }
-  }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode]);
-
-  const resolveLocationBg = React.useCallback((id, name) => {
-    if (typeof window.getLocationBackground === 'function') {
-      const bg = window.getLocationBackground(id, name);
-      if (bg) return bg;
-    }
-    const normalized = typeof name === 'string' ? name.trim().toLowerCase() : '';
-    if (normalized && window.LOCATION_BG_BY_NAME && window.LOCATION_BG_BY_NAME[normalized]) {
-      return window.LOCATION_BG_BY_NAME[normalized];
-    }
-    const numId = Number(id);
-    if (Number.isFinite(numId) && window.LOCATION_BG && window.LOCATION_BG[numId]) {
-      return window.LOCATION_BG[numId];
-    }
-    return null;
-  }, []);
-
-  const currentLocation = React.useMemo(() => {
-    if (!Array.isArray(me?.locations)) return null;
-    const targetId = Number(me?.locationId);
-    return me.locations.find(loc => Number(loc.id) === targetId) || null;
-  }, [me?.locations, me?.locationId]);
-
-  const bgAsset = React.useMemo(() => {
-    const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
-    if (byCurrent) return byCurrent;
-    const byIdOnly = resolveLocationBg(me.locationId, null);
-    if (byIdOnly) return byIdOnly;
-    return LOCATION_BG[1];
-  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
+  }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode, proCastArea]);
   const bgUrl = useAssetSrc(bgAsset);
   const [bgLoaded, setBgLoaded] = React.useState(false);
   React.useEffect(() => {
@@ -598,8 +668,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     if (cancelled) return;
     const distance = Math.hypot(active.dx, active.dy);
     if (distance < 40 || casting || !castReady) return;
-    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h, performance.now() - active.startedAt));
-  }, [castReady, casting, h, onCast, proMode, w]);
+    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h, performance.now() - active.startedAt, proCastArea));
+  }, [castReady, casting, h, onCast, proMode, proCastArea, w]);
 
   const handleProPointerUp = React.useCallback((event) => {
     finishProPointer(event, false);
