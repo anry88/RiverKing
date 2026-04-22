@@ -13,6 +13,7 @@ let t = window.t || ((key) => key);
 const TAP_CHALLENGE_DURATION_MS = window.TAP_CHALLENGE_DURATION_MS || 5000;
 const TAP_CHALLENGE_GOAL = window.TAP_CHALLENGE_GOAL || 10;
 const CAST_READY_DELAY_MS = window.CAST_READY_DELAY_MS || 3000;
+const CAST_ANIMATION_DEFAULT_MS = 560;
 const initLang = window.initLang || 'en';
 const translateLure = (name, lang) => {
   const fn = window.translateLure;
@@ -39,7 +40,7 @@ const AssetImage = window.AssetImage;
 const preloadAsset = window.preloadAsset;
 
 function randomProFishingCastSpot(){
-  return { xRoll: Math.random(), yRoll: Math.random(), proMode: true };
+  return { xRoll: Math.random(), yRoll: Math.random(), proMode: true, castDurationMs: CAST_ANIMATION_DEFAULT_MS };
 }
 
 function App(){

@@ -9,6 +9,10 @@ const PRO_CAST_FAR_Y = 0.47;
 const PRO_CAST_NEAR_Y = 0.78;
 const PRO_CAST_CENTER_X = 0.5;
 const PRO_CAST_CENTER_Y = 0.63;
+const CAST_ANIMATION_MIN_MS = 280;
+const CAST_ANIMATION_MAX_MS = 760;
+const CAST_ANIMATION_DEFAULT_MS = 560;
+const CATCH_DETAILS_OPEN_DELAY_MS = 1150;
 const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const AssetImage = window.AssetImage;
 const useAssetSrc = window.useAssetSrc;
@@ -24,7 +28,17 @@ function proCastTargetFromSpot(spot) {
   };
 }
 
-function proFishingCastSpotFromSwipe(dx, dy, w, h) {
+function castDurationFromSwipe(distance, elapsedMs) {
+  const elapsed = Math.max(16, Number(elapsedMs) || 0);
+  if (!Number.isFinite(distance) || distance <= 0 || !Number.isFinite(elapsed)) {
+    return CAST_ANIMATION_DEFAULT_MS;
+  }
+  const velocity = distance / elapsed;
+  const speed = clamp01((velocity - 0.18) / 1.55);
+  return Math.round(CAST_ANIMATION_MAX_MS - speed * (CAST_ANIMATION_MAX_MS - CAST_ANIMATION_MIN_MS));
+}
+
+function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
   const distance = Math.hypot(dx, dy);
   const strength = clamp01(distance / (minSide * 0.75));
@@ -38,6 +52,7 @@ function proFishingCastSpotFromSwipe(dx, dy, w, h) {
     xRoll: clamp01((target.x - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)),
     yRoll: clamp01((target.y - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)),
     proMode: true,
+    castDurationMs: castDurationFromSwipe(distance, elapsedMs),
   };
 }
 
@@ -476,7 +491,11 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         const startRel = floatRelRef.current;
         const relDistanceY = Math.abs((target?.y ?? startRel.y) - startRel.y);
         const arcHeight = Math.max(0.015, Math.min(0.08, relDistanceY * 0.75));
-        tweenCancelRef.current = tweenTo(target, 750, {
+        const castDurationMs = Math.max(
+          CAST_ANIMATION_MIN_MS,
+          Math.min(CAST_ANIMATION_MAX_MS, Number(castSpot?.castDurationMs) || CAST_ANIMATION_DEFAULT_MS)
+        );
+        tweenCancelRef.current = tweenTo(target, castDurationMs, {
           arcHeight,
           onComplete: () => {
             tweenCancelRef.current = null;
@@ -556,6 +575,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      startedAt: performance.now(),
       dx: 0,
       dy: 0,
     };
@@ -578,7 +598,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     if (cancelled) return;
     const distance = Math.hypot(active.dx, active.dy);
     if (distance < 40 || casting || !castReady) return;
-    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h));
+    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h, performance.now() - active.startedAt));
   }, [castReady, casting, h, onCast, proMode, w]);
 
   const handleProPointerUp = React.useCallback((event) => {
@@ -829,6 +849,22 @@ function FishingTab({
       });
     }
   }, [result]);
+
+  const proCatchOpenRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!proMode || !result?.id || typeof onCatchClick !== 'function') return undefined;
+    const token = result.animationId ?? result.id;
+    if (proCatchOpenRef.current === token) return undefined;
+    proCatchOpenRef.current = token;
+    const timeout = setTimeout(() => {
+      onCatchClick({
+        ...result,
+        userId: result.userId ?? me.id,
+        user: result.user || me.username || t('you')
+      });
+    }, CATCH_DETAILS_OPEN_DELAY_MS);
+    return () => clearTimeout(timeout);
+  }, [proMode, result?.animationId, result?.id, onCatchClick]);
 
   return (
     <>

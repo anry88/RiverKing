@@ -172,11 +172,13 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.Json
@@ -222,6 +224,15 @@ private data class BobberVisualState(
     val submerge: Float = 0f,
 )
 
+private data class CatchLiftAnimationState(
+    val catchId: Long,
+    val fish: String,
+    val rarity: String,
+    val start: Offset,
+    val end: Offset,
+    val progress: Float = 0f,
+)
+
 private const val TG_CAST_WATER_TOP = 0.48f
 private const val TG_CAST_LEFT_MARGIN = 0.05f
 private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
@@ -237,6 +248,10 @@ private const val PRO_CAST_SHORE_Y = 0.56f
 private const val PRO_CAST_CENTER_X = 0.5f
 private const val PRO_CAST_CENTER_Y = 0.63f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
+private const val CAST_ANIMATION_MIN_MILLIS = 280
+private const val CAST_ANIMATION_MAX_MILLIS = 760
+private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
+private const val CATCH_LIFT_ANIMATION_MILLIS = 900
 private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
 private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
 
@@ -2524,6 +2539,9 @@ private fun FishingStageScene(
     }
     var bobberRel by remember { mutableStateOf(shoreSpot) }
     var castLanded by remember { mutableStateOf(false) }
+    var lastLandedRel by remember { mutableStateOf(shoreSpot) }
+    var playedCatchAnimationId by remember { mutableStateOf<Long?>(null) }
+    var catchLiftAnimation by remember { mutableStateOf<CatchLiftAnimationState?>(null) }
     val hasSplashed = inWater && (castLanded || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
     val showRipple = hasSplashed && (!proMode || phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE)
     val shouldAnimateFloat = if (proMode) {
@@ -2640,16 +2658,19 @@ private fun FishingStageScene(
                 !proMode -> Modifier
                 phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx) {
                     var dragTotal = Offset.Zero
+                    var dragStartedAtMillis = 0L
                     detectDragGestures(
                         onDragStart = {
                             dragTotal = Offset.Zero
+                            dragStartedAtMillis = System.currentTimeMillis()
                         },
                         onDrag = { _, dragAmount ->
                             dragTotal += dragAmount
                         },
                         onDragEnd = {
                             if (hypot(dragTotal.x, dragTotal.y) >= minSwipePx) {
-                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx))
+                                val elapsedMillis = (System.currentTimeMillis() - dragStartedAtMillis).coerceAtLeast(16L)
+                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx, elapsedMillis))
                             }
                         },
                         onDragCancel = {
@@ -2698,16 +2719,30 @@ private fun FishingStageScene(
             // Push rod bottom aligned with the scene
             val rodBottomOvershoot = if (proMode) (maxHeight.value * -0.28f).dp else 50.dp
             val rodTopDp = maxHeight - rodHeightDp + rodBottomOvershoot
+            val rodLeftPx = with(density) { rodLeftDp.toPx() }
+            val rodTopPx = with(density) { rodTopDp.toPx() }
+            val rodWidthPx = with(density) { rodWidthDp.toPx() }
+            val rodHeightPx = with(density) { rodHeightDp.toPx() }
+            val isSmallScene = maxWidth < 420.dp
+            val catchMaxX = max(32f, sceneWidthPx - 32f)
+            val catchMaxY = max(32f, sceneHeightPx - 32f)
+            val catchTargetPx = Offset(
+                x = (rodLeftPx + rodWidthPx * rodBaseAnchorX - rodWidthPx * if (isSmallScene) 0.22f else 0.16f)
+                    .coerceIn(32f, catchMaxX),
+                y = (rodTopPx + rodHeightPx * 0.998f - rodHeightPx * if (isSmallScene) 0.26f else 0.20f)
+                    .coerceIn(32f, catchMaxY),
+            )
             val rodTipRelX = if (maxWidth.value > 0f) {
                 (rodLeftDp.value + rodWidthDp.value * rodTipAnchor.x) / maxWidth.value
             } else {
                 0.25f
             }
-            val activeCastTarget = castSpot?.let {
+            val activeCastSpot = castSpot
+            val activeCastTarget = activeCastSpot?.let {
                 if (proMode || it.proMode) proStyleCastTarget(it) else tgStyleCastTarget(it, rodTipRelX)
             }
 
-            LaunchedEffect(activeCastTarget, shoreSpot) {
+            LaunchedEffect(activeCastTarget, activeCastSpot?.castDurationMillis, shoreSpot) {
                 if (activeCastTarget == null) {
                     castLanded = false
                     bobberRel = shoreSpot
@@ -2718,7 +2753,9 @@ private fun FishingStageScene(
                 val startRel = bobberRel.takeIf { it.isFinite() } ?: shoreSpot
                 val relDistanceY = abs(activeCastTarget.y - startRel.y)
                 val arcHeight = max(0.015f, min(0.08f, relDistanceY * 0.75f))
-                val durationNanos = 750_000_000L
+                val durationNanos = (activeCastSpot?.castDurationMillis ?: CAST_ANIMATION_DEFAULT_MILLIS)
+                    .coerceIn(CAST_ANIMATION_MIN_MILLIS, CAST_ANIMATION_MAX_MILLIS)
+                    .toLong() * 1_000_000L
                 var startNanos = 0L
 
                 while (isActive) {
@@ -2737,7 +2774,48 @@ private fun FishingStageScene(
                 }
 
                 bobberRel = activeCastTarget
+                lastLandedRel = activeCastTarget
                 castLanded = true
+            }
+
+            val animatedCatch = state.fishing.lastCast?.takeIf { it.caught }?.catch
+            LaunchedEffect(animatedCatch?.id) {
+                val caught = animatedCatch
+                if (caught == null) {
+                    catchLiftAnimation = null
+                    return@LaunchedEffect
+                }
+                if (playedCatchAnimationId == caught.id || sceneWidthPx <= 0f || sceneHeightPx <= 0f) {
+                    return@LaunchedEffect
+                }
+                playedCatchAnimationId = caught.id
+                val start = Offset(
+                    x = sceneWidthPx * lastLandedRel.x,
+                    y = sceneHeightPx * lastLandedRel.y,
+                )
+                catchLiftAnimation = CatchLiftAnimationState(
+                    catchId = caught.id,
+                    fish = caught.fish,
+                    rarity = caught.rarity,
+                    start = start,
+                    end = catchTargetPx,
+                )
+                val durationNanos = CATCH_LIFT_ANIMATION_MILLIS * 1_000_000L
+                var startNanos = 0L
+                while (isActive) {
+                    val frameNanos = withFrameNanos { it }
+                    if (startNanos == 0L) {
+                        startNanos = frameNanos
+                    }
+                    val progress = ((frameNanos - startNanos).toFloat() / durationNanos).coerceIn(0f, 1f)
+                    val eased = easeOutCubic(progress)
+                    catchLiftAnimation = catchLiftAnimation?.takeIf { it.catchId == caught.id }?.copy(progress = eased)
+                    if (progress >= 1f) break
+                }
+                delay(250L)
+                if (catchLiftAnimation?.catchId == caught.id) {
+                    catchLiftAnimation = null
+                }
             }
 
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -2902,6 +2980,62 @@ private fun FishingStageScene(
                     )
                 }
             }
+            catchLiftAnimation?.let { animation ->
+                val fishAsset = fishAssetModel(animation.fish)
+                if (fishAsset != null) {
+                    val progress = animation.progress
+                    val lift = sin(progress * PI.toFloat()) * if (isSmallScene) 26f else 38f
+                    val fishSizeDp = if (isSmallScene) 72.dp else 88.dp
+                    val fishSizePx = with(density) { fishSizeDp.toPx() }
+                    val x = animation.start.x + (animation.end.x - animation.start.x) * progress
+                    val y = animation.start.y + (animation.end.y - animation.start.y) * progress - lift
+                    val scale = 0.75f + progress * 0.3f
+                    val rotation = sin(progress * PI.toFloat()) * if (isSmallScene) 9f else 13f
+                    val fadeStart = 0.8f
+                    val alpha = if (progress < fadeStart) {
+                        1f
+                    } else {
+                        (1f - (progress - fadeStart) / (1f - fadeStart)).coerceIn(0f, 1f)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    (x - fishSizePx / 2f).roundToInt(),
+                                    (y - fishSizePx / 2f).roundToInt(),
+                                )
+                            }
+                            .size(fishSizeDp)
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                rotationZ = rotation,
+                                alpha = alpha,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(
+                                            rarityColor(animation.rarity).copy(alpha = 0.42f),
+                                            Color.Transparent,
+                                        )
+                                    ),
+                                    CircleShape,
+                                )
+                        )
+                        AsyncImage(
+                            model = fishAsset,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
             if (proMode) {
                 FishingSetupBar(
                     strings = strings,
@@ -2966,6 +3100,7 @@ private fun proFishingCastSpotFromSwipe(
     swipe: Offset,
     widthPx: Float,
     heightPx: Float,
+    elapsedMillis: Long,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
     val distance = hypot(swipe.x, swipe.y)
@@ -2978,7 +3113,20 @@ private fun proFishingCastSpotFromSwipe(
         xRoll = ((targetX - PRO_CAST_MIN_X) / (PRO_CAST_MAX_X - PRO_CAST_MIN_X)).coerceIn(0f, 1f),
         yRoll = ((targetY - PRO_CAST_FAR_Y) / (PRO_CAST_NEAR_Y - PRO_CAST_FAR_Y)).coerceIn(0f, 1f),
         proMode = true,
+        castDurationMillis = castDurationFromSwipe(distance, elapsedMillis),
     )
+}
+
+private fun castDurationFromSwipe(distancePx: Float, elapsedMillis: Long): Int {
+    val elapsed = elapsedMillis.coerceAtLeast(16L).toFloat()
+    if (distancePx.isNaN() || distancePx.isInfinite() || distancePx <= 0f) {
+        return CAST_ANIMATION_DEFAULT_MILLIS
+    }
+    val velocity = distancePx / elapsed
+    val speed = ((velocity - 0.18f) / 1.55f).coerceIn(0f, 1f)
+    return (CAST_ANIMATION_MAX_MILLIS - speed * (CAST_ANIMATION_MAX_MILLIS - CAST_ANIMATION_MIN_MILLIS))
+        .roundToInt()
+        .coerceIn(CAST_ANIMATION_MIN_MILLIS, CAST_ANIMATION_MAX_MILLIS)
 }
 
 private fun easeInOutCubic(progress: Float): Float =
@@ -2988,6 +3136,11 @@ private fun easeInOutCubic(progress: Float): Float =
         val shifted = -2f * progress + 2f
         1f - (shifted * shifted * shifted) / 2f
     }
+
+private fun easeOutCubic(progress: Float): Float {
+    val remaining = 1f - progress.coerceIn(0f, 1f)
+    return 1f - remaining * remaining * remaining
+}
 
 private fun Offset.isFinite(): Boolean =
     !x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()

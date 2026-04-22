@@ -58,6 +58,7 @@ data class FishingCastSpot(
     val xRoll: Float,
     val yRoll: Float,
     val proMode: Boolean = false,
+    val castDurationMillis: Int = CAST_ANIMATION_DEFAULT_MILLIS,
 )
 
 enum class RatingsMode(val apiValue: String) {
@@ -1840,7 +1841,6 @@ class RiverKingViewModel(
                             lastCatchWasNewFish = isNewFish,
                             lastEscape = false,
                         ),
-                        selectedCatch = cast.catch ?: it.selectedCatch,
                     )
                 }
                 if (cast.caught) {
@@ -1850,6 +1850,17 @@ class RiverKingViewModel(
                     )
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
+                val caught = cast.catch
+                if (caught != null) {
+                    delay(CATCH_DETAILS_OPEN_DELAY_MILLIS)
+                    _state.update { current ->
+                        if (current.fishing.lastCast?.catch?.id == caught.id && current.selectedCatch == null) {
+                            current.copy(selectedCatch = caught)
+                        } else {
+                            current
+                        }
+                    }
+                }
             } catch (error: Throwable) {
                 val message = describeError(error)
                 _state.update { it.copy(error = message) }
@@ -1997,6 +2008,8 @@ private const val TAP_CHALLENGE_GOAL = 10
 private const val TAP_CHALLENGE_MILLIS = 5_000L
 private const val BITE_WINDOW_MILLIS = 5_000L
 private const val CAST_READY_DELAY_MILLIS = 3_000L
+private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
+private const val CATCH_DETAILS_OPEN_DELAY_MILLIS = 1_150L
 private const val TELEGRAM_POLL_INTERVAL_MS = 2_000L
 private const val FAIL_REACTION_SECONDS = 9.99
 private val REGISTER_LOGIN_REGEX = Regex("^[a-z0-9._-]{3,32}$")
