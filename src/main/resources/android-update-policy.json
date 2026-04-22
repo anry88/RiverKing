@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 1,
-  "latestVersionName": "0.1.2",
+  "latestVersionCode": 2,
+  "latestVersionName": "0.2.2",
   "minSupportedVersionCode": 1,
   "requireVersionHeaders": false,
   "releaseNotes": {
     "en": [
-      "This version improves app compatibility with the RiverKing server.",
-      "Fixed issues that could interrupt sign-in or gameplay."
+      "Added Pro fishing mode with fullscreen casting gestures.",
+      "Improved the Android fishing screen with in-scene auto-fishing and Pro mode controls."
     ],
     "ru": [
-      "В новой версии улучшена совместимость приложения с сервером RiverKing.",
-      "Исправлены проблемы, которые могли мешать входу или продолжению игры."
+      "Добавлен Pro-режим рыбалки с полноэкранным забросом жестом.",
+      "Улучшен экран рыбалки на Android: автоловля и Pro-режим теперь доступны прямо на сцене."
     ]
   }
 }
