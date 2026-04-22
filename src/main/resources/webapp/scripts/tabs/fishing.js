@@ -175,7 +175,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
-  const hookIcon = window.FISHING_HOOK_ICON || '/app/assets/menu/fishing_hook.svg';
   const bobberSize = proMode ? PRO_BOBBER_SIZE : BOBBER_SIZE;
   const bobberRadius = bobberSize / 2;
   const bobberVisibleAboveWater = Math.round(bobberRadius * 0.75);
@@ -237,11 +236,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const hookSize = proMode ? 18 : 14;
   const baitSize = proMode ? 18 : 15;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
+  const rigWidth = 44;
+  const rigCenterX = rigWidth / 2;
   const rigStyle = React.useMemo(() => ({
-    left: floatPx.x,
+    left: floatPx.x - rigCenterX,
     top: floatPx.y + bobberRadius * 0.44,
+    width: rigWidth,
     height: rigLineHeight + hookSize + 4
-  }), [floatPx.x, floatPx.y, bobberRadius, rigLineHeight, hookSize]);
+  }), [floatPx.x, floatPx.y, bobberRadius, rigLineHeight, hookSize, rigCenterX]);
   const [proMessage, setProMessage] = React.useState(null);
 
   React.useEffect(() => {
@@ -802,38 +804,51 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
 
       {shouldShowRig && (
         <div
-          className="absolute pointer-events-none z-20"
+          className="absolute pointer-events-none z-40 overflow-visible"
           style={rigStyle}
           aria-hidden="true"
         >
           <div
-            className="absolute left-1/2 top-0 w-px -translate-x-1/2 rounded-full bg-white/35"
-            style={{ height: rigLineHeight }}
+            className="absolute top-0 w-px rounded-full bg-white/35"
+            style={{ left: rigCenterX, height: rigLineHeight }}
           ></div>
-          <img
-            src={hookIcon}
-            alt=""
-            className="absolute object-contain drop-shadow"
+          <svg
+            viewBox="0 0 32 32"
+            className="absolute drop-shadow"
             style={{
-              left: -hookSize * 0.42,
+              left: rigCenterX - hookSize * 0.42,
               top: rigLineHeight - hookSize * 0.18,
               width: hookSize,
               height: hookSize,
               zIndex: 1
             }}
-          />
+          >
+            <path d="M15.8 3.4c-1.8 3.5-1.6 7.3.4 10.4l3.3 5.2c1.3 2.1.5 4.9-1.8 6.1-2.2 1.1-5 .2-6.1-2.1-.5-1-.6-2.1-.3-3.1" fill="none" stroke="#f4ead6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M10.1 20.2 6.4 18" fill="none" stroke="#f4ead6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M15.2 3.9 19 2.2" fill="none" stroke="#c8d8d4" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <div
+            className="absolute rounded-full bg-amber-300/90 blur-[0.2px]"
+            style={{
+              left: rigCenterX - baitSize * 0.38,
+              top: rigLineHeight + hookSize * 0.34,
+              width: baitSize * 0.76,
+              height: baitSize * 0.44,
+              zIndex: 2
+            }}
+          ></div>
           {currentLureIcon && (
-            <img
+            <AssetImage
               src={currentLureIcon}
               alt=""
               className="absolute object-contain drop-shadow"
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
-                left: -baitSize * 0.45,
+                left: rigCenterX - baitSize * 0.45,
                 top: rigLineHeight + hookSize * 0.28,
                 width: baitSize,
                 height: baitSize,
-                zIndex: 2
+                zIndex: 3
               }}
             />
           )}
