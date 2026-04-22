@@ -16,17 +16,17 @@ const DEFAULT_PRO_CAST_AREA = Object.freeze({
 const PRO_CAST_AREAS = Object.freeze({
   pond: { minX: 0.16, maxX: 0.80, farY: 0.50, nearY: 0.70 },
   swamp: { minX: 0.20, maxX: 0.70, farY: 0.57, nearY: 0.72 },
-  river: { minX: 0.14, maxX: 0.76, farY: 0.50, nearY: 0.69 },
+  river: { minX: 0.14, maxX: 0.76, farY: 0.54, nearY: 0.70 },
   lake: { minX: 0.16, maxX: 0.78, farY: 0.50, nearY: 0.70 },
   reservoir: { minX: 0.14, maxX: 0.80, farY: 0.50, nearY: 0.70 },
   mountain_river: { minX: 0.14, maxX: 0.58, farY: 0.54, nearY: 0.70 },
   river_delta: { minX: 0.14, maxX: 0.66, farY: 0.51, nearY: 0.68 },
   sea_coast: { minX: 0.18, maxX: 0.78, farY: 0.50, nearY: 0.70 },
-  amazon_riverbed: { minX: 0.32, maxX: 0.82, farY: 0.54, nearY: 0.70 },
+  amazon_riverbed: { minX: 0.18, maxX: 0.58, farY: 0.58, nearY: 0.72 },
   flooded_forest: { minX: 0.24, maxX: 0.78, farY: 0.52, nearY: 0.70 },
-  mangroves: { minX: 0.16, maxX: 0.58, farY: 0.54, nearY: 0.70 },
+  mangroves: { minX: 0.12, maxX: 0.44, farY: 0.58, nearY: 0.72 },
   coral_flats: { minX: 0.14, maxX: 0.50, farY: 0.52, nearY: 0.68 },
-  fjord: { minX: 0.16, maxX: 0.72, farY: 0.53, nearY: 0.70 },
+  fjord: { minX: 0.12, maxX: 0.50, farY: 0.60, nearY: 0.74 },
   open_ocean: { minX: 0.14, maxX: 0.62, farY: 0.46, nearY: 0.62 }
 });
 const CAST_ANIMATION_MIN_MS = 280;
