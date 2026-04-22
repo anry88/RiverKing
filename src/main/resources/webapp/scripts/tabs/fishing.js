@@ -233,8 +233,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     if (!currentLure || typeof window.getLureIcon !== 'function') return null;
     return window.getLureIcon(currentLure);
   }, [currentLure]);
-  const rigLineHeight = Math.round((proMode ? bobberSize * 1.15 : bobberSize * 0.95) * 1.5);
-  const hookSize = proMode ? 17 : 14;
+  const rigLineHeight = proMode ? 36 : 27;
+  const hookSize = proMode ? 18 : 14;
   const baitSize = proMode ? 18 : 15;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
   const rigStyle = React.useMemo(() => ({
@@ -802,7 +802,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
 
       {shouldShowRig && (
         <div
-          className="absolute pointer-events-none z-[5]"
+          className="absolute pointer-events-none z-20"
           style={rigStyle}
           aria-hidden="true"
         >
@@ -810,7 +810,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             className="absolute left-1/2 top-0 w-px -translate-x-1/2 rounded-full bg-white/35"
             style={{ height: rigLineHeight }}
           ></div>
-          <AssetImage
+          <img
             src={hookIcon}
             alt=""
             className="absolute object-contain drop-shadow"
@@ -818,19 +818,22 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
               left: -hookSize * 0.42,
               top: rigLineHeight - hookSize * 0.18,
               width: hookSize,
-              height: hookSize
+              height: hookSize,
+              zIndex: 1
             }}
           />
           {currentLureIcon && (
-            <AssetImage
+            <img
               src={currentLureIcon}
               alt=""
               className="absolute object-contain drop-shadow"
+              onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
                 left: -baitSize * 0.45,
                 top: rigLineHeight + hookSize * 0.28,
                 width: baitSize,
-                height: baitSize
+                height: baitSize,
+                zIndex: 2
               }}
             />
           )}
