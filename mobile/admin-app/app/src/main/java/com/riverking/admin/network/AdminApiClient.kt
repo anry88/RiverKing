@@ -4,6 +4,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.accept
 import io.ktor.client.request.delete
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
@@ -21,6 +23,7 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.riverking.admin.BuildConfig
 
 @Serializable
 data class TournamentDTO(
@@ -174,6 +177,12 @@ class AdminApiClient(
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(json)
+        }
+        defaultRequest {
+            accept(ContentType.Application.Json)
+            header("X-RiverKing-App-Platform", "android")
+            header("X-RiverKing-App-Version-Code", BuildConfig.VERSION_CODE.toString())
+            header("X-RiverKing-App-Version-Name", BuildConfig.VERSION_NAME)
         }
     }
 
