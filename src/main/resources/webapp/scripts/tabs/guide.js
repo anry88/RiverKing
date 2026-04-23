@@ -15,6 +15,13 @@ function Guide({
   const [data,setData] = React.useState(null);
   const [error,setError] = React.useState(null);
   const [fishRarityFilter,setFishRarityFilter] = React.useState('all');
+  const [locationKind,setLocationKind] = React.useState('regular');
+  const [eventLocations,setEventLocations] = React.useState([]);
+  const [eventLocationOffset,setEventLocationOffset] = React.useState(0);
+  const [eventLocationsHasMore,setEventLocationsHasMore] = React.useState(true);
+  const [eventLocationsLoading,setEventLocationsLoading] = React.useState(false);
+  const [eventLocationsError,setEventLocationsError] = React.useState(null);
+  const eventLocationsSentinelRef = React.useRef(null);
   const rodBonusText = React.useCallback((rod)=>{
     if(!rod || !rod.bonusWater) return t('rodNoBonus');
     if(rod.bonusWater==='fresh' && rod.bonusPredator) return t('rodBonusFreshPredator');
@@ -25,11 +32,50 @@ function Guide({
   }, [me.language]);
   React.useEffect(()=>{
     setData(null); setError(null);
+    setEventLocations([]);
+    setEventLocationOffset(0);
+    setEventLocationsHasMore(true);
+    setEventLocationsLoading(false);
+    setEventLocationsError(null);
     fetch('/api/guide',{credentials:'include'})
       .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
       .then(setData)
       .catch(e=> setError(e===401 ? t('authRequired') : t('loadFailed')));
   },[me.language]);
+  const loadEventLocations = React.useCallback((reset=false)=>{
+    if(eventLocationsLoading) return;
+    if(!reset && !eventLocationsHasMore) return;
+    const offset = reset ? 0 : eventLocationOffset;
+    setEventLocationsLoading(true);
+    setEventLocationsError(null);
+    fetch(`/api/guide/event-locations?offset=${offset}&limit=10`,{credentials:'include'})
+      .then(r=>{ if(!r.ok) throw r.status; return r.json(); })
+      .then(page=>{
+        const locations = Array.isArray(page.locations) ? page.locations : [];
+        setEventLocations(prev=> reset ? locations : [...prev, ...locations]);
+        setEventLocationOffset(Number.isFinite(Number(page.nextOffset)) ? Number(page.nextOffset) : offset + locations.length);
+        setEventLocationsHasMore(Boolean(page.hasMore));
+      })
+      .catch(()=> setEventLocationsError(t('loadFailed')))
+      .finally(()=> setEventLocationsLoading(false));
+  },[eventLocationOffset, eventLocationsHasMore, eventLocationsLoading, me.language]);
+  React.useEffect(()=>{
+    if(section==='locations' && locationKind==='special' && eventLocations.length===0 && eventLocationsHasMore && !eventLocationsLoading){
+      loadEventLocations(true);
+    }
+  },[section, locationKind, eventLocations.length, eventLocationsHasMore, eventLocationsLoading, loadEventLocations]);
+  React.useEffect(()=>{
+    if(section!=='locations' || locationKind!=='special') return undefined;
+    if(!eventLocationsHasMore || eventLocationsLoading) return undefined;
+    const node = eventLocationsSentinelRef.current;
+    if(!node) return undefined;
+    if(typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)) loadEventLocations(false);
+    },{rootMargin:'180px'});
+    observer.observe(node);
+    return ()=>observer.disconnect();
+  },[section, locationKind, eventLocationsHasMore, eventLocationsLoading, loadEventLocations, eventLocations.length]);
   React.useEffect(()=>{
     setFishRarityFilter('all');
   },[data?.fish, me.language]);
@@ -85,9 +131,14 @@ function Guide({
       </div>
       {section==='locations' && (
         <div className="space-y-4">
-          {data.locations.map(loc=>{
+          <div className="glass rounded-xl p-1 flex gap-1">
+            <button onClick={()=>setLocationKind('regular')} className={`flex-1 py-2 rounded-lg ${locationKind==='regular'?'bg-emerald-600':'hover:bg-white/5'}`}>{t('regular')}</button>
+            <button onClick={()=>setLocationKind('special')} className={`flex-1 py-2 rounded-lg ${locationKind==='special'?'bg-emerald-600':'hover:bg-white/5'}`}>{t('special')}</button>
+          </div>
+          {(locationKind==='regular' ? data.locations : eventLocations).map(loc=>{
             const myLoc = me.locations.find(l=>l.id===loc.id) || {};
-            const unlocked = myLoc.unlocked;
+            const isEvent = loc.isEvent === true || locationKind==='special';
+            const unlocked = isEvent || myLoc.unlocked;
             const bgResolver = typeof window.getLocationBackground === 'function'
               ? window.getLocationBackground
               : (id, name) => {
@@ -101,14 +152,19 @@ function Guide({
                   }
                   return null;
                 };
-            const bgUrl = bgResolver(loc.id, myLoc.name || loc.name);
+            const bgUrl = loc.imageUrl || bgResolver(loc.id, myLoc.name || loc.name);
             return (
               <div key={loc.id} className="p-4 glass rounded-xl text-center">
                 <div className="font-semibold mb-2">{myLoc.name || loc.name}</div>
+                {isEvent && <div className="text-xs mb-2 text-amber-200">{t('specialEvent')}</div>}
                 {unlocked ? (
                   <>
                     {bgUrl ? (
-                      <AssetImage src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                      loc.imageUrl ? (
+                        <img src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                      ) : (
+                        <AssetImage src={bgUrl} alt={loc.name} className="w-full h-40 object-cover rounded-lg mb-2"/>
+                      )
                     ) : (
                       <div className="w-full h-40 bg-gray-800 rounded-lg mb-2 flex items-center justify-center text-3xl">?</div>
                     )}
@@ -138,6 +194,18 @@ function Guide({
               </div>
             );
           })}
+          {locationKind==='special' && eventLocationsLoading && (
+            <div className="text-center opacity-70 py-3">{t('loading')}</div>
+          )}
+          {locationKind==='special' && eventLocationsError && !eventLocationsLoading && (
+            <div className="text-center text-red-300 py-3">{eventLocationsError}</div>
+          )}
+          {locationKind==='special' && !eventLocationsLoading && !eventLocationsError && eventLocations.length===0 && (
+            <div className="text-center opacity-70 py-3">{t('eventsEmpty')}</div>
+          )}
+          {locationKind==='special' && eventLocationsHasMore && (
+            <div ref={eventLocationsSentinelRef} className="h-8"/>
+          )}
         </div>
       )}
       {section==='fish' && (

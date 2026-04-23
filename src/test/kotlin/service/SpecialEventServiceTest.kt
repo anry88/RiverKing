@@ -5,8 +5,11 @@ import db.ClubMembers
 import db.Clubs
 import db.DB
 import db.Fish
+import db.InventoryLures
+import db.Lures
 import db.SpecialEventPrizes
 import db.SpecialEventUserProgress
+import db.Users
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +23,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import support.testEnv
 
 class SpecialEventServiceTest {
@@ -58,6 +62,57 @@ class SpecialEventServiceTest {
             )
         }
         assertEquals("event_overlap", error.code)
+    }
+
+    @Test
+    fun eventFishingAllowsMixedLureCompatibility() {
+        DB.init(testEnv("special-event-mixed-lures"))
+        val fishing = FishingService()
+        val events = SpecialEventService()
+        val now = Instant.now()
+        val eventId = events.createEvent(
+            nameRu = "Смешанный канал",
+            nameEn = "Mixed Canal",
+            start = now.minusSeconds(3_600),
+            end = now.plusSeconds(3_600),
+            imagePath = null,
+            castArea = defaultCastArea,
+            fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
+            weightPrizes = noPrizes,
+            countPrizes = noPrizes,
+            fishPrizes = noPrizes,
+        )
+        val locationId = events.eventLocationId(eventId) ?: error("event location missing")
+        val userId = fishing.ensureUserByTgId(10_900L, username = "mixed-lure")
+        createClub(userId, "Mixed Lures")
+        fishing.setLocation(userId, locationId)
+
+        transaction {
+            val saltPredatorLureId = Lures
+                .select { Lures.name eq "Морская хищная" }
+                .single()[Lures.id].value
+            val existing = InventoryLures.select {
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq saltPredatorLureId)
+            }.singleOrNull()
+            if (existing == null) {
+                InventoryLures.insert {
+                    it[InventoryLures.userId] = userId
+                    it[InventoryLures.lureId] = saltPredatorLureId
+                    it[InventoryLures.qty] = 2
+                }
+            } else {
+                InventoryLures.update({
+                    (InventoryLures.userId eq userId) and (InventoryLures.lureId eq saltPredatorLureId)
+                }) {
+                    it[InventoryLures.qty] = 2
+                }
+            }
+            Users.update({ Users.id eq userId }) {
+                it[Users.currentLureId] = saltPredatorLureId
+            }
+        }
+
+        fishing.startCast(userId)
     }
 
     @Test

@@ -239,6 +239,9 @@ class AuthRepository(
     suspend fun loadGuide(): GuideDto =
         withFreshAccessToken { accessToken -> api.guide(accessToken) }
 
+    suspend fun loadEventGuideLocations(offset: Long, limit: Int): GuideLocationsPageDto =
+        withFreshAccessToken { accessToken -> api.eventGuideLocations(accessToken, offset, limit) }
+
     suspend fun loadAchievements(): List<AchievementDto> =
         withFreshAccessToken { accessToken -> api.achievements(accessToken) }
 

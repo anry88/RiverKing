@@ -257,6 +257,7 @@ fun RiverKingApp(
                         onSetRatingsFish = viewModel::setRatingsFish,
                         onLoadRatings = viewModel::loadRatings,
                         onLoadGuide = viewModel::loadGuide,
+                        onLoadEventGuideLocations = viewModel::loadEventGuideLocations,
                         onClaimAchievement = viewModel::claimAchievement,
                         onDismissAchievementReward = viewModel::dismissAchievementReward,
                         onLoadClub = viewModel::loadClub,

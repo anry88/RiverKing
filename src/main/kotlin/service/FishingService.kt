@@ -811,6 +811,17 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val name: String,
         val fish: List<FishBriefDTO>,
         val lures: List<String>,
+        val imageUrl: String? = null,
+        val isEvent: Boolean = false,
+        val startTime: Long? = null,
+        val endTime: Long? = null,
+    )
+
+    @Serializable
+    data class GuideLocationPageDTO(
+        val locations: List<GuideLocationDTO>,
+        val nextOffset: Long? = null,
+        val hasMore: Boolean = false,
     )
 
     @Serializable
@@ -982,6 +993,64 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
         GuideDTO(locationDtos, fishDtos, lureDtos, rodDtos)
+    }
+
+    fun eventGuideLocations(
+        lang: String,
+        limit: Int = 10,
+        offset: Long = 0L,
+        eventImageUrl: (String?) -> String? = { null },
+    ): GuideLocationPageDTO = transaction {
+        fun rarityRank(r: String) = when (r) {
+            "common" -> 0
+            "uncommon" -> 1
+            "rare" -> 2
+            "epic" -> 3
+            "mythic" -> 4
+            "legendary" -> 5
+            else -> 6
+        }
+
+        val pageLimit = limit.coerceIn(1, 10)
+        val events = SpecialEvents.selectAll()
+            .orderBy(SpecialEvents.startTime to SortOrder.DESC, SpecialEvents.id to SortOrder.DESC)
+            .limit(pageLimit + 1, offset.coerceAtLeast(0L))
+            .toList()
+        val visibleEvents = events.take(pageLimit)
+        val allLureNames = Lures.selectAll()
+            .orderBy(Lures.id)
+            .map { I18n.lure(it[Lures.name], lang) }
+            .distinct()
+            .sorted()
+        val locations = visibleEvents.mapNotNull { eventRow ->
+            val eventId = eventRow[SpecialEvents.id].value
+            val locationId = Locations
+                .slice(Locations.id)
+                .select { Locations.specialEventId eq eventId }
+                .limit(1)
+                .singleOrNull()
+                ?.get(Locations.id)
+                ?.value
+                ?: return@mapNotNull null
+            val fishRows = (SpecialEventFish innerJoin Fish)
+                .slice(Fish.name, Fish.rarity)
+                .select { SpecialEventFish.eventId eq eventId }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
+                .distinctBy { it.name }
+                .sortedBy { rarityRank(it.rarity) }
+            GuideLocationDTO(
+                id = locationId,
+                name = if (lang == "en") eventRow[SpecialEvents.nameEn] else eventRow[SpecialEvents.nameRu],
+                fish = fishRows,
+                lures = allLureNames,
+                imageUrl = eventImageUrl(eventRow[SpecialEvents.imagePath]),
+                isEvent = true,
+                startTime = eventRow[SpecialEvents.startTime].epochSecond,
+                endTime = eventRow[SpecialEvents.endTime].epochSecond,
+            )
+        }
+        val nextOffset = if (events.size > pageLimit) offset.coerceAtLeast(0L) + pageLimit else null
+        GuideLocationPageDTO(locations, nextOffset, hasMore = nextOffset != null)
     }
 
     data class ShopPackage(
@@ -1583,11 +1652,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                     SpecialEventFish.weight,
                 )
                 .select {
-                    (SpecialEventFish.eventId eq event.id) and
-                        (Fish.predator eq lurePredator) and
-                        (Fish.water eq lureWater)
+                    SpecialEventFish.eventId eq event.id
                 }
                 .map {
+                    val predatorFactor = if (it[Fish.predator] == lurePredator) 1.0 else 0.18
+                    val waterFactor = if (it[Fish.water] == lureWater) 1.0 else 0.65
                     FishPoolEntry(
                         fishId = it[Fish.id].value,
                         fishName = it[Fish.name],
@@ -1596,7 +1665,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                         rarity = it[Fish.rarity],
                         predator = it[Fish.predator],
                         water = it[Fish.water],
-                        poolWeight = it[SpecialEventFish.weight],
+                        poolWeight = it[SpecialEventFish.weight] * predatorFactor * waterFactor,
                     )
                 }
         } else {
@@ -2170,6 +2239,22 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 )
             }
             .singleOrNull()
+    }
+
+    fun eventImagePathForCatch(catchId: Long): String? = transaction {
+        val eventId = (Catches innerJoin Locations)
+            .slice(Locations.specialEventId)
+            .select { Catches.id eq catchId }
+            .limit(1)
+            .singleOrNull()
+            ?.get(Locations.specialEventId)
+            ?: return@transaction null
+        SpecialEvents
+            .slice(SpecialEvents.imagePath)
+            .select { SpecialEvents.id eq eventId }
+            .limit(1)
+            .singleOrNull()
+            ?.get(SpecialEvents.imagePath)
     }
 
     private fun rarityRank(r: String) = when (r) {

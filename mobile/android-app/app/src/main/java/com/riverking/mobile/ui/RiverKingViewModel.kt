@@ -16,6 +16,7 @@ import com.riverking.mobile.auth.ClubSummaryDto
 import com.riverking.mobile.auth.CurrentTournamentDto
 import com.riverking.mobile.auth.GuideDto
 import com.riverking.mobile.auth.GuideFishDto
+import com.riverking.mobile.auth.GuideLocationDto
 import com.riverking.mobile.auth.HookResultDto
 import com.riverking.mobile.auth.HookedFishDto
 import com.riverking.mobile.auth.MeResponseDto
@@ -143,6 +144,10 @@ data class GuideUiState(
     val guide: GuideDto? = null,
     val achievements: List<AchievementDto> = emptyList(),
     val quests: QuestListDto? = null,
+    val eventLocations: List<GuideLocationDto> = emptyList(),
+    val eventLocationsLoading: Boolean = false,
+    val eventLocationsNextOffset: Long = 0L,
+    val eventLocationsHasMore: Boolean = true,
 )
 
 data class ClubUiState(
@@ -853,8 +858,14 @@ class RiverKingViewModel(
                     )
                 }
                 _state.update {
+                    val previousGuide = it.guide
                     it.copy(
-                        guide = data,
+                        guide = data.copy(
+                            eventLocations = if (force) emptyList() else previousGuide.eventLocations,
+                            eventLocationsLoading = false,
+                            eventLocationsNextOffset = if (force) 0L else previousGuide.eventLocationsNextOffset,
+                            eventLocationsHasMore = if (force) true else previousGuide.eventLocationsHasMore,
+                        ),
                         ratings = it.ratings.copy(
                             fishOptions = data.guide?.fish ?: it.ratings.fishOptions,
                         ),
@@ -866,6 +877,45 @@ class RiverKingViewModel(
                 _state.update {
                     it.copy(
                         guide = it.guide.copy(loading = false),
+                        error = message,
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadEventGuideLocations(reset: Boolean = false) {
+        if (state.value.me == null) return
+        val current = state.value.guide
+        if (current.eventLocationsLoading) return
+        if (!reset && !current.eventLocationsHasMore) return
+        val offset = if (reset) 0L else current.eventLocationsNextOffset
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    guide = it.guide.copy(eventLocationsLoading = true),
+                    error = null,
+                )
+            }
+            try {
+                val page = repository.loadEventGuideLocations(offset = offset, limit = 10)
+                _state.update {
+                    val previous = if (reset) emptyList() else it.guide.eventLocations
+                    it.copy(
+                        guide = it.guide.copy(
+                            eventLocations = previous + page.locations,
+                            eventLocationsLoading = false,
+                            eventLocationsNextOffset = page.nextOffset ?: (offset + page.locations.size),
+                            eventLocationsHasMore = page.hasMore,
+                        ),
+                        error = null,
+                    )
+                }
+            } catch (error: Throwable) {
+                val message = describeError(error)
+                _state.update {
+                    it.copy(
+                        guide = it.guide.copy(eventLocationsLoading = false),
                         error = message,
                     )
                 }

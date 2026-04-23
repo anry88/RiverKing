@@ -446,6 +446,21 @@ class AuthRoutesTest {
             unlockedEventLocation.getValue("id").jsonPrimitive.content.toLong(),
             withClubBody.getValue("locationId").jsonPrimitive.content.toLong(),
         )
+
+        val eventGuide = client.get("/api/guide/event-locations?limit=10&offset=0") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, eventGuide.status)
+        val eventGuideBody = json.parseToJsonElement(eventGuide.bodyAsText()).jsonObject
+        val eventLocation = eventGuideBody.getValue("locations").jsonArray.single().jsonObject
+        assertEquals(
+            unlockedEventLocation.getValue("id").jsonPrimitive.content.toLong(),
+            eventLocation.getValue("id").jsonPrimitive.content.toLong(),
+        )
+        assertEquals("https://riverking.example/event-assets/event-bay.webp", eventLocation.getValue("imageUrl").jsonPrimitive.content)
+        assertEquals(true, eventLocation.getValue("isEvent").jsonPrimitive.boolean)
+        assertEquals(false, eventGuideBody["hasMore"]?.jsonPrimitive?.boolean ?: false)
     }
 
     @Test

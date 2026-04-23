@@ -285,6 +285,17 @@ data class GuideLocationDto(
     val name: String,
     val fish: List<FishBriefDto>,
     val lures: List<String>,
+    val imageUrl: String? = null,
+    val isEvent: Boolean = false,
+    val startTime: Long? = null,
+    val endTime: Long? = null,
+)
+
+@Serializable
+data class GuideLocationsPageDto(
+    val locations: List<GuideLocationDto> = emptyList(),
+    val nextOffset: Long? = null,
+    val hasMore: Boolean = false,
 )
 
 @Serializable

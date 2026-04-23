@@ -203,6 +203,13 @@ class AuthApi(
             bearerAuth(accessToken)
         }.body()
 
+    suspend fun eventGuideLocations(accessToken: String, offset: Long, limit: Int): GuideLocationsPageDto =
+        client.get("$baseUrl/api/guide/event-locations") {
+            bearerAuth(accessToken)
+            parameter("offset", offset)
+            parameter("limit", limit)
+        }.body()
+
     suspend fun achievements(accessToken: String): List<AchievementDto> =
         client.get("$baseUrl/api/achievements") {
             bearerAuth(accessToken)

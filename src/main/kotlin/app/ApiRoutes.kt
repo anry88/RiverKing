@@ -535,6 +535,15 @@ fun Application.apiRoutes(
         return "${env.publicBaseUrl.trimEnd('/')}/event-assets/$fileName"
     }
 
+    fun eventAssetFile(imagePath: String?): File? {
+        val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+        val root = File(env.eventAssetsDir).canonicalFile
+        val file = File(root, fileName).canonicalFile
+        if (!file.path.startsWith(root.path + File.separator)) return null
+        return file.takeIf { it.isFile }
+    }
+
     fun SpecialEvent.toDto(language: String): SpecialEventDTO =
         SpecialEventDTO(
             id = id,
@@ -1751,6 +1760,14 @@ fun Application.apiRoutes(
             call.respond(data)
         }
 
+        get("/api/guide/event-locations") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 10) ?: 10
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+            call.respond(fishing.eventGuideLocations(language, limit, offset, ::eventAssetUrl))
+        }
+
         get("/api/stats/catch") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val period = call.request.queryParameters["period"] ?: "all"
@@ -1956,6 +1973,7 @@ fun Application.apiRoutes(
             val fishName = I18n.fish(catch.fish, language)
             val locationName = I18n.location(catch.location, language)
             val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -1966,6 +1984,7 @@ fun Application.apiRoutes(
                 language,
                 anglerName = catch.user,
                 caughtAt = caughtAt,
+                locationBackgroundFile = locationBackgroundFile,
             ) ?: return@get call.respond(HttpStatusCode.NotFound)
             call.response.header(HttpHeaders.CacheControl, "no-store")
             call.respondBytes(image, ContentType.Image.PNG)
@@ -1991,6 +2010,7 @@ fun Application.apiRoutes(
                 locationName = locationName,
             )
             val caption = appendCatchTags(captionBase, catch)
+            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -2001,6 +2021,7 @@ fun Application.apiRoutes(
                 language,
                 anglerName = catch.user,
                 caughtAt = caughtAt,
+                locationBackgroundFile = locationBackgroundFile,
             )
             try {
                 if (image != null) {

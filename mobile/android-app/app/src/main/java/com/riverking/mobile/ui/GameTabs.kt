@@ -213,6 +213,11 @@ private enum class CatalogSection {
     GEAR,
 }
 
+private enum class LocationCatalogKind {
+    REGULAR,
+    EVENT,
+}
+
 private enum class GearSection {
     RODS,
     LURES,
@@ -311,6 +316,7 @@ fun MainShell(
     onSetRatingsFish: (String) -> Unit,
     onLoadRatings: (Boolean) -> Unit,
     onLoadGuide: (Boolean) -> Unit,
+    onLoadEventGuideLocations: (Boolean) -> Unit,
     onClaimAchievement: (String) -> Unit,
     onDismissAchievementReward: () -> Unit,
     onLoadClub: (Boolean) -> Unit,
@@ -520,6 +526,7 @@ fun MainShell(
                     strings = strings,
                     isPlayFlavor = isPlayFlavor,
                     requestPlayPrice = requestPlayPrice,
+                    onLoadEventGuideLocations = onLoadEventGuideLocations,
                     modifier = Modifier.padding(padding),
                 )
                 MainTab.CLUB -> ClubScreen(
@@ -1909,14 +1916,28 @@ private fun CatalogScreen(
     strings: RiverStrings,
     isPlayFlavor: Boolean,
     requestPlayPrice: (String, (String?) -> Unit) -> Unit,
+    onLoadEventGuideLocations: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val me = state.me ?: return
     val guide = state.guide
     var section by rememberSaveable { mutableStateOf(CatalogSection.LOCATIONS) }
+    var locationKind by rememberSaveable { mutableStateOf(LocationCatalogKind.REGULAR) }
     var gearSection by rememberSaveable { mutableStateOf(GearSection.RODS) }
     var rarityFilter by rememberSaveable { mutableStateOf("all") }
     var showCaughtOnly by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(section, locationKind, guide.eventLocations.size, guide.eventLocationsHasMore, guide.eventLocationsLoading) {
+        if (
+            section == CatalogSection.LOCATIONS &&
+            locationKind == LocationCatalogKind.EVENT &&
+            guide.eventLocations.isEmpty() &&
+            guide.eventLocationsHasMore &&
+            !guide.eventLocationsLoading
+        ) {
+            onLoadEventGuideLocations(true)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
@@ -1961,6 +1982,26 @@ private fun CatalogScreen(
                         )
                     }
                 }
+                if (section == CatalogSection.LOCATIONS) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SegmentedSelectionBar(
+                        items = LocationCatalogKind.entries.toList(),
+                        selected = locationKind,
+                        onSelect = { locationKind = it },
+                        accentFor = {
+                            when (it) {
+                                LocationCatalogKind.REGULAR -> RiverTide
+                                LocationCatalogKind.EVENT -> RiverAmber
+                            }
+                        },
+                        labelFor = {
+                            when (it) {
+                                LocationCatalogKind.REGULAR -> regularTournamentsLabel(strings)
+                                LocationCatalogKind.EVENT -> eventLocationsLabel(strings)
+                            }
+                        },
+                    )
+                }
                 if (section == CatalogSection.GEAR) {
                     Spacer(modifier = Modifier.height(8.dp))
                     SegmentedSelectionBar(
@@ -1997,6 +2038,8 @@ private fun CatalogScreen(
                 guide = guide,
                 me = me,
                 strings = strings,
+                locationKind = locationKind,
+                onLoadMoreEventGuideLocations = { onLoadEventGuideLocations(false) },
                 modifier = Modifier.weight(1f),
             )
             CatalogSection.GEAR -> CatalogGearScreen(
@@ -2017,6 +2060,8 @@ private fun CatalogLocationsScreen(
     guide: GuideUiState,
     me: MeResponseDto,
     strings: RiverStrings,
+    locationKind: LocationCatalogKind,
+    onLoadMoreEventGuideLocations: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -2025,15 +2070,34 @@ private fun CatalogLocationsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionCard(strings.guideWaters) {
-                guide.guide?.locations?.forEachIndexed { index, location ->
+            val locations = when (locationKind) {
+                LocationCatalogKind.REGULAR -> guide.guide?.locations.orEmpty()
+                LocationCatalogKind.EVENT -> guide.eventLocations
+            }
+            SectionCard(if (locationKind == LocationCatalogKind.EVENT) eventLocationsLabel(strings) else strings.guideWaters) {
+                if (locations.isEmpty()) {
+                    if (locationKind == LocationCatalogKind.EVENT && guide.eventLocationsLoading) {
+                        LoadingStatePanel(strings.loading)
+                    } else {
+                        EmptyStatePanel(strings.noData)
+                    }
+                }
+                locations.forEachIndexed { index, location ->
                     if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                     GuideLocationRow(
                         strings = strings,
                         location = location,
-                        ownedLocation = me.locations.firstOrNull { it.id == location.id },
+                        ownedLocation = if (location.isEvent) null else me.locations.firstOrNull { it.id == location.id },
                     )
-                } ?: EmptyStatePanel(strings.noData)
+                }
+            }
+        }
+        if (locationKind == LocationCatalogKind.EVENT && guide.eventLocationsHasMore && guide.eventLocations.isNotEmpty()) {
+            item(key = "event-location-loader") {
+                LaunchedEffect(guide.eventLocations.size, guide.eventLocationsLoading) {
+                    if (!guide.eventLocationsLoading) onLoadMoreEventGuideLocations()
+                }
+                LoadingStatePanel(strings.loading)
             }
         }
     }
@@ -4842,12 +4906,13 @@ private fun GuideLocationRow(
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            val backgroundModel = location.imageUrl ?: locationBackgroundAsset(location.name)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp),
             ) {
-                locationBackgroundAsset(location.name)?.let { background ->
+                backgroundModel?.let { background ->
                     AsyncImage(
                         model = background,
                         contentDescription = location.name,
@@ -4888,6 +4953,7 @@ private fun GuideLocationRow(
                         CatchDetailChip(guideLureCountLabel(strings, location.lures.size))
                         CatchDetailChip(
                             when {
+                                location.isEvent -> specialEventLocationLabel(strings)
                                 ownedLocation?.unlocked == true -> unlockedLabel(strings)
                                 ownedLocation != null -> requiresKgLabel(strings, ownedLocation.unlockKg)
                                 else -> strings.unavailable
@@ -7295,6 +7361,12 @@ private fun regularTournamentsLabel(strings: RiverStrings): String =
 
 private fun specialTournamentsLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Специальные" else "Special"
+
+private fun eventLocationsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Ивентовые" else "Events"
+
+private fun specialEventLocationLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Событие" else "Event"
 
 private fun clubTournamentLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Турнир" else "Tournament"
