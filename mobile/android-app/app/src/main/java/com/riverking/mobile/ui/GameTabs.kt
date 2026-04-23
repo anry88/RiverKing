@@ -103,7 +103,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -292,7 +291,6 @@ private const val PAN_EDGE_TAP_FRACTION = 0.25f
 private const val PAN_EDGE_TAP_MAX_DISTANCE_DP = 22f
 private const val PAN_EDGE_TAP_MAX_DURATION_MILLIS = 260L
 private const val PAN_STEP_VIEWPORT_MULTIPLIER = 0.55f
-private const val PAN_DRAG_MULTIPLIER = 4.5f
 private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
@@ -3041,6 +3039,12 @@ private fun FishingStageScene(
                 computePanViewport(sceneWidthPx, sceneHeightPx, backgroundAspect)
             }
             val panoramicEnabled = proMode && panViewport.canPan
+            val backgroundRenderWidthPx = remember(sceneWidthPx, sceneHeightPx, backgroundAspect) {
+                max(sceneWidthPx, sceneHeightPx * backgroundAspect)
+            }
+            val backgroundPanRangePx = remember(sceneWidthPx, backgroundRenderWidthPx) {
+                max(0f, backgroundRenderWidthPx - sceneWidthPx)
+            }
             val panoramicWorldArea = remember(proSceneSpec, panViewport.visibleWidth) {
                 if (hasCustomCastArea) {
                     legacyScreenAreaToWorldArea(proSceneSpec, panViewport.visibleWidth)
@@ -3084,44 +3088,60 @@ private fun FishingStageScene(
                 }
             }
             val panStep = max(0.06f, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER)
-            val backgroundHorizontalBias = if (panoramicEnabled && panViewport.maxPan > 0f) {
-                ((clampCameraViewLeft(cameraViewLeft, cameraBounds) / panViewport.maxPan) * 2f - 1f)
-                    .coerceIn(-1f, 1f)
+            val backgroundPanOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (clampCameraViewLeft(cameraViewLeft, cameraBounds) / panViewport.maxPan) * backgroundPanRangePx
+            } else {
+                0f
+            }
+            val panDragViewScale = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                panViewport.maxPan / backgroundPanRangePx
             } else {
                 0f
             }
             if (backgroundUrl != null) {
-                coil.compose.AsyncImage(
-                    model = backgroundUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = if (panoramicEnabled) {
-                        BiasAlignment(horizontalBias = backgroundHorizontalBias, verticalBias = 1f)
-                    } else {
-                        Alignment.BottomCenter
-                    },
-                    onSuccess = { result ->
-                        val drawable = result.result.drawable
-                        backgroundIntrinsicSize = IntSize(
-                            width = drawable.intrinsicWidth.coerceAtLeast(0),
-                            height = drawable.intrinsicHeight.coerceAtLeast(0),
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = when {
-                                panoramicEnabled -> 1f
-                                proMode -> 1.06f
-                                else -> 1.22f
-                            },
-                            scaleY = when {
-                                panoramicEnabled -> 1f
-                                proMode -> 1.02f
-                                else -> 1.08f
-                            },
-                        ),
-                )
+                if (panoramicEnabled) {
+                    AsyncImage(
+                        model = backgroundUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.FillHeight,
+                        alignment = Alignment.BottomStart,
+                        onSuccess = { result ->
+                            val drawable = result.result.drawable
+                            backgroundIntrinsicSize = IntSize(
+                                width = drawable.intrinsicWidth.coerceAtLeast(0),
+                                height = drawable.intrinsicHeight.coerceAtLeast(0),
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(with(density) { backgroundRenderWidthPx.toDp() })
+                            .graphicsLayer(
+                                translationX = -backgroundPanOffsetPx,
+                                scaleX = 1f,
+                                scaleY = 1f,
+                            ),
+                    )
+                } else {
+                    AsyncImage(
+                        model = backgroundUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.BottomCenter,
+                        onSuccess = { result ->
+                            val drawable = result.result.drawable
+                            backgroundIntrinsicSize = IntSize(
+                                width = drawable.intrinsicWidth.coerceAtLeast(0),
+                                height = drawable.intrinsicHeight.coerceAtLeast(0),
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = if (proMode) 1.06f else 1.22f,
+                                scaleY = if (proMode) 1.02f else 1.08f,
+                            ),
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -3146,7 +3166,7 @@ private fun FishingStageScene(
                     visibleCastArea,
                     activeCastArea,
                     panoramicEnabled,
-                    panViewport.visibleWidth,
+                    panDragViewScale,
                     cameraBounds.minLeft,
                     cameraBounds.maxLeft,
                 ) {
@@ -3183,7 +3203,7 @@ private fun FishingStageScene(
                                 }
                                 val deltaX = centroidX - panStartCentroidX
                                 cameraViewLeft = clampCameraViewLeft(
-                                    panStartLeft - (deltaX * panViewport.visibleWidth * PAN_DRAG_MULTIPLIER / max(1f, sceneWidthPx)),
+                                    panStartLeft - (deltaX * panDragViewScale),
                                     cameraBounds,
                                 )
                                 event.changes.forEach { it.consume() }
