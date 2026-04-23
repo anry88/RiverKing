@@ -3,6 +3,7 @@ package com.riverking.mobile.ui
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.SystemClock
+import android.view.MotionEvent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
@@ -124,7 +125,9 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -269,6 +272,30 @@ private data class CameraPanBounds(
     val minLeft: Float = 0f,
     val maxLeft: Float = 0f,
 )
+
+private class ReadyPanGestureState {
+    var primaryPointerId: Int = MotionEvent.INVALID_POINTER_ID
+    var startX: Float = 0f
+    var startY: Float = 0f
+    var lastX: Float = 0f
+    var lastY: Float = 0f
+    var startedAtMillis: Long = 0L
+    var panActive: Boolean = false
+    var panStartOffsetPx: Float = 0f
+    val panStartXByPointer = linkedMapOf<Int, Float>()
+
+    fun reset() {
+        primaryPointerId = MotionEvent.INVALID_POINTER_ID
+        startX = 0f
+        startY = 0f
+        lastX = 0f
+        lastY = 0f
+        startedAtMillis = 0L
+        panActive = false
+        panStartOffsetPx = 0f
+        panStartXByPointer.clear()
+    }
+}
 
 private const val TG_CAST_WATER_TOP = 0.48f
 private const val TG_CAST_LEFT_MARGIN = 0.05f
@@ -2858,6 +2885,7 @@ private fun TelegramAccountSheet(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun FishingStageScene(
     state: RiverKingUiState,
@@ -3160,22 +3188,145 @@ private fun FishingStageScene(
                         )
                     )
             )
+            val readyPanGestureState = remember(locationCameraKey, phase, panoramicEnabled) {
+                ReadyPanGestureState()
+            }
 
             val proGestureModifier = when {
                 !proMode -> Modifier
+                phase == FishingPhase.READY && panoramicEnabled -> Modifier.pointerInteropFilter { event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            readyPanGestureState.reset()
+                            readyPanGestureState.primaryPointerId = event.getPointerId(0)
+                            readyPanGestureState.startX = event.x
+                            readyPanGestureState.startY = event.y
+                            readyPanGestureState.lastX = event.x
+                            readyPanGestureState.lastY = event.y
+                            readyPanGestureState.startedAtMillis =
+                                if (event.eventTime > 0L) event.eventTime else SystemClock.uptimeMillis()
+                            true
+                        }
+
+                        MotionEvent.ACTION_POINTER_DOWN -> {
+                            if (event.pointerCount >= 2) {
+                                readyPanGestureState.panActive = true
+                                readyPanGestureState.panStartOffsetPx = backgroundPanOffsetState.value
+                                readyPanGestureState.panStartXByPointer.clear()
+                                for (index in 0 until event.pointerCount) {
+                                    readyPanGestureState.panStartXByPointer[event.getPointerId(index)] =
+                                        event.getX(index)
+                                }
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_MOVE -> {
+                            if (readyPanGestureState.panActive && event.pointerCount >= 2) {
+                                var deltaX = 0f
+                                for (index in 0 until event.pointerCount) {
+                                    val pointerId = event.getPointerId(index)
+                                    val startX = readyPanGestureState.panStartXByPointer[pointerId] ?: continue
+                                    val currentDelta = event.getX(index) - startX
+                                    if (abs(currentDelta) > abs(deltaX)) {
+                                        deltaX = currentDelta
+                                    }
+                                }
+                                val nextOffsetPx = (readyPanGestureState.panStartOffsetPx - deltaX).coerceIn(
+                                    cameraMinOffsetPx,
+                                    cameraMaxOffsetPx,
+                                )
+                                cameraViewLeft = if (backgroundPanRangePx > 0f && panViewport.maxPan > 0f) {
+                                    clampCameraViewLeft(
+                                        (nextOffsetPx / backgroundPanRangePx) * panViewport.maxPan,
+                                        cameraBounds,
+                                    )
+                                } else {
+                                    0f
+                                }
+                            } else {
+                                val pointerIndex = event.findPointerIndex(readyPanGestureState.primaryPointerId)
+                                if (pointerIndex >= 0) {
+                                    readyPanGestureState.lastX = event.getX(pointerIndex)
+                                    readyPanGestureState.lastY = event.getY(pointerIndex)
+                                }
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_POINTER_UP -> {
+                            if (readyPanGestureState.panActive) {
+                                val remainingPointers = event.pointerCount - 1
+                                if (remainingPointers >= 2) {
+                                    readyPanGestureState.panStartOffsetPx = backgroundPanOffsetState.value
+                                    readyPanGestureState.panStartXByPointer.clear()
+                                    for (index in 0 until event.pointerCount) {
+                                        if (index == event.actionIndex) continue
+                                        readyPanGestureState.panStartXByPointer[event.getPointerId(index)] =
+                                            event.getX(index)
+                                    }
+                                } else {
+                                    readyPanGestureState.panActive = false
+                                    readyPanGestureState.panStartXByPointer.clear()
+                                }
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_UP -> {
+                            if (!readyPanGestureState.panActive) {
+                                val deltaX = event.x - readyPanGestureState.startX
+                                val deltaY = event.y - readyPanGestureState.startY
+                                val distance = hypot(deltaX, deltaY)
+                                val elapsedMillis =
+                                    (event.eventTime - readyPanGestureState.startedAtMillis).coerceAtLeast(16L)
+                                if (distance >= minSwipePx) {
+                                    onBeginCast(
+                                        proFishingCastSpotFromSwipe(
+                                            swipe = Offset(deltaX, deltaY),
+                                            widthPx = sceneWidthPx,
+                                            heightPx = sceneHeightPx,
+                                            elapsedMillis = elapsedMillis,
+                                            sceneSpec = visibleCastArea,
+                                            worldSpec = activeCastArea,
+                                            viewLeft = cameraViewLeftState.value,
+                                            viewportWidth = panViewport.visibleWidth,
+                                        )
+                                    )
+                                } else if (
+                                    distance <= tapMaxDistancePx &&
+                                    elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
+                                ) {
+                                    val nextViewLeft = when {
+                                        readyPanGestureState.lastX <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
+                                            cameraViewLeftState.value - panStep
+                                        readyPanGestureState.lastX >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
+                                            cameraViewLeftState.value + panStep
+                                        else -> null
+                                    }
+                                    if (nextViewLeft != null) {
+                                        cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
+                                    }
+                                }
+                            }
+                            readyPanGestureState.reset()
+                            true
+                        }
+
+                        MotionEvent.ACTION_CANCEL -> {
+                            readyPanGestureState.reset()
+                            true
+                        }
+
+                        else -> false
+                    }
+                }
                 phase == FishingPhase.READY -> Modifier.pointerInput(
                     phase,
                     sceneWidthPx,
                     sceneHeightPx,
                     visibleCastArea,
                     activeCastArea,
-                    panoramicEnabled,
-                    backgroundPanRangePx,
-                    panViewport.maxPan,
-                    cameraMinOffsetPx,
-                    cameraMaxOffsetPx,
-                    cameraBounds.minLeft,
-                    cameraBounds.maxLeft,
                 ) {
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
@@ -3184,9 +3335,6 @@ private fun FishingStageScene(
                         var lastPosition = firstDown.position
                         var dragTotal = Offset.Zero
                         val startedAtMillis = SystemClock.uptimeMillis()
-                        var panActive = false
-                        var panStartOffsetPx = backgroundPanOffsetState.value
-                        var panStartXByPointer = linkedMapOf(firstDown.id to firstDown.position.x)
                         while (true) {
                             val event = awaitPointerEvent()
                             event.changes.forEach { change ->
@@ -3200,68 +3348,35 @@ private fun FishingStageScene(
                                     pointerPositions.remove(change.id)
                                 }
                             }
-                            val pressedPositions = pointerPositions.values.toList()
-                            if (panoramicEnabled && pressedPositions.size >= 2) {
-                                if (!panActive || panStartXByPointer.keys != pointerPositions.keys) {
-                                    panActive = true
-                                    panStartOffsetPx = backgroundPanOffsetState.value
-                                    panStartXByPointer = linkedMapOf()
-                                    pointerPositions.forEach { (id, position) ->
-                                        panStartXByPointer[id] = position.x
-                                    }
-                                }
-                                val deltaX = pointerPositions.entries
-                                    .mapNotNull { (id, position) ->
-                                        panStartXByPointer[id]?.let { position.x - it }
-                                    }
-                                    .maxByOrNull { abs(it) }
-                                    ?: 0f
-                                val nextOffsetPx = (panStartOffsetPx - deltaX).coerceIn(
-                                    cameraMinOffsetPx,
-                                    cameraMaxOffsetPx,
-                                )
-                                cameraViewLeft = if (backgroundPanRangePx > 0f && panViewport.maxPan > 0f) {
-                                    clampCameraViewLeft(
-                                        (nextOffsetPx / backgroundPanRangePx) * panViewport.maxPan,
-                                        cameraBounds,
-                                    )
-                                } else {
-                                    0f
-                                }
-                                event.changes.forEach { it.consume() }
-                            }
                             if (pointerPositions.isEmpty()) {
-                                if (!panActive) {
-                                    val distance = hypot(dragTotal.x, dragTotal.y)
-                                    val elapsedMillis = (SystemClock.uptimeMillis() - startedAtMillis).coerceAtLeast(16L)
-                                    if (distance >= minSwipePx) {
-                                        onBeginCast(
-                                            proFishingCastSpotFromSwipe(
-                                                swipe = dragTotal,
-                                                widthPx = sceneWidthPx,
-                                                heightPx = sceneHeightPx,
-                                                elapsedMillis = elapsedMillis,
-                                                sceneSpec = visibleCastArea,
-                                                worldSpec = activeCastArea,
-                                                viewLeft = if (panoramicEnabled) cameraViewLeftState.value else 0f,
-                                                viewportWidth = if (panoramicEnabled) panViewport.visibleWidth else 1f,
-                                            )
+                                val distance = hypot(dragTotal.x, dragTotal.y)
+                                val elapsedMillis = (SystemClock.uptimeMillis() - startedAtMillis).coerceAtLeast(16L)
+                                if (distance >= minSwipePx) {
+                                    onBeginCast(
+                                        proFishingCastSpotFromSwipe(
+                                            swipe = dragTotal,
+                                            widthPx = sceneWidthPx,
+                                            heightPx = sceneHeightPx,
+                                            elapsedMillis = elapsedMillis,
+                                            sceneSpec = visibleCastArea,
+                                            worldSpec = activeCastArea,
+                                            viewLeft = 0f,
+                                            viewportWidth = 1f,
                                         )
-                                    } else if (
-                                        panoramicEnabled &&
-                                        distance <= tapMaxDistancePx &&
-                                        elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
-                                    ) {
-                                        val nextViewLeft = when {
-                                            lastPosition.x <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
-                                                cameraViewLeftState.value - panStep
-                                            lastPosition.x >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
-                                                cameraViewLeftState.value + panStep
-                                            else -> null
-                                        }
-                                        if (nextViewLeft != null) {
-                                            cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
-                                        }
+                                    )
+                                } else if (
+                                    distance <= tapMaxDistancePx &&
+                                    elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
+                                ) {
+                                    val nextViewLeft = when {
+                                        lastPosition.x <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
+                                            cameraViewLeftState.value - panStep
+                                        lastPosition.x >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
+                                            cameraViewLeftState.value + panStep
+                                        else -> null
+                                    }
+                                    if (nextViewLeft != null) {
+                                        cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
                                     }
                                 }
                                 break
