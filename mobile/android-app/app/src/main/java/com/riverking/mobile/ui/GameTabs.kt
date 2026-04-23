@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -124,6 +123,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
@@ -145,6 +145,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.R
 import com.riverking.mobile.auth.AchievementClaimDto
@@ -3094,47 +3095,49 @@ private fun FishingStageScene(
             } else {
                 0f
             }
-            val panDragViewScale = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
-                panViewport.maxPan / backgroundPanRangePx
+            val cameraMinOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (cameraBounds.minLeft / panViewport.maxPan) * backgroundPanRangePx
             } else {
                 0f
             }
+            val cameraMaxOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (cameraBounds.maxLeft / panViewport.maxPan) * backgroundPanRangePx
+            } else {
+                0f
+            }
+            val backgroundPanOffsetState = rememberUpdatedState(backgroundPanOffsetPx)
             if (backgroundUrl != null) {
+                val backgroundPainter = rememberAsyncImagePainter(
+                    model = backgroundUrl,
+                    onSuccess = { result ->
+                        val drawable = result.result.drawable
+                        backgroundIntrinsicSize = IntSize(
+                            width = drawable.intrinsicWidth.coerceAtLeast(0),
+                            height = drawable.intrinsicHeight.coerceAtLeast(0),
+                        )
+                    },
+                )
                 if (panoramicEnabled) {
-                    AsyncImage(
-                        model = backgroundUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.FillHeight,
-                        alignment = Alignment.BottomStart,
-                        onSuccess = { result ->
-                            val drawable = result.result.drawable
-                            backgroundIntrinsicSize = IntSize(
-                                width = drawable.intrinsicWidth.coerceAtLeast(0),
-                                height = drawable.intrinsicHeight.coerceAtLeast(0),
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .requiredWidth(with(density) { backgroundRenderWidthPx.toDp() })
-                            .graphicsLayer(
-                                translationX = -backgroundPanOffsetPx,
-                                scaleX = 1f,
-                                scaleY = 1f,
-                            ),
-                    )
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        clipRect {
+                            translate(left = -backgroundPanOffsetPx, top = 0f) {
+                                with(backgroundPainter) {
+                                    draw(
+                                        size = Size(
+                                            width = backgroundRenderWidthPx,
+                                            height = size.height,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    AsyncImage(
-                        model = backgroundUrl,
+                    Image(
+                        painter = backgroundPainter,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         alignment = Alignment.BottomCenter,
-                        onSuccess = { result ->
-                            val drawable = result.result.drawable
-                            backgroundIntrinsicSize = IntSize(
-                                width = drawable.intrinsicWidth.coerceAtLeast(0),
-                                height = drawable.intrinsicHeight.coerceAtLeast(0),
-                            )
-                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer(
@@ -3167,7 +3170,10 @@ private fun FishingStageScene(
                     visibleCastArea,
                     activeCastArea,
                     panoramicEnabled,
-                    panDragViewScale,
+                    backgroundPanRangePx,
+                    panViewport.maxPan,
+                    cameraMinOffsetPx,
+                    cameraMaxOffsetPx,
                     cameraBounds.minLeft,
                     cameraBounds.maxLeft,
                 ) {
@@ -3179,7 +3185,7 @@ private fun FishingStageScene(
                         var dragTotal = Offset.Zero
                         val startedAtMillis = SystemClock.uptimeMillis()
                         var panActive = false
-                        var panStartLeft = cameraViewLeftState.value
+                        var panStartOffsetPx = backgroundPanOffsetState.value
                         var panStartCentroidX = firstDown.position.x
                         while (true) {
                             val event = awaitPointerEvent()
@@ -3199,14 +3205,22 @@ private fun FishingStageScene(
                                 val centroidX = pressedPositions.map { it.x.toDouble() }.average().toFloat()
                                 if (!panActive) {
                                     panActive = true
-                                    panStartLeft = cameraViewLeftState.value
+                                    panStartOffsetPx = backgroundPanOffsetState.value
                                     panStartCentroidX = centroidX
                                 }
                                 val deltaX = centroidX - panStartCentroidX
-                                cameraViewLeft = clampCameraViewLeft(
-                                    panStartLeft - (deltaX * panDragViewScale),
-                                    cameraBounds,
+                                val nextOffsetPx = (panStartOffsetPx - deltaX).coerceIn(
+                                    cameraMinOffsetPx,
+                                    cameraMaxOffsetPx,
                                 )
+                                cameraViewLeft = if (backgroundPanRangePx > 0f && panViewport.maxPan > 0f) {
+                                    clampCameraViewLeft(
+                                        (nextOffsetPx / backgroundPanRangePx) * panViewport.maxPan,
+                                        cameraBounds,
+                                    )
+                                } else {
+                                    0f
+                                }
                                 event.changes.forEach { it.consume() }
                             }
                             if (pointerPositions.isEmpty()) {
