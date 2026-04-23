@@ -54,6 +54,11 @@ dependencies {
 
 application {
     mainClass.set("app.ApplicationKt")
+    applicationDefaultJvmArgs = listOf(
+        "-Xms512m",
+        "-Xmx1536m",
+        "-XX:+UseG1GC",
+    )
 }
 
 tasks.withType<Jar> {
