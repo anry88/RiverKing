@@ -3186,7 +3186,7 @@ private fun FishingStageScene(
                         val startedAtMillis = SystemClock.uptimeMillis()
                         var panActive = false
                         var panStartOffsetPx = backgroundPanOffsetState.value
-                        var panStartCentroidX = firstDown.position.x
+                        var panStartXByPointer = linkedMapOf(firstDown.id to firstDown.position.x)
                         while (true) {
                             val event = awaitPointerEvent()
                             event.changes.forEach { change ->
@@ -3202,13 +3202,20 @@ private fun FishingStageScene(
                             }
                             val pressedPositions = pointerPositions.values.toList()
                             if (panoramicEnabled && pressedPositions.size >= 2) {
-                                val centroidX = pressedPositions.map { it.x.toDouble() }.average().toFloat()
-                                if (!panActive) {
+                                if (!panActive || panStartXByPointer.keys != pointerPositions.keys) {
                                     panActive = true
                                     panStartOffsetPx = backgroundPanOffsetState.value
-                                    panStartCentroidX = centroidX
+                                    panStartXByPointer = linkedMapOf()
+                                    pointerPositions.forEach { (id, position) ->
+                                        panStartXByPointer[id] = position.x
+                                    }
                                 }
-                                val deltaX = centroidX - panStartCentroidX
+                                val deltaX = pointerPositions.entries
+                                    .mapNotNull { (id, position) ->
+                                        panStartXByPointer[id]?.let { position.x - it }
+                                    }
+                                    .maxByOrNull { abs(it) }
+                                    ?: 0f
                                 val nextOffsetPx = (panStartOffsetPx - deltaX).coerceIn(
                                     cameraMinOffsetPx,
                                     cameraMaxOffsetPx,
