@@ -281,6 +281,7 @@ private class ReadyPanGestureState {
     var lastY: Float = 0f
     var startedAtMillis: Long = 0L
     var panActive: Boolean = false
+    var hadPanGesture: Boolean = false
     var panStartOffsetPx: Float = 0f
     val panStartXByPointer = linkedMapOf<Int, Float>()
 
@@ -292,6 +293,7 @@ private class ReadyPanGestureState {
         lastY = 0f
         startedAtMillis = 0L
         panActive = false
+        hadPanGesture = false
         panStartOffsetPx = 0f
         panStartXByPointer.clear()
     }
@@ -3211,6 +3213,7 @@ private fun FishingStageScene(
                         MotionEvent.ACTION_POINTER_DOWN -> {
                             if (event.pointerCount >= 2) {
                                 readyPanGestureState.panActive = true
+                                readyPanGestureState.hadPanGesture = true
                                 readyPanGestureState.panStartOffsetPx = backgroundPanOffsetState.value
                                 readyPanGestureState.panStartXByPointer.clear()
                                 for (index in 0 until event.pointerCount) {
@@ -3274,7 +3277,7 @@ private fun FishingStageScene(
                         }
 
                         MotionEvent.ACTION_UP -> {
-                            if (!readyPanGestureState.panActive) {
+                            if (!readyPanGestureState.panActive && !readyPanGestureState.hadPanGesture) {
                                 val deltaX = event.x - readyPanGestureState.startX
                                 val deltaY = event.y - readyPanGestureState.startY
                                 val distance = hypot(deltaX, deltaY)
