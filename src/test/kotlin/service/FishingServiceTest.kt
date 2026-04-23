@@ -1,6 +1,9 @@
 package service
 
 import db.*
+import service.EventCastAreaDTO
+import service.SpecialEventFishSpec
+import service.SpecialEventService
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -92,6 +95,37 @@ class FishingServiceTest {
                 val expected = (0.05 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }
+        }
+    }
+
+    @Test
+    fun eventLocationUsesSameBaseEscapeChanceAsPond() {
+        val svc = newService("testdb_event_escape_matches_pond")
+        val events = SpecialEventService()
+        val eventId = events.createEvent(
+            nameRu = "Тестовый ивент",
+            nameEn = "Test Event",
+            start = Instant.parse("2026-04-01T00:00:00Z"),
+            end = Instant.parse("2026-04-02T00:00:00Z"),
+            imagePath = null,
+            castArea = EventCastAreaDTO(minX = 0.1, maxX = 0.9, farY = 0.4, nearY = 0.8),
+            fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
+            weightPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+            countPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+            fishPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+        )
+
+        transaction {
+            val pondId = Locations
+                .select { Locations.specialEventId.isNull() }
+                .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+                .first()[Locations.id].value
+            val eventLocationId = Locations
+                .select { Locations.specialEventId eq eventId }
+                .first()[Locations.id].value
+
+            assertEquals(svc.baseEscapeChance(pondId), svc.baseEscapeChance(eventLocationId), 0.0000001)
+            assertEquals(0.0, svc.baseEscapeChance(eventLocationId), 0.0000001)
         }
     }
 
@@ -317,5 +351,9 @@ class FishingServiceTest {
             ),
             prizeSummary,
         )
+    }
+
+    private fun fishId(name: String): Long = transaction {
+        Fish.select { Fish.name eq name }.single()[Fish.id].value
     }
 }
