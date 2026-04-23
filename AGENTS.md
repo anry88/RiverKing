@@ -62,6 +62,12 @@ AI-oriented repository guide for coding assistants and code-review tools.
 7. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
 8. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
 
+## Token Discipline
+
+- Optimize token usage aggressively: think first, then act.
+- Prefer the minimum necessary reads, searches, edits, and tool calls that can confidently solve the task.
+- Avoid speculative rewrites, repetitive retries, and exploratory changes when the next correct step can be reasoned out in advance.
+
 ## Common Change Paths
 
 ### Webapp UI
