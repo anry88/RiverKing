@@ -62,6 +62,7 @@ data class FishingCastSpot(
     val xRoll: Float,
     val yRoll: Float,
     val proMode: Boolean = false,
+    val panoramicAware: Boolean = false,
     val castDurationMillis: Int = CAST_ANIMATION_DEFAULT_MILLIS,
 )
 

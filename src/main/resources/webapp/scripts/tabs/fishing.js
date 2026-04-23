@@ -7,6 +7,16 @@ const PRO_CAST_MIN_X = 0.14;
 const PRO_CAST_MAX_X = 0.86;
 const PRO_CAST_FAR_Y = 0.47;
 const PRO_CAST_NEAR_Y = 0.78;
+const CAST_AREA_EXPAND_MIN_X = 0.035;
+const CAST_AREA_EXPAND_VIEWPORT_X = 0.16;
+const CAST_AREA_EXPAND_TOP = 0.02;
+const CAST_AREA_EXPAND_BOTTOM = 0.04;
+const CAST_AREA_MIN_VISIBLE_WORLD = 0.12;
+const CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.42;
+const PAN_EDGE_TAP_FRACTION = 0.25;
+const PAN_EDGE_TAP_MAX_DISTANCE = 22;
+const PAN_EDGE_TAP_MAX_DURATION_MS = 260;
+const PAN_STEP_VIEWPORT_MULTIPLIER = 0.55;
 const DEFAULT_PRO_CAST_AREA = Object.freeze({
   minX: PRO_CAST_MIN_X,
   maxX: PRO_CAST_MAX_X,
@@ -39,6 +49,10 @@ const useAssetSrc = window.useAssetSrc;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function proLocationKey(value) {
@@ -79,8 +93,30 @@ function proLocationKey(value) {
   })[raw] || raw;
 }
 
+function normalizeCastArea(area, fallback = DEFAULT_PRO_CAST_AREA) {
+  const minX = Number(area?.minX);
+  const maxX = Number(area?.maxX);
+  const farY = Number(area?.farY);
+  const nearY = Number(area?.nearY);
+  if (![minX, maxX, farY, nearY].every(Number.isFinite)) {
+    return { ...fallback };
+  }
+  const normalized = {
+    minX: clamp01(minX),
+    maxX: clamp01(maxX),
+    farY: clamp01(farY),
+    nearY: clamp01(nearY),
+  };
+  if (normalized.maxX <= normalized.minX || normalized.nearY <= normalized.farY) {
+    return { ...fallback };
+  }
+  return normalized;
+}
+
 function proCastAreaForLocation(location, bgAsset) {
-  return PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA;
+  return normalizeCastArea(
+    PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA
+  );
 }
 
 function proCastTargetFromSpot(spot, area = DEFAULT_PRO_CAST_AREA) {
@@ -100,7 +136,112 @@ function castDurationFromSwipe(distance, elapsedMs) {
   return Math.round(CAST_ANIMATION_MAX_MS - speed * (CAST_ANIMATION_MAX_MS - CAST_ANIMATION_MIN_MS));
 }
 
-function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT_PRO_CAST_AREA) {
+function defaultBackgroundAspect(location, bgAsset) {
+  const key = proLocationKey(bgAsset) || proLocationKey(location);
+  return key === 'flooded_forest' || key === 'mangroves' ? 1 : 1.5;
+}
+
+function computePanViewport(w, h, imageAspect) {
+  if (!(w > 0) || !(h > 0) || !(imageAspect > 0)) {
+    return { visibleWidth: 1, maxPan: 0, centeredLeft: 0, canPan: false };
+  }
+  const stageAspect = w / h;
+  if (!(imageAspect > stageAspect)) {
+    return { visibleWidth: 1, maxPan: 0, centeredLeft: 0, canPan: false };
+  }
+  const visibleWidth = clamp01(stageAspect / imageAspect);
+  const maxPan = Math.max(0, 1 - visibleWidth);
+  return {
+    visibleWidth,
+    maxPan,
+    centeredLeft: maxPan / 2,
+    canPan: maxPan > 0.001,
+  };
+}
+
+function centeredWorldCastArea(screenArea, viewportWidth) {
+  const safeArea = normalizeCastArea(screenArea);
+  const centeredLeft = Math.max(0, (1 - viewportWidth) / 2);
+  const worldMinX = centeredLeft + safeArea.minX * viewportWidth;
+  const worldMaxX = centeredLeft + safeArea.maxX * viewportWidth;
+  const expandX = Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X);
+  return normalizeCastArea({
+    minX: clamp01(worldMinX - expandX),
+    maxX: clamp01(worldMaxX + expandX),
+    farY: clamp01(safeArea.farY - CAST_AREA_EXPAND_TOP),
+    nearY: clamp01(safeArea.nearY + CAST_AREA_EXPAND_BOTTOM),
+  });
+}
+
+function cameraLimitsForArea(worldArea, viewportWidth) {
+  const maxPan = Math.max(0, 1 - viewportWidth);
+  if (!(maxPan > 0) || !(viewportWidth > 0)) {
+    return { minLeft: 0, maxLeft: 0 };
+  }
+  const areaWidth = Math.max(0, worldArea.maxX - worldArea.minX);
+  const minVisible = Math.min(
+    areaWidth,
+    Math.max(CAST_AREA_MIN_VISIBLE_WORLD, viewportWidth * CAST_AREA_MIN_VISIBLE_VIEWPORT)
+  );
+  let minLeft = worldArea.minX + minVisible - viewportWidth;
+  let maxLeft = worldArea.maxX - minVisible;
+  minLeft = clamp(minLeft, 0, maxPan);
+  maxLeft = clamp(maxLeft, 0, maxPan);
+  if (maxLeft < minLeft) {
+    const centered = clamp(((worldArea.minX + worldArea.maxX) / 2) - viewportWidth / 2, 0, maxPan);
+    return { minLeft: centered, maxLeft: centered };
+  }
+  return { minLeft, maxLeft };
+}
+
+function clampCameraViewLeft(viewLeft, limits) {
+  return clamp(viewLeft, limits.minLeft, limits.maxLeft);
+}
+
+function visibleWorldCastArea(worldArea, viewLeft, viewportWidth) {
+  const visibleMinX = Math.max(worldArea.minX, viewLeft);
+  const visibleMaxX = Math.min(worldArea.maxX, viewLeft + viewportWidth);
+  if (visibleMaxX > visibleMinX) {
+    return {
+      minX: visibleMinX,
+      maxX: visibleMaxX,
+      farY: worldArea.farY,
+      nearY: worldArea.nearY,
+    };
+  }
+  const center = clamp((worldArea.minX + worldArea.maxX) / 2, viewLeft, viewLeft + viewportWidth);
+  const halfWidth = Math.min(viewportWidth * 0.08, 0.04);
+  return {
+    minX: clamp(center - halfWidth, viewLeft, viewLeft + viewportWidth),
+    maxX: clamp(center + halfWidth, viewLeft, viewLeft + viewportWidth),
+    farY: worldArea.farY,
+    nearY: worldArea.nearY,
+  };
+}
+
+function worldAreaToScreenArea(worldArea, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) {
+    return normalizeCastArea(worldArea);
+  }
+  return normalizeCastArea({
+    minX: clamp01((worldArea.minX - viewLeft) / viewportWidth),
+    maxX: clamp01((worldArea.maxX - viewLeft) / viewportWidth),
+    farY: worldArea.farY,
+    nearY: worldArea.nearY,
+  });
+}
+
+function worldToScreenRel(point, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) {
+    return { x: point.x, y: point.y };
+  }
+  return {
+    x: (point.x - viewLeft) / viewportWidth,
+    y: point.y,
+  };
+}
+
+function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT_PRO_CAST_AREA, options = {}) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
   const distance = Math.hypot(dx, dy);
   const strength = clamp01(distance / (minSide * 0.75));
@@ -114,11 +255,35 @@ function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT
     x: Math.max(area.minX, Math.min(area.maxX, centerX + nx * strength * reachX)),
     y: Math.max(area.farY, Math.min(area.nearY, centerY + ny * strength * reachY)),
   };
+  const viewportWidth = Number.isFinite(Number(options.viewportWidth)) ? Number(options.viewportWidth) : 1;
+  const viewLeft = Number.isFinite(Number(options.viewLeft)) ? Number(options.viewLeft) : 0;
+  const worldArea = normalizeCastArea(options.worldArea || area);
+  const targetWorld = {
+    x: viewLeft + target.x * viewportWidth,
+    y: target.y,
+  };
+  const worldWidth = Math.max(0.0001, worldArea.maxX - worldArea.minX);
+  const worldHeight = Math.max(0.0001, worldArea.nearY - worldArea.farY);
   return {
-    xRoll: clamp01((target.x - area.minX) / (area.maxX - area.minX)),
-    yRoll: clamp01((target.y - area.farY) / (area.nearY - area.farY)),
+    xRoll: clamp01((targetWorld.x - worldArea.minX) / worldWidth),
+    yRoll: clamp01((targetWorld.y - worldArea.farY) / worldHeight),
     proMode: true,
+    panoramicAware: Boolean(options.worldArea && viewportWidth < 0.999),
     castDurationMs: castDurationFromSwipe(distance, elapsedMs),
+  };
+}
+
+function touchCentroid(points) {
+  const values = Array.from(points.values());
+  if (values.length === 0) return null;
+  const sum = values.reduce((acc, point) => {
+    acc.x += point.x;
+    acc.y += point.y;
+    return acc;
+  }, { x: 0, y: 0 });
+  return {
+    x: sum.x / values.length,
+    y: sum.y / values.length,
   };
 }
 
@@ -212,6 +377,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
   const [castLanded, setCastLanded] = React.useState(false);
   const tweenCancelRef = React.useRef(null);
   const prevCastingRef = React.useRef(false);
+  const cameraViewLeftRef = React.useRef(0);
+  const touchPointsRef = React.useRef(new Map());
+  const proPanRef = React.useRef(null);
 
   React.useEffect(() => { floatRelRef.current = floatRel; }, [floatRel.x, floatRel.y]);
 
@@ -632,10 +800,89 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     if (byIdOnly) return byIdOnly;
     return LOCATION_BG[1];
   }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, currentLocation?.imageUrl, me.locationId]);
-  const proCastArea = React.useMemo(
-    () => currentLocation?.castArea || proCastAreaForLocation(currentLocation?.name, bgAsset),
+  const baseCastArea = React.useMemo(
+    () => normalizeCastArea(currentLocation?.castArea || proCastAreaForLocation(currentLocation?.name, bgAsset)),
     [currentLocation?.castArea, currentLocation?.name, bgAsset]
   );
+  const preserveEventCastArea = Boolean(currentLocation?.isEvent || currentLocation?.eventId != null || currentLocation?.castArea);
+  const assetBgUrl = useAssetSrc(bgAsset);
+  const bgUrl = currentLocation?.imageUrl || assetBgUrl;
+  const [bgLoaded, setBgLoaded] = React.useState(false);
+  const [bgNaturalSize, setBgNaturalSize] = React.useState({ width: 0, height: 0 });
+  React.useEffect(() => {
+    setBgLoaded(false);
+    setBgNaturalSize({ width: 0, height: 0 });
+    if (!bgUrl) return;
+    const img = new Image();
+    img.src = bgUrl;
+    img.onload = () => {
+      setBgLoaded(true);
+      setBgNaturalSize({
+        width: Number(img.naturalWidth) || 0,
+        height: Number(img.naturalHeight) || 0,
+      });
+    };
+    return () => {
+      img.onload = null;
+    };
+  }, [bgUrl]);
+  const backgroundAspect = React.useMemo(() => {
+    if (bgNaturalSize.width > 0 && bgNaturalSize.height > 0) {
+      return bgNaturalSize.width / bgNaturalSize.height;
+    }
+    return defaultBackgroundAspect(currentLocation?.name, bgAsset);
+  }, [bgNaturalSize.width, bgNaturalSize.height, currentLocation?.name, bgAsset]);
+  const panViewport = React.useMemo(
+    () => computePanViewport(w, h, backgroundAspect),
+    [w, h, backgroundAspect]
+  );
+  const panoramicMode = proMode && !preserveEventCastArea && panViewport.canPan;
+  const panoramicCastArea = React.useMemo(
+    () => centeredWorldCastArea(baseCastArea, panViewport.visibleWidth),
+    [baseCastArea, panViewport.visibleWidth]
+  );
+  const activeCastArea = panoramicMode ? panoramicCastArea : baseCastArea;
+  const cameraLimits = React.useMemo(
+    () => panoramicMode ? cameraLimitsForArea(panoramicCastArea, panViewport.visibleWidth) : { minLeft: 0, maxLeft: 0 },
+    [panoramicMode, panoramicCastArea, panViewport.visibleWidth]
+  );
+  const [cameraViewLeft, setCameraViewLeft] = React.useState(panViewport.centeredLeft);
+  React.useEffect(() => {
+    cameraViewLeftRef.current = cameraViewLeft;
+  }, [cameraViewLeft]);
+  const locationCameraKey = `${currentLocation?.id ?? me.locationId}:${bgUrl || bgAsset || ''}:${panoramicMode ? 'pan' : 'static'}`;
+  React.useEffect(() => {
+    setCameraViewLeft(panoramicMode ? clampCameraViewLeft(panViewport.centeredLeft, cameraLimits) : 0);
+  }, [locationCameraKey]);
+  React.useEffect(() => {
+    if (!panoramicMode) {
+      if (cameraViewLeftRef.current !== 0) {
+        setCameraViewLeft(0);
+      }
+      return;
+    }
+    const clamped = clampCameraViewLeft(cameraViewLeftRef.current, cameraLimits);
+    if (Math.abs(clamped - cameraViewLeftRef.current) > 0.0001) {
+      setCameraViewLeft(clamped);
+    }
+  }, [cameraLimits.minLeft, cameraLimits.maxLeft, panoramicMode]);
+  const visibleCastArea = React.useMemo(() => {
+    if (!panoramicMode) return baseCastArea;
+    return worldAreaToScreenArea(
+      visibleWorldCastArea(panoramicCastArea, cameraViewLeft, panViewport.visibleWidth),
+      cameraViewLeft,
+      panViewport.visibleWidth
+    );
+  }, [baseCastArea, panoramicMode, panoramicCastArea, cameraViewLeft, panViewport.visibleWidth]);
+  const panByDirection = React.useCallback((direction) => {
+    if (!panoramicMode || casting || biting || tapping) return;
+    const step = Math.max(0.06, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER);
+    setCameraViewLeft(current => clampCameraViewLeft(current + direction * step, cameraLimits));
+  }, [biting, cameraLimits, casting, panoramicMode, panViewport.visibleWidth, tapping]);
+  const bgPositionX = React.useMemo(() => {
+    if (!panoramicMode || !(panViewport.maxPan > 0)) return '50%';
+    return `${(clampCameraViewLeft(cameraViewLeft, cameraLimits) / panViewport.maxPan) * 100}%`;
+  }, [cameraLimits, cameraViewLeft, panoramicMode, panViewport.maxPan]);
 
   React.useEffect(() => {
     if (casting) {
@@ -656,7 +903,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
         }
         let target;
         if (castSpot?.proMode || proMode) {
-          target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, proCastArea);
+          if (panoramicMode && castSpot?.panoramicAware) {
+            const worldTarget = proCastTargetFromSpot(castSpot, activeCastArea);
+            target = worldToScreenRel(worldTarget, cameraViewLeftRef.current, panViewport.visibleWidth);
+          } else {
+            target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, panoramicMode ? visibleCastArea : activeCastArea);
+          }
         } else {
           const minX = Math.max(0.05, tipRelX - 0.20);
           const maxX = Math.max(minX, tipRelX - 0.05);
@@ -691,18 +943,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       setFloatRel(shorePosRel);
       prevCastingRef.current = false;
     }
-  }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode, proCastArea]);
-  const assetBgUrl = useAssetSrc(bgAsset);
-  const bgUrl = currentLocation?.imageUrl || assetBgUrl;
-  const [bgLoaded, setBgLoaded] = React.useState(false);
-  React.useEffect(() => {
-    setBgLoaded(false);
-    if (!bgUrl) return;
-    const img = new Image();
-    img.src = bgUrl;
-    img.onload = () => setBgLoaded(true);
-    return () => { img.onload = null; };
-  }, [bgUrl]);
+  }, [activeCastArea, casting, panViewport.visibleWidth, panoramicMode, shorePosRel, tipX, tweenTo, visibleCastArea, w, castSpot, proMode]);
   const showRipple = castLanded && (biting || tapping);
   const proPointerRef = React.useRef(null);
   const handleProPointerDown = React.useCallback((event) => {
@@ -718,6 +959,21 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       onTap?.();
       return;
     }
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (panoramicMode && castReady && !casting && touchPointsRef.current.size >= 2) {
+        proPointerRef.current = null;
+        const centroid = touchCentroid(touchPointsRef.current);
+        if (centroid) {
+          proPanRef.current = {
+            startCentroidX: centroid.x,
+            startViewLeft: cameraViewLeftRef.current,
+          };
+        }
+        event.preventDefault();
+        return;
+      }
+    }
     if (casting || !castReady) return;
     proPointerRef.current = {
       id: event.pointerId,
@@ -728,26 +984,87 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       dy: 0,
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
-  }, [biting, castReady, casting, onHook, onTap, proMode, tapping]);
+  }, [biting, castReady, casting, onHook, onTap, panoramicMode, proMode, tapping]);
 
   const handleProPointerMove = React.useCallback((event) => {
+    if (event.pointerType === 'touch' && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (panoramicMode && proPanRef.current && w > 0) {
+        const centroid = touchCentroid(touchPointsRef.current);
+        if (centroid) {
+          const deltaX = centroid.x - proPanRef.current.startCentroidX;
+          const nextViewLeft = clampCameraViewLeft(
+            proPanRef.current.startViewLeft - (deltaX * panViewport.visibleWidth / Math.max(1, w)),
+            cameraLimits
+          );
+          setCameraViewLeft(nextViewLeft);
+        }
+        event.preventDefault();
+        return;
+      }
+    }
     const active = proPointerRef.current;
     if (!proMode || !active || active.id !== event.pointerId) return;
     active.dx = event.clientX - active.x;
     active.dy = event.clientY - active.y;
     event.preventDefault();
-  }, [proMode]);
+  }, [cameraLimits, panoramicMode, panViewport.visibleWidth, proMode, w]);
 
   const finishProPointer = React.useCallback((event, cancelled = false) => {
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.delete(event.pointerId);
+      if (proPanRef.current) {
+        if (touchPointsRef.current.size < 2) {
+          proPanRef.current = null;
+        }
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        return;
+      }
+    }
     const active = proPointerRef.current;
     if (!proMode || !active || active.id !== event.pointerId) return;
     proPointerRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     if (cancelled) return;
     const distance = Math.hypot(active.dx, active.dy);
+    const elapsedMs = performance.now() - active.startedAt;
+    if (
+      panoramicMode &&
+      distance <= PAN_EDGE_TAP_MAX_DISTANCE &&
+      elapsedMs <= PAN_EDGE_TAP_MAX_DURATION_MS &&
+      castReady &&
+      !casting
+    ) {
+      const stageRect = stageRef.current?.getBoundingClientRect?.();
+      if (stageRect && stageRect.width > 0) {
+        const localX = event.clientX - stageRect.left;
+        if (localX <= stageRect.width * PAN_EDGE_TAP_FRACTION) {
+          panByDirection(-1);
+          return;
+        }
+        if (localX >= stageRect.width * (1 - PAN_EDGE_TAP_FRACTION)) {
+          panByDirection(1);
+          return;
+        }
+      }
+    }
     if (distance < 40 || casting || !castReady) return;
-    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h, performance.now() - active.startedAt, proCastArea));
-  }, [castReady, casting, h, onCast, proMode, proCastArea, w]);
+    onCast?.(proFishingCastSpotFromSwipe(
+      active.dx,
+      active.dy,
+      w,
+      h,
+      elapsedMs,
+      visibleCastArea,
+      panoramicMode
+        ? {
+            worldArea: activeCastArea,
+            viewLeft: cameraViewLeftRef.current,
+            viewportWidth: panViewport.visibleWidth,
+          }
+        : undefined
+    ));
+  }, [activeCastArea, castReady, casting, h, onCast, panByDirection, panViewport.visibleWidth, panoramicMode, proMode, visibleCastArea, w]);
 
   const handleProPointerUp = React.useCallback((event) => {
     finishProPointer(event, false);
@@ -806,7 +1123,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     >
       <div
         className="absolute inset-0 transition-opacity duration-200"
-        style={{ backgroundImage: bgUrl ? `url(${bgUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center bottom', opacity: bgLoaded ? 1 : 0 }}
+        style={{
+          backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: `${bgPositionX} bottom`,
+          opacity: bgLoaded ? 1 : 0
+        }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 

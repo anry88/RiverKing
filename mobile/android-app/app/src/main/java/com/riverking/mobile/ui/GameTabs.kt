@@ -2,6 +2,7 @@ package com.riverking.mobile.ui
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
@@ -13,7 +14,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -97,9 +99,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -253,6 +257,18 @@ private data class ProFishingSceneSpec(
     val nearY: Float = PRO_CAST_NEAR_Y,
 )
 
+private data class PanViewportSpec(
+    val visibleWidth: Float = 1f,
+    val maxPan: Float = 0f,
+    val centeredLeft: Float = 0f,
+    val canPan: Boolean = false,
+)
+
+private data class CameraPanBounds(
+    val minLeft: Float = 0f,
+    val maxLeft: Float = 0f,
+)
+
 private const val TG_CAST_WATER_TOP = 0.48f
 private const val TG_CAST_LEFT_MARGIN = 0.05f
 private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
@@ -263,9 +279,19 @@ private const val PRO_CAST_MIN_X = 0.14f
 private const val PRO_CAST_MAX_X = 0.86f
 private const val PRO_CAST_FAR_Y = 0.47f
 private const val PRO_CAST_NEAR_Y = 0.78f
+private const val CAST_AREA_EXPAND_MIN_X = 0.035f
+private const val CAST_AREA_EXPAND_VIEWPORT_X = 0.16f
+private const val CAST_AREA_EXPAND_TOP = 0.02f
+private const val CAST_AREA_EXPAND_BOTTOM = 0.04f
+private const val CAST_AREA_MIN_VISIBLE_WORLD = 0.12f
+private const val CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.42f
 private const val PRO_CAST_SHORE_X = 0.44f
 private const val PRO_CAST_SHORE_Y = 0.56f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
+private const val PAN_EDGE_TAP_FRACTION = 0.25f
+private const val PAN_EDGE_TAP_MAX_DISTANCE_DP = 22f
+private const val PAN_EDGE_TAP_MAX_DURATION_MILLIS = 260L
+private const val PAN_STEP_VIEWPORT_MULTIPLIER = 0.55f
 private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
@@ -1334,6 +1360,7 @@ private fun FishingScreen(
             backgroundUrl = currentLocation?.imageUrl ?: locationBackgroundAsset(currentLocation?.name),
             locationName = currentLocation?.name,
             eventCastArea = currentLocation?.castArea,
+            preserveCustomCastArea = currentLocation?.isEvent == true || currentLocation?.castArea != null,
             modifier = Modifier.fillMaxSize(),
             proMode = true,
             setupEnabled = setupEnabled,
@@ -2838,6 +2865,7 @@ private fun FishingStageScene(
     backgroundUrl: String?,
     locationName: String?,
     eventCastArea: EventCastAreaDto? = null,
+    preserveCustomCastArea: Boolean = false,
     modifier: Modifier = Modifier,
     proMode: Boolean = true,
     setupEnabled: Boolean = false,
@@ -2875,6 +2903,7 @@ private fun FishingStageScene(
             )
         } ?: proFishingSceneSpec(locationName)
     }
+    var backgroundIntrinsicSize by remember(backgroundUrl) { mutableStateOf(IntSize.Zero) }
     val inWater = when (phase) {
         FishingPhase.WAITING_BITE,
         FishingPhase.BITING,
@@ -2995,16 +3024,97 @@ private fun FishingStageScene(
                 .fillMaxSize()
                 .clipToBounds()
         ) {
+            val density = LocalDensity.current
+            val sceneWidthPx = with(density) { maxWidth.toPx() }
+            val sceneHeightPx = with(density) { maxHeight.toPx() }
+            val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
+            val tapMaxDistancePx = with(density) { PAN_EDGE_TAP_MAX_DISTANCE_DP.dp.toPx() }
+            val backgroundAspect = remember(backgroundIntrinsicSize, locationName) {
+                if (backgroundIntrinsicSize.width > 0 && backgroundIntrinsicSize.height > 0) {
+                    backgroundIntrinsicSize.width.toFloat() / backgroundIntrinsicSize.height.toFloat()
+                } else {
+                    defaultBackgroundAspect(locationName)
+                }
+            }
+            val panViewport = remember(sceneWidthPx, sceneHeightPx, backgroundAspect) {
+                computePanViewport(sceneWidthPx, sceneHeightPx, backgroundAspect)
+            }
+            val panoramicEnabled = proMode && !preserveCustomCastArea && panViewport.canPan
+            val panoramicWorldArea = remember(proSceneSpec, panViewport.visibleWidth) {
+                centeredWorldCastArea(proSceneSpec, panViewport.visibleWidth)
+            }
+            val activeCastArea = if (panoramicEnabled) panoramicWorldArea else proSceneSpec
+            val cameraBounds = remember(panoramicEnabled, panoramicWorldArea, panViewport.visibleWidth) {
+                if (panoramicEnabled) {
+                    cameraBoundsForArea(panoramicWorldArea, panViewport.visibleWidth)
+                } else {
+                    CameraPanBounds()
+                }
+            }
+            val locationCameraKey = remember(backgroundUrl, me.locationId, panoramicEnabled) {
+                "${me.locationId}:${backgroundUrl.orEmpty()}:${if (panoramicEnabled) "pan" else "static"}"
+            }
+            var cameraViewLeft by remember(locationCameraKey) {
+                mutableStateOf(
+                    if (panoramicEnabled) clampCameraViewLeft(panViewport.centeredLeft, cameraBounds) else 0f
+                )
+            }
+            LaunchedEffect(cameraBounds, panoramicEnabled) {
+                cameraViewLeft = if (panoramicEnabled) {
+                    clampCameraViewLeft(cameraViewLeft, cameraBounds)
+                } else {
+                    0f
+                }
+            }
+            val cameraViewLeftState = rememberUpdatedState(cameraViewLeft)
+            val visibleCastArea = remember(panoramicEnabled, activeCastArea, cameraViewLeft, panViewport.visibleWidth) {
+                if (panoramicEnabled) {
+                    worldAreaToScreenArea(
+                        visibleWorldCastArea(activeCastArea, cameraViewLeft, panViewport.visibleWidth),
+                        cameraViewLeft,
+                        panViewport.visibleWidth,
+                    )
+                } else {
+                    proSceneSpec
+                }
+            }
+            val panStep = max(0.06f, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER)
+            val backgroundHorizontalBias = if (panoramicEnabled && panViewport.maxPan > 0f) {
+                ((clampCameraViewLeft(cameraViewLeft, cameraBounds) / panViewport.maxPan) * 2f - 1f)
+                    .coerceIn(-1f, 1f)
+            } else {
+                0f
+            }
             if (backgroundUrl != null) {
                 coil.compose.AsyncImage(
                     model = backgroundUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    alignment = if (panoramicEnabled) {
+                        BiasAlignment(horizontalBias = backgroundHorizontalBias, verticalBias = 1f)
+                    } else {
+                        Alignment.BottomCenter
+                    },
+                    onSuccess = { result ->
+                        val drawable = result.result.drawable
+                        backgroundIntrinsicSize = IntSize(
+                            width = drawable.intrinsicWidth.coerceAtLeast(0),
+                            height = drawable.intrinsicHeight.coerceAtLeast(0),
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(
-                            scaleX = if (proMode) 1.06f else 1.22f,
-                            scaleY = if (proMode) 1.02f else 1.08f,
+                            scaleX = when {
+                                panoramicEnabled -> 1f
+                                proMode -> 1.06f
+                                else -> 1.22f
+                            },
+                            scaleY = when {
+                                panoramicEnabled -> 1f
+                                proMode -> 1.02f
+                                else -> 1.08f
+                            },
                         ),
                 )
             }
@@ -3022,33 +3132,95 @@ private fun FishingStageScene(
                     )
             )
 
-            val density = LocalDensity.current
-            val sceneWidthPx = with(density) { maxWidth.toPx() }
-            val sceneHeightPx = with(density) { maxHeight.toPx() }
-            val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
             val proGestureModifier = when {
                 !proMode -> Modifier
-                phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx, proSceneSpec) {
-                    var dragTotal = Offset.Zero
-                    var dragStartedAtMillis = 0L
-                    detectDragGestures(
-                        onDragStart = {
-                            dragTotal = Offset.Zero
-                            dragStartedAtMillis = System.currentTimeMillis()
-                        },
-                        onDrag = { _, dragAmount ->
-                            dragTotal += dragAmount
-                        },
-                        onDragEnd = {
-                            if (hypot(dragTotal.x, dragTotal.y) >= minSwipePx) {
-                                val elapsedMillis = (System.currentTimeMillis() - dragStartedAtMillis).coerceAtLeast(16L)
-                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx, elapsedMillis, proSceneSpec))
+                phase == FishingPhase.READY -> Modifier.pointerInput(
+                    phase,
+                    sceneWidthPx,
+                    sceneHeightPx,
+                    visibleCastArea,
+                    activeCastArea,
+                    panoramicEnabled,
+                    panViewport.visibleWidth,
+                    cameraBounds.minLeft,
+                    cameraBounds.maxLeft,
+                ) {
+                    awaitEachGesture {
+                        val firstDown = awaitFirstDown(requireUnconsumed = false)
+                        val pointerPositions = linkedMapOf(firstDown.id to firstDown.position)
+                        val startPosition = firstDown.position
+                        var lastPosition = firstDown.position
+                        var dragTotal = Offset.Zero
+                        val startedAtMillis = SystemClock.uptimeMillis()
+                        var panActive = false
+                        var panStartLeft = cameraViewLeftState.value
+                        var panStartCentroidX = firstDown.position.x
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { change ->
+                                if (change.id == firstDown.id) {
+                                    lastPosition = change.position
+                                    dragTotal = change.position - startPosition
+                                }
+                                if (change.pressed) {
+                                    pointerPositions[change.id] = change.position
+                                } else {
+                                    pointerPositions.remove(change.id)
+                                }
                             }
-                        },
-                        onDragCancel = {
-                            dragTotal = Offset.Zero
-                        },
-                    )
+                            val pressedPositions = pointerPositions.values.toList()
+                            if (panoramicEnabled && pressedPositions.size >= 2) {
+                                val centroidX = pressedPositions.map { it.x.toDouble() }.average().toFloat()
+                                if (!panActive) {
+                                    panActive = true
+                                    panStartLeft = cameraViewLeftState.value
+                                    panStartCentroidX = centroidX
+                                }
+                                val deltaX = centroidX - panStartCentroidX
+                                cameraViewLeft = clampCameraViewLeft(
+                                    panStartLeft - (deltaX * panViewport.visibleWidth / max(1f, sceneWidthPx)),
+                                    cameraBounds,
+                                )
+                                event.changes.forEach { it.consume() }
+                            }
+                            if (pointerPositions.isEmpty()) {
+                                if (!panActive) {
+                                    val distance = hypot(dragTotal.x, dragTotal.y)
+                                    val elapsedMillis = (SystemClock.uptimeMillis() - startedAtMillis).coerceAtLeast(16L)
+                                    if (distance >= minSwipePx) {
+                                        onBeginCast(
+                                            proFishingCastSpotFromSwipe(
+                                                swipe = dragTotal,
+                                                widthPx = sceneWidthPx,
+                                                heightPx = sceneHeightPx,
+                                                elapsedMillis = elapsedMillis,
+                                                sceneSpec = visibleCastArea,
+                                                worldSpec = activeCastArea,
+                                                viewLeft = if (panoramicEnabled) cameraViewLeftState.value else 0f,
+                                                viewportWidth = if (panoramicEnabled) panViewport.visibleWidth else 1f,
+                                            )
+                                        )
+                                    } else if (
+                                        panoramicEnabled &&
+                                        distance <= tapMaxDistancePx &&
+                                        elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
+                                    ) {
+                                        val nextViewLeft = when {
+                                            lastPosition.x <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
+                                                cameraViewLeftState.value - panStep
+                                            lastPosition.x >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
+                                                cameraViewLeftState.value + panStep
+                                            else -> null
+                                        }
+                                        if (nextViewLeft != null) {
+                                            cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
+                                        }
+                                    }
+                                }
+                                break
+                            }
+                        }
+                    }
                 }
                 phase == FishingPhase.BITING -> Modifier.pointerInput(phase) {
                     detectTapGestures(onTap = { onHookFish() })
@@ -3111,7 +3283,16 @@ private fun FishingStageScene(
             }
             val activeCastSpot = castSpot
             val activeCastTarget = activeCastSpot?.let {
-                if (proMode || it.proMode) proStyleCastTarget(it, proSceneSpec) else tgStyleCastTarget(it, rodTipRelX)
+                if (proMode || it.proMode) {
+                    if (panoramicEnabled && it.panoramicAware) {
+                        val worldTarget = proStyleCastTarget(it, activeCastArea)
+                        worldToScreenRel(worldTarget, cameraViewLeft, panViewport.visibleWidth)
+                    } else {
+                        proStyleCastTarget(it, if (panoramicEnabled) visibleCastArea else activeCastArea)
+                    }
+                } else {
+                    tgStyleCastTarget(it, rodTipRelX)
+                }
             }
             val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }
             val currentLureAsset = lureAsset(currentLure?.name, currentLure?.displayName)
@@ -3533,6 +3714,104 @@ private fun tgStyleCastTarget(castSpot: FishingCastSpot, rodTipRelX: Float): Off
     )
 }
 
+private fun defaultBackgroundAspect(location: String?): Float = when (location) {
+    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest",
+    "Мангровые заросли", "Mangroves" -> 1f
+    else -> 1.5f
+}
+
+private fun computePanViewport(widthPx: Float, heightPx: Float, imageAspect: Float): PanViewportSpec {
+    if (widthPx <= 0f || heightPx <= 0f || imageAspect <= 0f) {
+        return PanViewportSpec()
+    }
+    val stageAspect = widthPx / heightPx
+    if (imageAspect <= stageAspect) {
+        return PanViewportSpec()
+    }
+    val visibleWidth = (stageAspect / imageAspect).coerceIn(0f, 1f)
+    val maxPan = max(0f, 1f - visibleWidth)
+    return PanViewportSpec(
+        visibleWidth = visibleWidth,
+        maxPan = maxPan,
+        centeredLeft = maxPan / 2f,
+        canPan = maxPan > 0.001f,
+    )
+}
+
+private fun centeredWorldCastArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): ProFishingSceneSpec {
+    val centeredLeft = max(0f, (1f - viewportWidth) / 2f)
+    val worldMinX = centeredLeft + sceneSpec.minX * viewportWidth
+    val worldMaxX = centeredLeft + sceneSpec.maxX * viewportWidth
+    val expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X)
+    return ProFishingSceneSpec(
+        minX = (worldMinX - expandX).coerceIn(0f, 1f),
+        maxX = (worldMaxX + expandX).coerceIn(0f, 1f),
+        farY = (sceneSpec.farY - CAST_AREA_EXPAND_TOP).coerceIn(0f, 1f),
+        nearY = (sceneSpec.nearY + CAST_AREA_EXPAND_BOTTOM).coerceIn(0f, 1f),
+    )
+}
+
+private fun cameraBoundsForArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): CameraPanBounds {
+    val maxPan = max(0f, 1f - viewportWidth)
+    if (maxPan <= 0f || viewportWidth <= 0f) {
+        return CameraPanBounds()
+    }
+    val areaWidth = max(0f, sceneSpec.maxX - sceneSpec.minX)
+    val minVisible = min(
+        areaWidth,
+        max(CAST_AREA_MIN_VISIBLE_WORLD, viewportWidth * CAST_AREA_MIN_VISIBLE_VIEWPORT),
+    )
+    var minLeft = (sceneSpec.minX + minVisible - viewportWidth).coerceIn(0f, maxPan)
+    var maxLeft = (sceneSpec.maxX - minVisible).coerceIn(0f, maxPan)
+    if (maxLeft < minLeft) {
+        val centered = (((sceneSpec.minX + sceneSpec.maxX) / 2f) - viewportWidth / 2f).coerceIn(0f, maxPan)
+        minLeft = centered
+        maxLeft = centered
+    }
+    return CameraPanBounds(minLeft = minLeft, maxLeft = maxLeft)
+}
+
+private fun clampCameraViewLeft(viewLeft: Float, bounds: CameraPanBounds): Float =
+    viewLeft.coerceIn(bounds.minLeft, bounds.maxLeft)
+
+private fun visibleWorldCastArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingSceneSpec {
+    val visibleMinX = max(sceneSpec.minX, viewLeft)
+    val visibleMaxX = min(sceneSpec.maxX, viewLeft + viewportWidth)
+    if (visibleMaxX > visibleMinX) {
+        return sceneSpec.copy(minX = visibleMinX, maxX = visibleMaxX)
+    }
+    val center = ((sceneSpec.minX + sceneSpec.maxX) / 2f).coerceIn(viewLeft, viewLeft + viewportWidth)
+    val halfWidth = min(viewportWidth * 0.08f, 0.04f)
+    return sceneSpec.copy(
+        minX = (center - halfWidth).coerceIn(viewLeft, viewLeft + viewportWidth),
+        maxX = (center + halfWidth).coerceIn(viewLeft, viewLeft + viewportWidth),
+    )
+}
+
+private fun worldAreaToScreenArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingSceneSpec {
+    if (viewportWidth <= 0f) return sceneSpec
+    return sceneSpec.copy(
+        minX = ((sceneSpec.minX - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+        maxX = ((sceneSpec.maxX - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+    )
+}
+
+private fun worldToScreenRel(point: Offset, viewLeft: Float, viewportWidth: Float): Offset {
+    if (viewportWidth <= 0f) return point
+    return Offset(
+        x = (point.x - viewLeft) / viewportWidth,
+        y = point.y,
+    )
+}
+
 private fun proStyleCastTarget(castSpot: FishingCastSpot, sceneSpec: ProFishingSceneSpec): Offset =
     Offset(
         x = sceneSpec.minX + castSpot.xRoll.coerceIn(0f, 1f) * (sceneSpec.maxX - sceneSpec.minX),
@@ -3545,6 +3824,9 @@ private fun proFishingCastSpotFromSwipe(
     heightPx: Float,
     elapsedMillis: Long,
     sceneSpec: ProFishingSceneSpec,
+    worldSpec: ProFishingSceneSpec = sceneSpec,
+    viewLeft: Float = 0f,
+    viewportWidth: Float = 1f,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
     val distance = hypot(swipe.x, swipe.y)
@@ -3557,10 +3839,14 @@ private fun proFishingCastSpotFromSwipe(
     val reachY = (sceneSpec.nearY - sceneSpec.farY) / 2f
     val targetX = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX)
     val targetY = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY)
+    val targetWorldX = viewLeft + targetX * viewportWidth
+    val worldWidth = max(0.0001f, worldSpec.maxX - worldSpec.minX)
+    val worldHeight = max(0.0001f, worldSpec.nearY - worldSpec.farY)
     return FishingCastSpot(
-        xRoll = ((targetX - sceneSpec.minX) / (sceneSpec.maxX - sceneSpec.minX)).coerceIn(0f, 1f),
-        yRoll = ((targetY - sceneSpec.farY) / (sceneSpec.nearY - sceneSpec.farY)).coerceIn(0f, 1f),
+        xRoll = ((targetWorldX - worldSpec.minX) / worldWidth).coerceIn(0f, 1f),
+        yRoll = ((targetY - worldSpec.farY) / worldHeight).coerceIn(0f, 1f),
         proMode = true,
+        panoramicAware = viewportWidth < 0.999f && worldSpec != sceneSpec,
         castDurationMillis = castDurationFromSwipe(distance, elapsedMillis),
     )
 }
