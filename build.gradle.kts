@@ -55,8 +55,8 @@ dependencies {
 application {
     mainClass.set("app.ApplicationKt")
     applicationDefaultJvmArgs = listOf(
-        "-Xms512m",
-        "-Xmx1536m",
+        "-Xms256m",
+        "-Xmx1024m",
         "-XX:+UseG1GC",
     )
 }
