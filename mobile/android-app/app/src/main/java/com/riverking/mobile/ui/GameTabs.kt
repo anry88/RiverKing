@@ -572,6 +572,7 @@ fun MainShell(
         CatchDetailsDialog(
             strings = strings,
             catch = catch,
+            me = me,
             resolvedRarity = if (fishDiscovered) resolveCatchRarity(catch, state.guide.guide?.fish) else null,
             fishDiscovered = fishDiscovered,
             allowShare = catch.userId != null && catch.userId == me.id,
@@ -1406,6 +1407,7 @@ private fun TournamentsScreen(
 ) {
     val tournaments = state.tournaments
     val me = state.me
+    val shopPacks = state.shop.categories.flatMap { it.packs }
     var tournamentMode by rememberSaveable { mutableStateOf("regular") }
     var eventPeriod by rememberSaveable { mutableStateOf("current") }
     val showingSpecial = tournamentMode == "special"
@@ -1459,7 +1461,7 @@ private fun TournamentsScreen(
                             tournaments.current.leaderboard.take(5).forEachIndexed { index, entry ->
                                 if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                                 CatchRow(
-                                    title = "#${entry.rank} ${entry.user ?: "Unknown"}",
+                                    title = "${entry.rank} ${entry.user ?: "Unknown"}",
                                     subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
                                     value = entry.value.asKgCompact(strings),
                                     fishName = entry.fish,
@@ -1528,7 +1530,7 @@ private fun TournamentsScreen(
                     FilterChip(
                         selected = eventPeriod == "current",
                         onClick = { eventPeriod = "current" },
-                        label = { Text(strings.currentLabel) },
+                        label = { Text(currentTournamentPeriodLabel(strings)) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -1542,6 +1544,7 @@ private fun TournamentsScreen(
                         strings = strings,
                         event = event,
                         me = me,
+                        shopPacks = shopPacks,
                         onOpenCatch = onOpenCatch,
                     )
                 }
@@ -1555,8 +1558,10 @@ private fun SpecialEventCard(
     strings: RiverStrings,
     event: SpecialEventResponseDto,
     me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
+    var selectedBoard by rememberSaveable(event.event.id) { mutableStateOf(EVENT_BOARD_WEIGHT) }
     SectionCard(event.event.name) {
         event.event.imageUrl?.let { imageUrl ->
             AsyncImage(
@@ -1576,29 +1581,64 @@ private fun SpecialEventCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        SpecialEventClubSection(
-            strings = strings,
-            title = eventTotalWeightLabel(strings),
-            rows = event.leaderboards.totalWeight,
-            mine = event.leaderboards.mineTotalWeight,
-            countMode = false,
+        SelectionDropdown(
+            title = eventLeaderboardLabel(strings),
+            selectedLabel = specialEventBoardTitle(strings, selectedBoard),
+            options = eventLeaderboardOptions(strings),
+            selectedKey = selectedBoard,
+            onSelect = { selectedBoard = it },
         )
         Spacer(modifier = Modifier.height(12.dp))
-        SpecialEventClubSection(
+        SpecialEventSelectedBoard(
+            strings = strings,
+            event = event,
+            selectedBoard = selectedBoard,
+            me = me,
+            shopPacks = shopPacks,
+            onOpenCatch = onOpenCatch,
+        )
+    }
+}
+
+@Composable
+private fun SpecialEventSelectedBoard(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    selectedBoard: String,
+    me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    when (selectedBoard) {
+        EVENT_BOARD_COUNT -> SpecialEventClubSection(
             strings = strings,
             title = eventTotalCountLabel(strings),
             rows = event.leaderboards.totalCount,
             mine = event.leaderboards.mineTotalCount,
             countMode = true,
+            shopPacks = shopPacks,
+            showTitle = false,
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        SpecialEventPersonalSection(
+
+        EVENT_BOARD_FISH -> SpecialEventPersonalSection(
             strings = strings,
             event = event,
             rows = event.leaderboards.personalFish,
             mine = event.leaderboards.minePersonalFish,
             me = me,
+            shopPacks = shopPacks,
             onOpenCatch = onOpenCatch,
+            showTitle = false,
+        )
+
+        else -> SpecialEventClubSection(
+            strings = strings,
+            title = eventTotalWeightLabel(strings),
+            rows = event.leaderboards.totalWeight,
+            mine = event.leaderboards.mineTotalWeight,
+            countMode = false,
+            shopPacks = shopPacks,
+            showTitle = false,
         )
     }
 }
@@ -1610,19 +1650,35 @@ private fun SpecialEventClubSection(
     rows: List<SpecialEventClubEntryDto>,
     mine: SpecialEventClubEntryDto?,
     countMode: Boolean,
+    shopPacks: List<ShopPackageDto>,
+    showTitle: Boolean = true,
 ) {
-    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-    Spacer(modifier = Modifier.height(6.dp))
+    if (showTitle) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+    }
     if (rows.isEmpty()) {
         EmptyStatePanel("—")
     } else {
         rows.take(10).forEachIndexed { index, row ->
             if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-            SpecialEventClubRow(strings = strings, row = row, highlighted = mine?.rank == row.rank, countMode = countMode)
+            SpecialEventClubRow(
+                strings = strings,
+                row = row,
+                highlighted = mine?.rank == row.rank,
+                countMode = countMode,
+                shopPacks = shopPacks,
+            )
         }
         if (mine != null && rows.none { it.rank == mine.rank }) {
             HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-            SpecialEventClubRow(strings = strings, row = mine, highlighted = true, countMode = countMode)
+            SpecialEventClubRow(
+                strings = strings,
+                row = mine,
+                highlighted = true,
+                countMode = countMode,
+                shopPacks = shopPacks,
+            )
         }
     }
 }
@@ -1633,6 +1689,7 @@ private fun SpecialEventClubRow(
     row: SpecialEventClubEntryDto,
     highlighted: Boolean,
     countMode: Boolean,
+    shopPacks: List<ShopPackageDto>,
 ) {
     Row(
         modifier = Modifier
@@ -1642,7 +1699,15 @@ private fun SpecialEventClubRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("#${row.rank} ${row.club}", modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("${row.rank} ${row.club}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            row.prize?.let { prize ->
+                PrizeChip(strings = strings, prize = prize, shopPacks = shopPacks)
+            }
+        }
         Text(if (countMode) row.value.roundToInt().toString() else row.value.asKgCompact(strings))
     }
 }
@@ -1654,10 +1719,14 @@ private fun SpecialEventPersonalSection(
     rows: List<SpecialEventPersonalEntryDto>,
     mine: SpecialEventPersonalEntryDto?,
     me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
     onOpenCatch: (CatchDto) -> Unit,
+    showTitle: Boolean = true,
 ) {
-    Text(eventTopFishLabel(strings), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-    Spacer(modifier = Modifier.height(6.dp))
+    if (showTitle) {
+        Text(eventTopFishLabel(strings), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+    }
     if (rows.isEmpty()) {
         EmptyStatePanel(strings.noData)
     } else {
@@ -1669,6 +1738,7 @@ private fun SpecialEventPersonalSection(
                 row = row,
                 highlighted = mine?.rank == row.rank,
                 me = me,
+                shopPacks = shopPacks,
                 onOpenCatch = onOpenCatch,
             )
         }
@@ -1680,6 +1750,7 @@ private fun SpecialEventPersonalSection(
                 row = mine,
                 highlighted = true,
                 me = me,
+                shopPacks = shopPacks,
                 onOpenCatch = onOpenCatch,
             )
         }
@@ -1693,6 +1764,7 @@ private fun SpecialEventPersonalRow(
     row: SpecialEventPersonalEntryDto,
     highlighted: Boolean,
     me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     val discovered = me?.caughtFishIds?.contains(row.fishId) == true || me?.id == row.userId
@@ -1721,8 +1793,11 @@ private fun SpecialEventPersonalRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text("#${row.rank} ${row.user ?: youLabel(strings)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("${row.rank} ${row.user ?: youLabel(strings)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 text = if (discovered) "${row.fish} • ${row.weight.asKgCompact(strings)}" else "??? • ${row.weight.asKgCompact(strings)}",
                 style = MaterialTheme.typography.bodySmall,
@@ -1730,6 +1805,9 @@ private fun SpecialEventPersonalRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            row.prize?.let { prize ->
+                PrizeChip(strings = strings, prize = prize, shopPacks = shopPacks)
+            }
         }
         Text(row.value.asKgCompact(strings))
     }
@@ -2221,6 +2299,7 @@ private fun ClubScreen(
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
     var selectedSection by rememberSaveable(state.club.club?.id) { mutableStateOf("ratings") }
     var selectedWeek by rememberSaveable(state.club.club?.id) { mutableStateOf("current") }
+    var selectedEventBoard by rememberSaveable(state.club.club?.id) { mutableStateOf(EVENT_BOARD_WEIGHT) }
     var selectedQuestCode by rememberSaveable(state.club.club?.id, selectedWeek) { mutableStateOf("") }
     val club = state.club.club
     val canManageClub = club?.role == "president" || club?.role == "heir"
@@ -2231,6 +2310,7 @@ private fun ClubScreen(
         ?.firstOrNull { it.code == selectedQuestCode }
         ?: questWeekData?.quests?.firstOrNull()
     val clubPrizes = state.tournaments.prizes.filter(::isClubPrize)
+    val shopPacks = state.shop.categories.flatMap { it.packs }
     val createCostCoins = 1_000L
     val minCreateWeightKg = 1_000.0
     val hasCreateWeight = (me?.totalWeight ?: 0.0) >= minCreateWeightKg
@@ -2289,6 +2369,10 @@ private fun ClubScreen(
             quests.any { it.code == selectedQuestCode } -> selectedQuestCode
             else -> quests.first().code
         }
+    }
+
+    LaunchedEffect(selectedSection, selectedWeek, clubEvent?.event?.id) {
+        selectedEventBoard = EVENT_BOARD_WEIGHT
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -2373,107 +2457,38 @@ private fun ClubScreen(
                             else -> questsSectionLabel
                         }
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    selectedSection = "ratings"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedSection == "ratings") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(strings.ratings)
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    selectedSection = "tournament"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedSection == "tournament") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(clubTournamentLabel(strings))
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    selectedSection = "quests"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedSection == "quests") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(questsSectionLabel)
-                            }
-                        }
+                        SegmentedSelectionBar(
+                            items = listOf("ratings", "tournament", "quests"),
+                            selected = selectedSection,
+                            onSelect = {
+                                selectedSection = it
+                                onReloadClub(true)
+                            },
+                            accentFor = { RiverMoss },
+                            labelFor = {
+                                when (it) {
+                                    "ratings" -> strings.ratings
+                                    "tournament" -> clubTournamentLabel(strings)
+                                    else -> questsSectionLabel
+                                }
+                            },
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    selectedWeek = "current"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedWeek == "current") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(if (selectedSection == "tournament") strings.currentLabel else if (strings.login == "Логин") "Текущая неделя" else "This week")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    selectedWeek = "previous"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedWeek == "previous") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(if (selectedSection == "tournament") previousLabel(strings) else if (strings.login == "Логин") "Прошлая неделя" else "Last week")
-                            }
-                        }
+                        SegmentedSelectionBar(
+                            items = listOf("current", "previous"),
+                            selected = selectedWeek,
+                            onSelect = {
+                                selectedWeek = it
+                                onReloadClub(true)
+                            },
+                            accentFor = { RiverMoss },
+                            labelFor = {
+                                when (it) {
+                                    "current" -> if (selectedSection == "tournament") currentTournamentPeriodLabel(strings) else if (strings.login == "Логин") "Текущая неделя" else "This week"
+                                    else -> if (selectedSection == "tournament") previousLabel(strings) else if (strings.login == "Логин") "Прошлая неделя" else "Last week"
+                                }
+                            },
+                        )
                         Text(
                             if (selectedSection == "tournament") {
                                 clubEvent?.event?.let { "${formatEpoch(it.startTime)} – ${formatEpoch(it.endTime)}" }.orEmpty()
@@ -2511,28 +2526,21 @@ private fun ClubScreen(
                             if (clubEvent == null) {
                                 EmptyStatePanel(eventsEmptyLabel(strings), modifier = Modifier.fillMaxWidth())
                             } else {
-                                SpecialEventClubSection(
-                                    strings = strings,
-                                    title = eventTotalWeightLabel(strings),
-                                    rows = clubEvent.leaderboards.totalWeight,
-                                    mine = clubEvent.leaderboards.mineTotalWeight,
-                                    countMode = false,
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SelectionDropdown(
+                                    title = eventLeaderboardLabel(strings),
+                                    selectedLabel = specialEventBoardTitle(strings, selectedEventBoard),
+                                    options = eventLeaderboardOptions(strings),
+                                    selectedKey = selectedEventBoard,
+                                    onSelect = { selectedEventBoard = it },
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
-                                SpecialEventClubSection(
-                                    strings = strings,
-                                    title = eventTotalCountLabel(strings),
-                                    rows = clubEvent.leaderboards.totalCount,
-                                    mine = clubEvent.leaderboards.mineTotalCount,
-                                    countMode = true,
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                SpecialEventPersonalSection(
+                                SpecialEventSelectedBoard(
                                     strings = strings,
                                     event = clubEvent,
-                                    rows = clubEvent.leaderboards.personalFish,
-                                    mine = clubEvent.leaderboards.minePersonalFish,
+                                    selectedBoard = selectedEventBoard,
                                     me = me,
+                                    shopPacks = shopPacks,
                                     onOpenCatch = onOpenCatch,
                                 )
                             }
@@ -6158,7 +6166,7 @@ private fun TournamentCard(
                 }
                 mine?.let {
                     SceneBadge(
-                        text = "#${it.rank} • ${tournamentMetricValueLabel(strings, tournament.metric, it.value)}",
+                        text = "${it.rank} • ${tournamentMetricValueLabel(strings, tournament.metric, it.value)}",
                         accent = Color(0xFF6FE7B7),
                     )
                 }
@@ -6311,7 +6319,7 @@ private fun RatingsEntryCard(
                     border = BorderStroke(1.dp, rarityColor(catch.rarity).copy(alpha = 0.45f)),
                 ) {
                     Text(
-                        "#$rank",
+                        "$rank",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -6400,7 +6408,7 @@ private fun TournamentLeaderboardRow(
                         color = Color.White.copy(alpha = 0.06f),
                     ) {
                         Text(
-                            "#${entry.rank}",
+                            "${entry.rank}",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -6498,6 +6506,7 @@ private fun PrizeChip(
 private fun CatchDetailsDialog(
     strings: RiverStrings,
     catch: CatchDto,
+    me: MeResponseDto,
     resolvedRarity: String?,
     fishDiscovered: Boolean,
     allowShare: Boolean,
@@ -6507,6 +6516,12 @@ private fun CatchDetailsDialog(
 ) {
     val rarityKey = resolvedRarity?.takeIf { it.isNotBlank() }
     val accent = rarityColor(rarityKey)
+    val backgroundModel = remember(me.locations, catch.location) {
+        val normalized = catch.location.trim().lowercase()
+        me.locations.firstOrNull { location -> location.name.trim().lowercase() == normalized }
+            ?.let { location -> location.imageUrl ?: locationBackgroundAsset(location.name) }
+            ?: locationBackgroundAsset(catch.location)
+    }
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -6524,7 +6539,7 @@ private fun CatchDetailsDialog(
                         .fillMaxWidth()
                         .height(250.dp),
                 ) {
-                    locationBackgroundAsset(catch.location)?.let { background ->
+                    backgroundModel?.let { background ->
                         AsyncImage(
                             model = background,
                             contentDescription = catch.location,
@@ -6648,7 +6663,7 @@ private fun CatchDetailsDialog(
                             CatchDetailChip(user)
                         }
                         catch.at?.let { CatchDetailChip(formatTimestamp(it)) }
-                        catch.rank?.let { CatchDetailChip("#$it") }
+                        catch.rank?.let { CatchDetailChip("$it") }
                         catch.prizeCoins?.let { CatchDetailChip("$it coins") }
                     }
                     Text(
@@ -7362,6 +7377,25 @@ private fun regularTournamentsLabel(strings: RiverStrings): String =
 private fun specialTournamentsLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Специальные" else "Special"
 
+private const val EVENT_BOARD_WEIGHT = "weight"
+private const val EVENT_BOARD_COUNT = "count"
+private const val EVENT_BOARD_FISH = "fish"
+
+private fun eventLeaderboardLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Зачет" else "Leaderboard"
+
+private fun eventLeaderboardOptions(strings: RiverStrings): List<Pair<String, String>> = listOf(
+    EVENT_BOARD_WEIGHT to eventTotalWeightLabel(strings),
+    EVENT_BOARD_COUNT to eventTotalCountLabel(strings),
+    EVENT_BOARD_FISH to eventTopFishLabel(strings),
+)
+
+private fun specialEventBoardTitle(strings: RiverStrings, board: String): String = when (board) {
+    EVENT_BOARD_COUNT -> eventTotalCountLabel(strings)
+    EVENT_BOARD_FISH -> eventTopFishLabel(strings)
+    else -> eventTotalWeightLabel(strings)
+}
+
 private fun eventLocationsLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Ивентовые" else "Events"
 
@@ -7370,6 +7404,9 @@ private fun specialEventLocationLabel(strings: RiverStrings): String =
 
 private fun clubTournamentLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Турнир" else "Tournament"
+
+private fun currentTournamentPeriodLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Текущий" else "Current"
 
 private fun previousLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Прошлый" else "Previous"

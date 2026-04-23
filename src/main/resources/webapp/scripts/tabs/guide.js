@@ -114,7 +114,7 @@ function Guide({
   if(error) return <div className="mt-6 text-center opacity-70">{error}</div>;
   if(!data) return <div className="mt-6 text-center opacity-70">{t('loading')}</div>;
   return (
-    <div className="mt-4">
+    <div className="mt-4 pb-safe">
       <div className="glass rounded-2xl p-3 shadow-lg mb-4">
         <div className="flex flex-wrap justify-center gap-2">
           <button onClick={()=>setSection('locations')} className={`px-3 py-2 rounded-xl min-w-[140px] text-center ${section==='locations'?'bg-emerald-600':'glass'}`}>{t('locations')}</button>

@@ -420,6 +420,7 @@ function CatchDetailsModal({catchData, me, onClose}){
         ? me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized)
         : me.locations.find(loc=> Number(loc.id) === Number(catchData.locationId));
       if(match){
+        if(match.imageUrl) return match.imageUrl;
         const resolved = resolver(match.id, match.name);
         if(resolved) return resolved;
       }
@@ -569,13 +570,14 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
   );
 }
 
-function ClubScreen({active,onClose,me,onReloadProfile}){
+function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   const CLUB_CREATE_COST = 1000;
   const CLUB_MIN_WEIGHT = 1000;
   const [mode, setMode] = React.useState('hub');
   const [club, setClub] = React.useState(null);
   const [clubView, setClubView] = React.useState('ratings');
   const [clubTab, setClubTab] = React.useState('current');
+  const [selectedEventBoardKey, setSelectedEventBoardKey] = React.useState('weight');
   const [clubCurrentEvent, setClubCurrentEvent] = React.useState(null);
   const [clubPreviousEvent, setClubPreviousEvent] = React.useState(null);
   const [selectedQuestCode, setSelectedQuestCode] = React.useState('');
@@ -613,6 +615,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [settingsSaving, setSettingsSaving] = React.useState(false);
   const [settingsError, setSettingsError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+  const shopPacks = React.useMemo(
+    () => Array.isArray(shop) ? shop.reduce((acc, category) => acc.concat(Array.isArray(category?.packs) ? category.packs : []), []) : [],
+    [shop]
+  );
 
   const roleLabel = React.useCallback(role => {
     if(role === 'president') return t('clubRolePresident');
@@ -631,12 +637,28 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, []);
 
   const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
+  const formatEventPrize = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      const amount = Number(prize.coins ?? prize.qty);
+      if(!Number.isFinite(amount) || amount <= 0) return null;
+      return `🪙 +${amount.toLocaleString(coinLocale)}`;
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const pack = shopPacks.find(item => item.id === packageId);
+    const label = pack?.name || (packageId === 'autofish_week' ? t('autofishWeek') : packageId);
+    const qty = Math.max(1, Number(prize.qty) || 1);
+    return qty > 1 ? `${label} x${qty}` : label;
+  }, [coinLocale, shopPacks]);
 
   const resetState = React.useCallback(() => {
     setMode('hub');
     setClub(null);
     setClubView('ratings');
     setClubTab('current');
+    setSelectedEventBoardKey('weight');
     setClubCurrentEvent(null);
     setClubPreviousEvent(null);
     setSelectedQuestCode('');
@@ -997,25 +1019,31 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const renderClubEventRows = (title, rows, mine, mode) => {
     const list = Array.isArray(rows) ? rows : [];
     const mineOutside = mine && !list.some(row => Number(row.rank) === Number(mine.rank));
-    const renderRow = (row, mineRow = false) => (
-      <div key={`${title}:${row.rank}:${mineRow ? 'mine' : 'row'}`} className={`p-2 rounded-xl border ${mineRow ? 'border-emerald-400' : 'border-white/10'}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="font-semibold text-sm truncate">
-              #{row.rank} {mode === 'fish' ? (row.user || t('you')) : row.club}
-            </div>
-            {mode === 'fish' && (
-              <div className="text-xs opacity-70 truncate">
-                {row.fish} · {Number(row.weight || 0).toFixed(2)} {t('kg')}
+    const renderRow = (row, mineRow = false) => {
+      const prizeLabel = formatEventPrize(row.prize);
+      return (
+        <div key={`${title}:${row.rank}:${mineRow ? 'mine' : 'row'}`} className={`p-2 rounded-xl border ${mineRow ? 'border-emerald-400' : 'border-white/10'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">
+                {row.rank} {mode === 'fish' ? (row.user || t('you')) : row.club}
               </div>
-            )}
-          </div>
-          <div className="text-sm text-emerald-300 shrink-0">
-            {mode === 'count' ? Number(row.value || 0).toFixed(0) : `${Number(row.value || 0).toFixed(2)} ${t('kg')}`}
+              {mode === 'fish' && (
+                <div className="text-xs opacity-70 truncate">
+                  {row.fish} · {Number(row.weight || 0).toFixed(2)} {t('kg')}
+                </div>
+              )}
+              {prizeLabel && (
+                <div className="mt-1 text-xs text-amber-300 truncate">{prizeLabel}</div>
+              )}
+            </div>
+            <div className="text-sm text-emerald-300 shrink-0">
+              {mode === 'count' ? Number(row.value || 0).toFixed(0) : `${Number(row.value || 0).toFixed(2)} ${t('kg')}`}
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    };
     return (
       <div className="space-y-2">
         <div className="text-xs font-semibold opacity-80">{title}</div>
@@ -1033,6 +1061,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(questList.some(quest => quest.code === selectedQuestCode)) return;
     setSelectedQuestCode(questList[0].code);
   }, [club?.id, clubTab, questWeekData?.weekStart, selectedQuestCode, questList]);
+
+  React.useEffect(() => {
+    setSelectedEventBoardKey('weight');
+  }, [clubView, clubTab, clubEventData?.event?.id]);
 
   if(!active) return null;
 
@@ -1231,7 +1263,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col pb-safe">
       <div className="flex items-center gap-2 mb-3">
         <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
         <div className="flex-1 text-lg font-semibold">{t('clubTitle')}</div>
@@ -1315,7 +1347,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       ) : error ? (
         <div className="text-sm opacity-70">{error}</div>
       ) : mode === 'club' && club ? (
-        <div className="space-y-4">
+        <div className="space-y-4 pb-2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-base font-semibold">{club.name}</div>
@@ -1389,18 +1421,18 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             <button
               type="button"
               onClick={()=>setClubView('ratings')}
-              className={`flex-1 py-2 rounded-xl ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
             >{t('ratings')}</button>
             <button
               type="button"
               onClick={()=>setClubView('tournament')}
-              className={`flex-1 py-2 rounded-xl ${clubView==='tournament' ? 'bg-emerald-600' : 'glass'}`}
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='tournament' ? 'bg-emerald-600' : 'glass'}`}
             >{t('clubTournament')}</button>
             <button
               type="button"
               onClick={()=>setClubView('quests')}
-              className={`flex-1 py-2 rounded-xl ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('clubQuests')}</button>
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('quests')}</button>
           </div>
           <div className="flex gap-2 text-sm">
             <button
@@ -1481,9 +1513,23 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                     <div className="font-semibold">{clubEventData.event.name}</div>
                     <div className="text-xs opacity-70">{t('specialEvent')}</div>
                   </div>
-                  {renderClubEventRows(t('eventTotalWeight'), clubEventData.leaderboards?.totalWeight, clubEventData.leaderboards?.mineTotalWeight, 'weight')}
-                  {renderClubEventRows(t('eventTotalCount'), clubEventData.leaderboards?.totalCount, clubEventData.leaderboards?.mineTotalCount, 'count')}
-                  {renderClubEventRows(t('eventTopFish'), clubEventData.leaderboards?.personalFish, clubEventData.leaderboards?.minePersonalFish, 'fish')}
+                  <div className="space-y-2">
+                    <div className="text-xs opacity-70">{t('eventLeaderboard')}</div>
+                    <select
+                      value={selectedEventBoardKey}
+                      onChange={e=>setSelectedEventBoardKey(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-black/20 border border-white/10"
+                    >
+                      <option value="weight">{t('eventTotalWeight')}</option>
+                      <option value="count">{t('eventTotalCount')}</option>
+                      <option value="fish">{t('eventTopFish')}</option>
+                    </select>
+                  </div>
+                  {selectedEventBoardKey === 'count'
+                    ? renderClubEventRows(t('eventTotalCount'), clubEventData.leaderboards?.totalCount, clubEventData.leaderboards?.mineTotalCount, 'count')
+                    : selectedEventBoardKey === 'fish'
+                      ? renderClubEventRows(t('eventTopFish'), clubEventData.leaderboards?.personalFish, clubEventData.leaderboards?.minePersonalFish, 'fish')
+                      : renderClubEventRows(t('eventTotalWeight'), clubEventData.leaderboards?.totalWeight, clubEventData.leaderboards?.mineTotalWeight, 'weight')}
                 </>
               )
             ) : !questList.length ? (

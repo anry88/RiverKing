@@ -1474,6 +1474,7 @@ function App(){
               active={tab === 'club'}
               onClose={()=>setTab(prevTabRef.current || 'fish')}
               me={me}
+              shop={shop}
               onReloadProfile={reloadProfile}
             />
           )}

@@ -46,6 +46,8 @@ function TournamentsTab({
     }
   },[pastResult]);
 
+  const [selectedEventBoardKey, setSelectedEventBoardKey] = React.useState('weight');
+
   const shopPacks = React.useMemo(() => shop.reduce((acc,c)=>acc.concat(c.packs),[]), [shop]);
   const locale = (typeof document !== 'undefined' && document.documentElement.lang === 'ru') ? 'ru-RU' : 'en-US';
 
@@ -116,19 +118,18 @@ function TournamentsTab({
   const specialPeriod = tournamentTab === 'past' ? 'past' : 'current';
   const selectedEvent = specialPeriod === 'past' ? previousEvent : currentEvent;
 
-  const renderEventPrizeButton = (hintKey, prize) => {
-    if(!prize) return null;
-    return (
-      <button
-        type="button"
-        onClick={ev=>{ev.stopPropagation(); setPrizeHint(p=>p && p.rank===hintKey ? null : {rank:hintKey, prize});}}
-        className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white/10"
-        aria-label={t('prizes')}
-      >
-        <span className="w-5 h-5 flex items-center justify-center">{renderPrizeIcon(prize)}</span>
-      </button>
-    );
-  };
+  React.useEffect(()=>{
+    setSelectedEventBoardKey('weight');
+  }, [selectedEvent?.event?.id, specialPeriod]);
+
+  const formatPrizeLabel = React.useCallback((prize) => {
+    const info = formatPrize(prize);
+    if(!info) return null;
+    if(info.isCoins){
+      return `🪙 +${Number(info.amount).toLocaleString(locale)}`;
+    }
+    return info.amount > 1 ? `${info.label} x${info.amount}` : info.label;
+  }, [formatPrize, locale]);
 
   const renderEventSection = (key, title, rows, mine, mode) => {
     const list = Array.isArray(rows) ? rows : [];
@@ -138,8 +139,8 @@ function TournamentsTab({
       return mode === 'count' ? value.toFixed(0) : value.toFixed(2);
     };
     const renderRow = (row, isMine = false) => {
-      const hintKey = `${key}:${row.rank}`;
       const isPersonal = mode === 'fish';
+      const prizeLabel = formatPrizeLabel(row.prize);
       const catchData = isPersonal && row.catchId ? {
         id: row.catchId,
         fish: row.fish,
@@ -154,14 +155,13 @@ function TournamentsTab({
       } : null;
       return (
         <div
-          key={`${hintKey}:${isMine ? 'mine' : 'row'}`}
-          className={`p-3 rounded-xl glass flex items-center justify-between relative ${prizeHint?.rank===hintKey ? 'z-10' : ''} ${isMine ? 'border border-emerald-400' : ''}`}
+          key={`${key}:${row.rank}:${isMine ? 'mine' : 'row'}`}
+          className={`p-3 rounded-xl glass flex items-center justify-between relative ${isMine ? 'border border-emerald-400' : ''}`}
           onClick={()=>{ if(catchData && onCatchClick){ onCatchClick(catchData); } }}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-12 h-8 flex items-center justify-center gap-1 shrink-0">
+            <div className="w-10 h-8 flex items-center justify-center shrink-0">
               <span>{row.rank}</span>
-              {renderEventPrizeButton(hintKey, row.prize)}
             </div>
             {isPersonal && (
               row.fish && (me.caughtFishIds||[]).includes(row.fishId) ? (
@@ -180,13 +180,15 @@ function TournamentsTab({
                   {row.fish} — {Number(row.weight || 0).toFixed(2)} {t('kg')} — {row.at ? new Date(row.at*1000).toLocaleString() : ''}
                 </div>
               )}
+              {prizeLabel && (
+                <div className="text-xs text-amber-300 truncate mt-1">{prizeLabel}</div>
+              )}
             </div>
           </div>
           <div className="w-16 text-right shrink-0">
             <div>{valueText(row)}</div>
             {mode !== 'count' && <div className="text-xs">{t('kg')}</div>}
           </div>
-          {renderPrizeHint(hintKey, row.prize)}
         </div>
       );
     };
@@ -204,7 +206,7 @@ function TournamentsTab({
   };
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 pb-safe">
       <div className="flex mb-3 p-1 rounded-xl glass gap-1">
         <button
           onClick={()=>setTournamentKind?.('regular')}
@@ -238,9 +240,23 @@ function TournamentsTab({
                   </div>
                 </div>
               </div>
-              {renderEventSection('weight', t('eventTotalWeight'), selectedEvent.leaderboards?.totalWeight, selectedEvent.leaderboards?.mineTotalWeight, 'weight')}
-              {renderEventSection('count', t('eventTotalCount'), selectedEvent.leaderboards?.totalCount, selectedEvent.leaderboards?.mineTotalCount, 'count')}
-              {renderEventSection('fish', t('eventTopFish'), selectedEvent.leaderboards?.personalFish, selectedEvent.leaderboards?.minePersonalFish, 'fish')}
+              <div className="space-y-2">
+                <div className="text-xs opacity-70">{t('eventLeaderboard')}</div>
+                <select
+                  value={selectedEventBoardKey}
+                  onChange={e=>setSelectedEventBoardKey(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-black/20 border border-white/10"
+                >
+                  <option value="weight">{t('eventTotalWeight')}</option>
+                  <option value="count">{t('eventTotalCount')}</option>
+                  <option value="fish">{t('eventTopFish')}</option>
+                </select>
+              </div>
+              {selectedEventBoardKey === 'count'
+                ? renderEventSection('count', t('eventTotalCount'), selectedEvent.leaderboards?.totalCount, selectedEvent.leaderboards?.mineTotalCount, 'count')
+                : selectedEventBoardKey === 'fish'
+                  ? renderEventSection('fish', t('eventTopFish'), selectedEvent.leaderboards?.personalFish, selectedEvent.leaderboards?.minePersonalFish, 'fish')
+                  : renderEventSection('weight', t('eventTotalWeight'), selectedEvent.leaderboards?.totalWeight, selectedEvent.leaderboards?.mineTotalWeight, 'weight')}
             </div>
           ) : (
             <div className="text-center opacity-70">{t('eventsEmpty')}</div>
