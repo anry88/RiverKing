@@ -296,6 +296,13 @@ class AdminApiClient(
     }
 
     suspend fun uploadEventImage(fileName: String, bytes: ByteArray): ImageUploadResp {
+        val safeFileName = fileName.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
+        val contentType = when (safeFileName.substringAfterLast('.', "").lowercase()) {
+            "png" -> ContentType.Image.PNG
+            "jpg", "jpeg" -> ContentType.Image.JPEG
+            "webp" -> ContentType.parse("image/webp")
+            else -> ContentType.Application.OctetStream
+        }
         val response = client.submitFormWithBinaryData(
             url = apiUrl("/api/admin/events/image"),
             formData = formData {
@@ -303,7 +310,8 @@ class AdminApiClient(
                     key = "file",
                     value = bytes,
                     headers = Headers.build {
-                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                        append(HttpHeaders.ContentDisposition, "form-data; name=\"file\"; filename=\"$safeFileName\"")
+                        append(HttpHeaders.ContentType, contentType.toString())
                     }
                 )
             }

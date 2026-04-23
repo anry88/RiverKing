@@ -1,29 +1,43 @@
 package com.riverking.admin.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -31,6 +45,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -46,7 +61,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -57,17 +81,29 @@ import com.riverking.admin.network.AdminEventFishDTO
 import com.riverking.admin.network.AdminEventPrizeDTO
 import com.riverking.admin.network.CatalogOptionDTO
 import com.riverking.admin.network.EventCastAreaDTO
+import com.riverking.admin.network.PrizeOptionDTO
 import com.riverking.admin.network.SpecialEventDTO
 import com.riverking.admin.network.SpecialEventReq
 import com.riverking.admin.ui.theme.riverBackdrop
-import com.riverking.admin.ui.theme.riverPrimaryButtonColors
 import com.riverking.admin.ui.theme.riverTextFieldColors
-import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
+private const val EVENT_MAX_PRIZE_PLACES = 1000
+private const val EVENT_COIN_PRIZE_ID = "coins"
+private const val EVENT_IMAGE_MAX_DIMENSION = 1800
+private const val EVENT_IMAGE_WEBP_QUALITY = 88
+private const val EVENT_IMAGE_DIRECT_UPLOAD_LIMIT_BYTES = 900 * 1024
 private val EventDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private val EventJson = Json { ignoreUnknownKeys = true }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +150,7 @@ fun EventsScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
                 editing = null
                 showEditor = true
             }) { Icon(Icons.Default.Add, contentDescription = "Add") }
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -184,34 +220,66 @@ private fun EventEditorDialog(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val prizeOptions = remember(catalog.tournamentPrizes) { eventPrizeOptions(catalog.tournamentPrizes) }
+    val today = remember { LocalDate.now(ZoneOffset.UTC) }
     var nameRu by remember(event?.id) { mutableStateOf(event?.nameRu.orEmpty()) }
     var nameEn by remember(event?.id) { mutableStateOf(event?.nameEn.orEmpty()) }
     var imagePath by remember(event?.id) { mutableStateOf(event?.imagePath.orEmpty()) }
-    var startDate by remember(event?.id) { mutableStateOf(event?.startTime?.let(::formatEventDate) ?: LocalDate.now(ZoneOffset.UTC).format(EventDateFormatter)) }
-    var endDate by remember(event?.id) { mutableStateOf(event?.endTime?.let(::formatEventDate) ?: LocalDate.now(ZoneOffset.UTC).plusDays(7).format(EventDateFormatter)) }
-    var minX by remember(event?.id) { mutableStateOf((event?.castArea?.minX ?: 0.14).toString()) }
-    var maxX by remember(event?.id) { mutableStateOf((event?.castArea?.maxX ?: 0.86).toString()) }
-    var farY by remember(event?.id) { mutableStateOf((event?.castArea?.farY ?: 0.47).toString()) }
-    var nearY by remember(event?.id) { mutableStateOf((event?.castArea?.nearY ?: 0.78).toString()) }
+    var imagePreview by remember(event?.id) { mutableStateOf<Bitmap?>(null) }
+    var startDate by remember(event?.id) {
+        mutableStateOf(event?.startTime?.let(::formatEventDate) ?: today.format(EventDateFormatter))
+    }
+    var endDate by remember(event?.id) {
+        mutableStateOf(event?.endTime?.let(::formatEventDate) ?: today.plusDays(7).format(EventDateFormatter))
+    }
+    var castArea by remember(event?.id) {
+        mutableStateOf(event?.castArea ?: EventCastAreaDTO(0.14, 0.86, 0.47, 0.78))
+    }
     var fishRows by remember(event?.id) {
-        mutableStateOf(event?.fish?.takeIf { it.isNotEmpty() } ?: listOf(AdminEventFishDTO(catalog.eventFish.firstOrNull()?.id?.toLongOrNull() ?: 1L, 1.0)))
+        mutableStateOf(
+            event?.fish?.takeIf { it.isNotEmpty() }
+                ?: listOf(AdminEventFishDTO(catalog.eventFish.firstOrNull()?.id?.toLongOrNull() ?: 1L, 1.0))
+        )
     }
     var weightPlaces by remember(event?.id) { mutableStateOf((event?.weightPrizes?.prizePlaces ?: 3).toString()) }
     var countPlaces by remember(event?.id) { mutableStateOf((event?.countPrizes?.prizePlaces ?: 3).toString()) }
     var fishPlaces by remember(event?.id) { mutableStateOf((event?.fishPrizes?.prizePlaces ?: 3).toString()) }
-    var weightPrizesJson by remember(event?.id) { mutableStateOf(event?.weightPrizes?.prizesJson ?: defaultEventPrizeJson()) }
-    var countPrizesJson by remember(event?.id) { mutableStateOf(event?.countPrizes?.prizesJson ?: defaultEventPrizeJson()) }
-    var fishPrizesJson by remember(event?.id) { mutableStateOf(event?.fishPrizes?.prizesJson ?: defaultEventPrizeJson()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var uploading by remember { mutableStateOf(false) }
+    var weightPrizes by remember(event?.id, prizeOptions) {
+        mutableStateOf(parseEventPrizes(event?.weightPrizes?.prizesJson, prizeOptions))
+    }
+    var countPrizes by remember(event?.id, prizeOptions) {
+        mutableStateOf(parseEventPrizes(event?.countPrizes?.prizesJson, prizeOptions))
+    }
+    var fishPrizes by remember(event?.id, prizeOptions) {
+        mutableStateOf(parseEventPrizes(event?.fishPrizes?.prizesJson, prizeOptions))
+    }
+    var error by remember(event?.id) { mutableStateOf<String?>(null) }
+    var uploading by remember(event?.id) { mutableStateOf(false) }
+
+    val weightPlaceCount = eventPrizePlaces(weightPlaces)
+    val countPlaceCount = eventPrizePlaces(countPlaces)
+    val fishPlaceCount = eventPrizePlaces(fishPlaces)
+
+    LaunchedEffect(weightPlaceCount, prizeOptions) {
+        weightPrizes = adjustEventPrizes(weightPrizes, weightPlaceCount, prizeOptions)
+    }
+    LaunchedEffect(countPlaceCount, prizeOptions) {
+        countPrizes = adjustEventPrizes(countPrizes, countPlaceCount, prizeOptions)
+    }
+    LaunchedEffect(fishPlaceCount, prizeOptions) {
+        fishPrizes = adjustEventPrizes(fishPrizes, fishPlaceCount, prizeOptions)
+    }
+
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             uploading = true
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: error("empty file")
-                imagePath = apiClient.uploadEventImage("event.webp", bytes).imagePath
+                val selection = prepareEventImageUpload(context, uri)
+                val uploaded = apiClient.uploadEventImage(selection.fileName, selection.bytes)
+                imagePath = uploaded.imagePath
+                imagePreview = selection.preview
+                error = null
             } catch (e: Exception) {
                 error = "Upload failed: ${e.message}"
             } finally {
@@ -228,26 +296,34 @@ private fun EventEditorDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(nameRu, { nameRu = it }, label = { Text("Location name RU") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(nameEn, { nameEn = it }, label = { Text("Location name EN") }, colors = riverTextFieldColors(), modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(imagePath, { imagePath = it }, label = { Text("Image path") }, colors = riverTextFieldColors(), modifier = Modifier.weight(1f))
-                    Button(onClick = { imagePicker.launch("image/*") }, enabled = !uploading) { Text(if (uploading) "..." else "Upload") }
+                    OutlinedTextField(
+                        value = imagePath,
+                        onValueChange = { imagePath = it },
+                        label = { Text("Image") },
+                        colors = riverTextFieldColors(),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(onClick = { imagePicker.launch("image/*") }, enabled = !uploading) {
+                        Text(if (uploading) "..." else "Upload")
+                    }
                 }
+                EventCastAreaPicker(
+                    image = imagePreview,
+                    imagePath = imagePath,
+                    castArea = castArea,
+                    onCastAreaChange = { castArea = it },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(startDate, { startDate = it }, label = { Text("Start dd.mm.yyyy") }, colors = riverTextFieldColors(), modifier = Modifier.weight(1f))
                     OutlinedTextField(endDate, { endDate = it }, label = { Text("End dd.mm.yyyy") }, colors = riverTextFieldColors(), modifier = Modifier.weight(1f))
                 }
-                Text("Cast area (normalized 0..1)")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    NumberField("minX", minX, { minX = it }, Modifier.weight(1f))
-                    NumberField("maxX", maxX, { maxX = it }, Modifier.weight(1f))
-                    NumberField("farY", farY, { farY = it }, Modifier.weight(1f))
-                    NumberField("nearY", nearY, { nearY = it }, Modifier.weight(1f))
-                }
-                Text("Fish pool")
+                Text("Fish pool", style = MaterialTheme.typography.titleMedium)
                 fishRows.forEachIndexed { index, row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         EventOptionDropdown(
@@ -261,7 +337,7 @@ private fun EventEditorDialog(
                             },
                             modifier = Modifier.weight(1f),
                         )
-                        NumberField("Weight", row.weight.toString(), { value ->
+                        EventDecimalField("Weight", row.weight.toString(), { value ->
                             fishRows = fishRows.toMutableList().also {
                                 it[index] = row.copy(weight = value.toDoubleOrNull() ?: row.weight)
                             }
@@ -275,9 +351,31 @@ private fun EventEditorDialog(
                     val first = catalog.eventFish.firstOrNull()?.id?.toLongOrNull() ?: 1L
                     fishRows = fishRows + AdminEventFishDTO(first, 1.0)
                 }) { Text("Add fish") }
-                EventPrizeBlock("Total weight prizes", weightPlaces, { weightPlaces = it }, weightPrizesJson, { weightPrizesJson = it })
-                EventPrizeBlock("Fish count prizes", countPlaces, { countPlaces = it }, countPrizesJson, { countPrizesJson = it })
-                EventPrizeBlock("Personal fish prizes", fishPlaces, { fishPlaces = it }, fishPrizesJson, { fishPrizesJson = it })
+
+                EventPrizeSection(
+                    title = "Total weight prizes",
+                    places = weightPlaces,
+                    onPlaces = { weightPlaces = sanitizeEventPrizePlacesInput(it) },
+                    prizes = weightPrizes,
+                    onPrizes = { weightPrizes = it },
+                    options = prizeOptions,
+                )
+                EventPrizeSection(
+                    title = "Fish count prizes",
+                    places = countPlaces,
+                    onPlaces = { countPlaces = sanitizeEventPrizePlacesInput(it) },
+                    prizes = countPrizes,
+                    onPrizes = { countPrizes = it },
+                    options = prizeOptions,
+                )
+                EventPrizeSection(
+                    title = "Personal fish prizes",
+                    places = fishPlaces,
+                    onPlaces = { fishPlaces = sanitizeEventPrizePlacesInput(it) },
+                    prizes = fishPrizes,
+                    onPrizes = { fishPrizes = it },
+                    options = prizeOptions,
+                )
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         },
@@ -285,34 +383,33 @@ private fun EventEditorDialog(
             TextButton(onClick = {
                 val start = parseEventDateMillis(startDate)
                 val end = parseEventDateMillis(endDate)
-                val castArea = EventCastAreaDTO(
-                    minX.toDoubleOrNull() ?: -1.0,
-                    maxX.toDoubleOrNull() ?: -1.0,
-                    farY.toDoubleOrNull() ?: -1.0,
-                    nearY.toDoubleOrNull() ?: -1.0,
-                )
-                if (nameRu.isBlank() || nameEn.isBlank() || start == null || end == null) {
-                    error = "Names and valid dates are required"
-                    return@TextButton
-                }
-                val req = SpecialEventReq(
-                    nameRu = nameRu.trim(),
-                    nameEn = nameEn.trim(),
-                    startTime = start,
-                    endTime = end,
-                    imagePath = imagePath.ifBlank { null },
-                    castArea = castArea,
-                    fish = fishRows,
-                    weightPrizes = AdminEventPrizeDTO(weightPlaces.toIntOrNull() ?: 0, weightPrizesJson),
-                    countPrizes = AdminEventPrizeDTO(countPlaces.toIntOrNull() ?: 0, countPrizesJson),
-                    fishPrizes = AdminEventPrizeDTO(fishPlaces.toIntOrNull() ?: 0, fishPrizesJson),
-                )
-                scope.launch {
-                    try {
-                        if (event == null) apiClient.createEvent(req) else apiClient.updateEvent(event.id, req)
-                        onSaved()
-                    } catch (e: Exception) {
-                        error = "Save failed: ${e.message}"
+                when {
+                    nameRu.isBlank() || nameEn.isBlank() -> error = "Names are required"
+                    start == null || end == null -> error = "Use date format dd.mm.yyyy"
+                    end <= start -> error = "End date must be after start date"
+                    fishRows.isEmpty() || fishRows.any { it.fishId <= 0L || it.weight <= 0.0 } -> error = "Fish and weights are required"
+                    else -> {
+                        error = null
+                        val req = SpecialEventReq(
+                            nameRu = nameRu.trim(),
+                            nameEn = nameEn.trim(),
+                            startTime = start,
+                            endTime = end,
+                            imagePath = imagePath.ifBlank { null },
+                            castArea = castArea,
+                            fish = fishRows,
+                            weightPrizes = eventPrizeConfig(weightPlaceCount, weightPrizes),
+                            countPrizes = eventPrizeConfig(countPlaceCount, countPrizes),
+                            fishPrizes = eventPrizeConfig(fishPlaceCount, fishPrizes),
+                        )
+                        scope.launch {
+                            try {
+                                if (event == null) apiClient.createEvent(req) else apiClient.updateEvent(event.id, req)
+                                onSaved()
+                            } catch (e: Exception) {
+                                error = "Save failed: ${e.message}"
+                            }
+                        }
                     }
                 }
             }) { Text(if (event == null) "Create" else "Save") }
@@ -322,7 +419,77 @@ private fun EventEditorDialog(
 }
 
 @Composable
-private fun NumberField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun EventCastAreaPicker(
+    image: Bitmap?,
+    imagePath: String,
+    castArea: EventCastAreaDTO,
+    onCastAreaChange: (EventCastAreaDTO) -> Unit,
+) {
+    Text("Cast area", style = MaterialTheme.typography.titleMedium)
+    if (image == null) {
+        Text(
+            text = if (imagePath.isBlank()) "Upload image first" else "Upload image again to edit rectangle",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        return
+    }
+    var dragStart by remember(image) { mutableStateOf<Offset?>(null) }
+    var dragEnd by remember(image) { mutableStateOf<Offset?>(null) }
+    val aspect = image.width.toFloat() / image.height.coerceAtLeast(1).toFloat()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 360.dp)
+            .aspectRatio(aspect)
+            .clip(RoundedCornerShape(12.dp))
+            .pointerInput(image) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        val clamped = offset.clamped(size.width.toFloat(), size.height.toFloat())
+                        dragStart = clamped
+                        dragEnd = clamped
+                    },
+                    onDrag = { change, dragAmount ->
+                        val start = dragStart ?: return@detectDragGestures
+                        val next = ((dragEnd ?: start) + dragAmount).clamped(size.width.toFloat(), size.height.toFloat())
+                        dragEnd = next
+                        areaFromOffsets(start, next, size.width.toFloat(), size.height.toFloat())?.let(onCastAreaChange)
+                    },
+                    onDragEnd = {
+                        val start = dragStart
+                        val end = dragEnd
+                        if (start != null && end != null) {
+                            areaFromOffsets(start, end, size.width.toFloat(), size.height.toFloat())?.let(onCastAreaChange)
+                        }
+                    },
+                    onDragCancel = {
+                        dragStart = null
+                        dragEnd = null
+                    },
+                )
+            },
+    ) {
+        Image(
+            bitmap = image.asImageBitmap(),
+            contentDescription = "Event location image",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds,
+        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val topLeft = Offset(castArea.minX.toFloat() * size.width, castArea.farY.toFloat() * size.height)
+            val rectSize = Size(
+                ((castArea.maxX - castArea.minX).toFloat() * size.width).coerceAtLeast(1f),
+                ((castArea.nearY - castArea.farY).toFloat() * size.height).coerceAtLeast(1f),
+            )
+            drawRect(Color(0x4400E5D0), topLeft = topLeft, size = rectSize)
+            drawRect(Color(0xFF78E0D4), topLeft = topLeft, size = rectSize, style = Stroke(width = 3.dp.toPx()))
+        }
+    }
+}
+
+@Composable
+private fun EventDecimalField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -335,23 +502,113 @@ private fun NumberField(label: String, value: String, onChange: (String) -> Unit
 }
 
 @Composable
-private fun EventPrizeBlock(
+private fun EventPrizeSection(
     title: String,
     places: String,
     onPlaces: (String) -> Unit,
-    prizesJson: String,
-    onPrizesJson: (String) -> Unit,
+    prizes: List<PrizeSpec>,
+    onPrizes: (List<PrizeSpec>) -> Unit,
+    options: List<PrizeOptionDTO>,
 ) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
-    NumberField("Places", places, onPlaces, Modifier.fillMaxWidth())
+    Text(title, style = MaterialTheme.typography.titleMedium)
     OutlinedTextField(
-        value = prizesJson,
-        onValueChange = onPrizesJson,
-        label = { Text("""Prize JSON [{"pack":"coins","qty":1000,"coins":1000}]""") },
+        value = places,
+        onValueChange = onPlaces,
+        label = { Text("Prize places") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         colors = riverTextFieldColors(),
-        minLines = 2,
+        singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
+    prizes.forEachIndexed { index, prize ->
+        EventPrizeEditorCard(
+            place = index + 1,
+            prize = prize,
+            options = options,
+            onChange = { updated ->
+                onPrizes(prizes.toMutableList().also { it[index] = updated })
+            },
+        )
+    }
+}
+
+@Composable
+private fun EventPrizeEditorCard(
+    place: Int,
+    prize: PrizeSpec,
+    options: List<PrizeOptionDTO>,
+    onChange: (PrizeSpec) -> Unit,
+) {
+    val amount = prize.coins ?: prize.qty
+    val step = if (prize.pack == EVENT_COIN_PRIZE_ID) 100 else 1
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Place $place", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            EventPrizeOptionDropdown(
+                options = options,
+                selectedId = prize.pack.ifBlank { EVENT_COIN_PRIZE_ID },
+                onSelected = { onChange(eventDefaultPrize(it)) },
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Qty:", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(6.dp))
+                IconButton(onClick = { onChange(prize.withEventAmount((amount - step).coerceAtLeast(1))) }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                }
+                OutlinedTextField(
+                    value = amount.toString(),
+                    onValueChange = { raw ->
+                        raw.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }?.let {
+                            onChange(prize.withEventAmount(it))
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = riverTextFieldColors(),
+                    singleLine = true,
+                    modifier = Modifier.width(100.dp),
+                )
+                IconButton(onClick = { onChange(prize.withEventAmount(amount + step)) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Increase")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EventPrizeOptionDropdown(
+    options: List<PrizeOptionDTO>,
+    selectedId: String,
+    onSelected: (PrizeOptionDTO) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.id == selectedId }?.label ?: selectedId
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Prize") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = riverTextFieldColors(),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        onSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -373,11 +630,11 @@ private fun EventOptionDropdown(
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             colors = riverTextFieldColors(),
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
-                androidx.compose.material3.DropdownMenuItem(
+                DropdownMenuItem(
                     text = { Text(option.label) },
                     onClick = {
                         onSelected(option.id)
@@ -389,10 +646,173 @@ private fun EventOptionDropdown(
     }
 }
 
+private data class EventImageUpload(
+    val fileName: String,
+    val bytes: ByteArray,
+    val preview: Bitmap,
+)
+
+private fun prepareEventImageUpload(context: Context, uri: Uri): EventImageUpload {
+    val resolver = context.contentResolver
+    val originalBytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: error("empty file")
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) error("bad image")
+
+    val preview = BitmapFactory.decodeByteArray(originalBytes, 0, originalBytes.size) ?: error("bad image")
+    if (originalBytes.size <= EVENT_IMAGE_DIRECT_UPLOAD_LIMIT_BYTES) {
+        return EventImageUpload(
+            fileName = eventUploadFileName(uri, context, fallback = "event.png"),
+            bytes = originalBytes,
+            preview = preview,
+        )
+    }
+    preview.recycle()
+
+    val sample = eventImageSampleSize(bounds.outWidth, bounds.outHeight)
+    val decoded = BitmapFactory.decodeByteArray(
+        originalBytes,
+        0,
+        originalBytes.size,
+        BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        },
+    ) ?: error("bad image")
+    val scaled = scaleEventBitmap(decoded)
+    if (scaled !== decoded) decoded.recycle()
+    val output = ByteArrayOutputStream()
+    @Suppress("DEPRECATION")
+    if (!scaled.compress(Bitmap.CompressFormat.WEBP, EVENT_IMAGE_WEBP_QUALITY, output)) {
+        error("image compression failed")
+    }
+    return EventImageUpload(
+        fileName = "event.webp",
+        bytes = output.toByteArray(),
+        preview = scaled,
+    )
+}
+
+private fun eventUploadFileName(uri: Uri, context: Context, fallback: String): String {
+    val type = context.contentResolver.getType(uri).orEmpty().lowercase()
+    val extension = when {
+        type.contains("webp") -> "webp"
+        type.contains("jpeg") || type.contains("jpg") -> "jpg"
+        type.contains("png") -> "png"
+        else -> fallback.substringAfterLast('.', "png")
+    }
+    return "event.$extension"
+}
+
+private fun eventImageSampleSize(width: Int, height: Int): Int {
+    var sample = 1
+    while (width / sample > EVENT_IMAGE_MAX_DIMENSION * 2 || height / sample > EVENT_IMAGE_MAX_DIMENSION * 2) {
+        sample *= 2
+    }
+    return sample
+}
+
+private fun scaleEventBitmap(bitmap: Bitmap): Bitmap {
+    val maxSide = maxOf(bitmap.width, bitmap.height)
+    if (maxSide <= EVENT_IMAGE_MAX_DIMENSION) return bitmap
+    val ratio = EVENT_IMAGE_MAX_DIMENSION.toFloat() / maxSide.toFloat()
+    return Bitmap.createScaledBitmap(
+        bitmap,
+        (bitmap.width * ratio).roundToInt().coerceAtLeast(1),
+        (bitmap.height * ratio).roundToInt().coerceAtLeast(1),
+        true,
+    )
+}
+
+private fun Offset.clamped(maxX: Float, maxY: Float): Offset =
+    Offset(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+
+private fun areaFromOffsets(start: Offset, end: Offset, width: Float, height: Float): EventCastAreaDTO? {
+    if (width <= 0f || height <= 0f) return null
+    val minX = min(start.x, end.x) / width
+    val maxX = maxOf(start.x, end.x) / width
+    val farY = min(start.y, end.y) / height
+    val nearY = maxOf(start.y, end.y) / height
+    if (maxX - minX < 0.02f || nearY - farY < 0.02f) return null
+    return EventCastAreaDTO(
+        minX = minX.toDouble().coerceIn(0.0, 1.0),
+        maxX = maxX.toDouble().coerceIn(0.0, 1.0),
+        farY = farY.toDouble().coerceIn(0.0, 1.0),
+        nearY = nearY.toDouble().coerceIn(0.0, 1.0),
+    )
+}
+
+private fun eventPrizeOptions(options: List<PrizeOptionDTO>): List<PrizeOptionDTO> =
+    options.ifEmpty { listOf(PrizeOptionDTO(EVENT_COIN_PRIZE_ID, "Coins", defaultQty = 1000, coins = true)) }
+
+private fun eventDefaultPrize(option: PrizeOptionDTO): PrizeSpec =
+    if (option.coins || option.id == EVENT_COIN_PRIZE_ID) {
+        PrizeSpec(pack = EVENT_COIN_PRIZE_ID, qty = option.defaultQty, coins = option.defaultQty)
+    } else {
+        PrizeSpec(pack = option.id, qty = option.defaultQty, coins = null)
+    }
+
+private fun PrizeSpec.withEventAmount(amount: Int): PrizeSpec =
+    if (pack == EVENT_COIN_PRIZE_ID) {
+        copy(qty = amount, coins = amount)
+    } else {
+        copy(qty = amount, coins = null)
+    }
+
+private fun normalizeEventPrize(prize: PrizeSpec): PrizeSpec =
+    if (prize.pack == EVENT_COIN_PRIZE_ID || prize.coins != null) {
+        val amount = (prize.coins ?: prize.qty).coerceAtLeast(1)
+        PrizeSpec(pack = EVENT_COIN_PRIZE_ID, qty = amount, coins = amount)
+    } else {
+        prize.copy(qty = prize.qty.coerceAtLeast(1), coins = null)
+    }
+
+private fun parseEventPrizes(raw: String?, options: List<PrizeOptionDTO>): List<PrizeSpec> {
+    val fallback = listOf(eventDefaultPrize(options.first()))
+    if (raw.isNullOrBlank()) return fallback
+    return runCatching {
+        EventJson.decodeFromString<List<PrizeSpec>>(raw)
+            .ifEmpty { fallback }
+            .map { prize ->
+                when {
+                    prize.pack == EVENT_COIN_PRIZE_ID || prize.coins != null -> {
+                        val amount = (prize.coins ?: prize.qty).coerceAtLeast(1)
+                        PrizeSpec(pack = EVENT_COIN_PRIZE_ID, qty = amount, coins = amount)
+                    }
+                    prize.pack.isBlank() -> eventDefaultPrize(options.first())
+                    else -> prize.copy(qty = prize.qty.coerceAtLeast(1), coins = null)
+                }
+            }
+    }.getOrElse { fallback }
+}
+
+private fun adjustEventPrizes(
+    current: List<PrizeSpec>,
+    prizePlaces: Int,
+    options: List<PrizeOptionDTO>,
+): List<PrizeSpec> = when {
+    prizePlaces > current.size -> current + List(prizePlaces - current.size) { eventDefaultPrize(options.first()) }
+    prizePlaces < current.size -> current.take(prizePlaces)
+    else -> current
+}
+
+private fun eventPrizeConfig(places: Int, prizes: List<PrizeSpec>): AdminEventPrizeDTO =
+    AdminEventPrizeDTO(
+        prizePlaces = places,
+        prizesJson = EventJson.encodeToString(prizes.take(places).map(::normalizeEventPrize)),
+    )
+
+private fun sanitizeEventPrizePlacesInput(value: String): String {
+    val digits = value.filter(Char::isDigit).take(EVENT_MAX_PRIZE_PLACES.toString().length)
+    val places = digits.toIntOrNull() ?: return digits
+    return if (places > EVENT_MAX_PRIZE_PLACES) EVENT_MAX_PRIZE_PLACES.toString() else digits
+}
+
+private fun eventPrizePlaces(value: String): Int =
+    value.toIntOrNull()?.coerceIn(0, EVENT_MAX_PRIZE_PLACES) ?: 0
+
 private fun parseEventDateMillis(value: String): Long? =
     runCatching { LocalDate.parse(value.trim(), EventDateFormatter).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() }.getOrNull()
 
 private fun formatEventDate(millis: Long): String =
     runCatching { java.time.Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().format(EventDateFormatter) }.getOrElse { millis.toString() }
-
-private fun defaultEventPrizeJson(): String = """[{"pack":"coins","qty":1000,"coins":1000}]"""
