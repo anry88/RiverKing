@@ -279,12 +279,12 @@ private const val PRO_CAST_MIN_X = 0.14f
 private const val PRO_CAST_MAX_X = 0.86f
 private const val PRO_CAST_FAR_Y = 0.47f
 private const val PRO_CAST_NEAR_Y = 0.78f
-private const val CAST_AREA_EXPAND_MIN_X = 0.035f
-private const val CAST_AREA_EXPAND_VIEWPORT_X = 0.16f
-private const val CAST_AREA_EXPAND_TOP = 0.02f
-private const val CAST_AREA_EXPAND_BOTTOM = 0.04f
-private const val CAST_AREA_MIN_VISIBLE_WORLD = 0.12f
-private const val CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.42f
+private const val CAST_AREA_EXPAND_MIN_X = 0.014f
+private const val CAST_AREA_EXPAND_VIEWPORT_X = 0.06f
+private const val CAST_AREA_EXPAND_TOP = 0.008f
+private const val CAST_AREA_EXPAND_BOTTOM = 0.02f
+private const val CAST_AREA_MIN_VISIBLE_WORLD = 0.08f
+private const val CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.28f
 private const val PRO_CAST_SHORE_X = 0.44f
 private const val PRO_CAST_SHORE_Y = 0.56f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
@@ -292,6 +292,7 @@ private const val PAN_EDGE_TAP_FRACTION = 0.25f
 private const val PAN_EDGE_TAP_MAX_DISTANCE_DP = 22f
 private const val PAN_EDGE_TAP_MAX_DURATION_MILLIS = 260L
 private const val PAN_STEP_VIEWPORT_MULTIPLIER = 0.55f
+private const val PAN_DRAG_MULTIPLIER = 1.85f
 private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
@@ -1360,7 +1361,7 @@ private fun FishingScreen(
             backgroundUrl = currentLocation?.imageUrl ?: locationBackgroundAsset(currentLocation?.name),
             locationName = currentLocation?.name,
             eventCastArea = currentLocation?.castArea,
-            preserveCustomCastArea = currentLocation?.isEvent == true || currentLocation?.castArea != null,
+            hasCustomCastArea = currentLocation?.castArea != null,
             modifier = Modifier.fillMaxSize(),
             proMode = true,
             setupEnabled = setupEnabled,
@@ -2865,7 +2866,7 @@ private fun FishingStageScene(
     backgroundUrl: String?,
     locationName: String?,
     eventCastArea: EventCastAreaDto? = null,
-    preserveCustomCastArea: Boolean = false,
+    hasCustomCastArea: Boolean = false,
     modifier: Modifier = Modifier,
     proMode: Boolean = true,
     setupEnabled: Boolean = false,
@@ -3039,9 +3040,13 @@ private fun FishingStageScene(
             val panViewport = remember(sceneWidthPx, sceneHeightPx, backgroundAspect) {
                 computePanViewport(sceneWidthPx, sceneHeightPx, backgroundAspect)
             }
-            val panoramicEnabled = proMode && !preserveCustomCastArea && panViewport.canPan
+            val panoramicEnabled = proMode && panViewport.canPan
             val panoramicWorldArea = remember(proSceneSpec, panViewport.visibleWidth) {
-                centeredWorldCastArea(proSceneSpec, panViewport.visibleWidth)
+                if (hasCustomCastArea) {
+                    legacyScreenAreaToWorldArea(proSceneSpec, panViewport.visibleWidth)
+                } else {
+                    centeredWorldCastArea(proSceneSpec, panViewport.visibleWidth)
+                }
             }
             val activeCastArea = if (panoramicEnabled) panoramicWorldArea else proSceneSpec
             val cameraBounds = remember(panoramicEnabled, panoramicWorldArea, panViewport.visibleWidth) {
@@ -3178,7 +3183,7 @@ private fun FishingStageScene(
                                 }
                                 val deltaX = centroidX - panStartCentroidX
                                 cameraViewLeft = clampCameraViewLeft(
-                                    panStartLeft - (deltaX * panViewport.visibleWidth / max(1f, sceneWidthPx)),
+                                    panStartLeft - (deltaX * panViewport.visibleWidth * PAN_DRAG_MULTIPLIER / max(1f, sceneWidthPx)),
                                     cameraBounds,
                                 )
                                 event.changes.forEach { it.consume() }
@@ -3738,18 +3743,32 @@ private fun computePanViewport(widthPx: Float, heightPx: Float, imageAspect: Flo
     )
 }
 
-private fun centeredWorldCastArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): ProFishingSceneSpec {
+private fun legacyScreenAreaToWorldArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewportWidth: Float,
+    expandX: Float = 0f,
+    expandTop: Float = 0f,
+    expandBottom: Float = 0f,
+): ProFishingSceneSpec {
     val centeredLeft = max(0f, (1f - viewportWidth) / 2f)
     val worldMinX = centeredLeft + sceneSpec.minX * viewportWidth
     val worldMaxX = centeredLeft + sceneSpec.maxX * viewportWidth
-    val expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X)
     return ProFishingSceneSpec(
         minX = (worldMinX - expandX).coerceIn(0f, 1f),
         maxX = (worldMaxX + expandX).coerceIn(0f, 1f),
-        farY = (sceneSpec.farY - CAST_AREA_EXPAND_TOP).coerceIn(0f, 1f),
-        nearY = (sceneSpec.nearY + CAST_AREA_EXPAND_BOTTOM).coerceIn(0f, 1f),
+        farY = (sceneSpec.farY - expandTop).coerceIn(0f, 1f),
+        nearY = (sceneSpec.nearY + expandBottom).coerceIn(0f, 1f),
     )
 }
+
+private fun centeredWorldCastArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): ProFishingSceneSpec =
+    legacyScreenAreaToWorldArea(
+        sceneSpec = sceneSpec,
+        viewportWidth = viewportWidth,
+        expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+        expandTop = CAST_AREA_EXPAND_TOP,
+        expandBottom = CAST_AREA_EXPAND_BOTTOM,
+    )
 
 private fun cameraBoundsForArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): CameraPanBounds {
     val maxPan = max(0f, 1f - viewportWidth)
@@ -3852,21 +3871,21 @@ private fun proFishingCastSpotFromSwipe(
 }
 
 private fun proFishingSceneSpec(location: String?): ProFishingSceneSpec = when (location) {
-    "Пруд", "Pond" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
-    "Болото", "Swamp" -> ProFishingSceneSpec(minX = 0.20f, maxX = 0.70f, farY = 0.57f, nearY = 0.72f)
-    "Река", "River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.76f, farY = 0.54f, nearY = 0.70f)
-    "Озеро", "Lake" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
-    "Водохранилище", "Reservoir" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
-    "Горная река", "Mountain River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.58f, farY = 0.54f, nearY = 0.70f)
-    "Дельта реки", "River Delta" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.66f, farY = 0.51f, nearY = 0.68f)
-    "Прибрежье моря", "Sea Coast" -> ProFishingSceneSpec(minX = 0.18f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
-    "Русло Амазонки", "Amazon Riverbed" -> ProFishingSceneSpec(minX = 0.18f, maxX = 0.58f, farY = 0.58f, nearY = 0.72f)
-    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> ProFishingSceneSpec(minX = 0.24f, maxX = 0.78f, farY = 0.52f, nearY = 0.70f)
-    "Мангровые заросли", "Mangroves" -> ProFishingSceneSpec(minX = 0.12f, maxX = 0.44f, farY = 0.58f, nearY = 0.72f)
-    "Коралловые отмели", "Coral Flats" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.50f, farY = 0.52f, nearY = 0.68f)
-    "Фьорд", "Fjord" -> ProFishingSceneSpec(minX = 0.12f, maxX = 0.50f, farY = 0.60f, nearY = 0.74f)
-    "Открытый океан", "Open Ocean" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.62f, farY = 0.46f, nearY = 0.62f)
-    else -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
+    "Пруд", "Pond" -> ProFishingSceneSpec(minX = 0.05f, maxX = 0.88f, farY = 0.46f, nearY = 0.90f)
+    "Болото", "Swamp" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.86f, farY = 0.48f, nearY = 0.90f)
+    "Река", "River" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.84f, farY = 0.46f, nearY = 0.88f)
+    "Озеро", "Lake" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.84f, farY = 0.44f, nearY = 0.90f)
+    "Водохранилище", "Reservoir" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.74f, farY = 0.44f, nearY = 0.88f)
+    "Горная река", "Mountain River" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.79f, farY = 0.48f, nearY = 0.86f)
+    "Дельта реки", "River Delta" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.82f, farY = 0.44f, nearY = 0.84f)
+    "Прибрежье моря", "Sea Coast" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.82f, farY = 0.42f, nearY = 0.90f)
+    "Русло Амазонки", "Amazon Riverbed" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.83f, farY = 0.51f, nearY = 0.90f)
+    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.98f, farY = 0.48f, nearY = 0.92f)
+    "Мангровые заросли", "Mangroves" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.96f, farY = 0.46f, nearY = 0.92f)
+    "Коралловые отмели", "Coral Flats" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.97f, farY = 0.42f, nearY = 0.90f)
+    "Фьорд", "Fjord" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.97f, farY = 0.53f, nearY = 0.92f)
+    "Открытый океан", "Open Ocean" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.83f, farY = 0.40f, nearY = 0.84f)
+    else -> ProFishingSceneSpec(minX = 0.05f, maxX = 0.88f, farY = 0.46f, nearY = 0.88f)
 }
 
 private fun castDurationFromSwipe(distancePx: Float, elapsedMillis: Long): Int {

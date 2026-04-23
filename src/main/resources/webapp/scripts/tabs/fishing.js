@@ -7,12 +7,12 @@ const PRO_CAST_MIN_X = 0.14;
 const PRO_CAST_MAX_X = 0.86;
 const PRO_CAST_FAR_Y = 0.47;
 const PRO_CAST_NEAR_Y = 0.78;
-const CAST_AREA_EXPAND_MIN_X = 0.035;
-const CAST_AREA_EXPAND_VIEWPORT_X = 0.16;
-const CAST_AREA_EXPAND_TOP = 0.02;
-const CAST_AREA_EXPAND_BOTTOM = 0.04;
-const CAST_AREA_MIN_VISIBLE_WORLD = 0.12;
-const CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.42;
+const CAST_AREA_EXPAND_MIN_X = 0.014;
+const CAST_AREA_EXPAND_VIEWPORT_X = 0.06;
+const CAST_AREA_EXPAND_TOP = 0.008;
+const CAST_AREA_EXPAND_BOTTOM = 0.02;
+const CAST_AREA_MIN_VISIBLE_WORLD = 0.08;
+const CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.28;
 const PAN_EDGE_TAP_FRACTION = 0.25;
 const PAN_EDGE_TAP_MAX_DISTANCE = 22;
 const PAN_EDGE_TAP_MAX_DURATION_MS = 260;
@@ -24,20 +24,20 @@ const DEFAULT_PRO_CAST_AREA = Object.freeze({
   nearY: PRO_CAST_NEAR_Y
 });
 const PRO_CAST_AREAS = Object.freeze({
-  pond: { minX: 0.16, maxX: 0.80, farY: 0.50, nearY: 0.70 },
-  swamp: { minX: 0.20, maxX: 0.70, farY: 0.57, nearY: 0.72 },
-  river: { minX: 0.14, maxX: 0.76, farY: 0.54, nearY: 0.70 },
-  lake: { minX: 0.16, maxX: 0.78, farY: 0.50, nearY: 0.70 },
-  reservoir: { minX: 0.14, maxX: 0.80, farY: 0.50, nearY: 0.70 },
-  mountain_river: { minX: 0.14, maxX: 0.58, farY: 0.54, nearY: 0.70 },
-  river_delta: { minX: 0.14, maxX: 0.66, farY: 0.51, nearY: 0.68 },
-  sea_coast: { minX: 0.18, maxX: 0.78, farY: 0.50, nearY: 0.70 },
-  amazon_riverbed: { minX: 0.18, maxX: 0.58, farY: 0.58, nearY: 0.72 },
-  flooded_forest: { minX: 0.24, maxX: 0.78, farY: 0.52, nearY: 0.70 },
-  mangroves: { minX: 0.12, maxX: 0.44, farY: 0.58, nearY: 0.72 },
-  coral_flats: { minX: 0.14, maxX: 0.50, farY: 0.52, nearY: 0.68 },
-  fjord: { minX: 0.12, maxX: 0.50, farY: 0.60, nearY: 0.74 },
-  open_ocean: { minX: 0.14, maxX: 0.62, farY: 0.46, nearY: 0.62 }
+  pond: { minX: 0.05, maxX: 0.88, farY: 0.46, nearY: 0.90 },
+  swamp: { minX: 0.04, maxX: 0.86, farY: 0.48, nearY: 0.90 },
+  river: { minX: 0.03, maxX: 0.84, farY: 0.46, nearY: 0.88 },
+  lake: { minX: 0.03, maxX: 0.84, farY: 0.44, nearY: 0.90 },
+  reservoir: { minX: 0.04, maxX: 0.74, farY: 0.44, nearY: 0.88 },
+  mountain_river: { minX: 0.03, maxX: 0.79, farY: 0.48, nearY: 0.86 },
+  river_delta: { minX: 0.04, maxX: 0.82, farY: 0.44, nearY: 0.84 },
+  sea_coast: { minX: 0.03, maxX: 0.82, farY: 0.42, nearY: 0.90 },
+  amazon_riverbed: { minX: 0.03, maxX: 0.83, farY: 0.51, nearY: 0.90 },
+  flooded_forest: { minX: 0.02, maxX: 0.98, farY: 0.48, nearY: 0.92 },
+  mangroves: { minX: 0.02, maxX: 0.96, farY: 0.46, nearY: 0.92 },
+  coral_flats: { minX: 0.04, maxX: 0.97, farY: 0.42, nearY: 0.90 },
+  fjord: { minX: 0.03, maxX: 0.97, farY: 0.53, nearY: 0.92 },
+  open_ocean: { minX: 0.02, maxX: 0.83, farY: 0.40, nearY: 0.84 }
 });
 const CAST_ANIMATION_MIN_MS = 280;
 const CAST_ANIMATION_MAX_MS = 760;
@@ -159,17 +159,27 @@ function computePanViewport(w, h, imageAspect) {
   };
 }
 
-function centeredWorldCastArea(screenArea, viewportWidth) {
+function legacyScreenAreaToWorldArea(screenArea, viewportWidth, options = {}) {
   const safeArea = normalizeCastArea(screenArea);
   const centeredLeft = Math.max(0, (1 - viewportWidth) / 2);
   const worldMinX = centeredLeft + safeArea.minX * viewportWidth;
   const worldMaxX = centeredLeft + safeArea.maxX * viewportWidth;
-  const expandX = Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X);
+  const expandX = Math.max(0, Number(options.expandX) || 0);
+  const expandTop = Math.max(0, Number(options.expandTop) || 0);
+  const expandBottom = Math.max(0, Number(options.expandBottom) || 0);
   return normalizeCastArea({
     minX: clamp01(worldMinX - expandX),
     maxX: clamp01(worldMaxX + expandX),
-    farY: clamp01(safeArea.farY - CAST_AREA_EXPAND_TOP),
-    nearY: clamp01(safeArea.nearY + CAST_AREA_EXPAND_BOTTOM),
+    farY: clamp01(safeArea.farY - expandTop),
+    nearY: clamp01(safeArea.nearY + expandBottom),
+  });
+}
+
+function centeredWorldCastArea(screenArea, viewportWidth) {
+  return legacyScreenAreaToWorldArea(screenArea, viewportWidth, {
+    expandX: Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+    expandTop: CAST_AREA_EXPAND_TOP,
+    expandBottom: CAST_AREA_EXPAND_BOTTOM,
   });
 }
 
@@ -804,7 +814,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     () => normalizeCastArea(currentLocation?.castArea || proCastAreaForLocation(currentLocation?.name, bgAsset)),
     [currentLocation?.castArea, currentLocation?.name, bgAsset]
   );
-  const preserveEventCastArea = Boolean(currentLocation?.isEvent || currentLocation?.eventId != null || currentLocation?.castArea);
+  const hasCustomCastArea = Boolean(currentLocation?.castArea);
   const assetBgUrl = useAssetSrc(bgAsset);
   const bgUrl = currentLocation?.imageUrl || assetBgUrl;
   const [bgLoaded, setBgLoaded] = React.useState(false);
@@ -836,10 +846,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     () => computePanViewport(w, h, backgroundAspect),
     [w, h, backgroundAspect]
   );
-  const panoramicMode = proMode && !preserveEventCastArea && panViewport.canPan;
+  const panoramicMode = proMode && panViewport.canPan;
   const panoramicCastArea = React.useMemo(
-    () => centeredWorldCastArea(baseCastArea, panViewport.visibleWidth),
-    [baseCastArea, panViewport.visibleWidth]
+    () => (hasCustomCastArea
+      ? legacyScreenAreaToWorldArea(baseCastArea, panViewport.visibleWidth)
+      : centeredWorldCastArea(baseCastArea, panViewport.visibleWidth)),
+    [baseCastArea, hasCustomCastArea, panViewport.visibleWidth]
   );
   const activeCastArea = panoramicMode ? panoramicCastArea : baseCastArea;
   const cameraLimits = React.useMemo(
