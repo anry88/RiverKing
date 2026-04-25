@@ -37,6 +37,7 @@ import service.AchievementService
 import service.QuestService
 import service.ClubService
 import service.ClubQuestService
+import service.SpecialEventService
 import util.Metrics
 import util.sanitizeName
 import java.text.DecimalFormat
@@ -186,7 +187,8 @@ fun Application.botRoutes(env: Env) {
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
     val clubQuests = ClubQuestService()
-    val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
+    val events = SpecialEventService()
+    val prizeService = PrizeService(tournaments, ratingPrizes, clubs, events)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()

@@ -2,6 +2,7 @@ package app
 
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
 import service.*
 import java.time.*
 import kotlin.coroutines.coroutineContext
@@ -146,8 +147,10 @@ object Scheduler {
             val fromRating = RatingPrizes.slice(RatingPrizes.userId).select { RatingPrizes.claimed eq false }.map { it[RatingPrizes.userId].value }
             val fromReferral = ReferralRewards.slice(ReferralRewards.userId).select { ReferralRewards.claimed eq false }.map { it[ReferralRewards.userId].value }
             val fromClubs = ClubWeeklyRewards.slice(ClubWeeklyRewards.userId).select { ClubWeeklyRewards.claimed eq false }.map { it[ClubWeeklyRewards.userId].value }
+            val fromEvents = SpecialEventPrizes.slice(SpecialEventPrizes.userId).select { SpecialEventPrizes.claimed eq false }.map { it[SpecialEventPrizes.userId].value }
+            val fromAchievements = AchievementProgress.slice(AchievementProgress.userId).select { AchievementProgress.level greater AchievementProgress.claimedLevel }.map { it[AchievementProgress.userId].value }
             
-            (fromPrizes + fromRating + fromReferral + fromClubs).distinct()
+            (fromPrizes + fromRating + fromReferral + fromClubs + fromEvents + fromAchievements).distinct()
         }
 
         for (uid in userIds) {
@@ -161,9 +164,21 @@ object Scheduler {
             val lang = user[Users.language]
 
             val text = service.I18n.text("🎁 У тебя есть неполученные призы! Давай скорее их заберем.", lang)
+            
+            val achievements = AchievementService.list(uid, lang).filter { it.claimable }
+            val buttons = mutableListOf<List<app.InlineKeyboardButton>>()
+            
             val btnText = service.I18n.text("🎁 Мои призы", lang)
+            buttons.add(listOf(app.InlineKeyboardButton(btnText, "/prizes")))
+            
+            achievements.forEach { ach ->
+                val label = "🎁 ${ach.name}"
+                buttons.add(listOf(app.InlineKeyboardButton(label, "/achvclaim $uid:${ach.code}")))
+            }
+            
+            val markup = kotlinx.serialization.json.Json.encodeToString(app.InlineKeyboardMarkup(buttons))
 
-            notifications.sendNotification(uid, tgId, text, btnText, "/prizes")
+            notifications.sendNotification(uid, tgId, text, markup = markup)
             delay(100)
         }
     }
