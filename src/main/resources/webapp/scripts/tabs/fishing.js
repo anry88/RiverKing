@@ -612,7 +612,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
   }, [currentLure]);
   const rigLineHeight = proMode ? 36 : 27;
   const hookSize = proMode ? 18 : 14;
-  const baitSize = proMode ? 18 : 15;
+  const baitSize = proMode ? 24 : 20;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
   const rigWidth = 44;
   const rigCenterX = rigWidth / 2;
@@ -1386,15 +1386,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
             <path d="M10.1 20.2 6.4 18" fill="none" stroke="#f4ead6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M15.2 3.9 19 2.2" fill="none" stroke="#c8d8d4" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          {currentLureIcon && (
+          {castReady && currentLureIcon && (
             <AssetImage
               src={currentLureIcon}
               alt=""
               className="absolute object-contain drop-shadow"
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
-                left: rigCenterX - baitSize * 0.38,
-                top: rigLineHeight + hookSize * 0.16,
+                left: rigCenterX - baitSize * 0.45,
+                top: rigLineHeight - baitSize * 0.18,
                 width: baitSize,
                 height: baitSize,
                 zIndex: 3
