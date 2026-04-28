@@ -3479,7 +3479,7 @@ private fun FishingStageScene(
             )
             val rigLineHeightPx = with(density) { (if (proMode) 36.dp else 27.dp).toPx() }
             val rigHookSizeDp = if (proMode) 18.dp else 14.dp
-            val rigBaitSizeDp = if (proMode) 24.dp else 20.dp
+            val rigBaitSizeDp = if (proMode) 30.dp else 25.dp
             val rigHookSizePx = with(density) { rigHookSizeDp.toPx() }
             val rigBaitSizePx = with(density) { rigBaitSizeDp.toPx() }
             val showRig = !hasSplashed && sceneWidthPx > 0f && sceneHeightPx > 0f
@@ -3731,8 +3731,8 @@ private fun FishingStageScene(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    (bobberPx.x - rigBaitSizePx * 0.45f).roundToInt(),
-                                    (rigTopPx - rigBaitSizePx * 0.18f).roundToInt(),
+                                    (bobberPx.x - rigBaitSizePx * 0.42f).roundToInt(),
+                                    (rigTopPx + rigHookSizePx * 0.35f - rigBaitSizePx * 0.45f).roundToInt(),
                                 )
                             }
                             .size(rigBaitSizeDp),

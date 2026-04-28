@@ -612,7 +612,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
   }, [currentLure]);
   const rigLineHeight = proMode ? 36 : 27;
   const hookSize = proMode ? 18 : 14;
-  const baitSize = proMode ? 24 : 20;
+  const baitSize = proMode ? 30 : 25;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
   const rigWidth = 44;
   const rigCenterX = rigWidth / 2;
@@ -1393,8 +1393,8 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
               className="absolute object-contain drop-shadow"
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
-                left: rigCenterX - baitSize * 0.45,
-                top: rigLineHeight - baitSize * 0.18,
+                left: rigCenterX - baitSize * 0.42,
+                top: rigLineHeight + hookSize * 0.35 - baitSize * 0.45,
                 width: baitSize,
                 height: baitSize,
                 zIndex: 3
