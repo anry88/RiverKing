@@ -1264,13 +1264,15 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
 
   return (
     <div className="flex-1 flex flex-col pb-safe">
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
-        <div className="flex-1 text-lg font-semibold">{t('clubTitle')}</div>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <button onClick={onClose} className="px-4 py-2 rounded-xl glass flex items-center gap-2 font-semibold">
+          <span>←</span>
+          <span>{t('back')}</span>
+        </button>
         {mode === 'club' && club && (
           <button
             type="button"
-            className="px-3 py-1 rounded-xl glass text-sm"
+            className="px-4 py-2 rounded-xl glass text-sm font-semibold"
             onClick={()=>{
               setChatOpen(true);
               loadChat();
