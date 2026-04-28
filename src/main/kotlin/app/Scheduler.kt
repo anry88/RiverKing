@@ -142,6 +142,7 @@ object Scheduler {
     }
 
     private suspend fun runPrizeReminders(notifications: NotificationService, fishing: FishingService) {
+        var regularPrizeUsers = emptySet<Long>()
         val userIds = transaction {
             val fromPrizes = UserPrizes.slice(UserPrizes.userId).select { UserPrizes.claimed eq false }.map { it[UserPrizes.userId].value }
             val fromRating = RatingPrizes.slice(RatingPrizes.userId).select { RatingPrizes.claimed eq false }.map { it[RatingPrizes.userId].value }
@@ -150,7 +151,8 @@ object Scheduler {
             val fromEvents = SpecialEventPrizes.slice(SpecialEventPrizes.userId).select { SpecialEventPrizes.claimed eq false }.map { it[SpecialEventPrizes.userId].value }
             val fromAchievements = AchievementProgress.slice(AchievementProgress.userId).select { AchievementProgress.level greater AchievementProgress.claimedLevel }.map { it[AchievementProgress.userId].value }
             
-            (fromPrizes + fromRating + fromReferral + fromClubs + fromEvents + fromAchievements).distinct()
+            regularPrizeUsers = (fromPrizes + fromRating + fromReferral + fromClubs + fromEvents).toSet()
+            (regularPrizeUsers + fromAchievements).distinct()
         }
 
         for (uid in userIds) {
@@ -168,8 +170,10 @@ object Scheduler {
             val achievements = AchievementService.list(uid, lang).filter { it.claimable }
             val buttons = mutableListOf<List<app.InlineKeyboardButton>>()
             
-            val btnText = service.I18n.text("🎁 Мои призы", lang)
-            buttons.add(listOf(app.InlineKeyboardButton(btnText, "/prizes")))
+            if (uid in regularPrizeUsers) {
+                val btnText = service.I18n.text("🎁 Мои призы", lang)
+                buttons.add(listOf(app.InlineKeyboardButton(btnText, "/prizes")))
+            }
             
             achievements.forEach { ach ->
                 val label = "🎁 ${ach.name}"
