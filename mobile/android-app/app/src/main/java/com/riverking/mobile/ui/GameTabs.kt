@@ -3723,7 +3723,7 @@ private fun FishingStageScene(
                         }
                         .size(rigHookSizeDp),
                 )
-                if (phase == FishingPhase.READY && currentLureAsset != null) {
+                if (phase != FishingPhase.COOLDOWN && currentLureAsset != null) {
                     AsyncImage(
                         model = currentLureAsset,
                         contentDescription = null,

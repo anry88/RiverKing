@@ -1386,7 +1386,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
             <path d="M10.1 20.2 6.4 18" fill="none" stroke="#f4ead6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M15.2 3.9 19 2.2" fill="none" stroke="#c8d8d4" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          {castReady && currentLureIcon && (
+          {(castReady || casting) && currentLureIcon && (
             <AssetImage
               src={currentLureIcon}
               alt=""
