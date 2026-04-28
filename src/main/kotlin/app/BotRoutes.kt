@@ -55,8 +55,7 @@ import org.slf4j.LoggerFactory
 import db.Users
 import db.Lures
 import db.Locations
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, userId: Long): String? {
@@ -1162,6 +1161,13 @@ fun Application.botRoutes(env: Env) {
                     Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value
                 }
                 val currentId = stored?.takeIf { id -> unlocked.any { it.id == id } } ?: unlocked.firstOrNull()?.id
+                if (stored != currentId && currentId != null) {
+                    transaction {
+                        Users.update({ Users.id eq uid }) {
+                            it[currentLocationId] = currentId
+                        }
+                    }
+                }
                 val currentName = currentId?.let { id ->
                     unlocked.find { it.id == id }?.let { I18n.location(it.name, lang) }
                 }

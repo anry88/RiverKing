@@ -838,6 +838,14 @@ fun Application.apiRoutes(
             }
             val currentLocId = storedLoc?.takeIf { id -> locs.any { it.id == id && it.unlocked } }
                 ?: locs.first { it.unlocked }.id
+            
+            if (storedLoc != currentLocId) {
+                transaction {
+                    Users.update({ Users.id eq uid }) {
+                        it[currentLocationId] = currentLocId
+                    }
+                }
+            }
             val currentLureId = transaction {
                 Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
             }
