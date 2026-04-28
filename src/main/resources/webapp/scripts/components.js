@@ -981,7 +981,7 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   }, [chatHasMore]);
 
   React.useEffect(() => {
-    if(!chatOpen) return;
+    if(!chatOpen || chatLoading || chatOlderLoading) return;
     const node = chatScrollRef.current;
     if(!node) return;
     requestAnimationFrame(() => {
@@ -1579,7 +1579,7 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
                               </div>
                               <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
                             </div>
-                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}`}</div>
                           </div>
                         </div>
                       ))
