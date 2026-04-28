@@ -6,26 +6,19 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -63,14 +56,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -80,7 +65,6 @@ import com.riverking.admin.network.AdminCatalogDTO
 import com.riverking.admin.network.AdminEventFishDTO
 import com.riverking.admin.network.AdminEventPrizeDTO
 import com.riverking.admin.network.CatalogOptionDTO
-import com.riverking.admin.network.EventCastAreaDTO
 import com.riverking.admin.network.PrizeOptionDTO
 import com.riverking.admin.network.SpecialEventDTO
 import com.riverking.admin.network.SpecialEventReq
@@ -90,7 +74,6 @@ import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -225,15 +208,11 @@ private fun EventEditorDialog(
     var nameRu by remember(event?.id) { mutableStateOf(event?.nameRu.orEmpty()) }
     var nameEn by remember(event?.id) { mutableStateOf(event?.nameEn.orEmpty()) }
     var imagePath by remember(event?.id) { mutableStateOf(event?.imagePath.orEmpty()) }
-    var imagePreview by remember(event?.id) { mutableStateOf<Bitmap?>(null) }
     var startDate by remember(event?.id) {
         mutableStateOf(event?.startTime?.let(::formatEventDate) ?: today.format(EventDateFormatter))
     }
     var endDate by remember(event?.id) {
         mutableStateOf(event?.endTime?.let(::formatEventDate) ?: today.plusDays(7).format(EventDateFormatter))
-    }
-    var castArea by remember(event?.id) {
-        mutableStateOf(event?.castArea ?: EventCastAreaDTO(0.14, 0.86, 0.47, 0.78))
     }
     var fishRows by remember(event?.id) {
         mutableStateOf(
@@ -278,7 +257,6 @@ private fun EventEditorDialog(
                 val selection = prepareEventImageUpload(context, uri)
                 val uploaded = apiClient.uploadEventImage(selection.fileName, selection.bytes)
                 imagePath = uploaded.imagePath
-                imagePreview = selection.preview
                 error = null
             } catch (e: Exception) {
                 error = "Upload failed: ${e.message}"
@@ -313,12 +291,6 @@ private fun EventEditorDialog(
                         Text(if (uploading) "..." else "Upload")
                     }
                 }
-                EventCastAreaPicker(
-                    image = imagePreview,
-                    imagePath = imagePath,
-                    castArea = castArea,
-                    onCastAreaChange = { castArea = it },
-                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(startDate, { startDate = it }, label = { Text("Start dd.mm.yyyy") }, colors = riverTextFieldColors(), modifier = Modifier.weight(1f))
                     OutlinedTextField(endDate, { endDate = it }, label = { Text("End dd.mm.yyyy") }, colors = riverTextFieldColors(), modifier = Modifier.weight(1f))
@@ -396,7 +368,7 @@ private fun EventEditorDialog(
                             startTime = start,
                             endTime = end,
                             imagePath = imagePath.ifBlank { null },
-                            castArea = castArea,
+                            castZone = event?.castZone,
                             fish = fishRows,
                             weightPrizes = eventPrizeConfig(weightPlaceCount, weightPrizes),
                             countPrizes = eventPrizeConfig(countPlaceCount, countPrizes),
@@ -416,76 +388,6 @@ private fun EventEditorDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
-}
-
-@Composable
-private fun EventCastAreaPicker(
-    image: Bitmap?,
-    imagePath: String,
-    castArea: EventCastAreaDTO,
-    onCastAreaChange: (EventCastAreaDTO) -> Unit,
-) {
-    Text("Cast area", style = MaterialTheme.typography.titleMedium)
-    if (image == null) {
-        Text(
-            text = if (imagePath.isBlank()) "Upload image first" else "Upload image again to edit rectangle",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-        )
-        return
-    }
-    var dragStart by remember(image) { mutableStateOf<Offset?>(null) }
-    var dragEnd by remember(image) { mutableStateOf<Offset?>(null) }
-    val aspect = image.width.toFloat() / image.height.coerceAtLeast(1).toFloat()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 360.dp)
-            .aspectRatio(aspect)
-            .clip(RoundedCornerShape(12.dp))
-            .pointerInput(image) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        val clamped = offset.clamped(size.width.toFloat(), size.height.toFloat())
-                        dragStart = clamped
-                        dragEnd = clamped
-                    },
-                    onDrag = { change, dragAmount ->
-                        val start = dragStart ?: return@detectDragGestures
-                        val next = ((dragEnd ?: start) + dragAmount).clamped(size.width.toFloat(), size.height.toFloat())
-                        dragEnd = next
-                        areaFromOffsets(start, next, size.width.toFloat(), size.height.toFloat())?.let(onCastAreaChange)
-                    },
-                    onDragEnd = {
-                        val start = dragStart
-                        val end = dragEnd
-                        if (start != null && end != null) {
-                            areaFromOffsets(start, end, size.width.toFloat(), size.height.toFloat())?.let(onCastAreaChange)
-                        }
-                    },
-                    onDragCancel = {
-                        dragStart = null
-                        dragEnd = null
-                    },
-                )
-            },
-    ) {
-        Image(
-            bitmap = image.asImageBitmap(),
-            contentDescription = "Event location image",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds,
-        )
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val topLeft = Offset(castArea.minX.toFloat() * size.width, castArea.farY.toFloat() * size.height)
-            val rectSize = Size(
-                ((castArea.maxX - castArea.minX).toFloat() * size.width).coerceAtLeast(1f),
-                ((castArea.nearY - castArea.farY).toFloat() * size.height).coerceAtLeast(1f),
-            )
-            drawRect(Color(0x4400E5D0), topLeft = topLeft, size = rectSize)
-            drawRect(Color(0xFF78E0D4), topLeft = topLeft, size = rectSize, style = Stroke(width = 3.dp.toPx()))
-        }
-    }
 }
 
 @Composable
@@ -721,24 +623,6 @@ private fun scaleEventBitmap(bitmap: Bitmap): Bitmap {
         (bitmap.width * ratio).roundToInt().coerceAtLeast(1),
         (bitmap.height * ratio).roundToInt().coerceAtLeast(1),
         true,
-    )
-}
-
-private fun Offset.clamped(maxX: Float, maxY: Float): Offset =
-    Offset(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
-
-private fun areaFromOffsets(start: Offset, end: Offset, width: Float, height: Float): EventCastAreaDTO? {
-    if (width <= 0f || height <= 0f) return null
-    val minX = min(start.x, end.x) / width
-    val maxX = maxOf(start.x, end.x) / width
-    val farY = min(start.y, end.y) / height
-    val nearY = maxOf(start.y, end.y) / height
-    if (maxX - minX < 0.02f || nearY - farY < 0.02f) return null
-    return EventCastAreaDTO(
-        minX = minX.toDouble().coerceIn(0.0, 1.0),
-        maxX = maxX.toDouble().coerceIn(0.0, 1.0),
-        farY = farY.toDouble().coerceIn(0.0, 1.0),
-        nearY = nearY.toDouble().coerceIn(0.0, 1.0),
     )
 }
 

@@ -1,9 +1,6 @@
 package service
 
 import db.*
-import service.EventCastAreaDTO
-import service.SpecialEventFishSpec
-import service.SpecialEventService
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -108,7 +105,14 @@ class FishingServiceTest {
             start = Instant.parse("2026-04-01T00:00:00Z"),
             end = Instant.parse("2026-04-02T00:00:00Z"),
             imagePath = null,
-            castArea = EventCastAreaDTO(minX = 0.1, maxX = 0.9, farY = 0.4, nearY = 0.8),
+            castZone = CastZoneDTO(
+                points = listOf(
+                    CastZonePointDTO(0.1, 0.4),
+                    CastZonePointDTO(0.9, 0.4),
+                    CastZonePointDTO(0.9, 0.8),
+                    CastZonePointDTO(0.1, 0.8),
+                ),
+            ),
             fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
             weightPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
             countPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),

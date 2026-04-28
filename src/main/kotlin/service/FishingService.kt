@@ -28,7 +28,7 @@ data class LocationDTO(
     val unlocked: Boolean,
     val eventId: Long? = null,
     val imageUrl: String? = null,
-    val castArea: EventCastAreaDTO? = null,
+    val castZone: CastZoneDTO? = null,
     val isEvent: Boolean = false,
     val lockedReason: String? = null,
 )
@@ -514,7 +514,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 unlocked = it.unlocked,
                 eventId = it.eventId,
                 imageUrl = eventImageUrl(it.imagePath),
-                castArea = it.castArea,
+                castZone = it.castZone,
                 isEvent = true,
                 lockedReason = it.lockedReason,
             )
@@ -529,6 +529,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 it[Locations.name],
                 unlock,
                 unlock <= total,
+                castZone = CastZoneCodec.decode(it[Locations.castZoneJson]),
             )
             }
         listOfNotNull(eventLocation) + regular

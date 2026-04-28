@@ -120,11 +120,29 @@ data class AdminCatalogDTO(
 )
 
 @Serializable
-data class EventCastAreaDTO(
-    val minX: Double,
-    val maxX: Double,
-    val farY: Double,
-    val nearY: Double
+data class CastZonePointDTO(
+    val x: Double,
+    val y: Double
+)
+
+@Serializable
+data class CastZoneDTO(
+    val points: List<CastZonePointDTO>
+)
+
+@Serializable
+data class CastZoneLocationDTO(
+    val id: Long,
+    val name: String,
+    val kind: String,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDTO? = null
+)
+
+@Serializable
+data class CastZoneUpdateReq(
+    val castZone: CastZoneDTO? = null
 )
 
 @Serializable
@@ -147,7 +165,7 @@ data class SpecialEventDTO(
     val startTime: Long,
     val endTime: Long,
     val imagePath: String? = null,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO? = null,
     val fish: List<AdminEventFishDTO> = emptyList(),
     val weightPrizes: AdminEventPrizeDTO,
     val countPrizes: AdminEventPrizeDTO,
@@ -161,7 +179,7 @@ data class SpecialEventReq(
     val startTime: Long,
     val endTime: Long,
     val imagePath: String? = null,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO? = null,
     val fish: List<AdminEventFishDTO>,
     val weightPrizes: AdminEventPrizeDTO,
     val countPrizes: AdminEventPrizeDTO,
@@ -221,6 +239,14 @@ class AdminApiClient(
         return "$base$path"
     }
 
+    fun publicUrl(pathOrUrl: String?): String? {
+        if (pathOrUrl.isNullOrBlank()) return null
+        if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl
+        val base = baseUrl.trimEnd('/')
+        val path = if (pathOrUrl.startsWith("/")) pathOrUrl else "/$pathOrUrl"
+        return "$base$path"
+    }
+
     suspend fun getTournaments(offset: Int = 0, limit: Int = 10): List<TournamentDTO> {
         val response = client.get(apiUrl("/api/admin/tournaments?offset=$offset&limit=$limit")) {
             header(HttpHeaders.Authorization, "Bearer $token")
@@ -235,6 +261,23 @@ class AdminApiClient(
         }
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
         return response.body()
+    }
+
+    suspend fun getCastZones(): List<CastZoneLocationDTO> {
+        val response = client.get(apiUrl("/api/admin/cast-zones")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
+    }
+
+    suspend fun updateCastZone(locationId: Long, castZone: CastZoneDTO?) {
+        val response = client.put(apiUrl("/api/admin/locations/$locationId/cast-zone")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CastZoneUpdateReq(castZone))
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun createTournament(req: TournamentReq) {

@@ -1,7 +1,6 @@
 package service
 
 import db.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
@@ -18,14 +17,6 @@ import java.time.Instant
 
 const val EVENT_PRIZE_ID_OFFSET: Long = -9_000_000_000_000L
 
-@Serializable
-data class EventCastAreaDTO(
-    val minX: Double,
-    val maxX: Double,
-    val farY: Double,
-    val nearY: Double,
-)
-
 data class SpecialEvent(
     val id: Long,
     val nameRu: String,
@@ -33,7 +24,7 @@ data class SpecialEvent(
     val startTime: Instant,
     val endTime: Instant,
     val imagePath: String?,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO?,
     val weightPrizePlaces: Int,
     val countPrizePlaces: Int,
     val fishPrizePlaces: Int,
@@ -104,12 +95,7 @@ class SpecialEventService {
         startTime = this[SpecialEvents.startTime],
         endTime = this[SpecialEvents.endTime],
         imagePath = this[SpecialEvents.imagePath],
-        castArea = EventCastAreaDTO(
-            minX = this[SpecialEvents.castMinX],
-            maxX = this[SpecialEvents.castMaxX],
-            farY = this[SpecialEvents.castFarY],
-            nearY = this[SpecialEvents.castNearY],
-        ),
+        castZone = eventLocationCastZoneTx(this[SpecialEvents.id].value),
         weightPrizePlaces = this[SpecialEvents.weightPrizePlaces],
         countPrizePlaces = this[SpecialEvents.countPrizePlaces],
         fishPrizePlaces = this[SpecialEvents.fishPrizePlaces],
@@ -124,13 +110,13 @@ class SpecialEventService {
         start: Instant,
         end: Instant,
         imagePath: String?,
-        castArea: EventCastAreaDTO,
+        castZone: CastZoneDTO?,
         fish: List<SpecialEventFishSpec>,
         weightPrizes: SpecialEventPrizeConfig,
         countPrizes: SpecialEventPrizeConfig,
         fishPrizes: SpecialEventPrizeConfig,
     ): Long = transaction {
-        validateEventInput(nameRu, nameEn, start, end, castArea, fish)
+        validateEventInput(nameRu, nameEn, start, end, castZone, fish)
         ensureNoOverlap(start, end, excludeId = null)
         val eventId = SpecialEvents.insertAndGetId {
             it[SpecialEvents.nameRu] = nameRu.trim()
@@ -138,10 +124,6 @@ class SpecialEventService {
             it[SpecialEvents.startTime] = start
             it[SpecialEvents.endTime] = end
             it[SpecialEvents.imagePath] = imagePath
-            it[castMinX] = castArea.minX
-            it[castMaxX] = castArea.maxX
-            it[castFarY] = castArea.farY
-            it[castNearY] = castArea.nearY
             it[weightPrizePlaces] = weightPrizes.prizePlaces
             it[countPrizePlaces] = countPrizes.prizePlaces
             it[fishPrizePlaces] = fishPrizes.prizePlaces
@@ -154,6 +136,7 @@ class SpecialEventService {
             it[unlockKg] = 0.0
             it[sizeMultiplier] = 1.0
             it[specialEventId] = eventId
+            it[castZoneJson] = CastZoneCodec.encode(castZone)
         }
         replaceFishTx(eventId, fish)
         eventId
@@ -166,13 +149,13 @@ class SpecialEventService {
         start: Instant,
         end: Instant,
         imagePath: String?,
-        castArea: EventCastAreaDTO,
+        castZone: CastZoneDTO?,
         fish: List<SpecialEventFishSpec>,
         weightPrizes: SpecialEventPrizeConfig,
         countPrizes: SpecialEventPrizeConfig,
         fishPrizes: SpecialEventPrizeConfig,
     ) = transaction {
-        validateEventInput(nameRu, nameEn, start, end, castArea, fish)
+        validateEventInput(nameRu, nameEn, start, end, castZone, fish)
         ensureNoOverlap(start, end, excludeId = id)
         val updated = SpecialEvents.update({ SpecialEvents.id eq id }) {
             it[SpecialEvents.nameRu] = nameRu.trim()
@@ -180,10 +163,6 @@ class SpecialEventService {
             it[SpecialEvents.startTime] = start
             it[SpecialEvents.endTime] = end
             it[SpecialEvents.imagePath] = imagePath
-            it[castMinX] = castArea.minX
-            it[castMaxX] = castArea.maxX
-            it[castFarY] = castArea.farY
-            it[castNearY] = castArea.nearY
             it[weightPrizePlaces] = weightPrizes.prizePlaces
             it[countPrizePlaces] = countPrizes.prizePlaces
             it[fishPrizePlaces] = fishPrizes.prizePlaces
@@ -194,6 +173,7 @@ class SpecialEventService {
         if (updated == 0) throw SpecialEventException("not_found")
         val locationUpdated = Locations.update({ Locations.specialEventId eq id }) {
             it[name] = nameRu.trim()
+            it[castZoneJson] = CastZoneCodec.encode(castZone)
         }
         if (locationUpdated == 0) {
             Locations.insert {
@@ -201,6 +181,7 @@ class SpecialEventService {
                 it[unlockKg] = 0.0
                 it[sizeMultiplier] = 1.0
                 it[specialEventId] = id
+                it[castZoneJson] = CastZoneCodec.encode(castZone)
             }
         }
         replaceFishTx(id, fish)
@@ -304,7 +285,7 @@ class SpecialEventService {
             eventId = event.id,
             name = locationName,
             imagePath = event.imagePath,
-            castArea = event.castArea,
+            castZone = eventLocationCastZoneTx(event.id),
             unlocked = hasClub,
             lockedReason = if (hasClub) null else if (language == "en") {
                 "Join a club to take part in the special event."
@@ -551,15 +532,14 @@ class SpecialEventService {
         nameEn: String,
         start: Instant,
         end: Instant,
-        castArea: EventCastAreaDTO,
+        castZone: CastZoneDTO?,
         fish: List<SpecialEventFishSpec>,
     ) {
         if (nameRu.isBlank() || nameEn.isBlank()) throw SpecialEventException("name_required")
         if (!end.isAfter(start)) throw SpecialEventException("invalid_dates")
-        if (castArea.minX !in 0.0..1.0 || castArea.maxX !in 0.0..1.0 ||
-            castArea.farY !in 0.0..1.0 || castArea.nearY !in 0.0..1.0 ||
-            castArea.maxX <= castArea.minX || castArea.nearY <= castArea.farY
-        ) {
+        try {
+            CastZoneCodec.validateNullable(castZone)
+        } catch (_: IllegalArgumentException) {
             throw SpecialEventException("invalid_cast_area")
         }
         if (fish.isEmpty() || fish.any { it.fishId <= 0L || it.weight <= 0.0 }) {
@@ -603,6 +583,14 @@ class SpecialEventService {
             .singleOrNull()
             ?.get(Locations.id)
             ?.value
+
+    private fun eventLocationCastZoneTx(eventId: Long): CastZoneDTO? =
+        Locations
+            .slice(Locations.castZoneJson)
+            .select { Locations.specialEventId eq eventId }
+            .singleOrNull()
+            ?.get(Locations.castZoneJson)
+            ?.let(CastZoneCodec::decode)
 
     private fun addClubProgressTx(eventId: Long, clubId: Long, weightDelta: Double, countDelta: Int, now: Instant) {
         val existing = SpecialEventClubProgress.select {
@@ -797,7 +785,7 @@ data class FishingEventLocation(
     val eventId: Long,
     val name: String,
     val imagePath: String?,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO?,
     val unlocked: Boolean,
     val lockedReason: String?,
 )

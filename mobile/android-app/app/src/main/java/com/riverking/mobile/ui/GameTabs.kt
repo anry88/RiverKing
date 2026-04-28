@@ -163,7 +163,8 @@ import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.ClubQuestDto
 import com.riverking.mobile.auth.ClubQuestMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
-import com.riverking.mobile.auth.EventCastAreaDto
+import com.riverking.mobile.auth.CastZoneDto
+import com.riverking.mobile.auth.CastZonePointDto
 import com.riverking.mobile.auth.FishBriefDto
 import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.GuideLocationDto
@@ -259,6 +260,10 @@ private data class ProFishingSceneSpec(
     val maxX: Float = PRO_CAST_MAX_X,
     val farY: Float = PRO_CAST_FAR_Y,
     val nearY: Float = PRO_CAST_NEAR_Y,
+)
+
+private data class ProFishingCastZone(
+    val points: List<Offset>,
 )
 
 private data class PanViewportSpec(
@@ -1389,8 +1394,8 @@ private fun FishingScreen(
             me = me,
             backgroundUrl = currentLocation?.imageUrl ?: locationBackgroundAsset(currentLocation?.name),
             locationName = currentLocation?.name,
-            eventCastArea = currentLocation?.castArea,
-            hasCustomCastArea = currentLocation?.castArea != null,
+            castZone = currentLocation?.castZone,
+            hasCustomCastZone = currentLocation?.castZone != null,
             modifier = Modifier.fillMaxSize(),
             proMode = true,
             setupEnabled = setupEnabled,
@@ -2895,8 +2900,8 @@ private fun FishingStageScene(
     me: MeResponseDto,
     backgroundUrl: String?,
     locationName: String?,
-    eventCastArea: EventCastAreaDto? = null,
-    hasCustomCastArea: Boolean = false,
+    castZone: CastZoneDto? = null,
+    hasCustomCastZone: Boolean = false,
     modifier: Modifier = Modifier,
     proMode: Boolean = true,
     setupEnabled: Boolean = false,
@@ -2924,15 +2929,11 @@ private fun FishingStageScene(
     val phase = state.fishing.phase
     val fightIntensity = state.fishing.struggleIntensity.toFloat().coerceIn(0f, 1f)
     val castSpot = state.fishing.castSpot
-    val proSceneSpec = remember(locationName, eventCastArea) {
-        eventCastArea?.let {
-            ProFishingSceneSpec(
-                minX = it.minX.toFloat(),
-                maxX = it.maxX.toFloat(),
-                farY = it.farY.toFloat(),
-                nearY = it.nearY.toFloat(),
-            )
-        } ?: proFishingSceneSpec(locationName)
+    val proSceneZone = remember(castZone) {
+        normalizeCastZone(castZone) ?: fallbackCastZone()
+    }
+    val proSceneSpec = remember(proSceneZone) {
+        proSceneZone.bounds()
     }
     var backgroundIntrinsicSize by remember(backgroundUrl) { mutableStateOf(IntSize.Zero) }
     val inWater = when (phase) {
@@ -3077,17 +3078,18 @@ private fun FishingStageScene(
             val backgroundPanRangePx = remember(sceneWidthPx, backgroundRenderWidthPx) {
                 max(0f, backgroundRenderWidthPx - sceneWidthPx)
             }
-            val panoramicWorldArea = remember(proSceneSpec, panViewport.visibleWidth) {
-                if (hasCustomCastArea) {
-                    legacyScreenAreaToWorldArea(proSceneSpec, panViewport.visibleWidth)
+            val panoramicWorldZone = remember(proSceneZone, panViewport.visibleWidth, hasCustomCastZone) {
+                if (hasCustomCastZone) {
+                    proSceneZone
                 } else {
-                    centeredWorldCastArea(proSceneSpec, panViewport.visibleWidth)
+                    centeredWorldCastZone(proSceneZone, panViewport.visibleWidth)
                 }
             }
-            val activeCastArea = if (panoramicEnabled) panoramicWorldArea else proSceneSpec
-            val cameraBounds = remember(panoramicEnabled, panoramicWorldArea, panViewport.visibleWidth) {
+            val activeCastZone = if (panoramicEnabled) panoramicWorldZone else proSceneZone
+            val activeCastArea = activeCastZone.bounds()
+            val cameraBounds = remember(panoramicEnabled, activeCastArea, panViewport.visibleWidth) {
                 if (panoramicEnabled) {
-                    cameraBoundsForArea(panoramicWorldArea, panViewport.visibleWidth)
+                    cameraBoundsForArea(activeCastArea, panViewport.visibleWidth)
                 } else {
                     CameraPanBounds()
                 }
@@ -3108,17 +3110,18 @@ private fun FishingStageScene(
                 }
             }
             val cameraViewLeftState = rememberUpdatedState(cameraViewLeft)
-            val visibleCastArea = remember(panoramicEnabled, activeCastArea, cameraViewLeft, panViewport.visibleWidth) {
+            val visibleCastZone = remember(panoramicEnabled, activeCastZone, cameraViewLeft, panViewport.visibleWidth) {
                 if (panoramicEnabled) {
-                    worldAreaToScreenArea(
-                        visibleWorldCastArea(activeCastArea, cameraViewLeft, panViewport.visibleWidth),
+                    worldCastZoneToScreen(
+                        visibleWorldCastZone(activeCastZone, cameraViewLeft, panViewport.visibleWidth),
                         cameraViewLeft,
                         panViewport.visibleWidth,
                     )
                 } else {
-                    proSceneSpec
+                    proSceneZone
                 }
             }
+            val visibleCastArea = visibleCastZone.bounds()
             val panStep = max(0.06f, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER)
             val backgroundPanOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
                 (clampCameraViewLeft(cameraViewLeft, cameraBounds) / panViewport.maxPan) * backgroundPanRangePx
@@ -3290,8 +3293,8 @@ private fun FishingStageScene(
                                             widthPx = sceneWidthPx,
                                             heightPx = sceneHeightPx,
                                             elapsedMillis = elapsedMillis,
-                                            sceneSpec = visibleCastArea,
-                                            worldSpec = activeCastArea,
+                                            sceneZone = visibleCastZone,
+                                            worldZone = activeCastZone,
                                             viewLeft = cameraViewLeftState.value,
                                             viewportWidth = panViewport.visibleWidth,
                                         )
@@ -3361,8 +3364,8 @@ private fun FishingStageScene(
                                             widthPx = sceneWidthPx,
                                             heightPx = sceneHeightPx,
                                             elapsedMillis = elapsedMillis,
-                                            sceneSpec = visibleCastArea,
-                                            worldSpec = activeCastArea,
+                                            sceneZone = visibleCastZone,
+                                            worldZone = activeCastZone,
                                             viewLeft = 0f,
                                             viewportWidth = 1f,
                                         )
@@ -3450,10 +3453,10 @@ private fun FishingStageScene(
             val activeCastTarget = activeCastSpot?.let {
                 if (proMode || it.proMode) {
                     if (panoramicEnabled && it.panoramicAware) {
-                        val worldTarget = proStyleCastTarget(it, activeCastArea)
+                        val worldTarget = proStyleCastTarget(it, activeCastZone)
                         worldToScreenRel(worldTarget, cameraViewLeft, panViewport.visibleWidth)
                     } else {
-                        proStyleCastTarget(it, if (panoramicEnabled) visibleCastArea else activeCastArea)
+                        proStyleCastTarget(it, if (panoramicEnabled) visibleCastZone else activeCastZone)
                     }
                 } else {
                     tgStyleCastTarget(it, rodTipRelX)
@@ -3903,6 +3906,151 @@ private fun computePanViewport(widthPx: Float, heightPx: Float, imageAspect: Flo
     )
 }
 
+private fun normalizeCastZone(castZone: CastZoneDto?): ProFishingCastZone? {
+    val points = castZone?.points.orEmpty().mapNotNull { point ->
+        val x = point.x.toFloat()
+        val y = point.y.toFloat()
+        if (!x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()) {
+            Offset(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
+        } else {
+            null
+        }
+    }
+    if (points.size < 3) return null
+    val zone = ProFishingCastZone(points)
+    if (zone.area() < 0.0004f) return null
+    return zone
+}
+
+private fun fallbackCastZone(): ProFishingCastZone =
+    ProFishingCastZone(
+        listOf(
+            Offset(0.08f, 0.62f),
+            Offset(0.48f, 0.62f),
+            Offset(0.48f, 0.94f),
+            Offset(0.08f, 0.94f),
+        )
+    )
+
+private fun rectCastZone(sceneSpec: ProFishingSceneSpec): ProFishingCastZone =
+    ProFishingCastZone(
+        listOf(
+            Offset(sceneSpec.minX, sceneSpec.farY),
+            Offset(sceneSpec.maxX, sceneSpec.farY),
+            Offset(sceneSpec.maxX, sceneSpec.nearY),
+            Offset(sceneSpec.minX, sceneSpec.nearY),
+        )
+    )
+
+private fun ProFishingCastZone.bounds(): ProFishingSceneSpec {
+    if (points.isEmpty()) return ProFishingSceneSpec()
+    return ProFishingSceneSpec(
+        minX = points.minOf { it.x }.coerceIn(0f, 1f),
+        maxX = points.maxOf { it.x }.coerceIn(0f, 1f),
+        farY = points.minOf { it.y }.coerceIn(0f, 1f),
+        nearY = points.maxOf { it.y }.coerceIn(0f, 1f),
+    )
+}
+
+private fun ProFishingCastZone.area(): Float {
+    if (points.size < 3) return 0f
+    var sum = 0f
+    points.forEachIndexed { index, point ->
+        val next = points[(index + 1) % points.size]
+        sum += point.x * next.y - next.x * point.y
+    }
+    return abs(sum) / 2f
+}
+
+private fun screenCastZoneToWorldZone(
+    zone: ProFishingCastZone,
+    viewportWidth: Float,
+    expandX: Float = 0f,
+    expandTop: Float = 0f,
+    expandBottom: Float = 0f,
+): ProFishingCastZone {
+    val centeredLeft = max(0f, (1f - viewportWidth) / 2f)
+    val points = zone.points.map { point ->
+        Offset(
+            x = (centeredLeft + point.x * viewportWidth).coerceIn(0f, 1f),
+            y = point.y.coerceIn(0f, 1f),
+        )
+    }
+    val expanded = ProFishingCastZone(points).bounds().let { bounds ->
+        rectCastZone(
+            ProFishingSceneSpec(
+                minX = (bounds.minX - expandX).coerceIn(0f, 1f),
+                maxX = (bounds.maxX + expandX).coerceIn(0f, 1f),
+                farY = (bounds.farY - expandTop).coerceIn(0f, 1f),
+                nearY = (bounds.nearY + expandBottom).coerceIn(0f, 1f),
+            )
+        )
+    }
+    return if (expandX > 0f || expandTop > 0f || expandBottom > 0f) expanded else ProFishingCastZone(points)
+}
+
+private fun centeredWorldCastZone(zone: ProFishingCastZone, viewportWidth: Float): ProFishingCastZone =
+    screenCastZoneToWorldZone(
+        zone = zone,
+        viewportWidth = viewportWidth,
+        expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+        expandTop = CAST_AREA_EXPAND_TOP,
+        expandBottom = CAST_AREA_EXPAND_BOTTOM,
+    )
+
+private fun visibleWorldCastZone(
+    zone: ProFishingCastZone,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingCastZone {
+    val clippedLeft = clipCastZoneVertical(zone.points, viewLeft, keepGreater = true)
+    val clipped = clipCastZoneVertical(clippedLeft, viewLeft + viewportWidth, keepGreater = false)
+    if (clipped.size >= 3) return ProFishingCastZone(clipped)
+    return rectCastZone(visibleWorldCastArea(zone.bounds(), viewLeft, viewportWidth))
+}
+
+private fun clipCastZoneVertical(points: List<Offset>, boundaryX: Float, keepGreater: Boolean): List<Offset> {
+    if (points.isEmpty()) return emptyList()
+    val result = mutableListOf<Offset>()
+    fun inside(point: Offset): Boolean = if (keepGreater) point.x >= boundaryX else point.x <= boundaryX
+    fun intersection(a: Offset, b: Offset): Offset {
+        val dx = b.x - a.x
+        if (abs(dx) < 0.000001f) return Offset(boundaryX, a.y)
+        val t = ((boundaryX - a.x) / dx).coerceIn(0f, 1f)
+        return Offset(boundaryX, a.y + (b.y - a.y) * t)
+    }
+    points.forEachIndexed { index, current ->
+        val previous = points[(index + points.size - 1) % points.size]
+        val currentInside = inside(current)
+        val previousInside = inside(previous)
+        when {
+            currentInside && !previousInside -> {
+                result += intersection(previous, current)
+                result += current
+            }
+            currentInside -> result += current
+            !currentInside && previousInside -> result += intersection(previous, current)
+        }
+    }
+    return result
+}
+
+private fun worldCastZoneToScreen(
+    zone: ProFishingCastZone,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingCastZone {
+    if (viewportWidth <= 0f) return zone
+    return ProFishingCastZone(
+        zone.points.map { point ->
+            Offset(
+                x = ((point.x - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+                y = point.y.coerceIn(0f, 1f),
+            )
+        }
+    )
+}
+
 private fun legacyScreenAreaToWorldArea(
     sceneSpec: ProFishingSceneSpec,
     viewportWidth: Float,
@@ -3991,19 +4139,22 @@ private fun worldToScreenRel(point: Offset, viewLeft: Float, viewportWidth: Floa
     )
 }
 
-private fun proStyleCastTarget(castSpot: FishingCastSpot, sceneSpec: ProFishingSceneSpec): Offset =
-    Offset(
-        x = sceneSpec.minX + castSpot.xRoll.coerceIn(0f, 1f) * (sceneSpec.maxX - sceneSpec.minX),
-        y = sceneSpec.farY + castSpot.yRoll.coerceIn(0f, 1f) * (sceneSpec.nearY - sceneSpec.farY),
+private fun proStyleCastTarget(castSpot: FishingCastSpot, zone: ProFishingCastZone): Offset {
+    val bounds = zone.bounds()
+    val point = Offset(
+        x = bounds.minX + castSpot.xRoll.coerceIn(0f, 1f) * (bounds.maxX - bounds.minX),
+        y = bounds.farY + castSpot.yRoll.coerceIn(0f, 1f) * (bounds.nearY - bounds.farY),
     )
+    return if (pointInCastZone(point, zone)) point else closestPointInCastZone(point, zone)
+}
 
 private fun proFishingCastSpotFromSwipe(
     swipe: Offset,
     widthPx: Float,
     heightPx: Float,
     elapsedMillis: Long,
-    sceneSpec: ProFishingSceneSpec,
-    worldSpec: ProFishingSceneSpec = sceneSpec,
+    sceneZone: ProFishingCastZone,
+    worldZone: ProFishingCastZone = sceneZone,
     viewLeft: Float = 0f,
     viewportWidth: Float = 1f,
 ): FishingCastSpot {
@@ -4012,22 +4163,72 @@ private fun proFishingCastSpotFromSwipe(
     val strength = (distance / (minSide * 0.75f)).coerceIn(0f, 1f)
     val nx = if (distance > 0f) swipe.x / distance else 0f
     val ny = if (distance > 0f) swipe.y / distance else 0f
+    val sceneSpec = sceneZone.bounds()
+    val worldSpec = worldZone.bounds()
     val centerX = (sceneSpec.minX + sceneSpec.maxX) / 2f
     val centerY = (sceneSpec.farY + sceneSpec.nearY) / 2f
     val reachX = (sceneSpec.maxX - sceneSpec.minX) / 2f
     val reachY = (sceneSpec.nearY - sceneSpec.farY) / 2f
-    val targetX = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX)
-    val targetY = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY)
-    val targetWorldX = viewLeft + targetX * viewportWidth
+    val screenTarget = Offset(
+        x = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX),
+        y = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY),
+    ).let { if (pointInCastZone(it, sceneZone)) it else closestPointInCastZone(it, sceneZone) }
+    val targetWorldX = viewLeft + screenTarget.x * viewportWidth
+    val worldTarget = Offset(targetWorldX, screenTarget.y)
+        .let { if (pointInCastZone(it, worldZone)) it else closestPointInCastZone(it, worldZone) }
     val worldWidth = max(0.0001f, worldSpec.maxX - worldSpec.minX)
     val worldHeight = max(0.0001f, worldSpec.nearY - worldSpec.farY)
     return FishingCastSpot(
-        xRoll = ((targetWorldX - worldSpec.minX) / worldWidth).coerceIn(0f, 1f),
-        yRoll = ((targetY - worldSpec.farY) / worldHeight).coerceIn(0f, 1f),
+        xRoll = ((worldTarget.x - worldSpec.minX) / worldWidth).coerceIn(0f, 1f),
+        yRoll = ((worldTarget.y - worldSpec.farY) / worldHeight).coerceIn(0f, 1f),
         proMode = true,
-        panoramicAware = viewportWidth < 0.999f && worldSpec != sceneSpec,
+        panoramicAware = viewportWidth < 0.999f && worldZone != sceneZone,
         castDurationMillis = castDurationFromSwipe(distance, elapsedMillis),
     )
+}
+
+private fun pointInCastZone(point: Offset, zone: ProFishingCastZone): Boolean {
+    val points = zone.points
+    if (points.size < 3) return false
+    var inside = false
+    var j = points.lastIndex
+    for (i in points.indices) {
+        val pi = points[i]
+        val pj = points[j]
+        val crosses = (pi.y > point.y) != (pj.y > point.y)
+        if (crosses) {
+            val xAtY = (pj.x - pi.x) * (point.y - pi.y) / ((pj.y - pi.y).takeIf { abs(it) > 0.000001f } ?: 0.000001f) + pi.x
+            if (point.x < xAtY) inside = !inside
+        }
+        j = i
+    }
+    return inside
+}
+
+private fun closestPointInCastZone(point: Offset, zone: ProFishingCastZone): Offset {
+    val points = zone.points
+    if (points.isEmpty()) return point
+    var closest = points.first()
+    var closestDistance = Float.MAX_VALUE
+    points.forEachIndexed { index, start ->
+        val end = points[(index + 1) % points.size]
+        val candidate = closestPointOnSegment(point, start, end)
+        val distance = hypot(candidate.x - point.x, candidate.y - point.y)
+        if (distance < closestDistance) {
+            closestDistance = distance
+            closest = candidate
+        }
+    }
+    return Offset(closest.x.coerceIn(0f, 1f), closest.y.coerceIn(0f, 1f))
+}
+
+private fun closestPointOnSegment(point: Offset, start: Offset, end: Offset): Offset {
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    val lenSq = dx * dx + dy * dy
+    if (lenSq <= 0.000001f) return start
+    val t = (((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq).coerceIn(0f, 1f)
+    return Offset(start.x + dx * t, start.y + dy * t)
 }
 
 private fun proFishingSceneSpec(location: String?): ProFishingSceneSpec = when (location) {

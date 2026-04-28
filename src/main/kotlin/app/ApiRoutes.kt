@@ -37,7 +37,7 @@ import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
 import service.AccountDeletionService
 import service.AndroidUpdateService
-import service.EventCastAreaDTO
+import service.CastZoneDTO
 import db.AuthIdentities
 import db.Payments
 import db.Users
@@ -400,7 +400,7 @@ fun Application.apiRoutes(
         val startTime: Long,
         val endTime: Long,
         val imageUrl: String? = null,
-        val castArea: EventCastAreaDTO,
+        val castZone: CastZoneDTO? = null,
     )
 
     @Serializable
@@ -551,7 +551,7 @@ fun Application.apiRoutes(
             startTime = startTime.epochSecond,
             endTime = endTime.epochSecond,
             imageUrl = eventAssetUrl(imagePath),
-            castArea = castArea,
+            castZone = castZone,
         )
 
     fun SpecialEventClubEntry.toDto(): SpecialEventClubEntryDTO =

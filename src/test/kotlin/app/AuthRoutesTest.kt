@@ -37,7 +37,8 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import service.AndroidUpdateService
 import service.ClubService
 import service.ClubQuestService
-import service.EventCastAreaDTO
+import service.CastZoneDTO
+import service.CastZonePointDTO
 import service.FishingService
 import service.PlayPurchaseVerificationResult
 import service.PlayPurchaseVerifier
@@ -803,7 +804,14 @@ class AuthRoutesTest {
             start = now.minusSeconds(3_600),
             end = now.plusSeconds(3_600),
             imagePath = "event-bay.webp",
-            castArea = EventCastAreaDTO(0.12, 0.88, 0.42, 0.78),
+            castZone = CastZoneDTO(
+                points = listOf(
+                    CastZonePointDTO(0.12, 0.42),
+                    CastZonePointDTO(0.88, 0.42),
+                    CastZonePointDTO(0.88, 0.78),
+                    CastZonePointDTO(0.12, 0.78),
+                ),
+            ),
             fish = listOf(SpecialEventFishSpec(fishId, 1.0)),
             weightPrizes = SpecialEventPrizeConfig(0, "[]"),
             countPrizes = SpecialEventPrizeConfig(0, "[]"),

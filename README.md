@@ -13,7 +13,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 - Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings, weekly club quests, and a shared club chat feed, with per-member contribution views for each active club quest.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.
 - Includes an Android nested project under `mobile/android-app` with shared-backend auth, `play`/`direct` flavors, real Google Play Billing for the `play` flavor, and a parity-focused mobile shell.
-- Includes an internal Jetpack Compose admin app under `mobile/admin-app` for token-protected tournament, special-event, discount, and broadcast operations.
+- Includes an internal Jetpack Compose admin app under `mobile/admin-app` for token-protected tournament, special-event, cast-zone, discount, and broadcast operations.
 
 **Why it is technically interesting**
 
@@ -52,7 +52,7 @@ Human-facing repository docs live in this file and in [docs/product-overview.md]
 - Telegram bot integrations for commands, auto-casting, prize flows, payment-support flows, and admin operations.
 - Exposed-backed persistence, startup restoration logic, background schedulers, TG Analytics integration, and Prometheus-style metrics.
 - A nested Android project with its own Gradle setup, Telegram/password/Google auth flows, nickname gate, shared-API main shell, update prompts/mandatory upgrade blocking, and real Google Play Billing verification for the `play` flavor.
-- A separate internal admin Android project with saved server profiles, bearer-token admin API access, tournament and special-event creation/deletion, shop discount management, and broadcast sending.
+- A separate internal admin Android project with saved server profiles, bearer-token admin API access, tournament and special-event creation/deletion, cast-zone editing, shop discount management, and broadcast sending.
 - Public Android-compliance surfaces for privacy, support, terms, and account deletion, plus an authenticated account deletion endpoint for mobile users.
 
 ## Architecture
@@ -87,7 +87,7 @@ flowchart LR
 - `Social loops`: clubs, member roles, weekly contribution boards, shared club quests, special club-event competition, and club chat feed.
 - `Economy`: Stars purchases, coin purchases, referral rewards, and prize distribution.
 - `Operations`: profanity filtering, metrics, TG Analytics hooks, startup recovery, and scheduled background jobs.
-- `Admin operations`: bot-side admin commands plus the internal admin Android app for tournaments, special events, discounts, and broadcasts.
+- `Admin operations`: bot-side admin commands plus the internal admin Android app for tournaments, special events, cast zones, discounts, and broadcasts.
 
 ## Documentation Map
 

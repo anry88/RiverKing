@@ -9,12 +9,13 @@ Both mobile projects share a single `version.properties` versioning scheme (`RIV
 ## Scope
 
 - Saved server profiles with backend URL and admin API token.
-- Dashboard navigation for tournaments, special events, discounts, and broadcasts.
+- Dashboard navigation for tournaments, special events, cast zones, discounts, and broadcasts.
 - Tournament list loaded from `/api/admin/tournaments` in pages of 10, sorted newest first.
 - Tournament creation and editing using backend catalog choices for metric, fish, location, and up to 1000 prize places.
 - Tournament deletion with explicit confirmation.
 - Shop discount management using selectable shop packages, rods, and subscriptions with current price context.
-- Special event management for temporary club-event locations, image upload, fish pools with manual weights, cast area rectangles, and separate prize lists for weight/count/top-fish leaderboards.
+- Special event management for temporary club-event locations, image upload, fish pools with manual weights, and separate prize lists for weight/count/top-fish leaderboards.
+- Cast-zone editing for both regular and special-event locations. Zones are polygon point paths stored against `Locations`; locations without a configured zone continue to use the client fallback region until an operator draws one.
 - Broadcast sending through the backend admin API.
 
 ## Backend Contract
@@ -49,6 +50,8 @@ Key endpoints:
 - `PUT /api/admin/events/{id}`
 - `DELETE /api/admin/events/{id}`
 - `POST /api/admin/events/image`
+- `GET /api/admin/cast-zones`
+- `PUT /api/admin/locations/{id}/cast-zone`
 - `GET /api/admin/discounts`
 - `POST /api/admin/discounts`
 - `DELETE /api/admin/discounts/{packageId}`
@@ -91,7 +94,8 @@ mobile/admin-app/app/build/outputs/apk/release/
 - `app/src/main/java/com/riverking/admin/ui/AdminApp.kt`: navigation graph.
 - `app/src/main/java/com/riverking/admin/ui/LoginAndDashboard.kt`: saved server profiles and dashboard.
 - `app/src/main/java/com/riverking/admin/ui/TournamentsScreen.kt`: paged tournament list, create dialog, delete confirmation.
-- `app/src/main/java/com/riverking/admin/ui/EventsScreen.kt`: special event list, create/edit dialog, image upload, fish pool, cast area, and reward configuration.
+- `app/src/main/java/com/riverking/admin/ui/EventsScreen.kt`: special event list, create/edit dialog, image upload, fish pool, and reward configuration.
+- `app/src/main/java/com/riverking/admin/ui/CastZonesScreen.kt`: point-based polygon editor for regular and event location cast zones.
 - `app/src/main/java/com/riverking/admin/ui/BroadcastAndDiscounts.kt`: broadcasts and discount management.
 - `app/src/main/java/com/riverking/admin/network/AdminApiClient.kt`: Ktor client and admin DTOs.
 - `app/src/main/java/com/riverking/admin/ui/theme/RiverTheme.kt`: Compose theme.

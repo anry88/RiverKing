@@ -40,7 +40,7 @@ class SpecialEventServiceTest {
             start = start,
             end = start.plusSeconds(86_400),
             imagePath = null,
-            castArea = defaultCastArea,
+            castZone = defaultCastZone,
             fish = listOf(SpecialEventFishSpec(fishId, 10.0)),
             weightPrizes = noPrizes,
             countPrizes = noPrizes,
@@ -54,7 +54,7 @@ class SpecialEventServiceTest {
                 start = start.plusSeconds(3_600),
                 end = start.plusSeconds(90_000),
                 imagePath = null,
-                castArea = defaultCastArea,
+                castZone = defaultCastZone,
                 fish = listOf(SpecialEventFishSpec(fishId, 1.0)),
                 weightPrizes = noPrizes,
                 countPrizes = noPrizes,
@@ -76,7 +76,7 @@ class SpecialEventServiceTest {
             start = now.minusSeconds(3_600),
             end = now.plusSeconds(3_600),
             imagePath = null,
-            castArea = defaultCastArea,
+            castZone = defaultCastZone,
             fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
             weightPrizes = noPrizes,
             countPrizes = noPrizes,
@@ -206,7 +206,7 @@ class SpecialEventServiceTest {
             start = start,
             end = start.plusSeconds(7_200),
             imagePath = null,
-            castArea = defaultCastArea,
+            castZone = defaultCastZone,
             fish = listOf(SpecialEventFishSpec(fishId, 1.0)),
             weightPrizes = SpecialEventPrizeConfig(1, """[{"pack":"coins","qty":1000,"coins":1000}]"""),
             countPrizes = SpecialEventPrizeConfig(1, """[{"pack":"coins","qty":500,"coins":500}]"""),
@@ -248,7 +248,7 @@ class SpecialEventServiceTest {
             start = Instant.parse("2026-04-01T00:00:00Z"),
             end = Instant.parse("2026-04-02T00:00:00Z"),
             imagePath = null,
-            castArea = defaultCastArea,
+            castZone = defaultCastZone,
             fish = fishIds.mapIndexed { index, fishId -> SpecialEventFishSpec(fishId, (index + 1).toDouble()) },
             weightPrizes = noPrizes,
             countPrizes = noPrizes,
@@ -315,7 +315,14 @@ class SpecialEventServiceTest {
     }
 
     private companion object {
-        val defaultCastArea = EventCastAreaDTO(minX = 0.1, maxX = 0.9, farY = 0.4, nearY = 0.8)
+        val defaultCastZone = CastZoneDTO(
+            points = listOf(
+                CastZonePointDTO(0.1, 0.4),
+                CastZonePointDTO(0.9, 0.4),
+                CastZonePointDTO(0.9, 0.8),
+                CastZonePointDTO(0.1, 0.8),
+            ),
+        )
         val noPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]")
     }
 }

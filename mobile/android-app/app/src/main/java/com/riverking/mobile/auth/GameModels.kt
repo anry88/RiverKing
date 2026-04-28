@@ -22,17 +22,20 @@ data class LocationDto(
     val unlocked: Boolean,
     val eventId: Long? = null,
     val imageUrl: String? = null,
-    val castArea: EventCastAreaDto? = null,
+    val castZone: CastZoneDto? = null,
     val isEvent: Boolean = false,
     val lockedReason: String? = null,
 )
 
 @Serializable
-data class EventCastAreaDto(
-    val minX: Double,
-    val maxX: Double,
-    val farY: Double,
-    val nearY: Double,
+data class CastZonePointDto(
+    val x: Double,
+    val y: Double,
+)
+
+@Serializable
+data class CastZoneDto(
+    val points: List<CastZonePointDto> = emptyList(),
 )
 
 @Serializable
@@ -219,7 +222,7 @@ data class SpecialEventDto(
     val startTime: Long,
     val endTime: Long,
     val imageUrl: String? = null,
-    val castArea: EventCastAreaDto,
+    val castZone: CastZoneDto? = null,
 )
 
 @Serializable

@@ -2,6 +2,7 @@ package app
 
 import db.Fish
 import db.Locations
+import db.SpecialEvents
 import db.Users
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -16,12 +17,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import service.CastZoneCodec
+import service.CastZoneDTO
 import service.COIN_PRIZE_ID
-import service.EventCastAreaDTO
 import service.FishingService
 import service.SpecialEvent
 import service.SpecialEventFishSpec
@@ -42,6 +47,26 @@ private fun parseAdminDate(value: String): LocalDate {
     return runCatching { LocalDate.parse(trimmed) }
         .getOrElse { LocalDate.parse(trimmed, adminDateFormatter) }
 }
+
+private val adminLocationBackgrounds = mapOf(
+    "Пруд" to "/app/assets/backgrounds/pond.png",
+    "Болото" to "/app/assets/backgrounds/swamp.png",
+    "Река" to "/app/assets/backgrounds/river.png",
+    "Озеро" to "/app/assets/backgrounds/lake.png",
+    "Водохранилище" to "/app/assets/backgrounds/reservoir.png",
+    "Горная река" to "/app/assets/backgrounds/mountain_river.png",
+    "Дельта реки" to "/app/assets/backgrounds/river_delta.png",
+    "Прибрежье моря" to "/app/assets/backgrounds/sea_coast.png",
+    "Русло Амазонки" to "/app/assets/backgrounds/amazon_riverbed.png",
+    "Игапо, затопленный лес" to "/app/assets/backgrounds/flooded_forest.png",
+    "Мангровые заросли" to "/app/assets/backgrounds/mangroves.png",
+    "Коралловые отмели" to "/app/assets/backgrounds/coral_flats.png",
+    "Фьорд" to "/app/assets/backgrounds/fjord.png",
+    "Открытый океан" to "/app/assets/backgrounds/open_ocean.png",
+)
+
+private fun adminEventAssetPath(imagePath: String?): String? =
+    imagePath?.takeIf { it.isNotBlank() }?.let { "/event-assets/$it" }
 
 // ── Serializable DTOs for API responses ──
 
@@ -155,7 +180,7 @@ data class AdminSpecialEventReq(
     val startTime: Long,
     val endTime: Long,
     val imagePath: String? = null,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO? = null,
     val fish: List<AdminEventFishReq>,
     val weightPrizes: AdminEventPrizeReq,
     val countPrizes: AdminEventPrizeReq,
@@ -170,7 +195,7 @@ data class AdminSpecialEventResp(
     val startTime: Long,
     val endTime: Long,
     val imagePath: String? = null,
-    val castArea: EventCastAreaDTO,
+    val castZone: CastZoneDTO? = null,
     val fish: List<AdminEventFishReq>,
     val weightPrizes: AdminEventPrizeReq,
     val countPrizes: AdminEventPrizeReq,
@@ -179,6 +204,21 @@ data class AdminSpecialEventResp(
 
 @Serializable
 data class AdminImageUploadResp(val imagePath: String)
+
+@Serializable
+data class AdminCastZoneLocationResp(
+    val id: Long,
+    val name: String,
+    val kind: String,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDTO? = null
+)
+
+@Serializable
+data class AdminCastZoneUpdateReq(
+    val castZone: CastZoneDTO? = null
+)
 
 fun Application.adminApiRoutes(env: Env) {
     val tournaments = TournamentService()
@@ -200,7 +240,7 @@ fun Application.adminApiRoutes(env: Env) {
             startTime = startTime.toEpochMilli(),
             endTime = endTime.toEpochMilli(),
             imagePath = imagePath,
-            castArea = castArea,
+            castZone = castZone,
             fish = events.fishSpecs(id).map { AdminEventFishReq(it.fishId, it.weight) },
             weightPrizes = AdminEventPrizeReq(weightPrizePlaces, weightPrizesJson),
             countPrizes = AdminEventPrizeReq(countPrizePlaces, countPrizesJson),
@@ -307,7 +347,7 @@ fun Application.adminApiRoutes(env: Env) {
                         start = Instant.ofEpochMilli(req.startTime),
                         end = Instant.ofEpochMilli(req.endTime),
                         imagePath = req.imagePath,
-                        castArea = req.castArea,
+                        castZone = req.castZone,
                         fish = req.fishSpecs(),
                         weightPrizes = req.weightPrizes.toConfig(),
                         countPrizes = req.countPrizes.toConfig(),
@@ -330,7 +370,7 @@ fun Application.adminApiRoutes(env: Env) {
                         start = Instant.ofEpochMilli(req.startTime),
                         end = Instant.ofEpochMilli(req.endTime),
                         imagePath = req.imagePath,
-                        castArea = req.castArea,
+                        castZone = req.castZone,
                         fish = req.fishSpecs(),
                         weightPrizes = req.weightPrizes.toConfig(),
                         countPrizes = req.countPrizes.toConfig(),
@@ -380,6 +420,70 @@ fun Application.adminApiRoutes(env: Env) {
                 }
                 val imagePath = savedName ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "file_required"))
                 call.respond(AdminImageUploadResp(imagePath))
+            }
+
+            // ── Cast zones ──
+
+            get("/cast-zones") {
+                val locations = transaction {
+                    val eventImages = SpecialEvents
+                        .slice(SpecialEvents.id, SpecialEvents.imagePath)
+                        .selectAll()
+                        .associate { row -> row[SpecialEvents.id].value to row[SpecialEvents.imagePath] }
+
+                    val regular = Locations
+                        .select { Locations.specialEventId.isNull() }
+                        .orderBy(Locations.unlockKg, SortOrder.ASC)
+                        .map { row ->
+                            val name = row[Locations.name]
+                            AdminCastZoneLocationResp(
+                                id = row[Locations.id].value,
+                                name = name,
+                                kind = "regular",
+                                imageUrl = adminLocationBackgrounds[name],
+                                castZone = CastZoneCodec.decode(row[Locations.castZoneJson]),
+                            )
+                        }
+
+                    val event = Locations
+                        .select { Locations.specialEventId.isNotNull() }
+                        .orderBy(Locations.id, SortOrder.DESC)
+                        .map { row ->
+                            val eventId = row[Locations.specialEventId]
+                            AdminCastZoneLocationResp(
+                                id = row[Locations.id].value,
+                                name = row[Locations.name],
+                                kind = "event",
+                                eventId = eventId,
+                                imageUrl = adminEventAssetPath(eventId?.let(eventImages::get)),
+                                castZone = CastZoneCodec.decode(row[Locations.castZoneJson]),
+                            )
+                        }
+
+                    regular + event
+                }
+                call.respond(locations)
+            }
+
+            put("/locations/{id}/cast-zone") {
+                val id = call.parameters["id"]?.toLongOrNull()
+                    ?: return@put call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_location"))
+                val req = call.receive<AdminCastZoneUpdateReq>()
+                val encoded = try {
+                    CastZoneCodec.encode(req.castZone)
+                } catch (_: IllegalArgumentException) {
+                    return@put call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_cast_zone"))
+                }
+                val updated = transaction {
+                    Locations.update({ Locations.id eq id }) {
+                        it[castZoneJson] = encoded
+                    }
+                }
+                if (updated == 0) {
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to "not_found"))
+                } else {
+                    call.respond(HttpStatusCode.OK)
+                }
             }
 
             // ── Discounts ──

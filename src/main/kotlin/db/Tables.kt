@@ -1558,6 +1558,7 @@ object Locations : LongIdTable() {
     val unlockKg = double("unlock_kg").default(0.0)
     val sizeMultiplier = double("size_multiplier").default(1.0)
     val specialEventId = long("special_event_id").nullable().index()
+    val castZoneJson = text("cast_zone_json").nullable()
 }
 
 object Fish : LongIdTable() {

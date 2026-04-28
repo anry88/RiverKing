@@ -23,6 +23,14 @@ const DEFAULT_PRO_CAST_AREA = Object.freeze({
   farY: PRO_CAST_FAR_Y,
   nearY: PRO_CAST_NEAR_Y
 });
+const DEFAULT_PRO_CAST_ZONE = Object.freeze({
+  points: Object.freeze([
+    Object.freeze({ x: 0.08, y: 0.62 }),
+    Object.freeze({ x: 0.48, y: 0.62 }),
+    Object.freeze({ x: 0.48, y: 0.94 }),
+    Object.freeze({ x: 0.08, y: 0.94 })
+  ])
+});
 const PRO_CAST_AREAS = Object.freeze({
   pond: { minX: 0.05, maxX: 0.88, farY: 0.46, nearY: 0.90 },
   swamp: { minX: 0.04, maxX: 0.86, farY: 0.48, nearY: 0.90 },
@@ -113,17 +121,181 @@ function normalizeCastArea(area, fallback = DEFAULT_PRO_CAST_AREA) {
   return normalized;
 }
 
+function castZoneFromArea(area) {
+  const safe = normalizeCastArea(area);
+  return {
+    points: [
+      { x: safe.minX, y: safe.farY },
+      { x: safe.maxX, y: safe.farY },
+      { x: safe.maxX, y: safe.nearY },
+      { x: safe.minX, y: safe.nearY }
+    ]
+  };
+}
+
+function castZoneArea(zone) {
+  const points = zone?.points || [];
+  if (points.length < 3) return 0;
+  let sum = 0;
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    sum += point.x * next.y - next.x * point.y;
+  });
+  return Math.abs(sum) / 2;
+}
+
+function normalizeCastZone(zone) {
+  const points = Array.isArray(zone?.points)
+    ? zone.points
+        .map(point => ({ x: clamp01(Number(point?.x)), y: clamp01(Number(point?.y)) }))
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    : [];
+  if (points.length < 3) return null;
+  const normalized = { points };
+  return castZoneArea(normalized) >= 0.0004 ? normalized : null;
+}
+
+function fallbackCastZone() {
+  return { points: DEFAULT_PRO_CAST_ZONE.points.map(point => ({ ...point })) };
+}
+
+function castZoneBounds(zone) {
+  const points = zone?.points || [];
+  if (points.length === 0) return { ...DEFAULT_PRO_CAST_AREA };
+  return normalizeCastArea({
+    minX: Math.min(...points.map(point => point.x)),
+    maxX: Math.max(...points.map(point => point.x)),
+    farY: Math.min(...points.map(point => point.y)),
+    nearY: Math.max(...points.map(point => point.y)),
+  });
+}
+
+function pointInCastZone(point, zone) {
+  const points = zone?.points || [];
+  if (points.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const pi = points[i];
+    const pj = points[j];
+    const crosses = (pi.y > point.y) !== (pj.y > point.y);
+    if (crosses) {
+      const xAtY = ((pj.x - pi.x) * (point.y - pi.y)) / ((pj.y - pi.y) || 0.000001) + pi.x;
+      if (point.x < xAtY) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function closestPointOnSegment(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.000001) return { ...start };
+  const t = clamp01(((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq);
+  return { x: start.x + dx * t, y: start.y + dy * t };
+}
+
+function closestPointInCastZone(point, zone) {
+  const points = zone?.points || [];
+  if (points.length === 0) return point;
+  let best = points[0];
+  let bestDistance = Infinity;
+  points.forEach((start, index) => {
+    const end = points[(index + 1) % points.length];
+    const candidate = closestPointOnSegment(point, start, end);
+    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  });
+  return { x: clamp01(best.x), y: clamp01(best.y) };
+}
+
+function screenCastZoneToWorldZone(zone, viewportWidth, options = {}) {
+  const centeredLeft = Math.max(0, (1 - viewportWidth) / 2);
+  const points = (zone?.points || []).map(point => ({
+    x: clamp01(centeredLeft + point.x * viewportWidth),
+    y: clamp01(point.y),
+  }));
+  const expandX = Math.max(0, Number(options.expandX) || 0);
+  const expandTop = Math.max(0, Number(options.expandTop) || 0);
+  const expandBottom = Math.max(0, Number(options.expandBottom) || 0);
+  if (expandX > 0 || expandTop > 0 || expandBottom > 0) {
+    const bounds = castZoneBounds({ points });
+    return castZoneFromArea({
+      minX: clamp01(bounds.minX - expandX),
+      maxX: clamp01(bounds.maxX + expandX),
+      farY: clamp01(bounds.farY - expandTop),
+      nearY: clamp01(bounds.nearY + expandBottom),
+    });
+  }
+  return { points };
+}
+
+function centeredWorldCastZone(zone, viewportWidth) {
+  return screenCastZoneToWorldZone(zone, viewportWidth, {
+    expandX: Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+    expandTop: CAST_AREA_EXPAND_TOP,
+    expandBottom: CAST_AREA_EXPAND_BOTTOM,
+  });
+}
+
+function clipCastZoneVertical(points, boundaryX, keepGreater) {
+  if (!Array.isArray(points) || points.length === 0) return [];
+  const result = [];
+  const inside = point => keepGreater ? point.x >= boundaryX : point.x <= boundaryX;
+  const intersection = (start, end) => {
+    const dx = end.x - start.x;
+    if (Math.abs(dx) < 0.000001) return { x: boundaryX, y: start.y };
+    const t = clamp01((boundaryX - start.x) / dx);
+    return { x: boundaryX, y: start.y + (end.y - start.y) * t };
+  };
+  points.forEach((current, index) => {
+    const previous = points[(index + points.length - 1) % points.length];
+    const currentInside = inside(current);
+    const previousInside = inside(previous);
+    if (currentInside && !previousInside) {
+      result.push(intersection(previous, current), current);
+    } else if (currentInside) {
+      result.push(current);
+    } else if (previousInside) {
+      result.push(intersection(previous, current));
+    }
+  });
+  return result;
+}
+
+function visibleWorldCastZone(zone, viewLeft, viewportWidth) {
+  const clippedLeft = clipCastZoneVertical(zone?.points || [], viewLeft, true);
+  const clipped = clipCastZoneVertical(clippedLeft, viewLeft + viewportWidth, false);
+  if (clipped.length >= 3) return { points: clipped };
+  return castZoneFromArea(visibleWorldCastArea(castZoneBounds(zone), viewLeft, viewportWidth));
+}
+
+function worldCastZoneToScreen(zone, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) return zone;
+  return {
+    points: (zone?.points || []).map(point => ({
+      x: clamp01((point.x - viewLeft) / viewportWidth),
+      y: clamp01(point.y),
+    }))
+  };
+}
+
 function proCastAreaForLocation(location, bgAsset) {
   return normalizeCastArea(
     PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA
   );
 }
 
-function proCastTargetFromSpot(spot, area = DEFAULT_PRO_CAST_AREA) {
-  return {
+function proCastTargetFromSpot(spot, zone = fallbackCastZone()) {
+  const area = castZoneBounds(zone);
+  const point = {
     x: area.minX + clamp01(Number(spot?.xRoll) || 0) * (area.maxX - area.minX),
     y: area.farY + clamp01(Number(spot?.yRoll) || 0) * (area.nearY - area.farY),
   };
+  return pointInCastZone(point, zone) ? point : closestPointInCastZone(point, zone);
 }
 
 function castDurationFromSwipe(distance, elapsedMs) {
@@ -251,34 +423,40 @@ function worldToScreenRel(point, viewLeft, viewportWidth) {
   };
 }
 
-function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT_PRO_CAST_AREA, options = {}) {
+function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, zone = fallbackCastZone(), options = {}) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
   const distance = Math.hypot(dx, dy);
   const strength = clamp01(distance / (minSide * 0.75));
   const nx = distance > 0 ? dx / distance : 0;
   const ny = distance > 0 ? dy / distance : 0;
+  const area = castZoneBounds(zone);
   const centerX = (area.minX + area.maxX) / 2;
   const centerY = (area.farY + area.nearY) / 2;
   const reachX = (area.maxX - area.minX) / 2;
   const reachY = (area.nearY - area.farY) / 2;
-  const target = {
+  const rawTarget = {
     x: Math.max(area.minX, Math.min(area.maxX, centerX + nx * strength * reachX)),
     y: Math.max(area.farY, Math.min(area.nearY, centerY + ny * strength * reachY)),
   };
+  const target = pointInCastZone(rawTarget, zone) ? rawTarget : closestPointInCastZone(rawTarget, zone);
   const viewportWidth = Number.isFinite(Number(options.viewportWidth)) ? Number(options.viewportWidth) : 1;
   const viewLeft = Number.isFinite(Number(options.viewLeft)) ? Number(options.viewLeft) : 0;
-  const worldArea = normalizeCastArea(options.worldArea || area);
+  const worldZone = options.worldZone || zone;
+  const worldArea = castZoneBounds(worldZone);
   const targetWorld = {
     x: viewLeft + target.x * viewportWidth,
     y: target.y,
   };
+  const projectedWorld = pointInCastZone(targetWorld, worldZone)
+    ? targetWorld
+    : closestPointInCastZone(targetWorld, worldZone);
   const worldWidth = Math.max(0.0001, worldArea.maxX - worldArea.minX);
   const worldHeight = Math.max(0.0001, worldArea.nearY - worldArea.farY);
   return {
-    xRoll: clamp01((targetWorld.x - worldArea.minX) / worldWidth),
-    yRoll: clamp01((targetWorld.y - worldArea.farY) / worldHeight),
+    xRoll: clamp01((projectedWorld.x - worldArea.minX) / worldWidth),
+    yRoll: clamp01((projectedWorld.y - worldArea.farY) / worldHeight),
     proMode: true,
-    panoramicAware: Boolean(options.worldArea && viewportWidth < 0.999),
+    panoramicAware: Boolean(options.worldZone && viewportWidth < 0.999),
     castDurationMs: castDurationFromSwipe(distance, elapsedMs),
   };
 }
@@ -810,11 +988,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     if (byIdOnly) return byIdOnly;
     return LOCATION_BG[1];
   }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, currentLocation?.imageUrl, me.locationId]);
-  const baseCastArea = React.useMemo(
-    () => normalizeCastArea(currentLocation?.castArea || proCastAreaForLocation(currentLocation?.name, bgAsset)),
-    [currentLocation?.castArea, currentLocation?.name, bgAsset]
+  const baseCastZone = React.useMemo(
+    () => normalizeCastZone(currentLocation?.castZone) || fallbackCastZone(),
+    [currentLocation?.castZone]
   );
-  const hasCustomCastArea = Boolean(currentLocation?.castArea);
+  const hasCustomCastZone = Boolean(normalizeCastZone(currentLocation?.castZone));
+  const baseCastArea = React.useMemo(() => castZoneBounds(baseCastZone), [baseCastZone]);
   const assetBgUrl = useAssetSrc(bgAsset);
   const bgUrl = currentLocation?.imageUrl || assetBgUrl;
   const [bgLoaded, setBgLoaded] = React.useState(false);
@@ -847,12 +1026,14 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
     [w, h, backgroundAspect]
   );
   const panoramicMode = proMode && panViewport.canPan;
-  const panoramicCastArea = React.useMemo(
-    () => (hasCustomCastArea
-      ? legacyScreenAreaToWorldArea(baseCastArea, panViewport.visibleWidth)
-      : centeredWorldCastArea(baseCastArea, panViewport.visibleWidth)),
-    [baseCastArea, hasCustomCastArea, panViewport.visibleWidth]
+  const panoramicCastZone = React.useMemo(
+    () => (hasCustomCastZone
+      ? baseCastZone
+      : centeredWorldCastZone(baseCastZone, panViewport.visibleWidth)),
+    [baseCastZone, hasCustomCastZone, panViewport.visibleWidth]
   );
+  const panoramicCastArea = React.useMemo(() => castZoneBounds(panoramicCastZone), [panoramicCastZone]);
+  const activeCastZone = panoramicMode ? panoramicCastZone : baseCastZone;
   const activeCastArea = panoramicMode ? panoramicCastArea : baseCastArea;
   const cameraLimits = React.useMemo(
     () => panoramicMode ? cameraLimitsForArea(panoramicCastArea, panViewport.visibleWidth) : { minLeft: 0, maxLeft: 0 },
@@ -878,14 +1059,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       setCameraViewLeft(clamped);
     }
   }, [cameraLimits.minLeft, cameraLimits.maxLeft, panoramicMode]);
-  const visibleCastArea = React.useMemo(() => {
-    if (!panoramicMode) return baseCastArea;
-    return worldAreaToScreenArea(
-      visibleWorldCastArea(panoramicCastArea, cameraViewLeft, panViewport.visibleWidth),
+  const visibleCastZone = React.useMemo(() => {
+    if (!panoramicMode) return baseCastZone;
+    return worldCastZoneToScreen(
+      visibleWorldCastZone(activeCastZone, cameraViewLeft, panViewport.visibleWidth),
       cameraViewLeft,
       panViewport.visibleWidth
     );
-  }, [baseCastArea, panoramicMode, panoramicCastArea, cameraViewLeft, panViewport.visibleWidth]);
+  }, [activeCastZone, baseCastZone, panoramicMode, cameraViewLeft, panViewport.visibleWidth]);
+  const visibleCastArea = React.useMemo(() => castZoneBounds(visibleCastZone), [visibleCastZone]);
   const panByDirection = React.useCallback((direction) => {
     if (!panoramicMode || casting || biting || tapping) return;
     const step = Math.max(0.06, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER);
@@ -916,10 +1098,10 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
         let target;
         if (castSpot?.proMode || proMode) {
           if (panoramicMode && castSpot?.panoramicAware) {
-            const worldTarget = proCastTargetFromSpot(castSpot, activeCastArea);
+            const worldTarget = proCastTargetFromSpot(castSpot, activeCastZone);
             target = worldToScreenRel(worldTarget, cameraViewLeftRef.current, panViewport.visibleWidth);
           } else {
-            target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, panoramicMode ? visibleCastArea : activeCastArea);
+            target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, panoramicMode ? visibleCastZone : activeCastZone);
           }
         } else {
           const minX = Math.max(0.05, tipRelX - 0.20);
@@ -955,7 +1137,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       setFloatRel(shorePosRel);
       prevCastingRef.current = false;
     }
-  }, [activeCastArea, casting, panViewport.visibleWidth, panoramicMode, shorePosRel, tipX, tweenTo, visibleCastArea, w, castSpot, proMode]);
+  }, [activeCastZone, casting, panViewport.visibleWidth, panoramicMode, shorePosRel, tipX, tweenTo, visibleCastZone, w, castSpot, proMode]);
   const showRipple = castLanded && (biting || tapping);
   const proPointerRef = React.useRef(null);
   const handleProPointerDown = React.useCallback((event) => {
@@ -1067,16 +1249,16 @@ function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity =
       w,
       h,
       elapsedMs,
-      visibleCastArea,
+      visibleCastZone,
       panoramicMode
         ? {
-            worldArea: activeCastArea,
+            worldZone: activeCastZone,
             viewLeft: cameraViewLeftRef.current,
             viewportWidth: panViewport.visibleWidth,
           }
         : undefined
     ));
-  }, [activeCastArea, castReady, casting, h, onCast, panByDirection, panViewport.visibleWidth, panoramicMode, proMode, visibleCastArea, w]);
+  }, [activeCastZone, castReady, casting, h, onCast, panByDirection, panViewport.visibleWidth, panoramicMode, proMode, visibleCastZone, w]);
 
   const handleProPointerUp = React.useCallback((event) => {
     finishProPointer(event, false);
