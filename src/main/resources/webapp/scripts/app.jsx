@@ -254,6 +254,10 @@ function App(){
     if(tab === 'guide'){
       loadAchievements();
     }
+    if(tab !== 'fish'){
+      setResult(null);
+      setCatchDetails(null);
+    }
   }, [tab, loadAchievements]);
 
   const claimAchievement = React.useCallback(async code => {

@@ -404,6 +404,7 @@ fun MainShell(
     onLoadCatchStats: (String) -> Unit,
     onShowErrorMessage: suspend (String) -> Unit,
     onConsumeError: () -> Unit,
+    onDismissFishingOutcome: () -> Unit,
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
@@ -432,6 +433,12 @@ fun MainShell(
             MainTab.CLUB to strings.club,
             MainTab.SHOP to strings.shop,
         )
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != MainTab.FISHING) {
+            onDismissFishingOutcome()
+        }
     }
 
     LaunchedEffect(state.error, selectedTab, strings) {

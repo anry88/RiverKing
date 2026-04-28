@@ -1479,6 +1479,18 @@ class RiverKingViewModel(
         _state.update { it.copy(selectedCatch = null, selectedCatchCard = null, catchLoading = false) }
     }
 
+    fun dismissFishingOutcome() {
+        _state.update {
+            it.copy(
+                fishing = it.fishing.copy(
+                    lastCast = null,
+                    lastEscape = false,
+                    lastCatchWasNewFish = false,
+                )
+            )
+        }
+    }
+
     fun isGoogleEnabled(): Boolean = BuildConfig.GOOGLE_AUTH_ENABLED
 
     fun isPlayFlavor(): Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "play"
