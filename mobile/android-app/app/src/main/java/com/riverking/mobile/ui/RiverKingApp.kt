@@ -257,6 +257,7 @@ fun RiverKingApp(
                         onSetRatingsFish = viewModel::setRatingsFish,
                         onLoadRatings = viewModel::loadRatings,
                         onLoadGuide = viewModel::loadGuide,
+                        onLoadEventGuideLocations = viewModel::loadEventGuideLocations,
                         onClaimAchievement = viewModel::claimAchievement,
                         onDismissAchievementReward = viewModel::dismissAchievementReward,
                         onLoadClub = viewModel::loadClub,
@@ -291,6 +292,7 @@ fun RiverKingApp(
                         onLoadCatchStats = viewModel::loadCatchStats,
                         onShowErrorMessage = { message -> snackbarHostState.showSnackbar(message) },
                         onConsumeError = viewModel::consumeError,
+                        onDismissFishingOutcome = viewModel::dismissFishingOutcome,
                     )
                 }
                 if (appUpdate != null && !appUpdate.isMandatory) {

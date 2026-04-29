@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 2,
-  "latestVersionName": "0.2.2",
-  "minSupportedVersionCode": 1,
-  "requireVersionHeaders": false,
+  "latestVersionCode": 4,
+  "latestVersionName": "0.4.0",
+  "minSupportedVersionCode": 4,
+  "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added Pro fishing mode with fullscreen casting gestures.",
-      "Improved the Android fishing screen with in-scene auto-fishing and Pro mode controls."
+      "Mandatory update: special club events add temporary event locations, club leaderboards, and event prizes.",
+      "Tournaments now have Regular and Special sections, and club screens include a Tournament tab for current and previous events."
     ],
     "ru": [
-      "Добавлен Pro-режим рыбалки с полноэкранным забросом жестом.",
-      "Улучшен экран рыбалки на Android: автоловля и Pro-режим теперь доступны прямо на сцене."
+      "Обязательное обновление: специальные клубные события добавляют временные локации, клубные рейтинги и event-награды.",
+      "В турнирах появились разделы Регулярные и Специальные, а в клубах добавлена вкладка Турнир для текущих и прошлых событий."
     ]
   }
 }

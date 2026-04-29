@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.and
@@ -25,6 +26,11 @@ data class LocationDTO(
     val name: String,
     val unlockKg: Double,
     val unlocked: Boolean,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDTO? = null,
+    val isEvent: Boolean = false,
+    val lockedReason: String? = null,
 )
 
 @Serializable
@@ -54,12 +60,55 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     companion object {
         private const val DEFAULT_ROD_CODE = "spark"
         private const val BEGINNER_CATCH_THRESHOLD = 6
+        private const val MIN_CHALLENGE_TAPS = 3
+        private const val MAX_CHALLENGE_TAPS = 22
+
+        internal fun rarityTapCount(rarity: String): Int = when (rarity) {
+            "common" -> 2
+            "uncommon" -> 4
+            "rare" -> 6
+            "epic" -> 8
+            "mythic" -> 10
+            "legendary" -> 12
+            else -> 2
+        }
+
+        internal fun weightTapCount(weight: Double): Int = when {
+            weight < 1.0 -> 1
+            weight < 5.0 -> 2
+            weight < 10.0 -> 3
+            weight < 30.0 -> 4
+            weight < 60.0 -> 5
+            weight < 100.0 -> 6
+            weight < 150.0 -> 7
+            weight < 250.0 -> 8
+            weight < 400.0 -> 9
+            else -> 10
+        }
+
+        internal fun hookChallengeFor(rarity: String, weight: Double): HookChallengeDTO {
+            val tapGoal = rarityTapCount(rarity) + weightTapCount(weight)
+            val durationMs = when {
+                tapGoal > 15 -> 15_000
+                tapGoal > 10 -> 10_000
+                else -> 5_000
+            }
+            val struggleIntensity = ((tapGoal - MIN_CHALLENGE_TAPS).toDouble() /
+                (MAX_CHALLENGE_TAPS - MIN_CHALLENGE_TAPS).toDouble())
+                .coerceIn(0.0, 1.0)
+            return HookChallengeDTO(
+                tapGoal = tapGoal,
+                durationMs = durationMs,
+                struggleIntensity = struggleIntensity,
+            )
+        }
     }
     data class DailyReward(val name: String, val qty: Int)
 
     private val ratingZone: ZoneId = ZoneId.of("Europe/Belgrade")
     private val clubs = ClubService()
     private val clubQuests = ClubQuestService()
+    private val specialEvents = SpecialEventService()
 
     @Serializable
     data class StartCastResult(
@@ -451,17 +500,39 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .withDistinct().map { it[Catches.fishId].value }
     }
 
-    fun locations(userId: Long): List<LocationDTO> = transaction {
+    fun locations(
+        userId: Long,
+        language: String = "ru",
+        eventImageUrl: (String?) -> String? = { null },
+    ): List<LocationDTO> = transaction {
         val total = totalKg(userId)
-        Locations.selectAll().orderBy(Locations.unlockKg).map {
+        val eventLocation = specialEvents.currentEventLocationForUserTx(userId, language)?.let {
+            LocationDTO(
+                id = it.locationId,
+                name = it.name,
+                unlockKg = 0.0,
+                unlocked = it.unlocked,
+                eventId = it.eventId,
+                imageUrl = eventImageUrl(it.imagePath),
+                castZone = it.castZone,
+                isEvent = true,
+                lockedReason = it.lockedReason,
+            )
+        }
+        val regular = Locations
+            .select { Locations.specialEventId.isNull() }
+            .orderBy(Locations.unlockKg)
+            .map {
             val unlock = it[Locations.unlockKg]
             LocationDTO(
                 it[Locations.id].value,
                 it[Locations.name],
                 unlock,
                 unlock <= total,
+                castZone = CastZoneCodec.decode(it[Locations.castZoneJson]),
             )
-        }
+            }
+        listOfNotNull(eventLocation) + regular
     }
 
     fun listRods(userId: Long): List<RodDTO> = transaction {
@@ -741,6 +812,17 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val name: String,
         val fish: List<FishBriefDTO>,
         val lures: List<String>,
+        val imageUrl: String? = null,
+        val isEvent: Boolean = false,
+        val startTime: Long? = null,
+        val endTime: Long? = null,
+    )
+
+    @Serializable
+    data class GuideLocationPageDTO(
+        val locations: List<GuideLocationDTO>,
+        val nextOffset: Long? = null,
+        val hasMore: Boolean = false,
     )
 
     @Serializable
@@ -808,7 +890,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             val name: String,
         )
 
-        val locations = Locations.selectAll()
+        val locations = Locations.select { Locations.specialEventId.isNull() }
             .orderBy(Locations.unlockKg)
             .map { LocationData(it[Locations.id].value, I18n.location(it[Locations.name], lang)) }
         val locationOrder = locations.mapIndexed { index, loc -> loc.id to index }.toMap()
@@ -912,6 +994,64 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
         GuideDTO(locationDtos, fishDtos, lureDtos, rodDtos)
+    }
+
+    fun eventGuideLocations(
+        lang: String,
+        limit: Int = 10,
+        offset: Long = 0L,
+        eventImageUrl: (String?) -> String? = { null },
+    ): GuideLocationPageDTO = transaction {
+        fun rarityRank(r: String) = when (r) {
+            "common" -> 0
+            "uncommon" -> 1
+            "rare" -> 2
+            "epic" -> 3
+            "mythic" -> 4
+            "legendary" -> 5
+            else -> 6
+        }
+
+        val pageLimit = limit.coerceIn(1, 10)
+        val events = SpecialEvents.selectAll()
+            .orderBy(SpecialEvents.startTime to SortOrder.DESC, SpecialEvents.id to SortOrder.DESC)
+            .limit(pageLimit + 1, offset.coerceAtLeast(0L))
+            .toList()
+        val visibleEvents = events.take(pageLimit)
+        val allLureNames = Lures.selectAll()
+            .orderBy(Lures.id)
+            .map { I18n.lure(it[Lures.name], lang) }
+            .distinct()
+            .sorted()
+        val locations = visibleEvents.mapNotNull { eventRow ->
+            val eventId = eventRow[SpecialEvents.id].value
+            val locationId = Locations
+                .slice(Locations.id)
+                .select { Locations.specialEventId eq eventId }
+                .limit(1)
+                .singleOrNull()
+                ?.get(Locations.id)
+                ?.value
+                ?: return@mapNotNull null
+            val fishRows = (SpecialEventFish innerJoin Fish)
+                .slice(Fish.name, Fish.rarity)
+                .select { SpecialEventFish.eventId eq eventId }
+                .map { FishBriefDTO(I18n.fish(it[Fish.name], lang), it[Fish.rarity]) }
+                .distinctBy { it.name }
+                .sortedBy { rarityRank(it.rarity) }
+            GuideLocationDTO(
+                id = locationId,
+                name = if (lang == "en") eventRow[SpecialEvents.nameEn] else eventRow[SpecialEvents.nameRu],
+                fish = fishRows,
+                lures = allLureNames,
+                imageUrl = eventImageUrl(eventRow[SpecialEvents.imagePath]),
+                isEvent = true,
+                startTime = eventRow[SpecialEvents.startTime].epochSecond,
+                endTime = eventRow[SpecialEvents.endTime].epochSecond,
+            )
+        }
+        val nextOffset = if (events.size > pageLimit) offset.coerceAtLeast(0L) + pageLimit else null
+        GuideLocationPageDTO(locations, nextOffset, hasMore = nextOffset != null)
     }
 
     data class ShopPackage(
@@ -1449,15 +1589,118 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         require(!casting) { "casting" }
         val loc = Locations.selectAll().where { Locations.id eq locationId }.singleOrNull()
             ?: error("bad location")
-        val total = totalKg(userId)
-        require(loc[Locations.unlockKg] <= total) { "locked" }
-        Users.update({ Users.id eq userId }) { it[currentLocationId] = locationId }
+        val eventId = loc[Locations.specialEventId]
+        if (eventId != null) {
+            val event = specialEvents.validateCanUseEventLocationTx(userId, locationId, Instant.now(clock))
+                ?: throw IllegalArgumentException("event_inactive")
+            Users.update({ Users.id eq userId }) {
+                it[currentLocationId] = locationId
+                it[currentEventId] = event.id
+            }
+        } else {
+            val total = totalKg(userId)
+            require(loc[Locations.unlockKg] <= total) { "locked" }
+            Users.update({ Users.id eq userId }) {
+                it[currentLocationId] = locationId
+                it[currentEventId] = null
+            }
+        }
     }
 
     /**
      * Consume a lure and validate that it can be used at the current location.
      * Returns the new current lure id if changed after consumption.
      */
+    private data class FishPoolEntry(
+        val fishId: Long,
+        val fishName: String,
+        val meanKg: Double,
+        val varKg: Double,
+        val rarity: String,
+        val predator: Boolean,
+        val water: String,
+        val poolWeight: Double,
+    )
+
+    private fun firstUnlockedRegularLocationIdTx(total: Double): Long =
+        Locations
+            .select { (Locations.unlockKg lessEq total) and Locations.specialEventId.isNull() }
+            .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+            .first()[Locations.id].value
+
+    private fun eventForLocationTx(userId: Long, locRow: ResultRow, now: Instant): SpecialEvent? {
+        if (locRow[Locations.specialEventId] == null) return null
+        return specialEvents.validateCanUseEventLocationTx(userId, locRow[Locations.id].value, now)
+            ?: throw IllegalArgumentException("event_inactive")
+    }
+
+    private fun fishPoolForLocationTx(
+        locId: Long,
+        lurePredator: Boolean,
+        lureWater: String,
+        event: SpecialEvent?,
+    ): List<FishPoolEntry> {
+        return if (event != null) {
+            (SpecialEventFish innerJoin Fish)
+                .slice(
+                    Fish.id,
+                    Fish.name,
+                    Fish.meanKg,
+                    Fish.varKg,
+                    Fish.rarity,
+                    Fish.predator,
+                    Fish.water,
+                    SpecialEventFish.weight,
+                )
+                .select {
+                    SpecialEventFish.eventId eq event.id
+                }
+                .map {
+                    val predatorFactor = if (it[Fish.predator] == lurePredator) 1.0 else 0.18
+                    val waterFactor = if (it[Fish.water] == lureWater) 1.0 else 0.65
+                    FishPoolEntry(
+                        fishId = it[Fish.id].value,
+                        fishName = it[Fish.name],
+                        meanKg = it[Fish.meanKg],
+                        varKg = it[Fish.varKg],
+                        rarity = it[Fish.rarity],
+                        predator = it[Fish.predator],
+                        water = it[Fish.water],
+                        poolWeight = it[SpecialEventFish.weight] * predatorFactor * waterFactor,
+                    )
+                }
+        } else {
+            (LocationFishWeights innerJoin Fish)
+                .slice(
+                    Fish.id,
+                    Fish.name,
+                    Fish.meanKg,
+                    Fish.varKg,
+                    Fish.rarity,
+                    Fish.predator,
+                    Fish.water,
+                    LocationFishWeights.weight,
+                )
+                .select {
+                    (LocationFishWeights.locationId eq locId) and
+                        (Fish.predator eq lurePredator) and
+                        (Fish.water eq lureWater)
+                }
+                .map {
+                    FishPoolEntry(
+                        fishId = it[Fish.id].value,
+                        fishName = it[Fish.name],
+                        meanKg = it[Fish.meanKg],
+                        varKg = it[Fish.varKg],
+                        rarity = it[Fish.rarity],
+                        predator = it[Fish.predator],
+                        water = it[Fish.water],
+                        poolWeight = it[LocationFishWeights.weight],
+                    )
+                }
+        }
+    }
+
     fun startCast(userId: Long): StartCastResult = transaction {
         val userRow = Users.select { Users.id eq userId }.single()
         require(!userRow[Users.isCasting]) { "casting" }
@@ -1476,12 +1719,11 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         ensureRodInventory(userId, total)
         ensureCurrentRod(userId, total)
         val locId = Users.select { Users.id eq userId }.single()[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
         val locRow = Locations.select { Locations.id eq locId }.single()
-        require(locRow[Locations.unlockKg] <= total) { "locked" }
-        val hasFish = (LocationFishWeights innerJoin Fish)
-            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
-            .limit(1).any()
+        val event = eventForLocationTx(userId, locRow, Instant.now(clock))
+        if (event == null) require(locRow[Locations.unlockKg] <= total) { "locked" }
+        val hasFish = fishPoolForLocationTx(locId, lurePred, lureWater, event).isNotEmpty()
         require(hasFish) { "No suitable fish" }
 
         InventoryLures.update({ (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }) {
@@ -1555,9 +1797,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val rodId = ensureCurrentRod(userId, total)
         val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
         val locId = userRow[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }
-                .orderBy(Locations.unlockKg)
-                .first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
+        val locRow = Locations.select { Locations.id eq locId }.single()
+        eventForLocationTx(userId, locRow, Instant.now(clock))
         val lureId = userRow[Users.castLureId]?.value ?: userRow[Users.currentLureId]?.value
         val lureRow = lureId?.let { Lures.select { Lures.id eq it }.singleOrNull() }
         val bonus = if (lureRow != null) {
@@ -1600,7 +1842,28 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     )
 
     @Serializable
-    data class HookResultDTO(val success: Boolean, val autoFish: Boolean)
+    data class HookedFishDTO(
+        val fishId: Long,
+        val fish: String,
+        val weight: Double,
+        val location: String,
+        val rarity: String,
+    )
+
+    @Serializable
+    data class HookChallengeDTO(
+        val tapGoal: Int,
+        val durationMs: Int,
+        val struggleIntensity: Double,
+    )
+
+    @Serializable
+    data class HookResultDTO(
+        val success: Boolean,
+        val autoFish: Boolean,
+        val hookedFish: HookedFishDTO? = null,
+        val challenge: HookChallengeDTO? = null,
+    )
 
     @Serializable
     data class CastResultDTO(
@@ -1628,9 +1891,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     }
 
     private fun locationTier(locId: Long): Int {
+        val isEventLocation = Locations
+            .slice(Locations.specialEventId)
+            .select { Locations.id eq locId }
+            .singleOrNull()
+            ?.get(Locations.specialEventId) != null
+        if (isEventLocation) return 0
         val ordered = Locations
             .slice(Locations.id, Locations.unlockKg)
-            .selectAll()
+            .select { Locations.specialEventId.isNull() }
             .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
             .mapIndexed { index, row -> row[Locations.id].value to index }
             .toMap()
@@ -1687,30 +1956,20 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
         val total = totalKg(userId)
         val locId = userRow[Users.currentLocationId]?.value
-            ?: Locations.select { Locations.unlockKg lessEq total }.orderBy(Locations.unlockKg).first()[Locations.id].value
+            ?: firstUnlockedRegularLocationIdTx(total)
         val locRow = Locations.select { Locations.id eq locId }.single()
-        require(locRow[Locations.unlockKg] <= total) { "locked" }
-        val pool = (LocationFishWeights innerJoin Fish)
-            .slice(
-                Fish.id,
-                Fish.meanKg,
-                Fish.varKg,
-                Fish.rarity,
-                Fish.predator,
-                Fish.water,
-                LocationFishWeights.weight,
-            )
-            .select { (LocationFishWeights.locationId eq locId) and (Fish.predator eq lurePred) and (Fish.water eq lureWater) }
-            .toList()
+        val event = eventForLocationTx(userId, locRow, Instant.now(clock))
+        if (event == null) require(locRow[Locations.unlockKg] <= total) { "locked" }
+        val pool = fishPoolForLocationTx(locId, lurePred, lureWater, event)
         require(pool.isNotEmpty()) { "No suitable fish" }
 
         val wait = waitSeconds.coerceIn(5, 30)
         val factor = ((wait - 5).toDouble() / 25.0 + rarityBonus).coerceIn(0.0, 1.0)
         val rnd = Rng.fast()
-        val totalWeight = pool.sumOf { it[LocationFishWeights.weight] * rarityModifier(it[Fish.rarity], factor) }
+        val totalWeight = pool.sumOf { it.poolWeight * rarityModifier(it.rarity, factor) }
         var roll = rnd.nextDouble() * totalWeight
         val picked = pool.first { row2 ->
-            roll -= row2[LocationFishWeights.weight] * rarityModifier(row2[Fish.rarity], factor)
+            roll -= row2.poolWeight * rarityModifier(row2.rarity, factor)
             roll <= 0.0
         }
 
@@ -1721,8 +1980,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val rodRow = Rods.select { Rods.id eq rodId }.singleOrNull()
         val escapeChance = baseEscapeChance(locId) * rodBonusMultiplier(
             rodRow,
-            picked[Fish.water],
-            picked[Fish.predator],
+            picked.water,
+            picked.predator,
         ) + extraEscapeChance
 
         fun escape(): HookResultDTO {
@@ -1744,8 +2003,12 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
         if (!auto && !isBeginner && rnd.nextDouble() > catchChance) return@transaction escape()
 
-        val fishId = picked[Fish.id].value
-        val weight = Rng.logNormalKg(picked[Fish.meanKg], picked[Fish.varKg]) * locRow[Locations.sizeMultiplier]
+        val fishId = picked.fishId
+        val fishName = picked.fishName
+        val rarity = picked.rarity
+        val weight = Rng.logNormalKg(picked.meanKg, picked.varKg) * locRow[Locations.sizeMultiplier]
+        val locName = locRow[Locations.name]
+        val challenge = hookChallengeFor(rarity, weight)
 
         val now = Instant.now()
         val updated = PendingCatches.update({ PendingCatches.userId eq userId }) {
@@ -1772,7 +2035,18 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             }
         }
 
-        HookResultDTO(true, auto)
+        HookResultDTO(
+            success = true,
+            autoFish = auto,
+            hookedFish = HookedFishDTO(
+                fishId = fishId,
+                fish = fishName,
+                weight = weight,
+                location = locName,
+                rarity = rarity,
+            ),
+            challenge = challenge,
+        )
     }
 
     fun cast(
@@ -1839,7 +2113,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val totalAfter = totalBefore + weight
         val unlockedLocations = if (totalAfter > totalBefore) {
             Locations.select {
-                (Locations.unlockKg greater totalBefore) and (Locations.unlockKg lessEq totalAfter)
+                (Locations.unlockKg greater totalBefore) and
+                    (Locations.unlockKg lessEq totalAfter) and
+                    Locations.specialEventId.isNull()
             }.orderBy(Locations.unlockKg).map { it[Locations.name] }
         } else {
             emptyList()
@@ -1872,6 +2148,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.createdAt] = caughtAt
             it[Catches.coins] = coinsAwarded
         }
+        specialEvents.recordCatchTx(userId, catchId.value, fishId, rarity, weight, locId, caughtAt)
 
         val achievements = AchievementService.updateOnCatch(userId, fishId, locId)
         val questResult = QuestService.updateOnCatch(
@@ -1963,6 +2240,22 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 )
             }
             .singleOrNull()
+    }
+
+    fun eventImagePathForCatch(catchId: Long): String? = transaction {
+        val eventId = (Catches innerJoin Locations)
+            .slice(Locations.specialEventId)
+            .select { Catches.id eq catchId }
+            .limit(1)
+            .singleOrNull()
+            ?.get(Locations.specialEventId)
+            ?: return@transaction null
+        SpecialEvents
+            .slice(SpecialEvents.imagePath)
+            .select { SpecialEvents.id eq eventId }
+            .limit(1)
+            .singleOrNull()
+            ?.get(SpecialEvents.imagePath)
     }
 
     private fun rarityRank(r: String) = when (r) {

@@ -16,12 +16,16 @@ import com.riverking.mobile.auth.ClubSummaryDto
 import com.riverking.mobile.auth.CurrentTournamentDto
 import com.riverking.mobile.auth.GuideDto
 import com.riverking.mobile.auth.GuideFishDto
+import com.riverking.mobile.auth.GuideLocationDto
+import com.riverking.mobile.auth.HookResultDto
+import com.riverking.mobile.auth.HookedFishDto
 import com.riverking.mobile.auth.MeResponseDto
 import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.ReferralInfoDto
 import com.riverking.mobile.auth.ReferralRewardDto
 import com.riverking.mobile.auth.ShopCategoryDto
+import com.riverking.mobile.auth.SpecialEventResponseDto
 import com.riverking.mobile.auth.StartCastResultDto
 import com.riverking.mobile.auth.TelegramLinkPollResult
 import com.riverking.mobile.auth.TelegramLinkStartDto
@@ -58,6 +62,7 @@ data class FishingCastSpot(
     val xRoll: Float,
     val yRoll: Float,
     val proMode: Boolean = false,
+    val panoramicAware: Boolean = false,
     val castDurationMillis: Int = CAST_ANIMATION_DEFAULT_MILLIS,
 )
 
@@ -96,6 +101,9 @@ data class FishingUiState(
     val phaseTimeLeftMillis: Long = 0L,
     val tapCount: Int = 0,
     val tapGoal: Int = TAP_CHALLENGE_GOAL,
+    val tapDurationMillis: Long = TAP_CHALLENGE_MILLIS,
+    val hookedFish: HookedFishDto? = null,
+    val struggleIntensity: Double = 0.0,
     val autoCastEnabled: Boolean = false,
     val castWaitSeconds: Int = 0,
     val castSpot: FishingCastSpot? = null,
@@ -111,6 +119,8 @@ data class TournamentsUiState(
     val current: CurrentTournamentDto? = null,
     val upcoming: List<TournamentDto> = emptyList(),
     val past: List<TournamentDto> = emptyList(),
+    val currentEvent: SpecialEventResponseDto? = null,
+    val previousEvent: SpecialEventResponseDto? = null,
     val prizes: List<PrizeDto> = emptyList(),
     val selectedTournamentId: Long? = null,
     val selectedTournament: CurrentTournamentDto? = null,
@@ -135,12 +145,18 @@ data class GuideUiState(
     val guide: GuideDto? = null,
     val achievements: List<AchievementDto> = emptyList(),
     val quests: QuestListDto? = null,
+    val eventLocations: List<GuideLocationDto> = emptyList(),
+    val eventLocationsLoading: Boolean = false,
+    val eventLocationsNextOffset: Long = 0L,
+    val eventLocationsHasMore: Boolean = true,
 )
 
 data class ClubUiState(
     val loaded: Boolean = false,
     val loading: Boolean = false,
     val club: ClubDetailsDto? = null,
+    val currentEvent: SpecialEventResponseDto? = null,
+    val previousEvent: SpecialEventResponseDto? = null,
     val searchResults: List<ClubSummaryDto> = emptyList(),
     val searchLoading: Boolean = false,
     val chat: List<ClubChatMessageDto> = emptyList(),
@@ -499,6 +515,11 @@ class RiverKingViewModel(
                         castSpot = castSpot,
                         lastCast = null,
                         lastEscape = false,
+                        tapCount = 0,
+                        hookedFish = null,
+                        tapGoal = TAP_CHALLENGE_GOAL,
+                        tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                        struggleIntensity = 0.0,
                     ),
                     error = null,
                 )
@@ -559,7 +580,7 @@ class RiverKingViewModel(
         if (state.value.fishing.phase != FishingPhase.TAP_CHALLENGE) return
         val nextCount = state.value.fishing.tapCount + 1
         _state.update { it.copy(fishing = it.fishing.copy(tapCount = nextCount)) }
-        if (nextCount >= TAP_CHALLENGE_GOAL) {
+        if (nextCount >= state.value.fishing.tapGoal) {
             finalizeCatch(success = true)
         }
     }
@@ -618,6 +639,8 @@ class RiverKingViewModel(
                     val current = async { repository.loadCurrentTournament() }
                     val upcoming = async { repository.loadUpcomingTournaments() }
                     val past = async { repository.loadPastTournaments() }
+                    val currentEvent = async { repository.loadCurrentEvent() }
+                    val previousEvent = async { repository.loadPreviousEvent() }
                     val prizes = async { repository.loadPendingPrizes() }
                     TournamentsUiState(
                         loaded = true,
@@ -625,6 +648,8 @@ class RiverKingViewModel(
                         current = current.await(),
                         upcoming = upcoming.await(),
                         past = past.await(),
+                        currentEvent = currentEvent.await(),
+                        previousEvent = previousEvent.await(),
                         prizes = prizes.await(),
                         selectedTournamentId = state.value.tournaments.selectedTournamentId,
                         selectedTournament = state.value.tournaments.selectedTournament,
@@ -834,8 +859,14 @@ class RiverKingViewModel(
                     )
                 }
                 _state.update {
+                    val previousGuide = it.guide
                     it.copy(
-                        guide = data,
+                        guide = data.copy(
+                            eventLocations = if (force) emptyList() else previousGuide.eventLocations,
+                            eventLocationsLoading = false,
+                            eventLocationsNextOffset = if (force) 0L else previousGuide.eventLocationsNextOffset,
+                            eventLocationsHasMore = if (force) true else previousGuide.eventLocationsHasMore,
+                        ),
                         ratings = it.ratings.copy(
                             fishOptions = data.guide?.fish ?: it.ratings.fishOptions,
                         ),
@@ -847,6 +878,45 @@ class RiverKingViewModel(
                 _state.update {
                     it.copy(
                         guide = it.guide.copy(loading = false),
+                        error = message,
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadEventGuideLocations(reset: Boolean = false) {
+        if (state.value.me == null) return
+        val current = state.value.guide
+        if (current.eventLocationsLoading) return
+        if (!reset && !current.eventLocationsHasMore) return
+        val offset = if (reset) 0L else current.eventLocationsNextOffset
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    guide = it.guide.copy(eventLocationsLoading = true),
+                    error = null,
+                )
+            }
+            try {
+                val page = repository.loadEventGuideLocations(offset = offset, limit = 10)
+                _state.update {
+                    val previous = if (reset) emptyList() else it.guide.eventLocations
+                    it.copy(
+                        guide = it.guide.copy(
+                            eventLocations = previous + page.locations,
+                            eventLocationsLoading = false,
+                            eventLocationsNextOffset = page.nextOffset ?: (offset + page.locations.size),
+                            eventLocationsHasMore = page.hasMore,
+                        ),
+                        error = null,
+                    )
+                }
+            } catch (error: Throwable) {
+                val message = describeError(error)
+                _state.update {
+                    it.copy(
+                        guide = it.guide.copy(eventLocationsLoading = false),
                         error = message,
                     )
                 }
@@ -915,13 +985,20 @@ class RiverKingViewModel(
         viewModelScope.launch {
             _state.update { it.copy(club = it.club.copy(loading = true), error = null) }
             try {
-                val club = repository.loadClub()
+                val data = coroutineScope {
+                    val club = async { repository.loadClub() }
+                    val currentEvent = async { repository.loadCurrentEvent() }
+                    val previousEvent = async { repository.loadPreviousEvent() }
+                    Triple(club.await(), currentEvent.await(), previousEvent.await())
+                }
                 _state.update {
                     it.copy(
                         club = it.club.copy(
                             loaded = true,
                             loading = false,
-                            club = club,
+                            club = data.first,
+                            currentEvent = data.second,
+                            previousEvent = data.third,
                         )
                     )
                 }
@@ -1402,6 +1479,18 @@ class RiverKingViewModel(
         _state.update { it.copy(selectedCatch = null, selectedCatchCard = null, catchLoading = false) }
     }
 
+    fun dismissFishingOutcome() {
+        _state.update {
+            it.copy(
+                fishing = it.fishing.copy(
+                    lastCast = null,
+                    lastEscape = false,
+                    lastCatchWasNewFish = false,
+                )
+            )
+        }
+    }
+
     fun isGoogleEnabled(): Boolean = BuildConfig.GOOGLE_AUTH_ENABLED
 
     fun isPlayFlavor(): Boolean = BuildConfig.DISTRIBUTION_CHANNEL == "play"
@@ -1786,7 +1875,7 @@ class RiverKingViewModel(
                     return@launch
                 }
                 hookReactionSeconds = reaction
-                startTapChallenge()
+                startTapChallenge(result)
             } catch (error: Throwable) {
                 val message = describeError(error)
                 _state.update { it.copy(error = message) }
@@ -1795,14 +1884,22 @@ class RiverKingViewModel(
         }
     }
 
-    private fun startTapChallenge() {
+    private fun startTapChallenge(result: HookResultDto) {
+        val challenge = result.challenge
+        val tapGoal = challenge?.tapGoal?.coerceAtLeast(1) ?: TAP_CHALLENGE_GOAL
+        val durationMillis = challenge?.durationMs?.coerceAtLeast(1_000)?.toLong() ?: TAP_CHALLENGE_MILLIS
+        val intensity = challenge?.struggleIntensity?.coerceIn(0.0, 1.0) ?: 0.0
         tapJob?.cancel()
         _state.update {
             it.copy(
                 fishing = it.fishing.copy(
                     phase = FishingPhase.TAP_CHALLENGE,
-                    phaseTimeLeftMillis = TAP_CHALLENGE_MILLIS,
+                    phaseTimeLeftMillis = durationMillis,
                     tapCount = 0,
+                    tapGoal = tapGoal,
+                    tapDurationMillis = durationMillis,
+                    hookedFish = result.hookedFish,
+                    struggleIntensity = intensity,
                 )
             )
         }
@@ -1810,7 +1907,7 @@ class RiverKingViewModel(
         tapJob = viewModelScope.launch {
             while (isActive) {
                 val elapsed = System.currentTimeMillis() - startedAt
-                val remaining = (TAP_CHALLENGE_MILLIS - elapsed).coerceAtLeast(0L)
+                val remaining = (durationMillis - elapsed).coerceAtLeast(0L)
                 _state.update { it.copy(fishing = it.fishing.copy(phaseTimeLeftMillis = remaining)) }
                 if (remaining <= 0L) break
                 delay(50L)
@@ -1839,7 +1936,7 @@ class RiverKingViewModel(
                         fishing = it.fishing.copy(
                             lastCast = cast,
                             lastCatchWasNewFish = isNewFish,
-                            lastEscape = false,
+                            lastEscape = !cast.caught,
                         ),
                     )
                 }
@@ -1848,6 +1945,8 @@ class RiverKingViewModel(
                         refreshQuests = cast.questProgressChanged || cast.questUpdates.isNotEmpty(),
                         refreshAchievements = cast.achievements.isNotEmpty(),
                     )
+                    loadTournaments(force = true)
+                    if (state.value.club.loaded) loadClub(force = true)
                 }
                 startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
                 val caught = cast.catch
@@ -1906,6 +2005,10 @@ class RiverKingViewModel(
                     phase = FishingPhase.COOLDOWN,
                     phaseTimeLeftMillis = CAST_READY_DELAY_MILLIS,
                     tapCount = 0,
+                    tapGoal = TAP_CHALLENGE_GOAL,
+                    tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                    hookedFish = null,
+                    struggleIntensity = 0.0,
                     castSpot = null,
                 )
             )
@@ -1925,6 +2028,10 @@ class RiverKingViewModel(
                         phase = FishingPhase.READY,
                         phaseTimeLeftMillis = 0L,
                         tapCount = 0,
+                        tapGoal = TAP_CHALLENGE_GOAL,
+                        tapDurationMillis = TAP_CHALLENGE_MILLIS,
+                        hookedFish = null,
+                        struggleIntensity = 0.0,
                     )
                 )
             }

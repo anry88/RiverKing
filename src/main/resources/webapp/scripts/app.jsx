@@ -72,6 +72,9 @@ function App(){
   const [pastTournaments,setPastTournaments] = React.useState([]);
   const [pastResult,setPastResult] = React.useState(null);
   const [tournamentTab,setTournamentTab] = React.useState('current');
+  const [tournamentKind,setTournamentKind] = React.useState('regular');
+  const [currentEvent,setCurrentEvent] = React.useState(null);
+  const [previousEvent,setPreviousEvent] = React.useState(null);
   const [nickOpen,setNickOpen] = React.useState(false);
   const [prize,setPrize] = React.useState(null);
   const [prizeHint,setPrizeHint] = React.useState(null);
@@ -131,8 +134,7 @@ function App(){
   const [autoCast,setAutoCast] = React.useState(()=>{ try{ return localStorage.getItem('autoCast')==='1'; }catch(e){ return false; }});
   const autoCastRef = React.useRef(autoCast);
   const autoCastTimeoutRef = React.useRef(null);
-  const [proFishingMode,setProFishingMode] = React.useState(()=>{ try{ return localStorage.getItem('proFishingMode')==='1'; }catch(e){ return false; }});
-  const proFishingModeRef = React.useRef(proFishingMode);
+  const proFishingMode = true;
   const [currentCastSpot,setCurrentCastSpot] = React.useState(null);
   const [castReady,setCastReady] = React.useState(true);
   const castReadyRef = React.useRef(true);
@@ -141,11 +143,16 @@ function App(){
   const tapActiveRef = React.useRef(false);
   const [tapCount,setTapCount] = React.useState(0);
   const tapCountRef = React.useRef(0);
+  const [tapGoal,setTapGoal] = React.useState(TAP_CHALLENGE_GOAL);
+  const tapGoalRef = React.useRef(TAP_CHALLENGE_GOAL);
+  const tapDurationMsRef = React.useRef(TAP_CHALLENGE_DURATION_MS);
   const [tapTimeLeft,setTapTimeLeft] = React.useState(TAP_CHALLENGE_DURATION_MS/1000);
   const tapDeadlineRef = React.useRef(0);
   const tapReactionRef = React.useRef(0);
   const tapTimerRef = React.useRef(null);
   const tapFinishingRef = React.useRef(false);
+  const [hookedFish,setHookedFish] = React.useState(null);
+  const [struggleIntensity,setStruggleIntensity] = React.useState(0);
   const catchAnimationIdRef = React.useRef(0);
   const lastCatchAnimationShownRef = React.useRef(null);
   const essentialAssetsRef = React.useRef(new Set());
@@ -247,6 +254,10 @@ function App(){
     if(tab === 'guide'){
       loadAchievements();
     }
+    if(tab !== 'fish'){
+      setResult(null);
+      setCatchDetails(null);
+    }
   }, [tab, loadAchievements]);
 
   const claimAchievement = React.useCallback(async code => {
@@ -296,11 +307,7 @@ function App(){
   }, [autoCast, me?.autoFish]);
   React.useEffect(()=>{ try{ localStorage.setItem('autoCast', autoCast?'1':'0'); }catch(e){} }, [autoCast]);
   React.useEffect(()=>{
-    proFishingModeRef.current = proFishingMode;
-    try{ localStorage.setItem('proFishingMode', proFishingMode?'1':'0'); }catch(e){}
-  }, [proFishingMode]);
-  React.useEffect(()=>{
-    const active = proFishingMode && tab === 'fish';
+    const active = tab === 'fish';
     try{
       if(active){
         if(typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
@@ -315,7 +322,7 @@ function App(){
     return ()=>{
       try{ tg?.enableVerticalSwipes?.(); }catch(e){}
     };
-  }, [proFishingMode, tab]);
+  }, [tab]);
 
   React.useEffect(()=>()=>{
     if(castReadyTimeoutRef.current){
@@ -348,7 +355,7 @@ function App(){
       const clamped = Math.max(0, remaining);
       setTapTimeLeft(clamped / 1000);
       if(clamped <= 0){
-        finishTap(tapCountRef.current >= TAP_CHALLENGE_GOAL);
+        finishTap(tapCountRef.current >= tapGoalRef.current);
         return;
       }
       tapTimerRef.current = requestAnimationFrame(tick);
@@ -510,6 +517,18 @@ function App(){
           } else if(!cancelled){
             setPastTournaments([]);
           }
+          const ce = await fetch(`/api/events/current`,{credentials:'include'});
+          if(ce.status===200){
+            if(!cancelled) setCurrentEvent(await ce.json());
+          } else if(!cancelled){
+            setCurrentEvent(null);
+          }
+          const pe = await fetch(`/api/events/previous`,{credentials:'include'});
+          if(pe.status===200){
+            if(!cancelled) setPreviousEvent(await pe.json());
+          } else if(!cancelled){
+            setPreviousEvent(null);
+          }
           const pr = await fetch(`/api/prizes`,{credentials:'include'});
           if(pr.ok){
             const list = await pr.json();
@@ -529,6 +548,8 @@ function App(){
             if(!cancelled) setCurrentTournament(null);
             if(!cancelled) setUpcomingTournaments([]);
             if(!cancelled) setPastTournaments([]);
+            if(!cancelled) setCurrentEvent(null);
+            if(!cancelled) setPreviousEvent(null);
           }
         }
       }catch(e){
@@ -947,7 +968,39 @@ function App(){
       } else {
         setPastTournaments([]);
       }
+      const ce = await fetch(`/api/events/current`,{credentials:'include'});
+      if(ce.status===200){ setCurrentEvent(await ce.json()); } else { setCurrentEvent(null); }
+      const pe = await fetch(`/api/events/previous`,{credentials:'include'});
+      if(pe.status===200){ setPreviousEvent(await pe.json()); } else { setPreviousEvent(null); }
     }catch(e){}
+  }
+
+  function resetHookChallenge(){
+    tapGoalRef.current = TAP_CHALLENGE_GOAL;
+    tapDurationMsRef.current = TAP_CHALLENGE_DURATION_MS;
+    setTapGoal(TAP_CHALLENGE_GOAL);
+    setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+    setHookedFish(null);
+    setStruggleIntensity(0);
+  }
+
+  function resetTapState(clearHook = true){
+    tapActiveRef.current = false;
+    setTapActive(false);
+    tapFinishingRef.current = false;
+    tapReactionRef.current = 0;
+    tapDeadlineRef.current = 0;
+    tapCountRef.current = 0;
+    setTapCount(0);
+    if(tapTimerRef.current){
+      cancelAnimationFrame(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
+    if(clearHook){
+      resetHookChallenge();
+    }else{
+      setTapTimeLeft(tapDurationMsRef.current/1000);
+    }
   }
 
   async function finalizeCatch(reaction, success){
@@ -972,7 +1025,7 @@ function App(){
         const c = d.catch;
         const isNewFish = !(me.caughtFishIds||[]).includes(c.fishId);
         const newTotal = (me.totalWeight||0)+c.weight;
-        const newLocs = me.locations.filter(l=>!l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
+        const newLocs = me.locations.filter(l=>!l.isEvent && !l.unlocked && newTotal>=l.unlockKg).map(l=>l.name);
         const newRods = Array.isArray(d.unlockedRods) ? d.unlockedRods : [];
         const achievementUnlocks = Array.isArray(d.achievements)
           ? d.achievements.map(a => ({
@@ -1003,7 +1056,7 @@ function App(){
                 todayWeight:(p.todayWeight||0)+c.weight,
                 coins: totalCoins,
                 todayCoins: todayCoins,
-                locations:p.locations.map(l=> l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l),
+                locations:p.locations.map(l=> l.isEvent ? l : (l.unlocked || tot>=l.unlockKg ? {...l,unlocked:true} : l)),
                 rods:(p.rods||[]).map(r=> r.unlocked || tot>=r.unlockKg ? {...r,unlocked:true} : r),
                 recent:[{id:c.id,fish:c.fish,weight:c.weight,location:c.location,rarity:c.rarity,at:new Date().toISOString()},...(p.recent||[])].slice(0,5),
                 caughtFishIds: isNewFish ? [...(p.caughtFishIds||[]), c.fishId] : p.caughtFishIds
@@ -1022,6 +1075,12 @@ function App(){
           } else {
             setCurrentTournament(null);
           }
+          const ce = await fetch(`/api/events/current`,{credentials:'include'});
+          if(ce.status===200){
+            setCurrentEvent(await ce.json());
+          } else {
+            setCurrentEvent(null);
+          }
         }catch(e){}
       } else {
         setError(t('fishEscaped'));
@@ -1035,26 +1094,33 @@ function App(){
       setCasting(false);
       setCurrentCastSpot(null);
       startCastCooldown();
-      tapFinishingRef.current = false;
-      tapReactionRef.current = 0;
+      resetTapState();
       if(caught && autoCastRef.current && autoFishActive){
         autoCastTimeoutRef.current = setTimeout(()=>cast(true), CAST_READY_DELAY_MS);
       }
     }
   }
 
-  function startTapChallenge(reaction){
+  function startTapChallenge(reaction, challenge, fish){
+    const goal = Math.max(1, Math.round(Number(challenge?.tapGoal) || TAP_CHALLENGE_GOAL));
+    const duration = Math.max(1000, Math.round(Number(challenge?.durationMs) || TAP_CHALLENGE_DURATION_MS));
+    const intensity = Math.max(0, Math.min(1, Number(challenge?.struggleIntensity) || 0));
+    tapGoalRef.current = goal;
+    tapDurationMsRef.current = duration;
     tapFinishingRef.current = false;
     tapReactionRef.current = reaction;
-    tapDeadlineRef.current = Date.now() + TAP_CHALLENGE_DURATION_MS;
+    tapDeadlineRef.current = Date.now() + duration;
     tapCountRef.current = 0;
     if(tapTimerRef.current){
       cancelAnimationFrame(tapTimerRef.current);
       tapTimerRef.current = null;
     }
     tapActiveRef.current = true;
+    setHookedFish(fish || null);
+    setStruggleIntensity(intensity);
+    setTapGoal(goal);
     setTapCount(0);
-    setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
+    setTapTimeLeft(duration/1000);
     setTapActive(true);
   }
 
@@ -1075,7 +1141,7 @@ function App(){
     const next = tapCountRef.current + 1;
     tapCountRef.current = next;
     setTapCount(next);
-    if(next >= TAP_CHALLENGE_GOAL){
+    if(next >= tapGoalRef.current){
       finishTap(true);
     }
   }
@@ -1086,8 +1152,9 @@ function App(){
     const curId = me.currentLureId;
     const curLure = me.lures.find(l=>l.id===curId);
     if(!curLure || curLure.qty<=0){ setError(t('noBaits')); return; }
-    const nextCastSpot = visualSpot || (proFishingModeRef.current ? randomProFishingCastSpot() : null);
+    const nextCastSpot = visualSpot || randomProFishingCastSpot();
     setError(null);
+    resetTapState();
     setDrawerOpen(false);
     setBaitsOpen(false);
     setRodsOpen(false);
@@ -1153,21 +1220,10 @@ function App(){
         setCasting(false);
         setCurrentCastSpot(null);
         startCastCooldown();
-        tapActiveRef.current = false;
-        setTapActive(false);
-        tapFinishingRef.current = false;
-        tapReactionRef.current = 0;
-        tapDeadlineRef.current = 0;
-        tapCountRef.current = 0;
-        setTapCount(0);
-        setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
-        if(tapTimerRef.current){
-          cancelAnimationFrame(tapTimerRef.current);
-          tapTimerRef.current = null;
-        }
+        resetTapState();
         return;
       }
-      startTapChallenge(reaction);
+      startTapChallenge(reaction, data.challenge, data.hookedFish);
     }catch(e){
       setError(e.message==='unauthorized'
         ? t('authRequired')
@@ -1176,18 +1232,7 @@ function App(){
       setCasting(false);
       setCurrentCastSpot(null);
       startCastCooldown();
-      tapActiveRef.current = false;
-      setTapActive(false);
-      tapFinishingRef.current = false;
-      tapReactionRef.current = 0;
-      tapDeadlineRef.current = 0;
-      tapCountRef.current = 0;
-      setTapCount(0);
-      setTapTimeLeft(TAP_CHALLENGE_DURATION_MS/1000);
-      if(tapTimerRef.current){
-        cancelAnimationFrame(tapTimerRef.current);
-        tapTimerRef.current = null;
-      }
+      resetTapState();
     }
   }
 
@@ -1401,15 +1446,13 @@ function App(){
               casting={casting}
               biting={biting}
               tapActive={tapActive}
-              tapCount={tapCount}
-              tapTimeLeft={tapTimeLeft}
+              struggleIntensity={struggleIntensity}
               castReady={castReady}
               onCast={(visualSpot)=>cast(false, visualSpot)}
               onHook={()=>hook(false)}
               onTap={handleTap}
               castSpot={currentCastSpot}
               proMode={proFishingMode}
-              onToggleProMode={()=>setProFishingMode(v=>!v)}
               result={result}
               error={error}
               onClearError={clearFishingError}
@@ -1435,6 +1478,7 @@ function App(){
               active={tab === 'club'}
               onClose={()=>setTab(prevTabRef.current || 'fish')}
               me={me}
+              shop={shop}
               onReloadProfile={reloadProfile}
             />
           )}
@@ -1444,9 +1488,13 @@ function App(){
               me={me}
               tournamentTab={tournamentTab}
               setTournamentTab={setTournamentTab}
+              tournamentKind={tournamentKind}
+              setTournamentKind={setTournamentKind}
               currentTournament={currentTournament}
               upcomingTournaments={upcomingTournaments}
               pastTournaments={pastTournaments}
+              currentEvent={currentEvent}
+              previousEvent={previousEvent}
               pastResult={pastResult}
               openPast={openPast}
               setPastResult={setPastResult}

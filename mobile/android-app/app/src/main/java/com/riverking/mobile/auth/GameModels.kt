@@ -20,6 +20,22 @@ data class LocationDto(
     val name: String,
     val unlockKg: Double,
     val unlocked: Boolean,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDto? = null,
+    val isEvent: Boolean = false,
+    val lockedReason: String? = null,
+)
+
+@Serializable
+data class CastZonePointDto(
+    val x: Double,
+    val y: Double,
+)
+
+@Serializable
+data class CastZoneDto(
+    val points: List<CastZonePointDto> = emptyList(),
 )
 
 @Serializable
@@ -80,6 +96,24 @@ data class HookRequestDto(
 data class HookResultDto(
     val success: Boolean,
     val autoFish: Boolean,
+    val hookedFish: HookedFishDto? = null,
+    val challenge: HookChallengeDto? = null,
+)
+
+@Serializable
+data class HookedFishDto(
+    val fishId: Long,
+    val fish: String,
+    val weight: Double,
+    val location: String,
+    val rarity: String,
+)
+
+@Serializable
+data class HookChallengeDto(
+    val tapGoal: Int,
+    val durationMs: Int,
+    val struggleIntensity: Double,
 )
 
 @Serializable
@@ -182,6 +216,56 @@ data class CurrentTournamentDto(
 )
 
 @Serializable
+data class SpecialEventDto(
+    val id: Long,
+    val name: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDto? = null,
+)
+
+@Serializable
+data class SpecialEventClubEntryDto(
+    val rank: Int,
+    val clubId: Long,
+    val club: String,
+    val value: Double,
+    val prize: PrizeSpecDto? = null,
+)
+
+@Serializable
+data class SpecialEventPersonalEntryDto(
+    val rank: Int,
+    val userId: Long,
+    val user: String? = null,
+    val value: Double,
+    val catchId: Long? = null,
+    val fish: String,
+    val fishId: Long,
+    val rarity: String,
+    val weight: Double,
+    val at: Long,
+    val prize: PrizeSpecDto? = null,
+)
+
+@Serializable
+data class SpecialEventLeaderboardsDto(
+    val totalWeight: List<SpecialEventClubEntryDto> = emptyList(),
+    val totalCount: List<SpecialEventClubEntryDto> = emptyList(),
+    val personalFish: List<SpecialEventPersonalEntryDto> = emptyList(),
+    val mineTotalWeight: SpecialEventClubEntryDto? = null,
+    val mineTotalCount: SpecialEventClubEntryDto? = null,
+    val minePersonalFish: SpecialEventPersonalEntryDto? = null,
+)
+
+@Serializable
+data class SpecialEventResponseDto(
+    val event: SpecialEventDto,
+    val leaderboards: SpecialEventLeaderboardsDto,
+)
+
+@Serializable
 data class PrizeDto(
     val id: Long,
     val packageId: String,
@@ -204,6 +288,17 @@ data class GuideLocationDto(
     val name: String,
     val fish: List<FishBriefDto>,
     val lures: List<String>,
+    val imageUrl: String? = null,
+    val isEvent: Boolean = false,
+    val startTime: Long? = null,
+    val endTime: Long? = null,
+)
+
+@Serializable
+data class GuideLocationsPageDto(
+    val locations: List<GuideLocationDto> = emptyList(),
+    val nextOffset: Long? = null,
+    val hasMore: Boolean = false,
 )
 
 @Serializable

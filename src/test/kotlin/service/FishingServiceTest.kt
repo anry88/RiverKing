@@ -32,6 +32,46 @@ class FishingServiceTest {
     }
 
     @Test
+    fun hookChallengeUsesRarityAndWeightTapFormula() {
+        assertEquals(2, FishingService.rarityTapCount("common"))
+        assertEquals(4, FishingService.rarityTapCount("uncommon"))
+        assertEquals(6, FishingService.rarityTapCount("rare"))
+        assertEquals(8, FishingService.rarityTapCount("epic"))
+        assertEquals(10, FishingService.rarityTapCount("mythic"))
+        assertEquals(12, FishingService.rarityTapCount("legendary"))
+        assertEquals(2, FishingService.rarityTapCount("unknown"))
+
+        assertEquals(1, FishingService.weightTapCount(0.99))
+        assertEquals(2, FishingService.weightTapCount(1.0))
+        assertEquals(3, FishingService.weightTapCount(5.0))
+        assertEquals(4, FishingService.weightTapCount(10.0))
+        assertEquals(5, FishingService.weightTapCount(30.0))
+        assertEquals(6, FishingService.weightTapCount(60.0))
+        assertEquals(7, FishingService.weightTapCount(100.0))
+        assertEquals(8, FishingService.weightTapCount(150.0))
+        assertEquals(9, FishingService.weightTapCount(250.0))
+        assertEquals(10, FishingService.weightTapCount(400.0))
+    }
+
+    @Test
+    fun hookChallengeDurationAndIntensityScaleWithTapGoal() {
+        val easy = FishingService.hookChallengeFor("common", 0.5)
+        assertEquals(3, easy.tapGoal)
+        assertEquals(5_000, easy.durationMs)
+        assertEquals(0.0, easy.struggleIntensity, 0.0000001)
+
+        val medium = FishingService.hookChallengeFor("rare", 60.0)
+        assertEquals(12, medium.tapGoal)
+        assertEquals(10_000, medium.durationMs)
+        assertEquals((12.0 - 3.0) / (22.0 - 3.0), medium.struggleIntensity, 0.0000001)
+
+        val hard = FishingService.hookChallengeFor("legendary", 400.0)
+        assertEquals(22, hard.tapGoal)
+        assertEquals(15_000, hard.durationMs)
+        assertEquals(1.0, hard.struggleIntensity, 0.0000001)
+    }
+
+    @Test
     fun baseEscapeChanceProgressesByLocation() {
         val svc = newService("testdb_fish_escape")
         transaction {
@@ -52,6 +92,44 @@ class FishingServiceTest {
                 val expected = (0.05 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }
+        }
+    }
+
+    @Test
+    fun eventLocationUsesSameBaseEscapeChanceAsPond() {
+        val svc = newService("testdb_event_escape_matches_pond")
+        val events = SpecialEventService()
+        val eventId = events.createEvent(
+            nameRu = "Тестовый ивент",
+            nameEn = "Test Event",
+            start = Instant.parse("2026-04-01T00:00:00Z"),
+            end = Instant.parse("2026-04-02T00:00:00Z"),
+            imagePath = null,
+            castZone = CastZoneDTO(
+                points = listOf(
+                    CastZonePointDTO(0.1, 0.4),
+                    CastZonePointDTO(0.9, 0.4),
+                    CastZonePointDTO(0.9, 0.8),
+                    CastZonePointDTO(0.1, 0.8),
+                ),
+            ),
+            fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
+            weightPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+            countPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+            fishPrizes = SpecialEventPrizeConfig(prizePlaces = 0, prizesJson = "[]"),
+        )
+
+        transaction {
+            val pondId = Locations
+                .select { Locations.specialEventId.isNull() }
+                .orderBy(Locations.unlockKg to SortOrder.ASC, Locations.id to SortOrder.ASC)
+                .first()[Locations.id].value
+            val eventLocationId = Locations
+                .select { Locations.specialEventId eq eventId }
+                .first()[Locations.id].value
+
+            assertEquals(svc.baseEscapeChance(pondId), svc.baseEscapeChance(eventLocationId), 0.0000001)
+            assertEquals(0.0, svc.baseEscapeChance(eventLocationId), 0.0000001)
         }
     }
 
@@ -277,5 +355,9 @@ class FishingServiceTest {
             ),
             prizeSummary,
         )
+    }
+
+    private fun fishId(name: String): Long = transaction {
+        Fish.select { Fish.name eq name }.single()[Fish.id].value
     }
 }

@@ -1,8 +1,9 @@
 package com.riverking.mobile.ui
 
-import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.SystemClock
+import android.view.MotionEvent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
@@ -14,7 +15,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -98,6 +100,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -121,7 +124,10 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -142,6 +148,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.riverking.mobile.BuildConfig
 import com.riverking.mobile.R
 import com.riverking.mobile.auth.AchievementClaimDto
@@ -156,6 +163,8 @@ import com.riverking.mobile.auth.ClubMemberDto
 import com.riverking.mobile.auth.ClubQuestDto
 import com.riverking.mobile.auth.ClubQuestMemberDto
 import com.riverking.mobile.auth.CurrentTournamentDto
+import com.riverking.mobile.auth.CastZoneDto
+import com.riverking.mobile.auth.CastZonePointDto
 import com.riverking.mobile.auth.FishBriefDto
 import com.riverking.mobile.auth.GuideFishDto
 import com.riverking.mobile.auth.GuideLocationDto
@@ -170,6 +179,9 @@ import com.riverking.mobile.auth.QuestDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.RodDto
 import com.riverking.mobile.auth.ShopPackageDto
+import com.riverking.mobile.auth.SpecialEventClubEntryDto
+import com.riverking.mobile.auth.SpecialEventPersonalEntryDto
+import com.riverking.mobile.auth.SpecialEventResponseDto
 import com.riverking.mobile.auth.TournamentDto
 import java.time.Instant
 import java.time.LocalDate
@@ -210,6 +222,11 @@ private enum class CatalogSection {
     GEAR,
 }
 
+private enum class LocationCatalogKind {
+    REGULAR,
+    EVENT,
+}
+
 private enum class GearSection {
     RODS,
     LURES,
@@ -224,6 +241,7 @@ private enum class FishingSheetType {
 
 private data class BobberVisualState(
     val offset: Float = 0f,
+    val xOffset: Float = 0f,
     val tilt: Float = 0f,
     val submerge: Float = 0f,
 )
@@ -244,6 +262,48 @@ private data class ProFishingSceneSpec(
     val nearY: Float = PRO_CAST_NEAR_Y,
 )
 
+private data class ProFishingCastZone(
+    val points: List<Offset>,
+)
+
+private data class PanViewportSpec(
+    val visibleWidth: Float = 1f,
+    val maxPan: Float = 0f,
+    val centeredLeft: Float = 0f,
+    val canPan: Boolean = false,
+)
+
+private data class CameraPanBounds(
+    val minLeft: Float = 0f,
+    val maxLeft: Float = 0f,
+)
+
+private class ReadyPanGestureState {
+    var primaryPointerId: Int = MotionEvent.INVALID_POINTER_ID
+    var startX: Float = 0f
+    var startY: Float = 0f
+    var lastX: Float = 0f
+    var lastY: Float = 0f
+    var startedAtMillis: Long = 0L
+    var panActive: Boolean = false
+    var hadPanGesture: Boolean = false
+    var panStartOffsetPx: Float = 0f
+    val panStartXByPointer = linkedMapOf<Int, Float>()
+
+    fun reset() {
+        primaryPointerId = MotionEvent.INVALID_POINTER_ID
+        startX = 0f
+        startY = 0f
+        lastX = 0f
+        lastY = 0f
+        startedAtMillis = 0L
+        panActive = false
+        hadPanGesture = false
+        panStartOffsetPx = 0f
+        panStartXByPointer.clear()
+    }
+}
+
 private const val TG_CAST_WATER_TOP = 0.48f
 private const val TG_CAST_LEFT_MARGIN = 0.05f
 private const val TG_CAST_MIN_DISTANCE_FROM_TIP = 0.05f
@@ -254,20 +314,34 @@ private const val PRO_CAST_MIN_X = 0.14f
 private const val PRO_CAST_MAX_X = 0.86f
 private const val PRO_CAST_FAR_Y = 0.47f
 private const val PRO_CAST_NEAR_Y = 0.78f
+private const val CAST_AREA_EXPAND_MIN_X = 0.014f
+private const val CAST_AREA_EXPAND_VIEWPORT_X = 0.06f
+private const val CAST_AREA_EXPAND_TOP = 0.008f
+private const val CAST_AREA_EXPAND_BOTTOM = 0.02f
+private const val CAST_AREA_MIN_VISIBLE_WORLD = 0.08f
+private const val CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.28f
 private const val PRO_CAST_SHORE_X = 0.44f
 private const val PRO_CAST_SHORE_Y = 0.56f
 private const val PRO_CAST_MIN_SWIPE_DP = 40f
+private const val PAN_EDGE_TAP_FRACTION = 0.25f
+private const val PAN_EDGE_TAP_MAX_DISTANCE_DP = 22f
+private const val PAN_EDGE_TAP_MAX_DURATION_MILLIS = 260L
+private const val PAN_STEP_VIEWPORT_MULTIPLIER = 0.55f
 private const val CAST_ANIMATION_MIN_MILLIS = 280
 private const val CAST_ANIMATION_MAX_MILLIS = 760
 private const val CAST_ANIMATION_DEFAULT_MILLIS = 560
 private const val CATCH_LIFT_ANIMATION_MILLIS = 900
-private const val PRO_FISHING_PREFS = "riverking_mobile_ui"
-private const val KEY_PRO_FISHING_MODE = "pro_fishing_mode"
+
+private enum class ProFishingNoticeTone {
+    ERROR,
+    INFO,
+}
 
 private data class ProFishingNotice(
     val token: Long,
     val text: String,
     val visible: Boolean,
+    val tone: ProFishingNoticeTone = ProFishingNoticeTone.ERROR,
 )
 
 @Composable
@@ -303,6 +377,7 @@ fun MainShell(
     onSetRatingsFish: (String) -> Unit,
     onLoadRatings: (Boolean) -> Unit,
     onLoadGuide: (Boolean) -> Unit,
+    onLoadEventGuideLocations: (Boolean) -> Unit,
     onClaimAchievement: (String) -> Unit,
     onDismissAchievementReward: () -> Unit,
     onLoadClub: (Boolean) -> Unit,
@@ -329,18 +404,12 @@ fun MainShell(
     onLoadCatchStats: (String) -> Unit,
     onShowErrorMessage: suspend (String) -> Unit,
     onConsumeError: () -> Unit,
+    onDismissFishingOutcome: () -> Unit,
 ) {
     val me = state.me ?: return
     val strings = rememberRiverStrings(me.language)
-    val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.FISHING) }
-    val proFishingPrefs = remember(context) {
-        context.getSharedPreferences(PRO_FISHING_PREFS, Context.MODE_PRIVATE)
-    }
-    var proFishingMode by rememberSaveable {
-        mutableStateOf(proFishingPrefs.getBoolean(KEY_PRO_FISHING_MODE, false))
-    }
     var showNicknameDialog by rememberSaveable { mutableStateOf(false) }
     var showCatchStats by rememberSaveable { mutableStateOf(false) }
     var showDailyRewardSheet by rememberSaveable { mutableStateOf(false) }
@@ -349,7 +418,7 @@ fun MainShell(
     var showDeleteAccountDialog by rememberSaveable { mutableStateOf(false) }
     var proFishingNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
 
-    val tournamentBadge = state.tournaments.prizes.any(::isTournamentPrize)
+    val tournamentBadge = state.tournaments.prizes.any { isTournamentPrize(it) || isEventPrize(it) }
     val ratingBadge = state.tournaments.prizes.any(::isRatingPrize)
     val clubBadge = state.tournaments.prizes.any(::isClubPrize)
     val achievementBadge = state.guide.achievements.any { it.claimable }
@@ -366,14 +435,16 @@ fun MainShell(
         )
     }
 
-    LaunchedEffect(proFishingMode) {
-        proFishingPrefs.edit().putBoolean(KEY_PRO_FISHING_MODE, proFishingMode).apply()
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != MainTab.FISHING) {
+            onDismissFishingOutcome()
+        }
     }
 
-    LaunchedEffect(state.error, selectedTab, proFishingMode, strings) {
+    LaunchedEffect(state.error, selectedTab, strings) {
         val rawMessage = state.error ?: return@LaunchedEffect
         val message = localizedAppError(strings, rawMessage)
-        if (selectedTab == MainTab.FISHING && proFishingMode) {
+        if (selectedTab == MainTab.FISHING) {
             val token = System.nanoTime()
             proFishingNotice = ProFishingNotice(token = token, text = message, visible = true)
             delay(2500L)
@@ -490,9 +561,7 @@ fun MainShell(
                     state = state,
                     strings = strings,
                     modifier = Modifier.padding(padding),
-                    proFishingMode = proFishingMode,
                     proNotice = proFishingNotice,
-                    onToggleProFishingMode = { proFishingMode = !proFishingMode },
                     onOpenDaily = { showDailyRewardSheet = true },
                     onBeginCast = onBeginCast,
                     onHookFish = onHookFish,
@@ -501,7 +570,6 @@ fun MainShell(
                     onSelectLocation = onSelectLocation,
                     onSelectLure = onSelectLure,
                     onSelectRod = onSelectRod,
-                    onOpenCatch = onOpenCatch,
                     onLoadGuide = onLoadGuide,
                 )
                 MainTab.LEADERS -> LeadersScreen(
@@ -526,6 +594,7 @@ fun MainShell(
                     strings = strings,
                     isPlayFlavor = isPlayFlavor,
                     requestPlayPrice = requestPlayPrice,
+                    onLoadEventGuideLocations = onLoadEventGuideLocations,
                     modifier = Modifier.padding(padding),
                 )
                 MainTab.CLUB -> ClubScreen(
@@ -544,6 +613,7 @@ fun MainShell(
                     onLeaveClub = onLeaveClub,
                     onMemberAction = onClubMemberAction,
                     onClaimPrize = onClaimPrize,
+                    onOpenCatch = onOpenCatch,
                 )
                 MainTab.SHOP -> ShopScreen(
                     state = state,
@@ -570,6 +640,7 @@ fun MainShell(
         CatchDetailsDialog(
             strings = strings,
             catch = catch,
+            me = me,
             resolvedRarity = if (fishDiscovered) resolveCatchRarity(catch, state.guide.guide?.fish) else null,
             fishDiscovered = fishDiscovered,
             allowShare = catch.userId != null && catch.userId == me.id,
@@ -712,7 +783,7 @@ private fun LeadersScreen(
     onOpenCatch: (CatchDto) -> Unit,
 ) {
     var section by rememberSaveable { mutableStateOf(LeaderSection.TOURNAMENTS) }
-    val tournamentsBadge = state.tournaments.prizes.any(::isTournamentPrize)
+    val tournamentsBadge = state.tournaments.prizes.any { isTournamentPrize(it) || isEventPrize(it) }
     val ratingsBadge = state.tournaments.prizes.any(::isRatingPrize)
     val achievementsBadge = state.guide.achievements.any { it.claimable }
 
@@ -1241,9 +1312,7 @@ private fun FishingScreen(
     state: RiverKingUiState,
     strings: RiverStrings,
     modifier: Modifier = Modifier,
-    proFishingMode: Boolean,
     proNotice: ProFishingNotice?,
-    onToggleProFishingMode: () -> Unit,
     onOpenDaily: () -> Unit,
     onBeginCast: (FishingCastSpot?) -> Unit,
     onHookFish: () -> Unit,
@@ -1252,7 +1321,6 @@ private fun FishingScreen(
     onSelectLocation: (Long) -> Unit,
     onSelectLure: (Long) -> Unit,
     onSelectRod: (Long) -> Unit,
-    onOpenCatch: (CatchDto) -> Unit,
     onLoadGuide: (Boolean) -> Unit,
 ) {
     val me = state.me ?: return
@@ -1260,6 +1328,7 @@ private fun FishingScreen(
     var activeSheet by rememberSaveable { mutableStateOf<FishingSheetType?>(null) }
     var lastDailyPromptToken by rememberSaveable(me.id) { mutableStateOf<String?>(null) }
     var escapeNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
+    var outcomeNotice by remember { mutableStateOf<ProFishingNotice?>(null) }
     val setupEnabled = !isFishingCastActive(state.fishing.phase)
     val dailyPromptToken = remember(me.dailyAvailable, me.dailyStreak, me.dailyRewards) {
         if (!me.dailyAvailable) {
@@ -1280,13 +1349,12 @@ private fun FishingScreen(
         }
     }
 
-    LaunchedEffect(proFishingMode, state.fishing.lastEscape) {
-        if (!proFishingMode || !state.fishing.lastEscape) {
-            if (!state.fishing.lastEscape) {
-                escapeNotice = null
-            }
+    LaunchedEffect(state.fishing.lastEscape) {
+        if (!state.fishing.lastEscape) {
+            escapeNotice = null
             return@LaunchedEffect
         }
+        outcomeNotice = null
         val token = System.nanoTime()
         escapeNotice = ProFishingNotice(token = token, text = strings.fishEscaped, visible = true)
         delay(2500L)
@@ -1299,138 +1367,61 @@ private fun FishingScreen(
         }
     }
 
-    if (proFishingMode) {
-        Box(modifier = modifier.fillMaxSize()) {
-            FishingStageScene(
-                state = state,
-                strings = strings,
-                me = me,
-                backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                locationName = currentLocation?.name,
-                modifier = Modifier.fillMaxSize(),
-                proMode = true,
-                setupEnabled = setupEnabled,
-                proFishingEnabled = proFishingMode,
-                autoCastEnabled = state.fishing.autoCastEnabled,
-                proNotice = proNotice ?: escapeNotice,
-                onToggleProFishingMode = onToggleProFishingMode,
-                onToggleAutoCast = onToggleAutoCast,
-                onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
-                onOpenLures = { activeSheet = FishingSheetType.LURES },
-                onOpenRods = { activeSheet = FishingSheetType.RODS },
-                onOpenQuests = {
-                    activeSheet = FishingSheetType.QUESTS
-                    if (state.guide.quests == null) {
-                        onLoadGuide(true)
-                    }
-                },
-                onBeginCast = onBeginCast,
-                onHookFish = onHookFish,
-                onTapChallenge = onTapChallenge,
-            )
+    LaunchedEffect(state.fishing.lastCast?.catch?.id) {
+        val text = fishingOutcomeNoticeText(
+            strings = strings,
+            fishing = state.fishing,
+            achievements = state.guide.achievements,
+        ) ?: run {
+            outcomeNotice = null
+            return@LaunchedEffect
         }
-    } else {
-        LazyColumn(
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                FishingSetupBar(
-                    strings = strings,
-                    me = me,
-                    enabled = setupEnabled,
-                    onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
-                    onOpenLures = { activeSheet = FishingSheetType.LURES },
-                    onOpenRods = { activeSheet = FishingSheetType.RODS },
-                )
-            }
-            item {
-                FishingStageScene(
-                    state = state,
-                    strings = strings,
-                    me = me,
-                    backgroundUrl = locationBackgroundAsset(currentLocation?.name),
-                    locationName = currentLocation?.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    proFishingEnabled = proFishingMode,
-                    autoCastEnabled = state.fishing.autoCastEnabled,
-                    onToggleProFishingMode = onToggleProFishingMode,
-                    onToggleAutoCast = onToggleAutoCast,
-                )
-            }
-            item {
-                FishingActionCard(
-                    state = state,
-                    strings = strings,
-                    onBeginCast = { onBeginCast(null) },
-                    onHookFish = onHookFish,
-                    onTapChallenge = onTapChallenge,
-                )
-            }
-            if (state.fishing.lastEscape || (state.fishing.lastCast?.caught == true && state.fishing.lastCast.catch != null)) {
-                item {
-                    FishingOutcomeCard(
-                        strings = strings,
-                        me = me,
-                        fishing = state.fishing,
-                        achievements = state.guide.achievements,
-                        onOpenCatch = onOpenCatch,
-                    )
-                }
-            }
-            item {
-                if (state.guide.quests != null) {
-                    QuestPreviewCard(
-                        strings = strings,
-                        quests = state.guide.quests,
-                        isClubMember = state.club.club != null,
-                        clubMembershipKnown = state.club.loaded,
-                        onOpenQuests = { activeSheet = FishingSheetType.QUESTS },
-                    )
-                } else {
-                    InfoCard {
-                        Text(strings.quests, fontWeight = FontWeight.SemiBold)
-                        LoadingStatePanel(strings.loading)
-                        OutlinedButton(onClick = { onLoadGuide(true) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(strings.refresh)
-                        }
-                    }
-                }
-            }
-            if (me.recent.isNotEmpty()) {
-                item {
-                    SectionCard(strings.recentCatches) {
-                        me.recent.forEachIndexed { index, recent ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            CatchRow(
-                                title = recent.fish,
-                                subtitle = "${recent.location} • ${strings.rarityLabel(recent.rarity)}",
-                                value = recent.weight.asKgCompact(strings),
-                                fishName = recent.fish,
-                                fishAccent = rarityColor(recent.rarity),
-                                onClick = {
-                                    onOpenCatch(
-                                        CatchDto(
-                                            id = recent.id,
-                                            fish = recent.fish,
-                                            weight = recent.weight,
-                                            location = recent.location,
-                                            rarity = recent.rarity,
-                                            at = recent.at,
-                                            user = me.username,
-                                            userId = me.id,
-                                        )
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+        escapeNotice = null
+        val token = System.nanoTime()
+        outcomeNotice = ProFishingNotice(
+            token = token,
+            text = text,
+            visible = true,
+            tone = ProFishingNoticeTone.INFO,
+        )
+        delay(5200L)
+        if (outcomeNotice?.token == token) {
+            outcomeNotice = outcomeNotice?.copy(visible = false)
         }
+        delay(500L)
+        if (outcomeNotice?.token == token) {
+            outcomeNotice = null
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        FishingStageScene(
+            state = state,
+            strings = strings,
+            me = me,
+            backgroundUrl = currentLocation?.imageUrl ?: locationBackgroundAsset(currentLocation?.name),
+            locationName = currentLocation?.name,
+            castZone = currentLocation?.castZone,
+            hasCustomCastZone = currentLocation?.castZone != null,
+            modifier = Modifier.fillMaxSize(),
+            proMode = true,
+            setupEnabled = setupEnabled,
+            autoCastEnabled = state.fishing.autoCastEnabled,
+            proNotice = proNotice ?: escapeNotice ?: outcomeNotice,
+            onToggleAutoCast = onToggleAutoCast,
+            onOpenLocations = { activeSheet = FishingSheetType.LOCATIONS },
+            onOpenLures = { activeSheet = FishingSheetType.LURES },
+            onOpenRods = { activeSheet = FishingSheetType.RODS },
+            onOpenQuests = {
+                activeSheet = FishingSheetType.QUESTS
+                if (state.guide.quests == null) {
+                    onLoadGuide(true)
+                }
+            },
+            onBeginCast = onBeginCast,
+            onHookFish = onHookFish,
+            onTapChallenge = onTapChallenge,
+        )
     }
 
     when (activeSheet) {
@@ -1485,12 +1476,34 @@ private fun TournamentsScreen(
 ) {
     val tournaments = state.tournaments
     val me = state.me
-    val visiblePrizes = tournaments.prizes.filter(::isTournamentPrize)
+    val shopPacks = state.shop.categories.flatMap { it.packs }
+    var tournamentMode by rememberSaveable { mutableStateOf("regular") }
+    var eventPeriod by rememberSaveable { mutableStateOf("current") }
+    val showingSpecial = tournamentMode == "special"
+    val visiblePrizes = tournaments.prizes.filter { prize ->
+        if (showingSpecial) isEventPrize(prize) else isTournamentPrize(prize)
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = !showingSpecial,
+                    onClick = { tournamentMode = "regular" },
+                    label = { Text(regularTournamentsLabel(strings)) },
+                    modifier = Modifier.weight(1f),
+                )
+                FilterChip(
+                    selected = showingSpecial,
+                    onClick = { tournamentMode = "special" },
+                    label = { Text(specialTournamentsLabel(strings)) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         if (visiblePrizes.isNotEmpty()) {
             item {
                 PendingPrizeCard(
@@ -1500,79 +1513,372 @@ private fun TournamentsScreen(
                 )
             }
         }
-        item {
-            SectionCard(strings.currentTournament) {
-                if (tournaments.current == null) {
-                    EmptyStatePanel(strings.noData)
-                } else {
-                    TournamentCard(
-                        strings = strings,
-                        tournament = tournaments.current.tournament,
-                        mine = tournaments.current.mine,
-                        onClick = { onOpenTournament(tournaments.current.tournament.id) },
-                    )
-                    if (tournaments.current.leaderboard.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        tournaments.current.leaderboard.take(5).forEachIndexed { index, entry ->
-                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                            CatchRow(
-                                title = "#${entry.rank} ${entry.user ?: "Unknown"}",
-                                subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
-                                value = entry.value.asKgCompact(strings),
-                                fishName = entry.fish,
-                                fishDiscovered = me?.let {
-                                    isFishDiscovered(
-                                        fishId = entry.fishId,
-                                        fishName = entry.fish,
-                                        ownerUserId = entry.userId,
-                                        currentUserId = it.id,
-                                        caughtFishIds = it.caughtFishIds,
-                                        fishGuide = state.guide.guide?.fish,
-                                    )
-                                } == true,
-                                fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
-                                onClick = {
-                                    if (entry.catchId != null && entry.fish != null && entry.location != null) {
-                                        onOpenCatch(
-                                            CatchDto(
-                                                id = entry.catchId,
-                                                fish = entry.fish,
-                                                weight = entry.value,
-                                                location = entry.location,
-                                                rarity = tournaments.current.tournament.fishRarity.orEmpty(),
-                                                user = entry.user,
-                                                userId = entry.userId,
-                                                fishId = entry.fishId,
-                                            )
+        if (!showingSpecial) {
+            item {
+                SectionCard(strings.currentTournament) {
+                    if (tournaments.current == null) {
+                        EmptyStatePanel(strings.noData)
+                    } else {
+                        TournamentCard(
+                            strings = strings,
+                            tournament = tournaments.current.tournament,
+                            mine = tournaments.current.mine,
+                            onClick = { onOpenTournament(tournaments.current.tournament.id) },
+                        )
+                        if (tournaments.current.leaderboard.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            tournaments.current.leaderboard.take(5).forEachIndexed { index, entry ->
+                                if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                                CatchRow(
+                                    title = "${entry.rank} ${entry.user ?: "Unknown"}",
+                                    subtitle = listOfNotNull(entry.fish, entry.location).joinToString(" • "),
+                                    value = entry.value.asKgCompact(strings),
+                                    fishName = entry.fish,
+                                    fishDiscovered = me?.let {
+                                        isFishDiscovered(
+                                            fishId = entry.fishId,
+                                            fishName = entry.fish,
+                                            ownerUserId = entry.userId,
+                                            currentUserId = it.id,
+                                            caughtFishIds = it.caughtFishIds,
+                                            fishGuide = state.guide.guide?.fish,
                                         )
-                                    }
-                                },
-                            )
+                                    } == true,
+                                    fishAccent = rarityColor(tournaments.current.tournament.fishRarity),
+                                    onClick = {
+                                        if (entry.catchId != null && entry.fish != null && entry.location != null) {
+                                            onOpenCatch(
+                                                CatchDto(
+                                                    id = entry.catchId,
+                                                    fish = entry.fish,
+                                                    weight = entry.value,
+                                                    location = entry.location,
+                                                    rarity = tournaments.current.tournament.fishRarity.orEmpty(),
+                                                    user = entry.user,
+                                                    userId = entry.userId,
+                                                    fishId = entry.fishId,
+                                                )
+                                            )
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
-        if (tournaments.upcoming.isNotEmpty()) {
-            item {
-                SectionCard(strings.upcomingTournaments) {
-                    tournaments.upcoming.forEachIndexed { index, tournament ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+            if (tournaments.upcoming.isNotEmpty()) {
+                item {
+                    SectionCard(strings.upcomingTournaments) {
+                        tournaments.upcoming.forEachIndexed { index, tournament ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        }
                     }
                 }
             }
-        }
-        if (tournaments.past.isNotEmpty()) {
-            item {
-                SectionCard(strings.pastTournaments) {
-                    tournaments.past.forEachIndexed { index, tournament ->
-                        if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
-                        TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+            if (tournaments.past.isNotEmpty()) {
+                item {
+                    SectionCard(strings.pastTournaments) {
+                        tournaments.past.forEachIndexed { index, tournament ->
+                            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+                            TournamentCard(strings = strings, tournament = tournament, mine = null, onClick = { onOpenTournament(tournament.id) })
+                        }
                     }
                 }
             }
+        } else {
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    FilterChip(
+                        selected = eventPeriod == "previous",
+                        onClick = { eventPeriod = "previous" },
+                        label = { Text(previousLabel(strings)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilterChip(
+                        selected = eventPeriod == "current",
+                        onClick = { eventPeriod = "current" },
+                        label = { Text(currentTournamentPeriodLabel(strings)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            item {
+                val event = if (eventPeriod == "previous") tournaments.previousEvent else tournaments.currentEvent
+                if (event == null) {
+                    EmptyStatePanel(eventsEmptyLabel(strings))
+                } else {
+                    SpecialEventCard(
+                        strings = strings,
+                        event = event,
+                        me = me,
+                        shopPacks = shopPacks,
+                        onOpenCatch = onOpenCatch,
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun SpecialEventCard(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    var selectedBoard by rememberSaveable(event.event.id) { mutableStateOf(EVENT_BOARD_WEIGHT) }
+    SectionCard(event.event.name) {
+        event.event.imageUrl?.let { imageUrl ->
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = event.event.name,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        Text(
+            text = "${formatEpoch(event.event.startTime)} – ${formatEpoch(event.event.endTime)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SelectionDropdown(
+            title = eventLeaderboardLabel(strings),
+            selectedLabel = specialEventBoardTitle(strings, selectedBoard),
+            options = eventLeaderboardOptions(strings),
+            selectedKey = selectedBoard,
+            onSelect = { selectedBoard = it },
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        SpecialEventSelectedBoard(
+            strings = strings,
+            event = event,
+            selectedBoard = selectedBoard,
+            me = me,
+            shopPacks = shopPacks,
+            onOpenCatch = onOpenCatch,
+        )
+    }
+}
+
+@Composable
+private fun SpecialEventSelectedBoard(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    selectedBoard: String,
+    me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    when (selectedBoard) {
+        EVENT_BOARD_COUNT -> SpecialEventClubSection(
+            strings = strings,
+            title = eventTotalCountLabel(strings),
+            rows = event.leaderboards.totalCount,
+            mine = event.leaderboards.mineTotalCount,
+            countMode = true,
+            shopPacks = shopPacks,
+            showTitle = false,
+        )
+
+        EVENT_BOARD_FISH -> SpecialEventPersonalSection(
+            strings = strings,
+            event = event,
+            rows = event.leaderboards.personalFish,
+            mine = event.leaderboards.minePersonalFish,
+            me = me,
+            shopPacks = shopPacks,
+            onOpenCatch = onOpenCatch,
+            showTitle = false,
+        )
+
+        else -> SpecialEventClubSection(
+            strings = strings,
+            title = eventTotalWeightLabel(strings),
+            rows = event.leaderboards.totalWeight,
+            mine = event.leaderboards.mineTotalWeight,
+            countMode = false,
+            shopPacks = shopPacks,
+            showTitle = false,
+        )
+    }
+}
+
+@Composable
+private fun SpecialEventClubSection(
+    strings: RiverStrings,
+    title: String,
+    rows: List<SpecialEventClubEntryDto>,
+    mine: SpecialEventClubEntryDto?,
+    countMode: Boolean,
+    shopPacks: List<ShopPackageDto>,
+    showTitle: Boolean = true,
+) {
+    if (showTitle) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+    }
+    if (rows.isEmpty()) {
+        EmptyStatePanel("—")
+    } else {
+        rows.take(10).forEachIndexed { index, row ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventClubRow(
+                strings = strings,
+                row = row,
+                highlighted = mine?.rank == row.rank,
+                countMode = countMode,
+                shopPacks = shopPacks,
+            )
+        }
+        if (mine != null && rows.none { it.rank == mine.rank }) {
+            HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventClubRow(
+                strings = strings,
+                row = mine,
+                highlighted = true,
+                countMode = countMode,
+                shopPacks = shopPacks,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpecialEventClubRow(
+    strings: RiverStrings,
+    row: SpecialEventClubEntryDto,
+    highlighted: Boolean,
+    countMode: Boolean,
+    shopPacks: List<ShopPackageDto>,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (highlighted) Color(0xFF1F6F4A).copy(alpha = 0.22f) else Color.Transparent)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("${row.rank} ${row.club}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            row.prize?.let { prize ->
+                PrizeChip(strings = strings, prize = prize, shopPacks = shopPacks)
+            }
+        }
+        Text(if (countMode) row.value.roundToInt().toString() else row.value.asKgCompact(strings))
+    }
+}
+
+@Composable
+private fun SpecialEventPersonalSection(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    rows: List<SpecialEventPersonalEntryDto>,
+    mine: SpecialEventPersonalEntryDto?,
+    me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+    showTitle: Boolean = true,
+) {
+    if (showTitle) {
+        Text(eventTopFishLabel(strings), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+    }
+    if (rows.isEmpty()) {
+        EmptyStatePanel(strings.noData)
+    } else {
+        rows.take(10).forEachIndexed { index, row ->
+            if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventPersonalRow(
+                strings = strings,
+                event = event,
+                row = row,
+                highlighted = mine?.rank == row.rank,
+                me = me,
+                shopPacks = shopPacks,
+                onOpenCatch = onOpenCatch,
+            )
+        }
+        if (mine != null && rows.none { it.rank == mine.rank }) {
+            HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
+            SpecialEventPersonalRow(
+                strings = strings,
+                event = event,
+                row = mine,
+                highlighted = true,
+                me = me,
+                shopPacks = shopPacks,
+                onOpenCatch = onOpenCatch,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpecialEventPersonalRow(
+    strings: RiverStrings,
+    event: SpecialEventResponseDto,
+    row: SpecialEventPersonalEntryDto,
+    highlighted: Boolean,
+    me: MeResponseDto?,
+    shopPacks: List<ShopPackageDto>,
+    onOpenCatch: (CatchDto) -> Unit,
+) {
+    val discovered = me?.caughtFishIds?.contains(row.fishId) == true || me?.id == row.userId
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = row.catchId != null) {
+                row.catchId?.let {
+                    onOpenCatch(
+                        CatchDto(
+                            id = it,
+                            fish = row.fish,
+                            weight = row.weight,
+                            location = event.event.name,
+                            rarity = row.rarity,
+                            userId = row.userId,
+                            fishId = row.fishId,
+                            user = row.user,
+                            at = Instant.ofEpochSecond(row.at).toString(),
+                        )
+                    )
+                }
+            }
+            .background(if (highlighted) Color(0xFF1F6F4A).copy(alpha = 0.22f) else Color.Transparent)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("${row.rank} ${row.user ?: youLabel(strings)}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = if (discovered) "${row.fish} • ${row.weight.asKgCompact(strings)}" else "??? • ${row.weight.asKgCompact(strings)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            row.prize?.let { prize ->
+                PrizeChip(strings = strings, prize = prize, shopPacks = shopPacks)
+            }
+        }
+        Text(row.value.asKgCompact(strings))
     }
 }
 
@@ -1757,14 +2063,28 @@ private fun CatalogScreen(
     strings: RiverStrings,
     isPlayFlavor: Boolean,
     requestPlayPrice: (String, (String?) -> Unit) -> Unit,
+    onLoadEventGuideLocations: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val me = state.me ?: return
     val guide = state.guide
     var section by rememberSaveable { mutableStateOf(CatalogSection.LOCATIONS) }
+    var locationKind by rememberSaveable { mutableStateOf(LocationCatalogKind.REGULAR) }
     var gearSection by rememberSaveable { mutableStateOf(GearSection.RODS) }
     var rarityFilter by rememberSaveable { mutableStateOf("all") }
     var showCaughtOnly by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(section, locationKind, guide.eventLocations.size, guide.eventLocationsHasMore, guide.eventLocationsLoading) {
+        if (
+            section == CatalogSection.LOCATIONS &&
+            locationKind == LocationCatalogKind.EVENT &&
+            guide.eventLocations.isEmpty() &&
+            guide.eventLocationsHasMore &&
+            !guide.eventLocationsLoading
+        ) {
+            onLoadEventGuideLocations(true)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
@@ -1809,6 +2129,26 @@ private fun CatalogScreen(
                         )
                     }
                 }
+                if (section == CatalogSection.LOCATIONS) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SegmentedSelectionBar(
+                        items = LocationCatalogKind.entries.toList(),
+                        selected = locationKind,
+                        onSelect = { locationKind = it },
+                        accentFor = {
+                            when (it) {
+                                LocationCatalogKind.REGULAR -> RiverTide
+                                LocationCatalogKind.EVENT -> RiverAmber
+                            }
+                        },
+                        labelFor = {
+                            when (it) {
+                                LocationCatalogKind.REGULAR -> regularTournamentsLabel(strings)
+                                LocationCatalogKind.EVENT -> eventLocationsLabel(strings)
+                            }
+                        },
+                    )
+                }
                 if (section == CatalogSection.GEAR) {
                     Spacer(modifier = Modifier.height(8.dp))
                     SegmentedSelectionBar(
@@ -1845,6 +2185,8 @@ private fun CatalogScreen(
                 guide = guide,
                 me = me,
                 strings = strings,
+                locationKind = locationKind,
+                onLoadMoreEventGuideLocations = { onLoadEventGuideLocations(false) },
                 modifier = Modifier.weight(1f),
             )
             CatalogSection.GEAR -> CatalogGearScreen(
@@ -1865,6 +2207,8 @@ private fun CatalogLocationsScreen(
     guide: GuideUiState,
     me: MeResponseDto,
     strings: RiverStrings,
+    locationKind: LocationCatalogKind,
+    onLoadMoreEventGuideLocations: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -1873,15 +2217,34 @@ private fun CatalogLocationsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionCard(strings.guideWaters) {
-                guide.guide?.locations?.forEachIndexed { index, location ->
+            val locations = when (locationKind) {
+                LocationCatalogKind.REGULAR -> guide.guide?.locations.orEmpty()
+                LocationCatalogKind.EVENT -> guide.eventLocations
+            }
+            SectionCard(if (locationKind == LocationCatalogKind.EVENT) eventLocationsLabel(strings) else strings.guideWaters) {
+                if (locations.isEmpty()) {
+                    if (locationKind == LocationCatalogKind.EVENT && guide.eventLocationsLoading) {
+                        LoadingStatePanel(strings.loading)
+                    } else {
+                        EmptyStatePanel(strings.noData)
+                    }
+                }
+                locations.forEachIndexed { index, location ->
                     if (index > 0) HorizontalDivider(color = DividerDefaults.color.copy(alpha = 0.25f))
                     GuideLocationRow(
                         strings = strings,
                         location = location,
-                        ownedLocation = me.locations.firstOrNull { it.id == location.id },
+                        ownedLocation = if (location.isEvent) null else me.locations.firstOrNull { it.id == location.id },
                     )
-                } ?: EmptyStatePanel(strings.noData)
+                }
+            }
+        }
+        if (locationKind == LocationCatalogKind.EVENT && guide.eventLocationsHasMore && guide.eventLocations.isNotEmpty()) {
+            item(key = "event-location-loader") {
+                LaunchedEffect(guide.eventLocations.size, guide.eventLocationsLoading) {
+                    if (!guide.eventLocationsLoading) onLoadMoreEventGuideLocations()
+                }
+                LoadingStatePanel(strings.loading)
             }
         }
     }
@@ -1994,6 +2357,7 @@ private fun ClubScreen(
     onLeaveClub: () -> Unit,
     onMemberAction: (Long, String) -> Unit,
     onClaimPrize: (Long) -> Unit,
+    onOpenCatch: (CatchDto) -> Unit,
 ) {
     val me = state.me
     val questsSectionLabel = if (strings.login == "Логин") "Квесты" else "Quests"
@@ -2004,15 +2368,18 @@ private fun ClubScreen(
     var recruitingDraft by rememberSaveable(state.club.club?.id) { mutableStateOf(state.club.club?.recruitingOpen ?: true) }
     var selectedSection by rememberSaveable(state.club.club?.id) { mutableStateOf("ratings") }
     var selectedWeek by rememberSaveable(state.club.club?.id) { mutableStateOf("current") }
+    var selectedEventBoard by rememberSaveable(state.club.club?.id) { mutableStateOf(EVENT_BOARD_WEIGHT) }
     var selectedQuestCode by rememberSaveable(state.club.club?.id, selectedWeek) { mutableStateOf("") }
     val club = state.club.club
     val canManageClub = club?.role == "president" || club?.role == "heir"
     val weekData = if (selectedWeek == "previous") club?.previousWeek else club?.currentWeek
     val questWeekData = if (selectedWeek == "previous") club?.previousQuestWeek else club?.currentQuestWeek
+    val clubEvent = if (selectedWeek == "previous") state.club.previousEvent else state.club.currentEvent
     val selectedQuest = questWeekData?.quests
         ?.firstOrNull { it.code == selectedQuestCode }
         ?: questWeekData?.quests?.firstOrNull()
     val clubPrizes = state.tournaments.prizes.filter(::isClubPrize)
+    val shopPacks = state.shop.categories.flatMap { it.packs }
     val createCostCoins = 1_000L
     val minCreateWeightKg = 1_000.0
     val hasCreateWeight = (me?.totalWeight ?: 0.0) >= minCreateWeightKg
@@ -2071,6 +2438,10 @@ private fun ClubScreen(
             quests.any { it.code == selectedQuestCode } -> selectedQuestCode
             else -> quests.first().code
         }
+    }
+
+    LaunchedEffect(selectedSection, selectedWeek, clubEvent?.event?.id) {
+        selectedEventBoard = EVENT_BOARD_WEIGHT
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -2148,94 +2519,53 @@ private fun ClubScreen(
                     }
                 }
                 item {
-                    SectionCard(if (selectedSection == "ratings") strings.ratings else questsSectionLabel) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    selectedSection = "ratings"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedSection == "ratings") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(strings.ratings)
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    selectedSection = "quests"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedSection == "quests") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(questsSectionLabel)
-                            }
+                    SectionCard(
+                        when (selectedSection) {
+                            "ratings" -> strings.ratings
+                            "tournament" -> clubTournamentLabel(strings)
+                            else -> questsSectionLabel
                         }
+                    ) {
+                        SegmentedSelectionBar(
+                            items = listOf("ratings", "tournament", "quests"),
+                            selected = selectedSection,
+                            onSelect = {
+                                selectedSection = it
+                                onReloadClub(true)
+                            },
+                            accentFor = { RiverMoss },
+                            labelFor = {
+                                when (it) {
+                                    "ratings" -> strings.ratings
+                                    "tournament" -> clubTournamentLabel(strings)
+                                    else -> questsSectionLabel
+                                }
+                            },
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    selectedWeek = "current"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedWeek == "current") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(if (strings.login == "Логин") "Текущая неделя" else "This week")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    selectedWeek = "previous"
-                                    onReloadClub(true)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = if (selectedWeek == "previous") {
-                                    ButtonDefaults.outlinedButtonColors(
-                                        containerColor = RiverMoss.copy(alpha = 0.24f),
-                                        contentColor = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                } else {
-                                    riverOutlinedButtonColors()
-                                },
-                                border = riverOutlineBorder(),
-                            ) {
-                                Text(if (strings.login == "Логин") "Прошлая неделя" else "Last week")
-                            }
-                        }
+                        SegmentedSelectionBar(
+                            items = listOf("current", "previous"),
+                            selected = selectedWeek,
+                            onSelect = {
+                                selectedWeek = it
+                                onReloadClub(true)
+                            },
+                            accentFor = { RiverMoss },
+                            labelFor = {
+                                when (it) {
+                                    "current" -> if (selectedSection == "tournament") currentTournamentPeriodLabel(strings) else if (strings.login == "Логин") "Текущая неделя" else "This week"
+                                    else -> if (selectedSection == "tournament") previousLabel(strings) else if (strings.login == "Логин") "Прошлая неделя" else "Last week"
+                                }
+                            },
+                        )
                         Text(
-                            (
-                                if (selectedSection == "quests") questWeekData?.weekStart else weekData?.weekStart
-                            )?.let { formatWeekRange(it, strings) }.orEmpty(),
+                            if (selectedSection == "tournament") {
+                                clubEvent?.event?.let { "${formatEpoch(it.startTime)} – ${formatEpoch(it.endTime)}" }.orEmpty()
+                            } else {
+                                (
+                                    if (selectedSection == "quests") questWeekData?.weekStart else weekData?.weekStart
+                                )?.let { formatWeekRange(it, strings) }.orEmpty()
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (selectedSection == "ratings") {
@@ -2261,6 +2591,28 @@ private fun ClubScreen(
                                 },
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        } else if (selectedSection == "tournament") {
+                            if (clubEvent == null) {
+                                EmptyStatePanel(eventsEmptyLabel(strings), modifier = Modifier.fillMaxWidth())
+                            } else {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SelectionDropdown(
+                                    title = eventLeaderboardLabel(strings),
+                                    selectedLabel = specialEventBoardTitle(strings, selectedEventBoard),
+                                    options = eventLeaderboardOptions(strings),
+                                    selectedKey = selectedEventBoard,
+                                    onSelect = { selectedEventBoard = it },
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                SpecialEventSelectedBoard(
+                                    strings = strings,
+                                    event = clubEvent,
+                                    selectedBoard = selectedEventBoard,
+                                    me = me,
+                                    shopPacks = shopPacks,
+                                    onOpenCatch = onOpenCatch,
+                                )
+                            }
                         } else {
                             if (questWeekData == null || questWeekData.quests.isEmpty()) {
                                 EmptyStatePanel(strings.noData, modifier = Modifier.fillMaxWidth())
@@ -2547,6 +2899,7 @@ private fun TelegramAccountSheet(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun FishingStageScene(
     state: RiverKingUiState,
@@ -2554,13 +2907,13 @@ private fun FishingStageScene(
     me: MeResponseDto,
     backgroundUrl: String?,
     locationName: String?,
+    castZone: CastZoneDto? = null,
+    hasCustomCastZone: Boolean = false,
     modifier: Modifier = Modifier,
-    proMode: Boolean = false,
+    proMode: Boolean = true,
     setupEnabled: Boolean = false,
-    proFishingEnabled: Boolean = false,
     autoCastEnabled: Boolean = false,
     proNotice: ProFishingNotice? = null,
-    onToggleProFishingMode: () -> Unit = {},
     onToggleAutoCast: () -> Unit = {},
     onOpenLocations: () -> Unit = {},
     onOpenLures: () -> Unit = {},
@@ -2581,8 +2934,15 @@ private fun FishingStageScene(
         }
     }
     val phase = state.fishing.phase
+    val fightIntensity = state.fishing.struggleIntensity.toFloat().coerceIn(0f, 1f)
     val castSpot = state.fishing.castSpot
-    val proSceneSpec = remember(locationName) { proFishingSceneSpec(locationName) }
+    val proSceneZone = remember(castZone) {
+        normalizeCastZone(castZone) ?: fallbackCastZone()
+    }
+    val proSceneSpec = remember(proSceneZone) {
+        proSceneZone.bounds()
+    }
+    var backgroundIntrinsicSize by remember(backgroundUrl) { mutableStateOf(IntSize.Zero) }
     val inWater = when (phase) {
         FishingPhase.WAITING_BITE,
         FishingPhase.BITING,
@@ -2622,7 +2982,7 @@ private fun FishingStageScene(
         label = "pro-fishing-notice-alpha",
     )
 
-    LaunchedEffect(shouldAnimateFloat, phase, proMode) {
+    LaunchedEffect(shouldAnimateFloat, phase, proMode, fightIntensity) {
         if (!shouldAnimateFloat) {
             bobberVisual = BobberVisualState()
             return@LaunchedEffect
@@ -2658,11 +3018,18 @@ private fun FishingStageScene(
                 }
                 "tapping" -> {
                     val quickWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.85f))
-                    val offset = mainWave * 4.2f + quickWave * 1.1f
+                    val pullWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 1.45f))
+                    val snapWave = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.42f))
+                    val offset = 5f +
+                        fightIntensity * 18f +
+                        mainWave * (4.2f + fightIntensity * 9f) +
+                        quickWave * (1.1f + fightIntensity * 5f)
                     BobberVisualState(
                         offset = offset,
-                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.95f)) * 5f,
-                        submerge = if (offset > 0f) min(1f, offset / 9f) else 0f,
+                        xOffset = pullWave * (5f + fightIntensity * 22f) + snapWave * fightIntensity * 7f,
+                        tilt = sin((elapsedSeconds * (2f * PI.toFloat())) / (basePeriod * 0.95f)) *
+                            (6f + fightIntensity * 15f),
+                        submerge = if (offset > 0f) min(1f, offset / (9f + fightIntensity * 9f)) else 0f,
                     )
                 }
                 else -> {
@@ -2676,6 +3043,7 @@ private fun FishingStageScene(
             }
             bobberVisual = BobberVisualState(
                 offset = bobberVisual.offset + (nextVisual.offset - bobberVisual.offset) * 0.18f,
+                xOffset = bobberVisual.xOffset + (nextVisual.xOffset - bobberVisual.xOffset) * 0.18f,
                 tilt = bobberVisual.tilt + (nextVisual.tilt - bobberVisual.tilt) * 0.18f,
                 submerge = bobberVisual.submerge + (nextVisual.submerge - bobberVisual.submerge) * 0.18f,
             )
@@ -2695,18 +3063,129 @@ private fun FishingStageScene(
                 .fillMaxSize()
                 .clipToBounds()
         ) {
-            if (backgroundUrl != null) {
-                coil.compose.AsyncImage(
-                    model = backgroundUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = if (proMode) 1.06f else 1.22f,
-                            scaleY = if (proMode) 1.02f else 1.08f,
-                        ),
+            val density = LocalDensity.current
+            val sceneWidthPx = with(density) { maxWidth.toPx() }
+            val sceneHeightPx = with(density) { maxHeight.toPx() }
+            val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
+            val tapMaxDistancePx = with(density) { PAN_EDGE_TAP_MAX_DISTANCE_DP.dp.toPx() }
+            val backgroundAspect = remember(backgroundIntrinsicSize, locationName) {
+                if (backgroundIntrinsicSize.width > 0 && backgroundIntrinsicSize.height > 0) {
+                    backgroundIntrinsicSize.width.toFloat() / backgroundIntrinsicSize.height.toFloat()
+                } else {
+                    defaultBackgroundAspect(locationName)
+                }
+            }
+            val panViewport = remember(sceneWidthPx, sceneHeightPx, backgroundAspect) {
+                computePanViewport(sceneWidthPx, sceneHeightPx, backgroundAspect)
+            }
+            val panoramicEnabled = proMode && panViewport.canPan
+            val backgroundRenderWidthPx = remember(sceneWidthPx, sceneHeightPx, backgroundAspect) {
+                max(sceneWidthPx, sceneHeightPx * backgroundAspect)
+            }
+            val backgroundPanRangePx = remember(sceneWidthPx, backgroundRenderWidthPx) {
+                max(0f, backgroundRenderWidthPx - sceneWidthPx)
+            }
+            val panoramicWorldZone = remember(proSceneZone, panViewport.visibleWidth, hasCustomCastZone) {
+                if (hasCustomCastZone) {
+                    proSceneZone
+                } else {
+                    centeredWorldCastZone(proSceneZone, panViewport.visibleWidth)
+                }
+            }
+            val activeCastZone = if (panoramicEnabled) panoramicWorldZone else proSceneZone
+            val activeCastArea = activeCastZone.bounds()
+            val cameraBounds = remember(panoramicEnabled, activeCastArea, panViewport.visibleWidth) {
+                if (panoramicEnabled) {
+                    cameraBoundsForArea(activeCastArea, panViewport.visibleWidth)
+                } else {
+                    CameraPanBounds()
+                }
+            }
+            val locationCameraKey = remember(backgroundUrl, me.locationId, panoramicEnabled) {
+                "${me.locationId}:${backgroundUrl.orEmpty()}:${if (panoramicEnabled) "pan" else "static"}"
+            }
+            var cameraViewLeft by remember(locationCameraKey) {
+                mutableStateOf(
+                    if (panoramicEnabled) clampCameraViewLeft(panViewport.centeredLeft, cameraBounds) else 0f
                 )
+            }
+            LaunchedEffect(cameraBounds, panoramicEnabled) {
+                cameraViewLeft = if (panoramicEnabled) {
+                    clampCameraViewLeft(cameraViewLeft, cameraBounds)
+                } else {
+                    0f
+                }
+            }
+            val cameraViewLeftState = rememberUpdatedState(cameraViewLeft)
+            val visibleCastZone = remember(panoramicEnabled, activeCastZone, cameraViewLeft, panViewport.visibleWidth) {
+                if (panoramicEnabled) {
+                    worldCastZoneToScreen(
+                        visibleWorldCastZone(activeCastZone, cameraViewLeft, panViewport.visibleWidth),
+                        cameraViewLeft,
+                        panViewport.visibleWidth,
+                    )
+                } else {
+                    proSceneZone
+                }
+            }
+            val visibleCastArea = visibleCastZone.bounds()
+            val panStep = max(0.06f, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER)
+            val backgroundPanOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (clampCameraViewLeft(cameraViewLeft, cameraBounds) / panViewport.maxPan) * backgroundPanRangePx
+            } else {
+                0f
+            }
+            val cameraMinOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (cameraBounds.minLeft / panViewport.maxPan) * backgroundPanRangePx
+            } else {
+                0f
+            }
+            val cameraMaxOffsetPx = if (panoramicEnabled && panViewport.maxPan > 0f && backgroundPanRangePx > 0f) {
+                (cameraBounds.maxLeft / panViewport.maxPan) * backgroundPanRangePx
+            } else {
+                0f
+            }
+            val backgroundPanOffsetState = rememberUpdatedState(backgroundPanOffsetPx)
+            if (backgroundUrl != null) {
+                val backgroundPainter = rememberAsyncImagePainter(
+                    model = backgroundUrl,
+                    onSuccess = { result ->
+                        val drawable = result.result.drawable
+                        backgroundIntrinsicSize = IntSize(
+                            width = drawable.intrinsicWidth.coerceAtLeast(0),
+                            height = drawable.intrinsicHeight.coerceAtLeast(0),
+                        )
+                    },
+                )
+                if (panoramicEnabled) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        clipRect {
+                            translate(left = -backgroundPanOffsetPx, top = 0f) {
+                                with(backgroundPainter) {
+                                    draw(
+                                        size = Size(
+                                            width = backgroundRenderWidthPx,
+                                            height = size.height,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Image(
+                        painter = backgroundPainter,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.BottomCenter,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = if (proMode) 1.06f else 1.22f,
+                                scaleY = if (proMode) 1.02f else 1.08f,
+                            ),
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -2721,34 +3200,202 @@ private fun FishingStageScene(
                         )
                     )
             )
+            val readyPanGestureState = remember(locationCameraKey, phase, panoramicEnabled) {
+                ReadyPanGestureState()
+            }
 
-            val density = LocalDensity.current
-            val sceneWidthPx = with(density) { maxWidth.toPx() }
-            val sceneHeightPx = with(density) { maxHeight.toPx() }
-            val minSwipePx = with(density) { PRO_CAST_MIN_SWIPE_DP.dp.toPx() }
             val proGestureModifier = when {
                 !proMode -> Modifier
-                phase == FishingPhase.READY -> Modifier.pointerInput(phase, sceneWidthPx, sceneHeightPx, proSceneSpec) {
-                    var dragTotal = Offset.Zero
-                    var dragStartedAtMillis = 0L
-                    detectDragGestures(
-                        onDragStart = {
-                            dragTotal = Offset.Zero
-                            dragStartedAtMillis = System.currentTimeMillis()
-                        },
-                        onDrag = { _, dragAmount ->
-                            dragTotal += dragAmount
-                        },
-                        onDragEnd = {
-                            if (hypot(dragTotal.x, dragTotal.y) >= minSwipePx) {
-                                val elapsedMillis = (System.currentTimeMillis() - dragStartedAtMillis).coerceAtLeast(16L)
-                                onBeginCast(proFishingCastSpotFromSwipe(dragTotal, sceneWidthPx, sceneHeightPx, elapsedMillis, proSceneSpec))
+                phase == FishingPhase.READY && panoramicEnabled -> Modifier.pointerInteropFilter { event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            readyPanGestureState.reset()
+                            readyPanGestureState.primaryPointerId = event.getPointerId(0)
+                            readyPanGestureState.startX = event.x
+                            readyPanGestureState.startY = event.y
+                            readyPanGestureState.lastX = event.x
+                            readyPanGestureState.lastY = event.y
+                            readyPanGestureState.startedAtMillis =
+                                if (event.eventTime > 0L) event.eventTime else SystemClock.uptimeMillis()
+                            true
+                        }
+
+                        MotionEvent.ACTION_POINTER_DOWN -> {
+                            if (event.pointerCount >= 2) {
+                                readyPanGestureState.panActive = true
+                                readyPanGestureState.hadPanGesture = true
+                                readyPanGestureState.panStartOffsetPx = backgroundPanOffsetState.value
+                                readyPanGestureState.panStartXByPointer.clear()
+                                for (index in 0 until event.pointerCount) {
+                                    readyPanGestureState.panStartXByPointer[event.getPointerId(index)] =
+                                        event.getX(index)
+                                }
                             }
-                        },
-                        onDragCancel = {
-                            dragTotal = Offset.Zero
-                        },
-                    )
+                            true
+                        }
+
+                        MotionEvent.ACTION_MOVE -> {
+                            if (readyPanGestureState.panActive && event.pointerCount >= 2) {
+                                var deltaX = 0f
+                                for (index in 0 until event.pointerCount) {
+                                    val pointerId = event.getPointerId(index)
+                                    val startX = readyPanGestureState.panStartXByPointer[pointerId] ?: continue
+                                    val currentDelta = event.getX(index) - startX
+                                    if (abs(currentDelta) > abs(deltaX)) {
+                                        deltaX = currentDelta
+                                    }
+                                }
+                                val nextOffsetPx = (readyPanGestureState.panStartOffsetPx - deltaX).coerceIn(
+                                    cameraMinOffsetPx,
+                                    cameraMaxOffsetPx,
+                                )
+                                cameraViewLeft = if (backgroundPanRangePx > 0f && panViewport.maxPan > 0f) {
+                                    clampCameraViewLeft(
+                                        (nextOffsetPx / backgroundPanRangePx) * panViewport.maxPan,
+                                        cameraBounds,
+                                    )
+                                } else {
+                                    0f
+                                }
+                            } else {
+                                val pointerIndex = event.findPointerIndex(readyPanGestureState.primaryPointerId)
+                                if (pointerIndex >= 0) {
+                                    readyPanGestureState.lastX = event.getX(pointerIndex)
+                                    readyPanGestureState.lastY = event.getY(pointerIndex)
+                                }
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_POINTER_UP -> {
+                            if (readyPanGestureState.panActive) {
+                                val remainingPointers = event.pointerCount - 1
+                                if (remainingPointers >= 2) {
+                                    readyPanGestureState.panStartOffsetPx = backgroundPanOffsetState.value
+                                    readyPanGestureState.panStartXByPointer.clear()
+                                    for (index in 0 until event.pointerCount) {
+                                        if (index == event.actionIndex) continue
+                                        readyPanGestureState.panStartXByPointer[event.getPointerId(index)] =
+                                            event.getX(index)
+                                    }
+                                } else {
+                                    readyPanGestureState.panActive = false
+                                    readyPanGestureState.panStartXByPointer.clear()
+                                }
+                            }
+                            true
+                        }
+
+                        MotionEvent.ACTION_UP -> {
+                            if (!readyPanGestureState.panActive && !readyPanGestureState.hadPanGesture) {
+                                val deltaX = event.x - readyPanGestureState.startX
+                                val deltaY = event.y - readyPanGestureState.startY
+                                val distance = hypot(deltaX, deltaY)
+                                val elapsedMillis =
+                                    (event.eventTime - readyPanGestureState.startedAtMillis).coerceAtLeast(16L)
+                                if (distance >= minSwipePx) {
+                                    onBeginCast(
+                                        proFishingCastSpotFromSwipe(
+                                            swipe = Offset(deltaX, deltaY),
+                                            widthPx = sceneWidthPx,
+                                            heightPx = sceneHeightPx,
+                                            elapsedMillis = elapsedMillis,
+                                            sceneZone = visibleCastZone,
+                                            worldZone = activeCastZone,
+                                            viewLeft = cameraViewLeftState.value,
+                                            viewportWidth = panViewport.visibleWidth,
+                                        )
+                                    )
+                                } else if (
+                                    distance <= tapMaxDistancePx &&
+                                    elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
+                                ) {
+                                    val nextViewLeft = when {
+                                        readyPanGestureState.lastX <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
+                                            cameraViewLeftState.value - panStep
+                                        readyPanGestureState.lastX >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
+                                            cameraViewLeftState.value + panStep
+                                        else -> null
+                                    }
+                                    if (nextViewLeft != null) {
+                                        cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
+                                    }
+                                }
+                            }
+                            readyPanGestureState.reset()
+                            true
+                        }
+
+                        MotionEvent.ACTION_CANCEL -> {
+                            readyPanGestureState.reset()
+                            true
+                        }
+
+                        else -> false
+                    }
+                }
+                phase == FishingPhase.READY -> Modifier.pointerInput(
+                    phase,
+                    sceneWidthPx,
+                    sceneHeightPx,
+                    visibleCastArea,
+                    activeCastArea,
+                ) {
+                    awaitEachGesture {
+                        val firstDown = awaitFirstDown(requireUnconsumed = false)
+                        val pointerPositions = linkedMapOf(firstDown.id to firstDown.position)
+                        val startPosition = firstDown.position
+                        var lastPosition = firstDown.position
+                        var dragTotal = Offset.Zero
+                        val startedAtMillis = SystemClock.uptimeMillis()
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { change ->
+                                if (change.id == firstDown.id) {
+                                    lastPosition = change.position
+                                    dragTotal = change.position - startPosition
+                                }
+                                if (change.pressed) {
+                                    pointerPositions[change.id] = change.position
+                                } else {
+                                    pointerPositions.remove(change.id)
+                                }
+                            }
+                            if (pointerPositions.isEmpty()) {
+                                val distance = hypot(dragTotal.x, dragTotal.y)
+                                val elapsedMillis = (SystemClock.uptimeMillis() - startedAtMillis).coerceAtLeast(16L)
+                                if (distance >= minSwipePx) {
+                                    onBeginCast(
+                                        proFishingCastSpotFromSwipe(
+                                            swipe = dragTotal,
+                                            widthPx = sceneWidthPx,
+                                            heightPx = sceneHeightPx,
+                                            elapsedMillis = elapsedMillis,
+                                            sceneZone = visibleCastZone,
+                                            worldZone = activeCastZone,
+                                            viewLeft = 0f,
+                                            viewportWidth = 1f,
+                                        )
+                                    )
+                                } else if (
+                                    distance <= tapMaxDistancePx &&
+                                    elapsedMillis <= PAN_EDGE_TAP_MAX_DURATION_MILLIS
+                                ) {
+                                    val nextViewLeft = when {
+                                        lastPosition.x <= sceneWidthPx * PAN_EDGE_TAP_FRACTION ->
+                                            cameraViewLeftState.value - panStep
+                                        lastPosition.x >= sceneWidthPx * (1f - PAN_EDGE_TAP_FRACTION) ->
+                                            cameraViewLeftState.value + panStep
+                                        else -> null
+                                    }
+                                    if (nextViewLeft != null) {
+                                        cameraViewLeft = clampCameraViewLeft(nextViewLeft, cameraBounds)
+                                    }
+                                }
+                                break
+                            }
+                        }
+                    }
                 }
                 phase == FishingPhase.BITING -> Modifier.pointerInput(phase) {
                     detectTapGestures(onTap = { onHookFish() })
@@ -2811,19 +3458,28 @@ private fun FishingStageScene(
             }
             val activeCastSpot = castSpot
             val activeCastTarget = activeCastSpot?.let {
-                if (proMode || it.proMode) proStyleCastTarget(it, proSceneSpec) else tgStyleCastTarget(it, rodTipRelX)
+                if (proMode || it.proMode) {
+                    if (panoramicEnabled && it.panoramicAware) {
+                        val worldTarget = proStyleCastTarget(it, activeCastZone)
+                        worldToScreenRel(worldTarget, cameraViewLeft, panViewport.visibleWidth)
+                    } else {
+                        proStyleCastTarget(it, if (panoramicEnabled) visibleCastZone else activeCastZone)
+                    }
+                } else {
+                    tgStyleCastTarget(it, rodTipRelX)
+                }
             }
             val currentLure = me.lures.firstOrNull { it.id == me.currentLureId }
             val currentLureAsset = lureAsset(currentLure?.name, currentLure?.displayName)
             val bobberRectSizePx = sceneWidthPx * if (proMode) 0.105f else 0.08f
             val bobberRadiusPx = bobberRectSizePx / 2f
             val bobberPx = Offset(
-                x = sceneWidthPx * bobberRel.x,
+                x = sceneWidthPx * bobberRel.x + bobberVisual.xOffset,
                 y = sceneHeightPx * bobberRel.y + bobberVisual.offset,
             )
             val rigLineHeightPx = with(density) { (if (proMode) 36.dp else 27.dp).toPx() }
             val rigHookSizeDp = if (proMode) 18.dp else 14.dp
-            val rigBaitSizeDp = if (proMode) 18.dp else 15.dp
+            val rigBaitSizeDp = if (proMode) 30.dp else 25.dp
             val rigHookSizePx = with(density) { rigHookSizeDp.toPx() }
             val rigBaitSizePx = with(density) { rigBaitSizeDp.toPx() }
             val showRig = !hasSplashed && sceneWidthPx > 0f && sceneHeightPx > 0f
@@ -2906,7 +3562,7 @@ private fun FishingStageScene(
 
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val waterTop = size.height * TG_CAST_WATER_TOP
-                val bobberBase = Offset(size.width * bobberRel.x, size.height * bobberRel.y)
+                val bobberBase = Offset(size.width * bobberRel.x + bobberVisual.xOffset, size.height * bobberRel.y)
                 val bobberRectSize = size.width * if (proMode) 0.105f else 0.08f
                 val bobberRadius = bobberRectSize / 2f
                 val visibleAboveWater = bobberRadius * 0.75f
@@ -2959,9 +3615,15 @@ private fun FishingStageScene(
                         cubicTo(control1.x, control1.y, control2.x, control2.y, lineAttach.x, lineAttach.y)
                     } else {
                         val gentleSag = min(size.height * 0.08f, dist * 0.12f)
+                        val fightPull = if (phase == FishingPhase.TAP_CHALLENGE) {
+                            bobberVisual.xOffset * 0.5f + size.width * 0.035f * fightIntensity *
+                                sin((rippleProgress + 0.2f) * 2f * PI.toFloat())
+                        } else {
+                            0f
+                        }
                         val control = Offset(
-                            x = lineOrigin.x + dx * 0.5f,
-                            y = lineOrigin.y + dy * 0.5f + gentleSag,
+                            x = lineOrigin.x + dx * 0.5f + fightPull,
+                            y = lineOrigin.y + dy * 0.5f + gentleSag + fightIntensity * 18f,
                         )
                         quadraticTo(control.x, control.y, lineAttach.x, lineAttach.y)
                     }
@@ -2996,9 +3658,9 @@ private fun FishingStageScene(
                 if (showRipple) {
                     repeat(if (phase == FishingPhase.BITING || phase == FishingPhase.TAP_CHALLENGE) 2 else 1) { index ->
                         val progress = ((rippleProgress + index * 0.35f) % 1f)
-                        val radius = size.width * (0.04f + progress * 0.08f)
+                        val radius = size.width * (0.04f + progress * (0.08f + fightIntensity * 0.06f))
                         drawCircle(
-                            color = Color.White.copy(alpha = (0.4f - progress * 0.25f).coerceAtLeast(0f)),
+                            color = Color.White.copy(alpha = (0.4f + fightIntensity * 0.18f - progress * 0.28f).coerceAtLeast(0f)),
                             radius = radius,
                             center = Offset(bobber.x, max(waterTop + 8f, bobber.y + size.height * 0.02f)),
                             style = Stroke(width = 3f),
@@ -3061,7 +3723,7 @@ private fun FishingStageScene(
                         }
                         .size(rigHookSizeDp),
                 )
-                if (currentLureAsset != null) {
+                if (phase != FishingPhase.COOLDOWN && currentLureAsset != null) {
                     AsyncImage(
                         model = currentLureAsset,
                         contentDescription = null,
@@ -3069,8 +3731,8 @@ private fun FishingStageScene(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    (bobberPx.x - rigBaitSizePx * 0.45f).roundToInt(),
-                                    (rigTopPx + rigHookSizePx * 0.34f).roundToInt(),
+                                    (bobberPx.x - rigBaitSizePx * 0.42f).roundToInt(),
+                                    (rigTopPx + rigHookSizePx * 0.35f - rigBaitSizePx * 0.45f).roundToInt(),
                                 )
                             }
                             .size(rigBaitSizeDp),
@@ -3192,22 +3854,17 @@ private fun FishingStageScene(
                             .padding(horizontal = 28.dp)
                             .padding(bottom = 74.dp)
                             .graphicsLayer(alpha = proNoticeAlpha),
-                        color = Color(0xFFFFD7D0),
-                        style = MaterialTheme.typography.titleMedium,
+                        color = if (proNotice.tone == ProFishingNoticeTone.ERROR) {
+                            Color(0xFFFFD7D0)
+                        } else {
+                            Color(0xFFC9FBD8)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                     )
                 }
             }
-            FishingOverlayToggle(
-                label = "Pro",
-                checked = proFishingEnabled,
-                onClick = onToggleProFishingMode,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .then(if (proMode) Modifier.navigationBarsPadding() else Modifier)
-                    .padding(start = 12.dp, bottom = 12.dp),
-            )
             if (me.autoFish) {
                 FishingOverlayToggle(
                     label = strings.autoCast,
@@ -3232,54 +3889,371 @@ private fun tgStyleCastTarget(castSpot: FishingCastSpot, rodTipRelX: Float): Off
     )
 }
 
-private fun proStyleCastTarget(castSpot: FishingCastSpot, sceneSpec: ProFishingSceneSpec): Offset =
-    Offset(
-        x = sceneSpec.minX + castSpot.xRoll.coerceIn(0f, 1f) * (sceneSpec.maxX - sceneSpec.minX),
-        y = sceneSpec.farY + castSpot.yRoll.coerceIn(0f, 1f) * (sceneSpec.nearY - sceneSpec.farY),
+private fun defaultBackgroundAspect(location: String?): Float = when (location) {
+    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest",
+    "Мангровые заросли", "Mangroves" -> 1f
+    else -> 1.5f
+}
+
+private fun computePanViewport(widthPx: Float, heightPx: Float, imageAspect: Float): PanViewportSpec {
+    if (widthPx <= 0f || heightPx <= 0f || imageAspect <= 0f) {
+        return PanViewportSpec()
+    }
+    val stageAspect = widthPx / heightPx
+    if (imageAspect <= stageAspect) {
+        return PanViewportSpec()
+    }
+    val visibleWidth = (stageAspect / imageAspect).coerceIn(0f, 1f)
+    val maxPan = max(0f, 1f - visibleWidth)
+    return PanViewportSpec(
+        visibleWidth = visibleWidth,
+        maxPan = maxPan,
+        centeredLeft = maxPan / 2f,
+        canPan = maxPan > 0.001f,
     )
+}
+
+private fun normalizeCastZone(castZone: CastZoneDto?): ProFishingCastZone? {
+    val points = castZone?.points.orEmpty().mapNotNull { point ->
+        val x = point.x.toFloat()
+        val y = point.y.toFloat()
+        if (!x.isNaN() && !x.isInfinite() && !y.isNaN() && !y.isInfinite()) {
+            Offset(x.coerceIn(0f, 1f), y.coerceIn(0f, 1f))
+        } else {
+            null
+        }
+    }
+    if (points.size < 3) return null
+    val zone = ProFishingCastZone(points)
+    if (zone.area() < 0.0004f) return null
+    return zone
+}
+
+private fun fallbackCastZone(): ProFishingCastZone =
+    ProFishingCastZone(
+        listOf(
+            Offset(0.08f, 0.62f),
+            Offset(0.48f, 0.62f),
+            Offset(0.48f, 0.94f),
+            Offset(0.08f, 0.94f),
+        )
+    )
+
+private fun rectCastZone(sceneSpec: ProFishingSceneSpec): ProFishingCastZone =
+    ProFishingCastZone(
+        listOf(
+            Offset(sceneSpec.minX, sceneSpec.farY),
+            Offset(sceneSpec.maxX, sceneSpec.farY),
+            Offset(sceneSpec.maxX, sceneSpec.nearY),
+            Offset(sceneSpec.minX, sceneSpec.nearY),
+        )
+    )
+
+private fun ProFishingCastZone.bounds(): ProFishingSceneSpec {
+    if (points.isEmpty()) return ProFishingSceneSpec()
+    return ProFishingSceneSpec(
+        minX = points.minOf { it.x }.coerceIn(0f, 1f),
+        maxX = points.maxOf { it.x }.coerceIn(0f, 1f),
+        farY = points.minOf { it.y }.coerceIn(0f, 1f),
+        nearY = points.maxOf { it.y }.coerceIn(0f, 1f),
+    )
+}
+
+private fun ProFishingCastZone.area(): Float {
+    if (points.size < 3) return 0f
+    var sum = 0f
+    points.forEachIndexed { index, point ->
+        val next = points[(index + 1) % points.size]
+        sum += point.x * next.y - next.x * point.y
+    }
+    return abs(sum) / 2f
+}
+
+private fun screenCastZoneToWorldZone(
+    zone: ProFishingCastZone,
+    viewportWidth: Float,
+    expandX: Float = 0f,
+    expandTop: Float = 0f,
+    expandBottom: Float = 0f,
+): ProFishingCastZone {
+    val centeredLeft = max(0f, (1f - viewportWidth) / 2f)
+    val points = zone.points.map { point ->
+        Offset(
+            x = (centeredLeft + point.x * viewportWidth).coerceIn(0f, 1f),
+            y = point.y.coerceIn(0f, 1f),
+        )
+    }
+    val expanded = ProFishingCastZone(points).bounds().let { bounds ->
+        rectCastZone(
+            ProFishingSceneSpec(
+                minX = (bounds.minX - expandX).coerceIn(0f, 1f),
+                maxX = (bounds.maxX + expandX).coerceIn(0f, 1f),
+                farY = (bounds.farY - expandTop).coerceIn(0f, 1f),
+                nearY = (bounds.nearY + expandBottom).coerceIn(0f, 1f),
+            )
+        )
+    }
+    return if (expandX > 0f || expandTop > 0f || expandBottom > 0f) expanded else ProFishingCastZone(points)
+}
+
+private fun centeredWorldCastZone(zone: ProFishingCastZone, viewportWidth: Float): ProFishingCastZone =
+    screenCastZoneToWorldZone(
+        zone = zone,
+        viewportWidth = viewportWidth,
+        expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+        expandTop = CAST_AREA_EXPAND_TOP,
+        expandBottom = CAST_AREA_EXPAND_BOTTOM,
+    )
+
+private fun visibleWorldCastZone(
+    zone: ProFishingCastZone,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingCastZone {
+    val clippedLeft = clipCastZoneVertical(zone.points, viewLeft, keepGreater = true)
+    val clipped = clipCastZoneVertical(clippedLeft, viewLeft + viewportWidth, keepGreater = false)
+    if (clipped.size >= 3) return ProFishingCastZone(clipped)
+    return rectCastZone(visibleWorldCastArea(zone.bounds(), viewLeft, viewportWidth))
+}
+
+private fun clipCastZoneVertical(points: List<Offset>, boundaryX: Float, keepGreater: Boolean): List<Offset> {
+    if (points.isEmpty()) return emptyList()
+    val result = mutableListOf<Offset>()
+    fun inside(point: Offset): Boolean = if (keepGreater) point.x >= boundaryX else point.x <= boundaryX
+    fun intersection(a: Offset, b: Offset): Offset {
+        val dx = b.x - a.x
+        if (abs(dx) < 0.000001f) return Offset(boundaryX, a.y)
+        val t = ((boundaryX - a.x) / dx).coerceIn(0f, 1f)
+        return Offset(boundaryX, a.y + (b.y - a.y) * t)
+    }
+    points.forEachIndexed { index, current ->
+        val previous = points[(index + points.size - 1) % points.size]
+        val currentInside = inside(current)
+        val previousInside = inside(previous)
+        when {
+            currentInside && !previousInside -> {
+                result += intersection(previous, current)
+                result += current
+            }
+            currentInside -> result += current
+            !currentInside && previousInside -> result += intersection(previous, current)
+        }
+    }
+    return result
+}
+
+private fun worldCastZoneToScreen(
+    zone: ProFishingCastZone,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingCastZone {
+    if (viewportWidth <= 0f) return zone
+    return ProFishingCastZone(
+        zone.points.map { point ->
+            Offset(
+                x = ((point.x - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+                y = point.y.coerceIn(0f, 1f),
+            )
+        }
+    )
+}
+
+private fun legacyScreenAreaToWorldArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewportWidth: Float,
+    expandX: Float = 0f,
+    expandTop: Float = 0f,
+    expandBottom: Float = 0f,
+): ProFishingSceneSpec {
+    val centeredLeft = max(0f, (1f - viewportWidth) / 2f)
+    val worldMinX = centeredLeft + sceneSpec.minX * viewportWidth
+    val worldMaxX = centeredLeft + sceneSpec.maxX * viewportWidth
+    return ProFishingSceneSpec(
+        minX = (worldMinX - expandX).coerceIn(0f, 1f),
+        maxX = (worldMaxX + expandX).coerceIn(0f, 1f),
+        farY = (sceneSpec.farY - expandTop).coerceIn(0f, 1f),
+        nearY = (sceneSpec.nearY + expandBottom).coerceIn(0f, 1f),
+    )
+}
+
+private fun centeredWorldCastArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): ProFishingSceneSpec =
+    legacyScreenAreaToWorldArea(
+        sceneSpec = sceneSpec,
+        viewportWidth = viewportWidth,
+        expandX = max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+        expandTop = CAST_AREA_EXPAND_TOP,
+        expandBottom = CAST_AREA_EXPAND_BOTTOM,
+    )
+
+private fun cameraBoundsForArea(sceneSpec: ProFishingSceneSpec, viewportWidth: Float): CameraPanBounds {
+    val maxPan = max(0f, 1f - viewportWidth)
+    if (maxPan <= 0f || viewportWidth <= 0f) {
+        return CameraPanBounds()
+    }
+    val areaWidth = max(0f, sceneSpec.maxX - sceneSpec.minX)
+    val minVisible = min(
+        areaWidth,
+        max(CAST_AREA_MIN_VISIBLE_WORLD, viewportWidth * CAST_AREA_MIN_VISIBLE_VIEWPORT),
+    )
+    var minLeft = (sceneSpec.minX + minVisible - viewportWidth).coerceIn(0f, maxPan)
+    var maxLeft = (sceneSpec.maxX - minVisible).coerceIn(0f, maxPan)
+    if (maxLeft < minLeft) {
+        val centered = (((sceneSpec.minX + sceneSpec.maxX) / 2f) - viewportWidth / 2f).coerceIn(0f, maxPan)
+        minLeft = centered
+        maxLeft = centered
+    }
+    return CameraPanBounds(minLeft = minLeft, maxLeft = maxLeft)
+}
+
+private fun clampCameraViewLeft(viewLeft: Float, bounds: CameraPanBounds): Float =
+    viewLeft.coerceIn(bounds.minLeft, bounds.maxLeft)
+
+private fun visibleWorldCastArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingSceneSpec {
+    val visibleMinX = max(sceneSpec.minX, viewLeft)
+    val visibleMaxX = min(sceneSpec.maxX, viewLeft + viewportWidth)
+    if (visibleMaxX > visibleMinX) {
+        return sceneSpec.copy(minX = visibleMinX, maxX = visibleMaxX)
+    }
+    val center = ((sceneSpec.minX + sceneSpec.maxX) / 2f).coerceIn(viewLeft, viewLeft + viewportWidth)
+    val halfWidth = min(viewportWidth * 0.08f, 0.04f)
+    return sceneSpec.copy(
+        minX = (center - halfWidth).coerceIn(viewLeft, viewLeft + viewportWidth),
+        maxX = (center + halfWidth).coerceIn(viewLeft, viewLeft + viewportWidth),
+    )
+}
+
+private fun worldAreaToScreenArea(
+    sceneSpec: ProFishingSceneSpec,
+    viewLeft: Float,
+    viewportWidth: Float,
+): ProFishingSceneSpec {
+    if (viewportWidth <= 0f) return sceneSpec
+    return sceneSpec.copy(
+        minX = ((sceneSpec.minX - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+        maxX = ((sceneSpec.maxX - viewLeft) / viewportWidth).coerceIn(0f, 1f),
+    )
+}
+
+private fun worldToScreenRel(point: Offset, viewLeft: Float, viewportWidth: Float): Offset {
+    if (viewportWidth <= 0f) return point
+    return Offset(
+        x = (point.x - viewLeft) / viewportWidth,
+        y = point.y,
+    )
+}
+
+private fun proStyleCastTarget(castSpot: FishingCastSpot, zone: ProFishingCastZone): Offset {
+    val bounds = zone.bounds()
+    val point = Offset(
+        x = bounds.minX + castSpot.xRoll.coerceIn(0f, 1f) * (bounds.maxX - bounds.minX),
+        y = bounds.farY + castSpot.yRoll.coerceIn(0f, 1f) * (bounds.nearY - bounds.farY),
+    )
+    return if (pointInCastZone(point, zone)) point else closestPointInCastZone(point, zone)
+}
 
 private fun proFishingCastSpotFromSwipe(
     swipe: Offset,
     widthPx: Float,
     heightPx: Float,
     elapsedMillis: Long,
-    sceneSpec: ProFishingSceneSpec,
+    sceneZone: ProFishingCastZone,
+    worldZone: ProFishingCastZone = sceneZone,
+    viewLeft: Float = 0f,
+    viewportWidth: Float = 1f,
 ): FishingCastSpot {
     val minSide = min(widthPx, heightPx).coerceAtLeast(1f)
     val distance = hypot(swipe.x, swipe.y)
     val strength = (distance / (minSide * 0.75f)).coerceIn(0f, 1f)
     val nx = if (distance > 0f) swipe.x / distance else 0f
     val ny = if (distance > 0f) swipe.y / distance else 0f
+    val sceneSpec = sceneZone.bounds()
+    val worldSpec = worldZone.bounds()
     val centerX = (sceneSpec.minX + sceneSpec.maxX) / 2f
     val centerY = (sceneSpec.farY + sceneSpec.nearY) / 2f
     val reachX = (sceneSpec.maxX - sceneSpec.minX) / 2f
     val reachY = (sceneSpec.nearY - sceneSpec.farY) / 2f
-    val targetX = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX)
-    val targetY = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY)
+    val screenTarget = Offset(
+        x = (centerX + nx * strength * reachX).coerceIn(sceneSpec.minX, sceneSpec.maxX),
+        y = (centerY + ny * strength * reachY).coerceIn(sceneSpec.farY, sceneSpec.nearY),
+    ).let { if (pointInCastZone(it, sceneZone)) it else closestPointInCastZone(it, sceneZone) }
+    val targetWorldX = viewLeft + screenTarget.x * viewportWidth
+    val worldTarget = Offset(targetWorldX, screenTarget.y)
+        .let { if (pointInCastZone(it, worldZone)) it else closestPointInCastZone(it, worldZone) }
+    val worldWidth = max(0.0001f, worldSpec.maxX - worldSpec.minX)
+    val worldHeight = max(0.0001f, worldSpec.nearY - worldSpec.farY)
     return FishingCastSpot(
-        xRoll = ((targetX - sceneSpec.minX) / (sceneSpec.maxX - sceneSpec.minX)).coerceIn(0f, 1f),
-        yRoll = ((targetY - sceneSpec.farY) / (sceneSpec.nearY - sceneSpec.farY)).coerceIn(0f, 1f),
+        xRoll = ((worldTarget.x - worldSpec.minX) / worldWidth).coerceIn(0f, 1f),
+        yRoll = ((worldTarget.y - worldSpec.farY) / worldHeight).coerceIn(0f, 1f),
         proMode = true,
+        panoramicAware = viewportWidth < 0.999f && worldZone != sceneZone,
         castDurationMillis = castDurationFromSwipe(distance, elapsedMillis),
     )
 }
 
+private fun pointInCastZone(point: Offset, zone: ProFishingCastZone): Boolean {
+    val points = zone.points
+    if (points.size < 3) return false
+    var inside = false
+    var j = points.lastIndex
+    for (i in points.indices) {
+        val pi = points[i]
+        val pj = points[j]
+        val crosses = (pi.y > point.y) != (pj.y > point.y)
+        if (crosses) {
+            val xAtY = (pj.x - pi.x) * (point.y - pi.y) / ((pj.y - pi.y).takeIf { abs(it) > 0.000001f } ?: 0.000001f) + pi.x
+            if (point.x < xAtY) inside = !inside
+        }
+        j = i
+    }
+    return inside
+}
+
+private fun closestPointInCastZone(point: Offset, zone: ProFishingCastZone): Offset {
+    val points = zone.points
+    if (points.isEmpty()) return point
+    var closest = points.first()
+    var closestDistance = Float.MAX_VALUE
+    points.forEachIndexed { index, start ->
+        val end = points[(index + 1) % points.size]
+        val candidate = closestPointOnSegment(point, start, end)
+        val distance = hypot(candidate.x - point.x, candidate.y - point.y)
+        if (distance < closestDistance) {
+            closestDistance = distance
+            closest = candidate
+        }
+    }
+    return Offset(closest.x.coerceIn(0f, 1f), closest.y.coerceIn(0f, 1f))
+}
+
+private fun closestPointOnSegment(point: Offset, start: Offset, end: Offset): Offset {
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    val lenSq = dx * dx + dy * dy
+    if (lenSq <= 0.000001f) return start
+    val t = (((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq).coerceIn(0f, 1f)
+    return Offset(start.x + dx * t, start.y + dy * t)
+}
+
 private fun proFishingSceneSpec(location: String?): ProFishingSceneSpec = when (location) {
-    "Пруд", "Pond" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
-    "Болото", "Swamp" -> ProFishingSceneSpec(minX = 0.20f, maxX = 0.70f, farY = 0.57f, nearY = 0.72f)
-    "Река", "River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.76f, farY = 0.54f, nearY = 0.70f)
-    "Озеро", "Lake" -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
-    "Водохранилище", "Reservoir" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
-    "Горная река", "Mountain River" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.58f, farY = 0.54f, nearY = 0.70f)
-    "Дельта реки", "River Delta" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.66f, farY = 0.51f, nearY = 0.68f)
-    "Прибрежье моря", "Sea Coast" -> ProFishingSceneSpec(minX = 0.18f, maxX = 0.78f, farY = 0.50f, nearY = 0.70f)
-    "Русло Амазонки", "Amazon Riverbed" -> ProFishingSceneSpec(minX = 0.18f, maxX = 0.58f, farY = 0.58f, nearY = 0.72f)
-    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> ProFishingSceneSpec(minX = 0.24f, maxX = 0.78f, farY = 0.52f, nearY = 0.70f)
-    "Мангровые заросли", "Mangroves" -> ProFishingSceneSpec(minX = 0.12f, maxX = 0.44f, farY = 0.58f, nearY = 0.72f)
-    "Коралловые отмели", "Coral Flats" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.50f, farY = 0.52f, nearY = 0.68f)
-    "Фьорд", "Fjord" -> ProFishingSceneSpec(minX = 0.12f, maxX = 0.50f, farY = 0.60f, nearY = 0.74f)
-    "Открытый океан", "Open Ocean" -> ProFishingSceneSpec(minX = 0.14f, maxX = 0.62f, farY = 0.46f, nearY = 0.62f)
-    else -> ProFishingSceneSpec(minX = 0.16f, maxX = 0.80f, farY = 0.50f, nearY = 0.70f)
+    "Пруд", "Pond" -> ProFishingSceneSpec(minX = 0.05f, maxX = 0.88f, farY = 0.46f, nearY = 0.90f)
+    "Болото", "Swamp" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.86f, farY = 0.48f, nearY = 0.90f)
+    "Река", "River" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.84f, farY = 0.46f, nearY = 0.88f)
+    "Озеро", "Lake" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.84f, farY = 0.44f, nearY = 0.90f)
+    "Водохранилище", "Reservoir" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.74f, farY = 0.44f, nearY = 0.88f)
+    "Горная река", "Mountain River" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.79f, farY = 0.48f, nearY = 0.86f)
+    "Дельта реки", "River Delta" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.82f, farY = 0.44f, nearY = 0.84f)
+    "Прибрежье моря", "Sea Coast" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.82f, farY = 0.42f, nearY = 0.90f)
+    "Русло Амазонки", "Amazon Riverbed" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.83f, farY = 0.51f, nearY = 0.90f)
+    "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.98f, farY = 0.48f, nearY = 0.92f)
+    "Мангровые заросли", "Mangroves" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.96f, farY = 0.46f, nearY = 0.92f)
+    "Коралловые отмели", "Coral Flats" -> ProFishingSceneSpec(minX = 0.04f, maxX = 0.97f, farY = 0.42f, nearY = 0.90f)
+    "Фьорд", "Fjord" -> ProFishingSceneSpec(minX = 0.03f, maxX = 0.97f, farY = 0.53f, nearY = 0.92f)
+    "Открытый океан", "Open Ocean" -> ProFishingSceneSpec(minX = 0.02f, maxX = 0.83f, farY = 0.40f, nearY = 0.84f)
+    else -> ProFishingSceneSpec(minX = 0.05f, maxX = 0.88f, farY = 0.46f, nearY = 0.88f)
 }
 
 private fun castDurationFromSwipe(distancePx: Float, elapsedMillis: Long): Int {
@@ -3590,6 +4564,44 @@ private fun FishingOutcomeCard(
             }
         }
     }
+}
+
+private fun fishingOutcomeNoticeText(
+    strings: RiverStrings,
+    fishing: FishingUiState,
+    achievements: List<AchievementDto>,
+): String? {
+    if (fishing.lastEscape) return strings.fishEscaped
+    val cast = fishing.lastCast ?: return null
+    val catch = cast.catch ?: return null
+    val lines = mutableListOf(
+        "${strings.catchResultTitle()}: ${catch.fish} • ${catch.weight.asKgCompact(strings)}"
+    )
+    if (fishing.lastCatchWasNewFish) {
+        lines += strings.newFishLabel()
+    }
+    if (cast.coins > 0) {
+        lines += strings.coinsEarnedLine(cast.coins)
+    }
+    cast.unlockedLocations.forEach { location ->
+        lines += strings.locationUnlockedLine(location)
+    }
+    cast.unlockedRods.forEach { rod ->
+        lines += strings.rodUnlockedLine(rod)
+    }
+    cast.achievements.forEach { unlock ->
+        lines += strings.achievementUnlockedLine(
+            name = achievementNameForCatch(strings, achievements, unlock.code),
+            level = strings.achievementLevelLabel(unlock.newLevelIndex),
+        )
+    }
+    cast.questUpdates.forEach { quest ->
+        lines += strings.questCompletedLine(
+            name = quest.name.ifBlank { quest.code },
+            coins = quest.rewardCoins,
+        )
+    }
+    return lines.take(7).joinToString("\n")
 }
 
 @Composable
@@ -4411,12 +5423,13 @@ private fun LocationPickerSheet(
                 title = location.name,
                 subtitle = if (location.unlocked) {
                     strings.currentLabel.takeIf { me.locationId == location.id }
-                        ?: location.unlockKg.asKgCompact(strings)
+                        ?: if (location.isEvent) specialTournamentsLabel(strings) else location.unlockKg.asKgCompact(strings)
                 } else {
-                    location.unlockKg.asKgCompact(strings)
+                    location.lockedReason ?: if (location.isEvent) eventsEmptyLabel(strings) else location.unlockKg.asKgCompact(strings)
                 },
                 enabled = location.unlocked,
                 selected = me.locationId == location.id,
+                special = location.isEvent,
                 onClick = { onSelect(location.id) },
             )
         }
@@ -4507,6 +5520,7 @@ private fun PickerRow(
     subtitle: String,
     enabled: Boolean,
     selected: Boolean,
+    special: Boolean = false,
     onClick: () -> Unit,
 ) {
     Surface(
@@ -4515,10 +5529,18 @@ private fun PickerRow(
             .clip(RoundedCornerShape(20.dp))
             .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else RiverPanelSoft.copy(alpha = 0.88f),
+        color = when {
+            selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            special -> RiverAmber.copy(alpha = 0.16f)
+            else -> RiverPanelSoft.copy(alpha = 0.88f)
+        },
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.46f) else RiverOutline.copy(alpha = 0.72f),
+            when {
+                selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.46f)
+                special -> RiverAmber.copy(alpha = 0.72f)
+                else -> RiverOutline.copy(alpha = 0.72f)
+            },
         ),
     ) {
         Row(
@@ -4565,12 +5587,13 @@ private fun GuideLocationRow(
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            val backgroundModel = location.imageUrl ?: locationBackgroundAsset(location.name)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp),
             ) {
-                locationBackgroundAsset(location.name)?.let { background ->
+                backgroundModel?.let { background ->
                     AsyncImage(
                         model = background,
                         contentDescription = location.name,
@@ -4611,6 +5634,7 @@ private fun GuideLocationRow(
                         CatchDetailChip(guideLureCountLabel(strings, location.lures.size))
                         CatchDetailChip(
                             when {
+                                location.isEvent -> specialEventLocationLabel(strings)
                                 ownedLocation?.unlocked == true -> unlockedLabel(strings)
                                 ownedLocation != null -> requiresKgLabel(strings, ownedLocation.unlockKg)
                                 else -> strings.unavailable
@@ -5815,7 +6839,7 @@ private fun TournamentCard(
                 }
                 mine?.let {
                     SceneBadge(
-                        text = "#${it.rank} • ${tournamentMetricValueLabel(strings, tournament.metric, it.value)}",
+                        text = "${it.rank} • ${tournamentMetricValueLabel(strings, tournament.metric, it.value)}",
                         accent = Color(0xFF6FE7B7),
                     )
                 }
@@ -5968,7 +6992,7 @@ private fun RatingsEntryCard(
                     border = BorderStroke(1.dp, rarityColor(catch.rarity).copy(alpha = 0.45f)),
                 ) {
                     Text(
-                        "#$rank",
+                        "$rank",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -6057,7 +7081,7 @@ private fun TournamentLeaderboardRow(
                         color = Color.White.copy(alpha = 0.06f),
                     ) {
                         Text(
-                            "#${entry.rank}",
+                            "${entry.rank}",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -6155,6 +7179,7 @@ private fun PrizeChip(
 private fun CatchDetailsDialog(
     strings: RiverStrings,
     catch: CatchDto,
+    me: MeResponseDto,
     resolvedRarity: String?,
     fishDiscovered: Boolean,
     allowShare: Boolean,
@@ -6164,6 +7189,12 @@ private fun CatchDetailsDialog(
 ) {
     val rarityKey = resolvedRarity?.takeIf { it.isNotBlank() }
     val accent = rarityColor(rarityKey)
+    val backgroundModel = remember(me.locations, catch.location) {
+        val normalized = catch.location.trim().lowercase()
+        me.locations.firstOrNull { location -> location.name.trim().lowercase() == normalized }
+            ?.let { location -> location.imageUrl ?: locationBackgroundAsset(location.name) }
+            ?: locationBackgroundAsset(catch.location)
+    }
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -6181,7 +7212,7 @@ private fun CatchDetailsDialog(
                         .fillMaxWidth()
                         .height(250.dp),
                 ) {
-                    locationBackgroundAsset(catch.location)?.let { background ->
+                    backgroundModel?.let { background ->
                         AsyncImage(
                             model = background,
                             contentDescription = catch.location,
@@ -6305,7 +7336,7 @@ private fun CatchDetailsDialog(
                             CatchDetailChip(user)
                         }
                         catch.at?.let { CatchDetailChip(formatTimestamp(it)) }
-                        catch.rank?.let { CatchDetailChip("#$it") }
+                        catch.rank?.let { CatchDetailChip("$it") }
                         catch.prizeCoins?.let { CatchDetailChip("$it coins") }
                     }
                     Text(
@@ -7010,6 +8041,61 @@ private fun anyFishLabel(strings: RiverStrings): String =
 private fun unknownUserLabel(strings: RiverStrings): String =
     if (strings.login == "Логин") "Неизвестно" else "Unknown"
 
+private fun youLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Ты" else "You"
+
+private fun regularTournamentsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Регулярные" else "Regular"
+
+private fun specialTournamentsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Специальные" else "Special"
+
+private const val EVENT_BOARD_WEIGHT = "weight"
+private const val EVENT_BOARD_COUNT = "count"
+private const val EVENT_BOARD_FISH = "fish"
+
+private fun eventLeaderboardLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Зачет" else "Leaderboard"
+
+private fun eventLeaderboardOptions(strings: RiverStrings): List<Pair<String, String>> = listOf(
+    EVENT_BOARD_WEIGHT to eventTotalWeightLabel(strings),
+    EVENT_BOARD_COUNT to eventTotalCountLabel(strings),
+    EVENT_BOARD_FISH to eventTopFishLabel(strings),
+)
+
+private fun specialEventBoardTitle(strings: RiverStrings, board: String): String = when (board) {
+    EVENT_BOARD_COUNT -> eventTotalCountLabel(strings)
+    EVENT_BOARD_FISH -> eventTopFishLabel(strings)
+    else -> eventTotalWeightLabel(strings)
+}
+
+private fun eventLocationsLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Ивентовые" else "Events"
+
+private fun specialEventLocationLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Событие" else "Event"
+
+private fun clubTournamentLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Турнир" else "Tournament"
+
+private fun currentTournamentPeriodLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Текущий" else "Current"
+
+private fun previousLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Прошлый" else "Previous"
+
+private fun eventsEmptyLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Нет специального события" else "No special event"
+
+private fun eventTotalWeightLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Клубы: суммарный вес" else "Clubs: total weight"
+
+private fun eventTotalCountLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Клубы: количество рыб" else "Clubs: fish count"
+
+private fun eventTopFishLabel(strings: RiverStrings): String =
+    if (strings.login == "Логин") "Игроки: редкая крупная рыба" else "Players: rare heavy fish"
+
 private fun achievementNameForCatch(
     strings: RiverStrings,
     achievements: List<AchievementDto>,
@@ -7197,6 +8283,8 @@ private fun isTournamentPrize(prize: PrizeDto): Boolean = prize.source == "tourn
 private fun isRatingPrize(prize: PrizeDto): Boolean = prize.source == "rating"
 
 private fun isClubPrize(prize: PrizeDto): Boolean = prize.source == "club"
+
+private fun isEventPrize(prize: PrizeDto): Boolean = prize.source == "event"
 
 private fun achievementRewardTitle(
     strings: RiverStrings,

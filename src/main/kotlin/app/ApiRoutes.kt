@@ -37,12 +37,19 @@ import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
 import service.AccountDeletionService
 import service.AndroidUpdateService
+import service.CastZoneDTO
 import db.AuthIdentities
 import db.Payments
 import db.Users
 import service.PayService
 import service.StarsPaymentService
+import service.SpecialEvent
+import service.SpecialEventClubEntry
+import service.SpecialEventLeaderboard
+import service.SpecialEventPersonalEntry
+import service.SpecialEventService
 import util.Metrics
+import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -64,7 +71,8 @@ fun Application.apiRoutes(
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
     val clubQuests = ClubQuestService()
-    val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
+    val events = SpecialEventService()
+    val prizeService = PrizeService(tournaments, ratingPrizes, clubs, events)
     val bot = TelegramBot(env.botToken)
     val accountDeletion = AccountDeletionService(clubs)
     val rarityGroups = setOf("common", "uncommon", "rare", "epic", "mythic", "legendary")
@@ -386,6 +394,56 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class SpecialEventDTO(
+        val id: Long,
+        val name: String,
+        val startTime: Long,
+        val endTime: Long,
+        val imageUrl: String? = null,
+        val castZone: CastZoneDTO? = null,
+    )
+
+    @Serializable
+    data class SpecialEventClubEntryDTO(
+        val rank: Int,
+        val clubId: Long,
+        val club: String,
+        val value: Double,
+        val prize: PrizeSpecDTO? = null,
+    )
+
+    @Serializable
+    data class SpecialEventPersonalEntryDTO(
+        val rank: Int,
+        val userId: Long,
+        val user: String? = null,
+        val value: Double,
+        val catchId: Long? = null,
+        val fish: String,
+        val fishId: Long,
+        val rarity: String,
+        val weight: Double,
+        val at: Long,
+        val prize: PrizeSpecDTO? = null,
+    )
+
+    @Serializable
+    data class SpecialEventLeaderboardsDTO(
+        val totalWeight: List<SpecialEventClubEntryDTO>,
+        val totalCount: List<SpecialEventClubEntryDTO>,
+        val personalFish: List<SpecialEventPersonalEntryDTO>,
+        val mineTotalWeight: SpecialEventClubEntryDTO? = null,
+        val mineTotalCount: SpecialEventClubEntryDTO? = null,
+        val minePersonalFish: SpecialEventPersonalEntryDTO? = null,
+    )
+
+    @Serializable
+    data class SpecialEventResponseDTO(
+        val event: SpecialEventDTO,
+        val leaderboards: SpecialEventLeaderboardsDTO,
+    )
+
+    @Serializable
     data class AuthUserDTO(
         val id: Long,
         val username: String?,
@@ -471,6 +529,68 @@ fun Application.apiRoutes(
             user = currentUserSummary(result.userId),
         )
 
+    fun eventAssetUrl(imagePath: String?): String? {
+        val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+        return "${env.publicBaseUrl.trimEnd('/')}/event-assets/$fileName"
+    }
+
+    fun eventAssetFile(imagePath: String?): File? {
+        val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+        val root = File(env.eventAssetsDir).canonicalFile
+        val file = File(root, fileName).canonicalFile
+        if (!file.path.startsWith(root.path + File.separator)) return null
+        return file.takeIf { it.isFile }
+    }
+
+    fun SpecialEvent.toDto(language: String): SpecialEventDTO =
+        SpecialEventDTO(
+            id = id,
+            name = if (language == "en") nameEn else nameRu,
+            startTime = startTime.epochSecond,
+            endTime = endTime.epochSecond,
+            imageUrl = eventAssetUrl(imagePath),
+            castZone = castZone,
+        )
+
+    fun SpecialEventClubEntry.toDto(): SpecialEventClubEntryDTO =
+        SpecialEventClubEntryDTO(
+            rank = rank,
+            clubId = clubId,
+            club = club,
+            value = value,
+            prize = prize?.toDtoOrNull(),
+        )
+
+    fun SpecialEventPersonalEntry.toDto(language: String): SpecialEventPersonalEntryDTO =
+        SpecialEventPersonalEntryDTO(
+            rank = rank,
+            userId = userId,
+            user = user,
+            value = value,
+            catchId = catchId,
+            fish = I18n.fish(fish, language),
+            fishId = fishId,
+            rarity = rarity,
+            weight = weight,
+            at = at.epochSecond,
+            prize = prize?.toDtoOrNull(),
+        )
+
+    fun SpecialEventLeaderboard.toDto(language: String): SpecialEventResponseDTO =
+        SpecialEventResponseDTO(
+            event = event.toDto(language),
+            leaderboards = SpecialEventLeaderboardsDTO(
+                totalWeight = weight.map { it.toDto() },
+                totalCount = count.map { it.toDto() },
+                personalFish = fish.map { it.toDto(language) },
+                mineTotalWeight = mineWeight?.toDto(),
+                mineTotalCount = mineCount?.toDto(),
+                minePersonalFish = mineFish?.toDto(language),
+            ),
+        )
+
     suspend fun ApplicationCall.requireUserId(): Long? {
         sessions.get<AppSession>()?.userId?.let { return fishing.ensureUserById(it) }
         bearerToken()?.let { token ->
@@ -494,6 +614,24 @@ fun Application.apiRoutes(
                         ?: headers[HttpHeaders.AcceptLanguage],
                 )
             )
+        }
+
+        get("/event-assets/{file}") {
+            val fileName = call.parameters["file"]?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) {
+                return@get call.respond(HttpStatusCode.BadRequest)
+            }
+            val root = File(env.eventAssetsDir).canonicalFile
+            val file = File(root, fileName).canonicalFile
+            if (!file.path.startsWith(root.path) || !file.isFile) {
+                return@get call.respond(HttpStatusCode.NotFound)
+            }
+            val contentType = ContentType.fromFilePath(file.name).firstOrNull()
+                ?: ContentType.Application.OctetStream
+            call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+            val bytes = withContext(Dispatchers.IO) { file.readBytes() }
+            call.respondBytes(bytes, contentType)
         }
 
         get("/api/assets/{path...}") {
@@ -682,7 +820,9 @@ fun Application.apiRoutes(
             val rods = fishing.listRods(uid).map { it.copy(name = I18n.rod(it.name, language)) }
             val totalWeight = fishing.totalCaughtKg(uid)
             val todayWeight = fishing.todayCaughtKg(uid)
-            val locs = fishing.locations(uid).map { it.copy(name = I18n.location(it.name, language)) }
+            val locs = fishing.locations(uid, language, ::eventAssetUrl).map {
+                if (it.isEvent) it else it.copy(name = I18n.location(it.name, language))
+            }
             val dailyAvailable = fishing.canClaimDaily(uid)
             val dailyStreak = transaction { Users.select { Users.id eq uid }.single()[Users.dailyStreak] }
 
@@ -698,6 +838,14 @@ fun Application.apiRoutes(
             }
             val currentLocId = storedLoc?.takeIf { id -> locs.any { it.id == id && it.unlocked } }
                 ?: locs.first { it.unlocked }.id
+            
+            if (storedLoc != currentLocId) {
+                transaction {
+                    Users.update({ Users.id eq uid }) {
+                        it[currentLocationId] = currentLocId
+                    }
+                }
+            }
             val currentLureId = transaction {
                 Users.select { Users.id eq uid }.single()[Users.currentLureId]?.value
             }
@@ -855,6 +1003,33 @@ fun Application.apiRoutes(
                 },
             )
             call.respond(resp)
+        }
+
+        get("/api/events/current") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val event = events.currentEvent() ?: return@get call.respond(HttpStatusCode.NoContent)
+            val leaderboard = events.leaderboard(event.id, uid, limit = 20)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.respond(leaderboard.toDto(language))
+        }
+
+        get("/api/events/previous") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val event = events.previousEvent() ?: return@get call.respond(HttpStatusCode.NoContent)
+            val leaderboard = events.leaderboard(event.id, uid, limit = 20)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.respond(leaderboard.toDto(language))
+        }
+
+        get("/api/events/{id}") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val id = call.parameters["id"]?.toLongOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val leaderboard = events.leaderboard(id, uid, limit = 20)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.respond(leaderboard.toDto(language))
         }
 
         get("/api/achievements") {
@@ -1593,6 +1768,14 @@ fun Application.apiRoutes(
             call.respond(data)
         }
 
+        get("/api/guide/event-locations") {
+            val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 10) ?: 10
+            val offset = call.request.queryParameters["offset"]?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+            call.respond(fishing.eventGuideLocations(language, limit, offset, ::eventAssetUrl))
+        }
+
         get("/api/stats/catch") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
             val period = call.request.queryParameters["period"] ?: "all"
@@ -1630,6 +1813,8 @@ fun Application.apiRoutes(
             try {
                 fishing.setLocation(uid, id)
                 call.respond(HttpStatusCode.NoContent)
+            } catch (e: SpecialEventService.SpecialEventException) {
+                call.respond(HttpStatusCode.Forbidden, mapOf("error" to e.code))
             } catch (e: IllegalArgumentException) {
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to (e.message ?: "locked")))
             } catch (e: IllegalStateException) {
@@ -1643,6 +1828,8 @@ fun Application.apiRoutes(
             try {
                 val result = fishing.startCast(uid)
                 call.respond(result)
+            } catch (e: SpecialEventService.SpecialEventException) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to e.code))
             } catch (e: IllegalArgumentException) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to (e.message ?: "bad lure")))
             } catch (e: Exception) {
@@ -1653,6 +1840,7 @@ fun Application.apiRoutes(
         // Hook result: determine if fish can be caught
         post("/api/hook") {
             val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val req = call.receive<HookReq>()
             val res = try {
                 fishing.hook(uid, req.wait, req.reaction, applyBeginnerProtection = false)
@@ -1673,7 +1861,13 @@ fun Application.apiRoutes(
                 "hook_total",
                 mapOf("result" to if (res.success) "caught" else "escaped")
             )
-            call.respond(res)
+            val localizedHookedFish = res.hookedFish?.let { fish ->
+                fish.copy(
+                    fish = I18n.fish(fish.fish, language),
+                    location = I18n.location(fish.location, language),
+                )
+            }
+            call.respond(res.copy(hookedFish = localizedHookedFish))
         }
 
         // Cast result / finalize catch
@@ -1787,6 +1981,7 @@ fun Application.apiRoutes(
             val fishName = I18n.fish(catch.fish, language)
             val locationName = I18n.location(catch.location, language)
             val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -1797,6 +1992,7 @@ fun Application.apiRoutes(
                 language,
                 anglerName = catch.user,
                 caughtAt = caughtAt,
+                locationBackgroundFile = locationBackgroundFile,
             ) ?: return@get call.respond(HttpStatusCode.NotFound)
             call.response.header(HttpHeaders.CacheControl, "no-store")
             call.respondBytes(image, ContentType.Image.PNG)
@@ -1822,6 +2018,7 @@ fun Application.apiRoutes(
                 locationName = locationName,
             )
             val caption = appendCatchTags(captionBase, catch)
+            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -1832,6 +2029,7 @@ fun Application.apiRoutes(
                 language,
                 anglerName = catch.user,
                 caughtAt = caughtAt,
+                locationBackgroundFile = locationBackgroundFile,
             )
             try {
                 if (image != null) {

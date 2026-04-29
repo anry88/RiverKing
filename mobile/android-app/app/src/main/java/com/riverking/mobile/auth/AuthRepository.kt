@@ -222,6 +222,12 @@ class AuthRepository(
     suspend fun loadPastTournaments(): List<TournamentDto> =
         withFreshAccessToken { accessToken -> api.pastTournaments(accessToken) }
 
+    suspend fun loadCurrentEvent(): SpecialEventResponseDto? =
+        withFreshAccessToken { accessToken -> api.currentEvent(accessToken) }
+
+    suspend fun loadPreviousEvent(): SpecialEventResponseDto? =
+        withFreshAccessToken { accessToken -> api.previousEvent(accessToken) }
+
     suspend fun loadPendingPrizes(): List<PrizeDto> =
         withFreshAccessToken { accessToken -> api.prizes(accessToken) }
 
@@ -232,6 +238,9 @@ class AuthRepository(
 
     suspend fun loadGuide(): GuideDto =
         withFreshAccessToken { accessToken -> api.guide(accessToken) }
+
+    suspend fun loadEventGuideLocations(offset: Long, limit: Int): GuideLocationsPageDto =
+        withFreshAccessToken { accessToken -> api.eventGuideLocations(accessToken, offset, limit) }
 
     suspend fun loadAchievements(): List<AchievementDto> =
         withFreshAccessToken { accessToken -> api.achievements(accessToken) }

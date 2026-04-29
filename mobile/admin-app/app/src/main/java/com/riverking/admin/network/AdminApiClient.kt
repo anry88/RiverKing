@@ -3,20 +3,30 @@ package com.riverking.admin.network
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.accept
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.Headers
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.riverking.admin.BuildConfig
 
 @Serializable
 data class TournamentDTO(
@@ -103,10 +113,98 @@ data class DiscountPackageDTO(
 data class AdminCatalogDTO(
     val metrics: List<CatalogOptionDTO> = emptyList(),
     val fish: List<CatalogOptionDTO> = emptyList(),
+    val eventFish: List<CatalogOptionDTO> = emptyList(),
     val locations: List<CatalogOptionDTO> = emptyList(),
     val tournamentPrizes: List<PrizeOptionDTO> = emptyList(),
     val discountPackages: List<DiscountPackageDTO> = emptyList()
 )
+
+@Serializable
+data class CastZonePointDTO(
+    val x: Double,
+    val y: Double
+)
+
+@Serializable
+data class CastZoneDTO(
+    val points: List<CastZonePointDTO>
+)
+
+@Serializable
+data class CastZoneLocationDTO(
+    val id: Long,
+    val name: String,
+    val kind: String,
+    val eventId: Long? = null,
+    val imageUrl: String? = null,
+    val castZone: CastZoneDTO? = null
+)
+
+@Serializable
+data class CastZoneUpdateReq(
+    val castZone: CastZoneDTO? = null
+)
+
+@Serializable
+data class AdminEventFishDTO(
+    val fishId: Long,
+    val weight: Double
+)
+
+@Serializable
+data class AdminEventPrizeDTO(
+    val prizePlaces: Int,
+    val prizesJson: String
+)
+
+@Serializable
+data class SpecialEventDTO(
+    val id: Long = 0,
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imagePath: String? = null,
+    val castZone: CastZoneDTO? = null,
+    val fish: List<AdminEventFishDTO> = emptyList(),
+    val weightPrizes: AdminEventPrizeDTO,
+    val countPrizes: AdminEventPrizeDTO,
+    val fishPrizes: AdminEventPrizeDTO
+)
+
+@Serializable
+data class SpecialEventReq(
+    val nameRu: String,
+    val nameEn: String,
+    val startTime: Long,
+    val endTime: Long,
+    val imagePath: String? = null,
+    val castZone: CastZoneDTO? = null,
+    val fish: List<AdminEventFishDTO>,
+    val weightPrizes: AdminEventPrizeDTO,
+    val countPrizes: AdminEventPrizeDTO,
+    val fishPrizes: AdminEventPrizeDTO
+)
+
+@Serializable
+data class ImageUploadResp(val imagePath: String)
+
+@Serializable
+data class AppUpdateInfoDTO(
+    val status: String = "",
+    val latestVersionCode: Int = 0,
+    val latestVersionName: String = "",
+    val minSupportedVersionCode: Int = 0,
+    val mandatory: Boolean = false,
+    val releaseNotes: List<String> = emptyList(),
+    val installMode: String = "",
+    val installUrl: String = "",
+)
+
+class AppUpgradeRequiredException(
+    val update: AppUpdateInfoDTO,
+    cause: Throwable? = null,
+) : Exception("App upgrade required to version ${update.latestVersionName}", cause)
 
 class AdminApiClient(
     var baseUrl: String = "",
@@ -118,10 +216,34 @@ class AdminApiClient(
         install(ContentNegotiation) {
             json(json)
         }
+        HttpResponseValidator {
+            validateResponse { response ->
+                if (response.status == HttpStatusCode.UpgradeRequired) {
+                    val update = runCatching {
+                        json.decodeFromString<AppUpdateInfoDTO>(response.bodyAsText())
+                    }.getOrNull() ?: AppUpdateInfoDTO(status = "update_required", mandatory = true)
+                    throw AppUpgradeRequiredException(update)
+                }
+            }
+        }
+        defaultRequest {
+            accept(ContentType.Application.Json)
+            header("X-RiverKing-App-Platform", "android")
+            header("X-RiverKing-App-Version-Code", BuildConfig.VERSION_CODE.toString())
+            header("X-RiverKing-App-Version-Name", BuildConfig.VERSION_NAME)
+        }
     }
 
     private fun apiUrl(path: String): String {
         val base = baseUrl.trimEnd('/')
+        return "$base$path"
+    }
+
+    fun publicUrl(pathOrUrl: String?): String? {
+        if (pathOrUrl.isNullOrBlank()) return null
+        if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) return pathOrUrl
+        val base = baseUrl.trimEnd('/')
+        val path = if (pathOrUrl.startsWith("/")) pathOrUrl else "/$pathOrUrl"
         return "$base$path"
     }
 
@@ -139,6 +261,23 @@ class AdminApiClient(
         }
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
         return response.body()
+    }
+
+    suspend fun getCastZones(): List<CastZoneLocationDTO> {
+        val response = client.get(apiUrl("/api/admin/cast-zones")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
+    }
+
+    suspend fun updateCastZone(locationId: Long, castZone: CastZoneDTO?) {
+        val response = client.put(apiUrl("/api/admin/locations/$locationId/cast-zone")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(CastZoneUpdateReq(castZone))
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
     }
 
     suspend fun createTournament(req: TournamentReq) {
@@ -164,6 +303,66 @@ class AdminApiClient(
             header(HttpHeaders.Authorization, "Bearer $token")
         }
         if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+    }
+
+    suspend fun getEvents(offset: Int = 0, limit: Int = 20): List<SpecialEventDTO> {
+        val response = client.get(apiUrl("/api/admin/events?offset=$offset&limit=$limit")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
+    }
+
+    suspend fun createEvent(req: SpecialEventReq) {
+        val response = client.post(apiUrl("/api/admin/events")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+    }
+
+    suspend fun updateEvent(id: Long, req: SpecialEventReq) {
+        val response = client.put(apiUrl("/api/admin/events/$id")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+    }
+
+    suspend fun deleteEvent(id: Long) {
+        val response = client.delete(apiUrl("/api/admin/events/$id")) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+    }
+
+    suspend fun uploadEventImage(fileName: String, bytes: ByteArray): ImageUploadResp {
+        val safeFileName = fileName.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
+        val contentType = when (safeFileName.substringAfterLast('.', "").lowercase()) {
+            "png" -> ContentType.Image.PNG
+            "jpg", "jpeg" -> ContentType.Image.JPEG
+            "webp" -> ContentType.parse("image/webp")
+            else -> ContentType.Application.OctetStream
+        }
+        val response = client.submitFormWithBinaryData(
+            url = apiUrl("/api/admin/events/image"),
+            formData = formData {
+                append(
+                    key = "file",
+                    value = bytes,
+                    headers = Headers.build {
+                        append(HttpHeaders.ContentDisposition, "form-data; name=\"file\"; filename=\"$safeFileName\"")
+                        append(HttpHeaders.ContentType, contentType.toString())
+                    }
+                )
+            }
+        ) {
+            headers { append(HttpHeaders.Authorization, "Bearer $token") }
+        }
+        if (!response.status.isSuccess()) throw Exception("Failed: ${response.status}")
+        return response.body()
     }
 
     suspend fun getDiscounts(): List<DiscountDTO> {

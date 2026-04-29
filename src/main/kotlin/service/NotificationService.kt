@@ -19,14 +19,15 @@ class NotificationService(private val bot: TelegramBot) {
         tgId: Long,
         text: String,
         buttonText: String? = null,
-        buttonCallback: String? = null
+        buttonCallback: String? = null,
+        markup: String? = null
     ): Boolean {
-        val markup = if (buttonText != null && buttonCallback != null) {
+        val finalMarkup = markup ?: if (buttonText != null && buttonCallback != null) {
             Json.encodeToString(InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton(buttonText, buttonCallback)))))
         } else null
 
         return try {
-            bot.sendMessage(tgId, text, markup)
+            bot.sendMessage(tgId, text, finalMarkup)
             true
         } catch (e: TelegramApiException) {
             if (e.code == 403 || e.message?.contains("forbidden", ignoreCase = true) == true) {

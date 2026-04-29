@@ -129,11 +129,14 @@ function LocationsDrawer({open, onClose, me, onSelect}){
           {me.locations.map(l=> (
             <button key={l.id} disabled={!l.unlocked}
                     onClick={()=>{ if(l.unlocked){ onSelect(l.id); onClose(); } }}
-                    className={`w-full text-left p-3 rounded-xl border ${me.locationId===l.id? 'border-emerald-500 bg-emerald-500/10':'border-white/10 hover:bg-white/5'} ${!l.unlocked?'opacity-50 cursor-not-allowed':''}`}>
+                    className={`w-full text-left p-3 rounded-xl border ${l.isEvent ? 'border-amber-400/80 bg-amber-400/10' : ''} ${me.locationId===l.id? 'border-emerald-500 bg-emerald-500/10':(l.isEvent ? '' : 'border-white/10 hover:bg-white/5')} ${!l.unlocked?'opacity-60 cursor-not-allowed':''}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-semibold">{l.name}</div>
-                  {l.unlocked? <div className="text-xs opacity-70">{t('unlocked')}</div> : <div className="text-xs opacity-70">{t('requiresKg', l.unlockKg)}</div>}
+                  {l.isEvent && <div className="text-xs text-amber-300">{t('specialEvent')}</div>}
+                  {l.unlocked
+                    ? <div className="text-xs opacity-70">{t('unlocked')}</div>
+                    : <div className="text-xs opacity-70">{l.lockedReason || t('requiresKg', l.unlockKg)}</div>}
                 </div>
                 {me.locationId===l.id && <div className="text-emerald-400 text-sm">{t('current')}</div>}
               </div>
@@ -417,12 +420,14 @@ function CatchDetailsModal({catchData, me, onClose}){
         ? me.locations.find(loc=> typeof loc.name === 'string' && loc.name.trim().toLowerCase() === normalized)
         : me.locations.find(loc=> Number(loc.id) === Number(catchData.locationId));
       if(match){
+        if(match.imageUrl) return match.imageUrl;
         const resolved = resolver(match.id, match.name);
         if(resolved) return resolved;
       }
     }
     return null;
   }, [catchData.locationBg, catchData.locationId, catchData.location, me?.locations]);
+  const locationBgIsRemote = typeof locationBg === 'string' && /^https?:\/\//i.test(locationBg);
 
   async function handleSend(){
     if(!canSend || sending) return;
@@ -447,12 +452,21 @@ function CatchDetailsModal({catchData, me, onClose}){
         <div className="glass w-full max-w-sm rounded-2xl p-4 pointer-events-auto relative overflow-hidden">
           {locationBg && (
             <>
-              <AssetImage
-                src={locationBg}
-                alt={catchData.location || ''}
-                className="absolute inset-0 w-full h-full object-cover"
-                onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }}
-              />
+              {locationBgIsRemote ? (
+                <img
+                  src={locationBg}
+                  alt={catchData.location || ''}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }}
+                />
+              ) : (
+                <AssetImage
+                  src={locationBg}
+                  alt={catchData.location || ''}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={e=>{ if(e?.currentTarget) e.currentTarget.style.display='none'; }}
+                />
+              )}
               <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
             </>
           )}
@@ -556,13 +570,16 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
   );
 }
 
-function ClubScreen({active,onClose,me,onReloadProfile}){
+function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   const CLUB_CREATE_COST = 1000;
   const CLUB_MIN_WEIGHT = 1000;
   const [mode, setMode] = React.useState('hub');
   const [club, setClub] = React.useState(null);
   const [clubView, setClubView] = React.useState('ratings');
   const [clubTab, setClubTab] = React.useState('current');
+  const [selectedEventBoardKey, setSelectedEventBoardKey] = React.useState('weight');
+  const [clubCurrentEvent, setClubCurrentEvent] = React.useState(null);
+  const [clubPreviousEvent, setClubPreviousEvent] = React.useState(null);
   const [selectedQuestCode, setSelectedQuestCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
@@ -598,6 +615,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   const [settingsSaving, setSettingsSaving] = React.useState(false);
   const [settingsError, setSettingsError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
+  const shopPacks = React.useMemo(
+    () => Array.isArray(shop) ? shop.reduce((acc, category) => acc.concat(Array.isArray(category?.packs) ? category.packs : []), []) : [],
+    [shop]
+  );
 
   const roleLabel = React.useCallback(role => {
     if(role === 'president') return t('clubRolePresident');
@@ -616,12 +637,30 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, []);
 
   const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
+  const formatEventPrize = React.useCallback((prize) => {
+    if(!prize) return null;
+    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
+    if(isCoins){
+      const amount = Number(prize.coins ?? prize.qty);
+      if(!Number.isFinite(amount) || amount <= 0) return null;
+      return `🪙 +${amount.toLocaleString(coinLocale)}`;
+    }
+    const packageId = prize.packageId;
+    if(!packageId) return null;
+    const pack = shopPacks.find(item => item.id === packageId);
+    const label = pack?.name || (packageId === 'autofish_week' ? t('autofishWeek') : packageId);
+    const qty = Math.max(1, Number(prize.qty) || 1);
+    return qty > 1 ? `${label} x${qty}` : label;
+  }, [coinLocale, shopPacks]);
 
   const resetState = React.useCallback(() => {
     setMode('hub');
     setClub(null);
     setClubView('ratings');
     setClubTab('current');
+    setSelectedEventBoardKey('weight');
+    setClubCurrentEvent(null);
+    setClubPreviousEvent(null);
     setSelectedQuestCode('');
     setLoading(false);
     setError(null);
@@ -660,6 +699,8 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       const resp = await fetch(`/api/club`, {credentials:'include'});
       if(resp.status === 204){
         setClub(null);
+        setClubCurrentEvent(null);
+        setClubPreviousEvent(null);
         setMode('hub');
         return;
       }
@@ -673,6 +714,15 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       setClubTab('current');
       setSelectedQuestCode('');
       setMode('club');
+      try{
+        const currentResp = await fetch(`/api/events/current`, {credentials:'include'});
+        setClubCurrentEvent(currentResp.status === 200 ? await currentResp.json() : null);
+        const previousResp = await fetch(`/api/events/previous`, {credentials:'include'});
+        setClubPreviousEvent(previousResp.status === 200 ? await previousResp.json() : null);
+      }catch(_){
+        setClubCurrentEvent(null);
+        setClubPreviousEvent(null);
+      }
     }catch(e){
       setError(e.message==='unauthorized' ? t('authRequired') : t('clubLoadFailed'));
     }finally{
@@ -931,7 +981,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   }, [chatHasMore]);
 
   React.useEffect(() => {
-    if(!chatOpen) return;
+    if(!chatOpen || chatLoading || chatOlderLoading) return;
     const node = chatScrollRef.current;
     if(!node) return;
     requestAnimationFrame(() => {
@@ -953,6 +1003,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
 
   const weekData = clubTab === 'previous' ? club?.previousWeek : club?.currentWeek;
   const questWeekData = clubTab === 'previous' ? club?.previousQuestWeek : club?.currentQuestWeek;
+  const clubEventData = clubTab === 'previous' ? clubPreviousEvent : clubCurrentEvent;
   const questList = Array.isArray(questWeekData?.quests) ? questWeekData.quests : [];
   const selectedQuest = questList.find(quest => quest.code === selectedQuestCode) || questList[0] || null;
   const viewingPreviousWeek = clubTab === 'previous';
@@ -965,6 +1016,42 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     const formatter = new Intl.DateTimeFormat(coinLocale, { day:'2-digit', month:'2-digit' });
     return `${formatter.format(start)}–${formatter.format(end)}`;
   };
+  const renderClubEventRows = (title, rows, mine, mode) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const mineOutside = mine && !list.some(row => Number(row.rank) === Number(mine.rank));
+    const renderRow = (row, mineRow = false) => {
+      const prizeLabel = formatEventPrize(row.prize);
+      return (
+        <div key={`${title}:${row.rank}:${mineRow ? 'mine' : 'row'}`} className={`p-2 rounded-xl border ${mineRow ? 'border-emerald-400' : 'border-white/10'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">
+                {row.rank} {mode === 'fish' ? (row.user || t('you')) : row.club}
+              </div>
+              {mode === 'fish' && (
+                <div className="text-xs opacity-70 truncate">
+                  {row.fish} · {Number(row.weight || 0).toFixed(2)} {t('kg')}
+                </div>
+              )}
+              {prizeLabel && (
+                <div className="mt-1 text-xs text-amber-300 truncate">{prizeLabel}</div>
+              )}
+            </div>
+            <div className="text-sm text-emerald-300 shrink-0">
+              {mode === 'count' ? Number(row.value || 0).toFixed(0) : `${Number(row.value || 0).toFixed(2)} ${t('kg')}`}
+            </div>
+          </div>
+        </div>
+      );
+    };
+    return (
+      <div className="space-y-2">
+        <div className="text-xs font-semibold opacity-80">{title}</div>
+        {list.length === 0 ? <div className="text-sm opacity-70">{t('noData')}</div> : list.map(row => renderRow(row, mine && Number(row.rank) === Number(mine.rank)))}
+        {mineOutside && renderRow(mine, true)}
+      </div>
+    );
+  };
 
   React.useEffect(() => {
     if(!questList.length){
@@ -974,6 +1061,10 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
     if(questList.some(quest => quest.code === selectedQuestCode)) return;
     setSelectedQuestCode(questList[0].code);
   }, [club?.id, clubTab, questWeekData?.weekStart, selectedQuestCode, questList]);
+
+  React.useEffect(() => {
+    setSelectedEventBoardKey('weight');
+  }, [clubView, clubTab, clubEventData?.event?.id]);
 
   if(!active) return null;
 
@@ -1172,14 +1263,16 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={onClose} className="px-3 py-1 rounded-xl glass">←</button>
-        <div className="flex-1 text-lg font-semibold">{t('clubTitle')}</div>
+    <div className="flex-1 flex flex-col pb-safe">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <button onClick={onClose} className="px-4 py-2 rounded-xl glass flex items-center gap-2 font-semibold">
+          <span>←</span>
+          <span>{t('back')}</span>
+        </button>
         {mode === 'club' && club && (
           <button
             type="button"
-            className="px-3 py-1 rounded-xl glass text-sm"
+            className="px-4 py-2 rounded-xl glass text-sm font-semibold"
             onClick={()=>{
               setChatOpen(true);
               loadChat();
@@ -1256,7 +1349,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
       ) : error ? (
         <div className="text-sm opacity-70">{error}</div>
       ) : mode === 'club' && club ? (
-        <div className="space-y-4">
+        <div className="space-y-4 pb-2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-base font-semibold">{club.name}</div>
@@ -1330,29 +1423,36 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
             <button
               type="button"
               onClick={()=>setClubView('ratings')}
-              className={`flex-1 py-2 rounded-xl ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
             >{t('ratings')}</button>
             <button
               type="button"
+              onClick={()=>setClubView('tournament')}
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='tournament' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('clubTournament')}</button>
+            <button
+              type="button"
               onClick={()=>setClubView('quests')}
-              className={`flex-1 py-2 rounded-xl ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('clubQuests')}</button>
+              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
+            >{t('quests')}</button>
           </div>
           <div className="flex gap-2 text-sm">
             <button
               type="button"
               onClick={()=>setClubTab('current')}
               className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('clubCurrentWeek')}</button>
+            >{clubView === 'tournament' ? t('current') : t('clubCurrentWeek')}</button>
             <button
               type="button"
               onClick={()=>setClubTab('previous')}
               className={`flex-1 py-2 rounded-xl ${clubTab==='previous' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('clubPreviousWeek')}</button>
+            >{clubView === 'tournament' ? t('previous') : t('clubPreviousWeek')}</button>
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             <div className="text-xs opacity-70">
-              {formatWeekRange((clubView === 'quests' ? questWeekData?.weekStart : weekData?.weekStart))}
+              {clubView === 'tournament'
+                ? (clubEventData?.event ? `${new Date(clubEventData.event.startTime*1000).toLocaleString()} — ${new Date(clubEventData.event.endTime*1000).toLocaleString()}` : '')
+                : formatWeekRange((clubView === 'quests' ? questWeekData?.weekStart : weekData?.weekStart))}
             </div>
             {clubView === 'ratings' ? (
               (weekData?.members || []).length === 0 ? (
@@ -1406,6 +1506,34 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                   </div>
                 ))
               )
+            ) : clubView === 'tournament' ? (
+              !clubEventData ? (
+                <div className="text-sm opacity-70">{t('eventsEmpty')}</div>
+              ) : (
+                <>
+                  <div className="p-3 rounded-xl border border-amber-400/40 bg-amber-400/10">
+                    <div className="font-semibold">{clubEventData.event.name}</div>
+                    <div className="text-xs opacity-70">{t('specialEvent')}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs opacity-70">{t('eventLeaderboard')}</div>
+                    <select
+                      value={selectedEventBoardKey}
+                      onChange={e=>setSelectedEventBoardKey(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-black/20 border border-white/10"
+                    >
+                      <option value="weight">{t('eventTotalWeight')}</option>
+                      <option value="count">{t('eventTotalCount')}</option>
+                      <option value="fish">{t('eventTopFish')}</option>
+                    </select>
+                  </div>
+                  {selectedEventBoardKey === 'count'
+                    ? renderClubEventRows(t('eventTotalCount'), clubEventData.leaderboards?.totalCount, clubEventData.leaderboards?.mineTotalCount, 'count')
+                    : selectedEventBoardKey === 'fish'
+                      ? renderClubEventRows(t('eventTopFish'), clubEventData.leaderboards?.personalFish, clubEventData.leaderboards?.minePersonalFish, 'fish')
+                      : renderClubEventRows(t('eventTotalWeight'), clubEventData.leaderboards?.totalWeight, clubEventData.leaderboards?.mineTotalWeight, 'weight')}
+                </>
+              )
             ) : !questList.length ? (
               <div className="text-sm opacity-70">{t('noData')}</div>
             ) : (
@@ -1453,7 +1581,7 @@ function ClubScreen({active,onClose,me,onReloadProfile}){
                               </div>
                               <div className="text-xs opacity-70">{roleLabel(member.role)}</div>
                             </div>
-                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}/${Math.max(1, Number(selectedQuest.target) || 1)}`}</div>
+                            <div className="text-sm text-emerald-300">{`${Number(member.progress || 0)}`}</div>
                           </div>
                         </div>
                       ))

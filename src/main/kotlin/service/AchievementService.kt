@@ -563,7 +563,7 @@ object AchievementService {
         val totalKg = Catches.slice(Catches.weight.sum())
             .select { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
-        Locations.select { Locations.unlockKg lessEq totalKg }.count().toDouble()
+        Locations.select { (Locations.unlockKg lessEq totalKg) and Locations.specialEventId.isNull() }.count().toDouble()
     }
 
     private fun heaviestCatchKg(userId: Long): Double = inTxn {

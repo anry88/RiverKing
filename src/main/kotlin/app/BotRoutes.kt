@@ -37,8 +37,12 @@ import service.AchievementService
 import service.QuestService
 import service.ClubService
 import service.ClubQuestService
+import service.SpecialEventService
+import service.SpecialEventClubEntry
+import service.SpecialEventPersonalEntry
 import util.Metrics
 import util.sanitizeName
+import java.io.File
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
@@ -54,8 +58,7 @@ import org.slf4j.LoggerFactory
 import db.Users
 import db.Lures
 import db.Locations
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
 internal fun parseInvoicePayload(payload: String, userId: Long): String? {
@@ -134,6 +137,15 @@ private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 private val castScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 private val autoCastScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+private fun eventAssetFile(rootDir: String, imagePath: String?): File? {
+    val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+    val root = File(rootDir).canonicalFile
+    val file = File(root, fileName).canonicalFile
+    if (!file.path.startsWith(root.path + File.separator)) return null
+    return file.takeIf { it.isFile }
+}
+
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
         Json.parseToJsonElement(str).jsonArray.map { el ->
@@ -186,7 +198,8 @@ fun Application.botRoutes(env: Env) {
     val ratingPrizes = RatingPrizeService()
     val clubs = ClubService()
     val clubQuests = ClubQuestService()
-    val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
+    val events = SpecialEventService()
+    val prizeService = PrizeService(tournaments, ratingPrizes, clubs, events)
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
@@ -316,6 +329,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "View the current tournament leaderboard and your rank",
                         assetName = "tournament.png"
                     ) { _, _ -> "/tournament" },
+                    InlineCommandInfo(
+                        name = "event",
+                        ruDescription = "Таблицы текущего клубного события",
+                        enDescription = "View the current club event leaderboards",
+                        assetName = "event.png"
+                    ) { _, _ -> "/event" },
                     InlineCommandInfo(
                         name = "daily_rating",
                         ruDescription = "Твои места в сегодняшнем ежедневном рейтинге",
@@ -814,6 +833,10 @@ fun Application.botRoutes(env: Env) {
                             caption += "\n${options.catchFooter}"
                         }
                         val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                        val locationBackgroundFile = eventAssetFile(
+                            env.eventAssetsDir,
+                            fishing.eventImagePathForCatch(catch.id),
+                        )
                         val image = generateCatchImage(
                             fishInternalName = catch.fish,
                             locationInternalName = catch.location,
@@ -824,6 +847,7 @@ fun Application.botRoutes(env: Env) {
                             lang = lang,
                             anglerName = catch.user,
                             caughtAt = caughtAt,
+                            locationBackgroundFile = locationBackgroundFile,
                         )
                         if (image != null) {
                             try {
@@ -1160,6 +1184,13 @@ fun Application.botRoutes(env: Env) {
                     Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value
                 }
                 val currentId = stored?.takeIf { id -> unlocked.any { it.id == id } } ?: unlocked.firstOrNull()?.id
+                if (stored != currentId && currentId != null) {
+                    transaction {
+                        Users.update({ Users.id eq uid }) {
+                            it[currentLocationId] = currentId
+                        }
+                    }
+                }
                 val currentName = currentId?.let { id ->
                     unlocked.find { it.id == id }?.let { I18n.location(it.name, lang) }
                 }
@@ -1692,6 +1723,119 @@ fun Application.botRoutes(env: Env) {
                 trySend(chatId, text, markup, replyToMessageId)
             }
 
+            fun eventTimeLeftText(endTime: Instant, lang: String): String {
+                val remaining = Duration.between(Instant.now(), endTime)
+                val safeRemaining = if (remaining.isNegative) Duration.ZERO else remaining
+                val totalMinutes = safeRemaining.toMinutes()
+                val days = totalMinutes / (24 * 60)
+                val hours = (totalMinutes % (24 * 60)) / 60
+                val minutes = totalMinutes % 60
+                return if (lang == "ru") {
+                    "Осталось: ${days}д ${hours}ч ${minutes}м"
+                } else {
+                    "Time left: ${days}d ${hours}h ${minutes}m"
+                }
+            }
+
+            fun formatEventNumber(value: Double, kind: String): String =
+                if (kind == "count") value.toInt().toString() else "%.2f".format(Locale.US, value)
+
+            fun formatEventClubEntry(entry: SpecialEventClubEntry, kind: String, lang: String): String {
+                val clubName = "\u2066${entry.club}\u2069"
+                val value = formatEventNumber(entry.value, kind)
+                val suffix = if (kind == "count") "" else if (lang == "ru") " кг" else " kg"
+                return "\u200E${entry.rank}. $clubName — $value$suffix"
+            }
+
+            fun formatEventClubSection(
+                title: String,
+                rows: List<SpecialEventClubEntry>,
+                mine: SpecialEventClubEntry?,
+                prizePlaces: Int,
+                kind: String,
+                lang: String,
+            ): String {
+                val visiblePlaces = prizePlaces.coerceAtLeast(0)
+                val visible = rows.take(visiblePlaces)
+                val emptyText = when {
+                    visiblePlaces <= 0 -> if (lang == "ru") {
+                        "Призовые места не настроены"
+                    } else {
+                        "Prize places are not configured"
+                    }
+                    else -> if (lang == "ru") "Список пуст" else "Leaderboard is empty"
+                }
+                val mineLine = mine
+                    ?.takeIf { it.rank > visiblePlaces }
+                    ?.let { entry ->
+                        val label = if (lang == "ru") "Твой клуб" else "Your club"
+                        "$label: ${formatEventClubEntry(entry, kind, lang).removePrefix("\u200E")}"
+                    }
+                return buildString {
+                    append(title)
+                    append('\n')
+                    if (visible.isEmpty()) {
+                        append(emptyText)
+                    } else {
+                        append(visible.joinToString("\n") { formatEventClubEntry(it, kind, lang) })
+                    }
+                    if (mineLine != null) {
+                        append("\n\n")
+                        append('\u200E')
+                        append(mineLine)
+                    }
+                }
+            }
+
+            fun formatEventPersonalEntry(entry: SpecialEventPersonalEntry, lang: String, fallbackName: String): String {
+                val userName = "\u2066${entry.user ?: fallbackName}\u2069"
+                val fishName = I18n.fish(entry.fish, lang)
+                val rarity = RARITY_LABELS[lang]?.get(entry.rarity) ?: entry.rarity
+                val unit = if (lang == "ru") "кг" else "kg"
+                val weight = "%.2f".format(Locale.US, entry.weight)
+                return "\u200E${entry.rank}. $userName — $fishName ($rarity), $weight $unit"
+            }
+
+            fun formatEventPersonalSection(
+                title: String,
+                rows: List<SpecialEventPersonalEntry>,
+                mine: SpecialEventPersonalEntry?,
+                prizePlaces: Int,
+                lang: String,
+            ): String {
+                val visiblePlaces = prizePlaces.coerceAtLeast(0)
+                val visible = rows.take(visiblePlaces)
+                val emptyText = when {
+                    visiblePlaces <= 0 -> if (lang == "ru") {
+                        "Призовые места не настроены"
+                    } else {
+                        "Prize places are not configured"
+                    }
+                    else -> if (lang == "ru") "Список пуст" else "Leaderboard is empty"
+                }
+                val you = if (lang == "ru") "ты" else "you"
+                val mineLine = mine
+                    ?.takeIf { it.rank > visiblePlaces }
+                    ?.let { entry ->
+                        val label = if (lang == "ru") "Твой результат" else "Your result"
+                        "$label: ${formatEventPersonalEntry(entry, lang, you).removePrefix("\u200E")}"
+                    }
+                return buildString {
+                    append(title)
+                    append('\n')
+                    if (visible.isEmpty()) {
+                        append(emptyText)
+                    } else {
+                        append(visible.joinToString("\n") { formatEventPersonalEntry(it, lang, "-") })
+                    }
+                    if (mineLine != null) {
+                        append("\n\n")
+                        append('\u200E')
+                        append(mineLine)
+                    }
+                }
+            }
+
             val keywordCommandMap = mapOf(
                 "рыба" to "/cast",
                 "рыбалка" to "/cast",
@@ -1741,6 +1885,9 @@ fun Application.botRoutes(env: Env) {
                 "club" to "/club_rating",
                 "турнир" to "/tournament",
                 "tournament" to "/tournament",
+                "ивент" to "/event",
+                "событие" to "/event",
+                "event" to "/event",
             )
 
             suspend fun processUserCommand(
@@ -1858,6 +2005,7 @@ fun Application.botRoutes(env: Env) {
 /shop — купить приманки и удочки за звёзды
 /coin_shop — купить наборы за монеты
 /tournament — таблица текущего турнира и твоя позиция
+/event — таблицы текущего клубного события
 /daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
 /club_rating — таблица текущей недели клуба
 /stats — статистика по пойманной рыбе
@@ -1881,6 +2029,7 @@ Available commands:
 /shop — buy baits and rods with Stars
 /coin_shop — buy bundles with coins
 /tournament — view the current tournament leaderboard and your rank
+/event — view the current club event leaderboards
 /daily_rating — view the current placement of your best catch in today's daily rating
 /club_rating — view the current club weekly rating
 /stats — your fishing stats
@@ -2017,6 +2166,90 @@ Available commands:
                         }
                         val params = t?.let { mapOf("metric" to it.metric.lowercase()) } ?: emptyMap()
                         logCommandMetric("tournament", params, source)
+                        trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/event" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val event = events.currentEvent()
+                        val reply = if (event != null) {
+                            val limit = maxOf(
+                                event.weightPrizePlaces.coerceAtLeast(0),
+                                event.countPrizePlaces.coerceAtLeast(0),
+                                event.fishPrizePlaces.coerceAtLeast(0),
+                            )
+                            val leaderboard = events.leaderboard(event.id, uid, limit = limit)
+                            if (leaderboard == null) {
+                                if (lang == "ru") {
+                                    "Не удалось загрузить текущее событие"
+                                } else {
+                                    "Couldn't load the current event"
+                                }
+                            } else {
+                                val eventName = if (lang == "ru") leaderboard.event.nameRu else leaderboard.event.nameEn
+                                val titleWeight = if (lang == "ru") {
+                                    "🏆 Клубы: суммарный вес"
+                                } else {
+                                    "🏆 Clubs: total weight"
+                                }
+                                val titleCount = if (lang == "ru") {
+                                    "🎣 Клубы: количество рыбы"
+                                } else {
+                                    "🎣 Clubs: fish count"
+                                }
+                                val titleFish = if (lang == "ru") {
+                                    "🐟 Игроки: лучший улов"
+                                } else {
+                                    "🐟 Players: top fish"
+                                }
+                                buildString {
+                                    appendLine(eventName)
+                                    appendLine(eventTimeLeftText(leaderboard.event.endTime, lang))
+                                    appendLine()
+                                    append(
+                                        formatEventClubSection(
+                                            title = titleWeight,
+                                            rows = leaderboard.weight,
+                                            mine = leaderboard.mineWeight,
+                                            prizePlaces = leaderboard.event.weightPrizePlaces,
+                                            kind = "weight",
+                                            lang = lang,
+                                        )
+                                    )
+                                    append("\n\n")
+                                    append(
+                                        formatEventClubSection(
+                                            title = titleCount,
+                                            rows = leaderboard.count,
+                                            mine = leaderboard.mineCount,
+                                            prizePlaces = leaderboard.event.countPrizePlaces,
+                                            kind = "count",
+                                            lang = lang,
+                                        )
+                                    )
+                                    append("\n\n")
+                                    append(
+                                        formatEventPersonalSection(
+                                            title = titleFish,
+                                            rows = leaderboard.fish,
+                                            mine = leaderboard.mineFish,
+                                            prizePlaces = leaderboard.event.fishPrizePlaces,
+                                            lang = lang,
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            if (lang == "ru") {
+                                "Сейчас нет активного события"
+                            } else {
+                                "No active event"
+                            }
+                        }
+                        val params = event?.let { mapOf("result" to "active", "event" to it.id.toString()) }
+                            ?: mapOf("result" to "none")
+                        logCommandMetric("event", params, source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
                         return true
                     }

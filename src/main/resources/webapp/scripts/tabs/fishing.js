@@ -7,27 +7,45 @@ const PRO_CAST_MIN_X = 0.14;
 const PRO_CAST_MAX_X = 0.86;
 const PRO_CAST_FAR_Y = 0.47;
 const PRO_CAST_NEAR_Y = 0.78;
+const CAST_AREA_EXPAND_MIN_X = 0.014;
+const CAST_AREA_EXPAND_VIEWPORT_X = 0.06;
+const CAST_AREA_EXPAND_TOP = 0.008;
+const CAST_AREA_EXPAND_BOTTOM = 0.02;
+const CAST_AREA_MIN_VISIBLE_WORLD = 0.08;
+const CAST_AREA_MIN_VISIBLE_VIEWPORT = 0.28;
+const PAN_EDGE_TAP_FRACTION = 0.25;
+const PAN_EDGE_TAP_MAX_DISTANCE = 22;
+const PAN_EDGE_TAP_MAX_DURATION_MS = 260;
+const PAN_STEP_VIEWPORT_MULTIPLIER = 0.55;
 const DEFAULT_PRO_CAST_AREA = Object.freeze({
   minX: PRO_CAST_MIN_X,
   maxX: PRO_CAST_MAX_X,
   farY: PRO_CAST_FAR_Y,
   nearY: PRO_CAST_NEAR_Y
 });
+const DEFAULT_PRO_CAST_ZONE = Object.freeze({
+  points: Object.freeze([
+    Object.freeze({ x: 0.08, y: 0.62 }),
+    Object.freeze({ x: 0.48, y: 0.62 }),
+    Object.freeze({ x: 0.48, y: 0.94 }),
+    Object.freeze({ x: 0.08, y: 0.94 })
+  ])
+});
 const PRO_CAST_AREAS = Object.freeze({
-  pond: { minX: 0.16, maxX: 0.80, farY: 0.50, nearY: 0.70 },
-  swamp: { minX: 0.20, maxX: 0.70, farY: 0.57, nearY: 0.72 },
-  river: { minX: 0.14, maxX: 0.76, farY: 0.54, nearY: 0.70 },
-  lake: { minX: 0.16, maxX: 0.78, farY: 0.50, nearY: 0.70 },
-  reservoir: { minX: 0.14, maxX: 0.80, farY: 0.50, nearY: 0.70 },
-  mountain_river: { minX: 0.14, maxX: 0.58, farY: 0.54, nearY: 0.70 },
-  river_delta: { minX: 0.14, maxX: 0.66, farY: 0.51, nearY: 0.68 },
-  sea_coast: { minX: 0.18, maxX: 0.78, farY: 0.50, nearY: 0.70 },
-  amazon_riverbed: { minX: 0.18, maxX: 0.58, farY: 0.58, nearY: 0.72 },
-  flooded_forest: { minX: 0.24, maxX: 0.78, farY: 0.52, nearY: 0.70 },
-  mangroves: { minX: 0.12, maxX: 0.44, farY: 0.58, nearY: 0.72 },
-  coral_flats: { minX: 0.14, maxX: 0.50, farY: 0.52, nearY: 0.68 },
-  fjord: { minX: 0.12, maxX: 0.50, farY: 0.60, nearY: 0.74 },
-  open_ocean: { minX: 0.14, maxX: 0.62, farY: 0.46, nearY: 0.62 }
+  pond: { minX: 0.05, maxX: 0.88, farY: 0.46, nearY: 0.90 },
+  swamp: { minX: 0.04, maxX: 0.86, farY: 0.48, nearY: 0.90 },
+  river: { minX: 0.03, maxX: 0.84, farY: 0.46, nearY: 0.88 },
+  lake: { minX: 0.03, maxX: 0.84, farY: 0.44, nearY: 0.90 },
+  reservoir: { minX: 0.04, maxX: 0.74, farY: 0.44, nearY: 0.88 },
+  mountain_river: { minX: 0.03, maxX: 0.79, farY: 0.48, nearY: 0.86 },
+  river_delta: { minX: 0.04, maxX: 0.82, farY: 0.44, nearY: 0.84 },
+  sea_coast: { minX: 0.03, maxX: 0.82, farY: 0.42, nearY: 0.90 },
+  amazon_riverbed: { minX: 0.03, maxX: 0.83, farY: 0.51, nearY: 0.90 },
+  flooded_forest: { minX: 0.02, maxX: 0.98, farY: 0.48, nearY: 0.92 },
+  mangroves: { minX: 0.02, maxX: 0.96, farY: 0.46, nearY: 0.92 },
+  coral_flats: { minX: 0.04, maxX: 0.97, farY: 0.42, nearY: 0.90 },
+  fjord: { minX: 0.03, maxX: 0.97, farY: 0.53, nearY: 0.92 },
+  open_ocean: { minX: 0.02, maxX: 0.83, farY: 0.40, nearY: 0.84 }
 });
 const CAST_ANIMATION_MIN_MS = 280;
 const CAST_ANIMATION_MAX_MS = 760;
@@ -39,6 +57,10 @@ const useAssetSrc = window.useAssetSrc;
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function proLocationKey(value) {
@@ -79,15 +101,201 @@ function proLocationKey(value) {
   })[raw] || raw;
 }
 
-function proCastAreaForLocation(location, bgAsset) {
-  return PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA;
+function normalizeCastArea(area, fallback = DEFAULT_PRO_CAST_AREA) {
+  const minX = Number(area?.minX);
+  const maxX = Number(area?.maxX);
+  const farY = Number(area?.farY);
+  const nearY = Number(area?.nearY);
+  if (![minX, maxX, farY, nearY].every(Number.isFinite)) {
+    return { ...fallback };
+  }
+  const normalized = {
+    minX: clamp01(minX),
+    maxX: clamp01(maxX),
+    farY: clamp01(farY),
+    nearY: clamp01(nearY),
+  };
+  if (normalized.maxX <= normalized.minX || normalized.nearY <= normalized.farY) {
+    return { ...fallback };
+  }
+  return normalized;
 }
 
-function proCastTargetFromSpot(spot, area = DEFAULT_PRO_CAST_AREA) {
+function castZoneFromArea(area) {
+  const safe = normalizeCastArea(area);
   return {
+    points: [
+      { x: safe.minX, y: safe.farY },
+      { x: safe.maxX, y: safe.farY },
+      { x: safe.maxX, y: safe.nearY },
+      { x: safe.minX, y: safe.nearY }
+    ]
+  };
+}
+
+function castZoneArea(zone) {
+  const points = zone?.points || [];
+  if (points.length < 3) return 0;
+  let sum = 0;
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    sum += point.x * next.y - next.x * point.y;
+  });
+  return Math.abs(sum) / 2;
+}
+
+function normalizeCastZone(zone) {
+  const points = Array.isArray(zone?.points)
+    ? zone.points
+        .map(point => ({ x: clamp01(Number(point?.x)), y: clamp01(Number(point?.y)) }))
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    : [];
+  if (points.length < 3) return null;
+  const normalized = { points };
+  return castZoneArea(normalized) >= 0.0004 ? normalized : null;
+}
+
+function fallbackCastZone() {
+  return { points: DEFAULT_PRO_CAST_ZONE.points.map(point => ({ ...point })) };
+}
+
+function castZoneBounds(zone) {
+  const points = zone?.points || [];
+  if (points.length === 0) return { ...DEFAULT_PRO_CAST_AREA };
+  return normalizeCastArea({
+    minX: Math.min(...points.map(point => point.x)),
+    maxX: Math.max(...points.map(point => point.x)),
+    farY: Math.min(...points.map(point => point.y)),
+    nearY: Math.max(...points.map(point => point.y)),
+  });
+}
+
+function pointInCastZone(point, zone) {
+  const points = zone?.points || [];
+  if (points.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const pi = points[i];
+    const pj = points[j];
+    const crosses = (pi.y > point.y) !== (pj.y > point.y);
+    if (crosses) {
+      const xAtY = ((pj.x - pi.x) * (point.y - pi.y)) / ((pj.y - pi.y) || 0.000001) + pi.x;
+      if (point.x < xAtY) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function closestPointOnSegment(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= 0.000001) return { ...start };
+  const t = clamp01(((point.x - start.x) * dx + (point.y - start.y) * dy) / lenSq);
+  return { x: start.x + dx * t, y: start.y + dy * t };
+}
+
+function closestPointInCastZone(point, zone) {
+  const points = zone?.points || [];
+  if (points.length === 0) return point;
+  let best = points[0];
+  let bestDistance = Infinity;
+  points.forEach((start, index) => {
+    const end = points[(index + 1) % points.length];
+    const candidate = closestPointOnSegment(point, start, end);
+    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  });
+  return { x: clamp01(best.x), y: clamp01(best.y) };
+}
+
+function screenCastZoneToWorldZone(zone, viewportWidth, options = {}) {
+  const centeredLeft = Math.max(0, (1 - viewportWidth) / 2);
+  const points = (zone?.points || []).map(point => ({
+    x: clamp01(centeredLeft + point.x * viewportWidth),
+    y: clamp01(point.y),
+  }));
+  const expandX = Math.max(0, Number(options.expandX) || 0);
+  const expandTop = Math.max(0, Number(options.expandTop) || 0);
+  const expandBottom = Math.max(0, Number(options.expandBottom) || 0);
+  if (expandX > 0 || expandTop > 0 || expandBottom > 0) {
+    const bounds = castZoneBounds({ points });
+    return castZoneFromArea({
+      minX: clamp01(bounds.minX - expandX),
+      maxX: clamp01(bounds.maxX + expandX),
+      farY: clamp01(bounds.farY - expandTop),
+      nearY: clamp01(bounds.nearY + expandBottom),
+    });
+  }
+  return { points };
+}
+
+function centeredWorldCastZone(zone, viewportWidth) {
+  return screenCastZoneToWorldZone(zone, viewportWidth, {
+    expandX: Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+    expandTop: CAST_AREA_EXPAND_TOP,
+    expandBottom: CAST_AREA_EXPAND_BOTTOM,
+  });
+}
+
+function clipCastZoneVertical(points, boundaryX, keepGreater) {
+  if (!Array.isArray(points) || points.length === 0) return [];
+  const result = [];
+  const inside = point => keepGreater ? point.x >= boundaryX : point.x <= boundaryX;
+  const intersection = (start, end) => {
+    const dx = end.x - start.x;
+    if (Math.abs(dx) < 0.000001) return { x: boundaryX, y: start.y };
+    const t = clamp01((boundaryX - start.x) / dx);
+    return { x: boundaryX, y: start.y + (end.y - start.y) * t };
+  };
+  points.forEach((current, index) => {
+    const previous = points[(index + points.length - 1) % points.length];
+    const currentInside = inside(current);
+    const previousInside = inside(previous);
+    if (currentInside && !previousInside) {
+      result.push(intersection(previous, current), current);
+    } else if (currentInside) {
+      result.push(current);
+    } else if (previousInside) {
+      result.push(intersection(previous, current));
+    }
+  });
+  return result;
+}
+
+function visibleWorldCastZone(zone, viewLeft, viewportWidth) {
+  const clippedLeft = clipCastZoneVertical(zone?.points || [], viewLeft, true);
+  const clipped = clipCastZoneVertical(clippedLeft, viewLeft + viewportWidth, false);
+  if (clipped.length >= 3) return { points: clipped };
+  return castZoneFromArea(visibleWorldCastArea(castZoneBounds(zone), viewLeft, viewportWidth));
+}
+
+function worldCastZoneToScreen(zone, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) return zone;
+  return {
+    points: (zone?.points || []).map(point => ({
+      x: clamp01((point.x - viewLeft) / viewportWidth),
+      y: clamp01(point.y),
+    }))
+  };
+}
+
+function proCastAreaForLocation(location, bgAsset) {
+  return normalizeCastArea(
+    PRO_CAST_AREAS[proLocationKey(bgAsset)] || PRO_CAST_AREAS[proLocationKey(location)] || DEFAULT_PRO_CAST_AREA
+  );
+}
+
+function proCastTargetFromSpot(spot, zone = fallbackCastZone()) {
+  const area = castZoneBounds(zone);
+  const point = {
     x: area.minX + clamp01(Number(spot?.xRoll) || 0) * (area.maxX - area.minX),
     y: area.farY + clamp01(Number(spot?.yRoll) || 0) * (area.nearY - area.farY),
   };
+  return pointInCastZone(point, zone) ? point : closestPointInCastZone(point, zone);
 }
 
 function castDurationFromSwipe(distance, elapsedMs) {
@@ -100,25 +308,170 @@ function castDurationFromSwipe(distance, elapsedMs) {
   return Math.round(CAST_ANIMATION_MAX_MS - speed * (CAST_ANIMATION_MAX_MS - CAST_ANIMATION_MIN_MS));
 }
 
-function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, area = DEFAULT_PRO_CAST_AREA) {
+function defaultBackgroundAspect(location, bgAsset) {
+  const key = proLocationKey(bgAsset) || proLocationKey(location);
+  return key === 'flooded_forest' || key === 'mangroves' ? 1 : 1.5;
+}
+
+function computePanViewport(w, h, imageAspect) {
+  if (!(w > 0) || !(h > 0) || !(imageAspect > 0)) {
+    return { visibleWidth: 1, maxPan: 0, centeredLeft: 0, canPan: false };
+  }
+  const stageAspect = w / h;
+  if (!(imageAspect > stageAspect)) {
+    return { visibleWidth: 1, maxPan: 0, centeredLeft: 0, canPan: false };
+  }
+  const visibleWidth = clamp01(stageAspect / imageAspect);
+  const maxPan = Math.max(0, 1 - visibleWidth);
+  return {
+    visibleWidth,
+    maxPan,
+    centeredLeft: maxPan / 2,
+    canPan: maxPan > 0.001,
+  };
+}
+
+function legacyScreenAreaToWorldArea(screenArea, viewportWidth, options = {}) {
+  const safeArea = normalizeCastArea(screenArea);
+  const centeredLeft = Math.max(0, (1 - viewportWidth) / 2);
+  const worldMinX = centeredLeft + safeArea.minX * viewportWidth;
+  const worldMaxX = centeredLeft + safeArea.maxX * viewportWidth;
+  const expandX = Math.max(0, Number(options.expandX) || 0);
+  const expandTop = Math.max(0, Number(options.expandTop) || 0);
+  const expandBottom = Math.max(0, Number(options.expandBottom) || 0);
+  return normalizeCastArea({
+    minX: clamp01(worldMinX - expandX),
+    maxX: clamp01(worldMaxX + expandX),
+    farY: clamp01(safeArea.farY - expandTop),
+    nearY: clamp01(safeArea.nearY + expandBottom),
+  });
+}
+
+function centeredWorldCastArea(screenArea, viewportWidth) {
+  return legacyScreenAreaToWorldArea(screenArea, viewportWidth, {
+    expandX: Math.max(CAST_AREA_EXPAND_MIN_X, viewportWidth * CAST_AREA_EXPAND_VIEWPORT_X),
+    expandTop: CAST_AREA_EXPAND_TOP,
+    expandBottom: CAST_AREA_EXPAND_BOTTOM,
+  });
+}
+
+function cameraLimitsForArea(worldArea, viewportWidth) {
+  const maxPan = Math.max(0, 1 - viewportWidth);
+  if (!(maxPan > 0) || !(viewportWidth > 0)) {
+    return { minLeft: 0, maxLeft: 0 };
+  }
+  const areaWidth = Math.max(0, worldArea.maxX - worldArea.minX);
+  const minVisible = Math.min(
+    areaWidth,
+    Math.max(CAST_AREA_MIN_VISIBLE_WORLD, viewportWidth * CAST_AREA_MIN_VISIBLE_VIEWPORT)
+  );
+  let minLeft = worldArea.minX + minVisible - viewportWidth;
+  let maxLeft = worldArea.maxX - minVisible;
+  minLeft = clamp(minLeft, 0, maxPan);
+  maxLeft = clamp(maxLeft, 0, maxPan);
+  if (maxLeft < minLeft) {
+    const centered = clamp(((worldArea.minX + worldArea.maxX) / 2) - viewportWidth / 2, 0, maxPan);
+    return { minLeft: centered, maxLeft: centered };
+  }
+  return { minLeft, maxLeft };
+}
+
+function clampCameraViewLeft(viewLeft, limits) {
+  return clamp(viewLeft, limits.minLeft, limits.maxLeft);
+}
+
+function visibleWorldCastArea(worldArea, viewLeft, viewportWidth) {
+  const visibleMinX = Math.max(worldArea.minX, viewLeft);
+  const visibleMaxX = Math.min(worldArea.maxX, viewLeft + viewportWidth);
+  if (visibleMaxX > visibleMinX) {
+    return {
+      minX: visibleMinX,
+      maxX: visibleMaxX,
+      farY: worldArea.farY,
+      nearY: worldArea.nearY,
+    };
+  }
+  const center = clamp((worldArea.minX + worldArea.maxX) / 2, viewLeft, viewLeft + viewportWidth);
+  const halfWidth = Math.min(viewportWidth * 0.08, 0.04);
+  return {
+    minX: clamp(center - halfWidth, viewLeft, viewLeft + viewportWidth),
+    maxX: clamp(center + halfWidth, viewLeft, viewLeft + viewportWidth),
+    farY: worldArea.farY,
+    nearY: worldArea.nearY,
+  };
+}
+
+function worldAreaToScreenArea(worldArea, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) {
+    return normalizeCastArea(worldArea);
+  }
+  return normalizeCastArea({
+    minX: clamp01((worldArea.minX - viewLeft) / viewportWidth),
+    maxX: clamp01((worldArea.maxX - viewLeft) / viewportWidth),
+    farY: worldArea.farY,
+    nearY: worldArea.nearY,
+  });
+}
+
+function worldToScreenRel(point, viewLeft, viewportWidth) {
+  if (!(viewportWidth > 0)) {
+    return { x: point.x, y: point.y };
+  }
+  return {
+    x: (point.x - viewLeft) / viewportWidth,
+    y: point.y,
+  };
+}
+
+function proFishingCastSpotFromSwipe(dx, dy, w, h, elapsedMs = 0, zone = fallbackCastZone(), options = {}) {
   const minSide = Math.max(1, Math.min(w || 0, h || 0));
   const distance = Math.hypot(dx, dy);
   const strength = clamp01(distance / (minSide * 0.75));
   const nx = distance > 0 ? dx / distance : 0;
   const ny = distance > 0 ? dy / distance : 0;
+  const area = castZoneBounds(zone);
   const centerX = (area.minX + area.maxX) / 2;
   const centerY = (area.farY + area.nearY) / 2;
   const reachX = (area.maxX - area.minX) / 2;
   const reachY = (area.nearY - area.farY) / 2;
-  const target = {
+  const rawTarget = {
     x: Math.max(area.minX, Math.min(area.maxX, centerX + nx * strength * reachX)),
     y: Math.max(area.farY, Math.min(area.nearY, centerY + ny * strength * reachY)),
   };
+  const target = pointInCastZone(rawTarget, zone) ? rawTarget : closestPointInCastZone(rawTarget, zone);
+  const viewportWidth = Number.isFinite(Number(options.viewportWidth)) ? Number(options.viewportWidth) : 1;
+  const viewLeft = Number.isFinite(Number(options.viewLeft)) ? Number(options.viewLeft) : 0;
+  const worldZone = options.worldZone || zone;
+  const worldArea = castZoneBounds(worldZone);
+  const targetWorld = {
+    x: viewLeft + target.x * viewportWidth,
+    y: target.y,
+  };
+  const projectedWorld = pointInCastZone(targetWorld, worldZone)
+    ? targetWorld
+    : closestPointInCastZone(targetWorld, worldZone);
+  const worldWidth = Math.max(0.0001, worldArea.maxX - worldArea.minX);
+  const worldHeight = Math.max(0.0001, worldArea.nearY - worldArea.farY);
   return {
-    xRoll: clamp01((target.x - area.minX) / (area.maxX - area.minX)),
-    yRoll: clamp01((target.y - area.farY) / (area.nearY - area.farY)),
+    xRoll: clamp01((projectedWorld.x - worldArea.minX) / worldWidth),
+    yRoll: clamp01((projectedWorld.y - worldArea.farY) / worldHeight),
     proMode: true,
+    panoramicAware: Boolean(options.worldZone && viewportWidth < 0.999),
     castDurationMs: castDurationFromSwipe(distance, elapsedMs),
+  };
+}
+
+function touchCentroid(points) {
+  const values = Array.from(points.values());
+  if (values.length === 0) return null;
+  const sum = values.reduce((acc, point) => {
+    acc.x += point.x;
+    acc.y += point.y;
+    return acc;
+  }, { x: 0, y: 0 });
+  return {
+    x: sum.x / values.length,
+    y: sum.y / values.length,
   };
 }
 
@@ -171,7 +524,29 @@ function FishingOverlayToggle({ label, checked, onClick, className = '' }) {
   );
 }
 
-function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, tapTimeLeft, castReady, onCast, onHook, onTap, castSpot, proMode, onToggleProMode, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
+function buildFishingOutcomeLines(result) {
+  if (!result) return [];
+  const lines = [
+    `${t('catch')} ${result.fish} — ${Number(result.weight || 0).toFixed(2)} ${t('kg')}`
+  ];
+  if (result.newFish) lines.push(t('new'));
+  if (typeof result.coins === 'number') {
+    lines.push(result.coins > 0 ? t('coinsEarned', result.coins) : t('coinsCapReached'));
+  }
+  (result.newLocations || []).forEach(name => lines.push(`${t('newLocation')} ${name}`));
+  if ((result.newRods || []).length > 0) {
+    lines.push(`${result.newRods.length > 1 ? t('newRodPlural') : t('newRod')} ${result.newRods.join(', ')}`);
+  }
+  (result.achievements || []).forEach(a => {
+    lines.push(t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex }));
+  });
+  (result.questUpdates || []).forEach(q => {
+    lines.push(t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 }));
+  });
+  return lines.slice(0, 7);
+}
+
+function FishingStage({ me, setMe, casting, biting, tapping, struggleIntensity = 0, castReady, onCast, onHook, onTap, castSpot, proMode = true, autoCast, setAutoCast, autoCastRef, autoCastTimeoutRef, result, error, onClearError, hasCatchAnimationBeenShown, markCatchAnimationShown, onOpenQuests, onOpenClub, onOpenLocations, onOpenBaits, onOpenRods }) {
   const stageRef = React.useRef(null);
   const { w, h } = useResizeObserver(stageRef);
   const bobberIcon = window.BOBBER_ICON || '/app/assets/menu/bobber.png';
@@ -184,12 +559,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     proMode ? { x: PRO_SHORE_X, y: PRO_SHORE_Y } : { x: 0.09, y: WATER_TOP_REL - 0.03 }
   ), [proMode]);
   const [floatRel, setFloatRel] = React.useState(shorePosRel);
-  const [floatVisual, setFloatVisual] = React.useState({ offset: 0, tilt: 0, submerge: 0 });
+  const [floatVisual, setFloatVisual] = React.useState({ offset: 0, xOffset: 0, tilt: 0, submerge: 0 });
   const floatPxRef = React.useRef({ x: 0, y: 0 });
   const floatRelRef = React.useRef(floatRel);
   const [castLanded, setCastLanded] = React.useState(false);
   const tweenCancelRef = React.useRef(null);
   const prevCastingRef = React.useRef(false);
+  const cameraViewLeftRef = React.useRef(0);
+  const touchPointsRef = React.useRef(new Map());
+  const proPanRef = React.useRef(null);
 
   React.useEffect(() => { floatRelRef.current = floatRel; }, [floatRel.x, floatRel.y]);
 
@@ -203,9 +581,9 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   const toPx = (rel) => ({ x: rel.x * w, y: rel.y * h });
   const floatBasePx = toPx(floatRel);
   const floatPx = React.useMemo(() => ({
-    x: floatBasePx.x,
+    x: floatBasePx.x + (floatVisual.xOffset || 0),
     y: floatBasePx.y + floatVisual.offset
-  }), [floatBasePx.x, floatBasePx.y, floatVisual.offset]);
+  }), [floatBasePx.x, floatBasePx.y, floatVisual.offset, floatVisual.xOffset]);
   React.useEffect(() => { floatPxRef.current = floatPx; }, [floatPx.x, floatPx.y]);
 
   const waterlineY = React.useMemo(() => {
@@ -234,7 +612,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }, [currentLure]);
   const rigLineHeight = proMode ? 36 : 27;
   const hookSize = proMode ? 18 : 14;
-  const baitSize = proMode ? 18 : 15;
+  const baitSize = proMode ? 30 : 25;
   const shouldShowRig = !isCastInWater && w > 0 && h > 0;
   const rigWidth = 44;
   const rigCenterX = rigWidth / 2;
@@ -249,7 +627,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   React.useEffect(() => {
     if (!proMode || !error) return undefined;
     const id = Date.now();
-    setProMessage({ id, text: error });
+    setProMessage({ id, lines: [error], tone: 'error' });
     const timer = setTimeout(() => {
       setProMessage(prev => (prev?.id === id ? null : prev));
       if (typeof onClearError === 'function') {
@@ -258,6 +636,18 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     }, 3000);
     return () => clearTimeout(timer);
   }, [error, proMode, onClearError]);
+
+  React.useEffect(() => {
+    if (!proMode || !result) return undefined;
+    const lines = buildFishingOutcomeLines(result);
+    if (lines.length === 0) return undefined;
+    const id = result.animationId || result.id || Date.now();
+    setProMessage({ id, lines, tone: 'success' });
+    const timer = setTimeout(() => {
+      setProMessage(prev => (prev?.id === id ? null : prev));
+    }, 5200);
+    return () => clearTimeout(timer);
+  }, [result, proMode]);
 
   const bobberClipStyle = React.useMemo(() => {
     if (!bobberClipPath) return null;
@@ -268,14 +658,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }, [bobberClipPath]);
 
   const shouldAnimateFloat = proMode ? (biting || tapping) : ((casting && castLanded) || biting || tapping);
+  const fightIntensity = Math.max(0, Math.min(1, Number(struggleIntensity) || 0));
   React.useEffect(() => {
     let frame;
     if (!shouldAnimateFloat) {
       setFloatVisual(prev => {
-        if (prev.offset === 0 && prev.tilt === 0 && prev.submerge === 0) {
+        if (prev.offset === 0 && (prev.xOffset || 0) === 0 && prev.tilt === 0 && prev.submerge === 0) {
           return prev;
         }
-        return { offset: 0, tilt: 0, submerge: 0 };
+        return { offset: 0, xOffset: 0, tilt: 0, submerge: 0 };
       });
       return;
     }
@@ -287,6 +678,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       const basePeriod = state === 'biting' ? 0.8 : (state === 'tapping' ? 0.65 : 3);
       const mainWave = Math.sin((t * Math.PI * 2) / basePeriod);
       let offset;
+      let xOffset = 0;
       let tilt;
       let submerge;
       if (state === 'biting') {
@@ -297,24 +689,29 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         submerge = offset > 0 ? Math.min(1, offset / 11) : 0;
       } else if (state === 'tapping') {
         const quickWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.85));
-        offset = mainWave * 4.2 + quickWave * 1.1;
-        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.95)) * 5;
-        submerge = offset > 0 ? Math.min(1, offset / 9) : 0;
+        const pullWave = Math.sin((t * Math.PI * 2) / (basePeriod * 1.45));
+        const snapWave = Math.sin((t * Math.PI * 2) / (basePeriod * 0.42));
+        offset = 5 + fightIntensity * 18 + mainWave * (4.2 + fightIntensity * 9) + quickWave * (1.1 + fightIntensity * 5);
+        xOffset = pullWave * (5 + fightIntensity * 22) + snapWave * fightIntensity * 7;
+        tilt = Math.sin((t * Math.PI * 2) / (basePeriod * 0.95)) * (5 + fightIntensity * 18);
+        submerge = offset > 0 ? Math.min(1, offset / (9 + fightIntensity * 14)) : 0;
       } else {
         offset = mainWave * 4;
         tilt = mainWave * 2.5;
         submerge = offset > 0 ? Math.min(1, offset / 6) : 0;
       }
-      const nextState = { offset, tilt, submerge };
+      const nextState = { offset, xOffset, tilt, submerge };
       setFloatVisual(prev => {
         const lerp = (prevValue, targetValue) => prevValue + (targetValue - prevValue) * 0.18;
         const smoothed = {
           offset: lerp(prev.offset, nextState.offset),
+          xOffset: lerp(prev.xOffset || 0, nextState.xOffset || 0),
           tilt: lerp(prev.tilt, nextState.tilt),
           submerge: lerp(prev.submerge, nextState.submerge)
         };
         if (
           Math.abs(smoothed.offset - prev.offset) < 0.01 &&
+          Math.abs(smoothed.xOffset - (prev.xOffset || 0)) < 0.01 &&
           Math.abs(smoothed.tilt - prev.tilt) < 0.01 &&
           Math.abs(smoothed.submerge - prev.submerge) < 0.01
         ) {
@@ -328,7 +725,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     return () => {
       if (frame) { cancelAnimationFrame(frame); }
     };
-  }, [shouldAnimateFloat, biting, tapping, proMode]);
+  }, [shouldAnimateFloat, biting, tapping, proMode, fightIntensity]);
 
   const isSmall = w < 420;
   const isTablet = w >= 420 && w < 1024;
@@ -423,12 +820,13 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       wPath = `M ${lastPoint.x},${lastPoint.y} C ${control1.x},${control1.y} ${control2.x},${control2.y} ${lineAttach.x},${lineAttach.y}`;
     } else {
       const gentleSag = Math.min(h * 0.08, dist * 0.12);
-      const controlX = lastPoint.x + dx * 0.5;
-      const controlY = lastPoint.y + dy * 0.5 + gentleSag;
+      const fightPull = tapping ? (floatVisual.xOffset || 0) * (0.4 + fightIntensity * 0.75) : 0;
+      const controlX = lastPoint.x + dx * 0.5 + fightPull;
+      const controlY = lastPoint.y + dy * 0.5 + gentleSag + (tapping ? h * 0.03 * fightIntensity : 0);
       wPath = `M ${lastPoint.x},${lastPoint.y} Q ${controlX},${controlY} ${lineAttach.x},${lineAttach.y}`;
     }
     return { rodLinePath: rPath, waterLinePath: wPath };
-  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, proMode]);
+  }, [tipX, tipY, lineAttach.x, lineAttach.y, shouldShowSlack, h, rodLinePoints, rodLeft, rodW, rodTop, rodH, proMode, tapping, fightIntensity, floatVisual.xOffset]);
 
   const catchTargetPx = React.useMemo(() => {
     const baseX = rodLeft + rodW * ROD_BASE_ANCHOR.x;
@@ -583,16 +981,102 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
   }, [me?.locations, me?.locationId]);
 
   const bgAsset = React.useMemo(() => {
+    if (currentLocation?.imageUrl) return null;
     const byCurrent = resolveLocationBg(currentLocation?.id ?? me.locationId, currentLocation?.name);
     if (byCurrent) return byCurrent;
     const byIdOnly = resolveLocationBg(me.locationId, null);
     if (byIdOnly) return byIdOnly;
     return LOCATION_BG[1];
-  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, me.locationId]);
-  const proCastArea = React.useMemo(
-    () => proCastAreaForLocation(currentLocation?.name, bgAsset),
-    [currentLocation?.name, bgAsset]
+  }, [resolveLocationBg, currentLocation?.id, currentLocation?.name, currentLocation?.imageUrl, me.locationId]);
+  const baseCastZone = React.useMemo(
+    () => normalizeCastZone(currentLocation?.castZone) || fallbackCastZone(),
+    [currentLocation?.castZone]
   );
+  const hasCustomCastZone = Boolean(normalizeCastZone(currentLocation?.castZone));
+  const baseCastArea = React.useMemo(() => castZoneBounds(baseCastZone), [baseCastZone]);
+  const assetBgUrl = useAssetSrc(bgAsset);
+  const bgUrl = currentLocation?.imageUrl || assetBgUrl;
+  const [bgLoaded, setBgLoaded] = React.useState(false);
+  const [bgNaturalSize, setBgNaturalSize] = React.useState({ width: 0, height: 0 });
+  React.useEffect(() => {
+    setBgLoaded(false);
+    setBgNaturalSize({ width: 0, height: 0 });
+    if (!bgUrl) return;
+    const img = new Image();
+    img.src = bgUrl;
+    img.onload = () => {
+      setBgLoaded(true);
+      setBgNaturalSize({
+        width: Number(img.naturalWidth) || 0,
+        height: Number(img.naturalHeight) || 0,
+      });
+    };
+    return () => {
+      img.onload = null;
+    };
+  }, [bgUrl]);
+  const backgroundAspect = React.useMemo(() => {
+    if (bgNaturalSize.width > 0 && bgNaturalSize.height > 0) {
+      return bgNaturalSize.width / bgNaturalSize.height;
+    }
+    return defaultBackgroundAspect(currentLocation?.name, bgAsset);
+  }, [bgNaturalSize.width, bgNaturalSize.height, currentLocation?.name, bgAsset]);
+  const panViewport = React.useMemo(
+    () => computePanViewport(w, h, backgroundAspect),
+    [w, h, backgroundAspect]
+  );
+  const panoramicMode = proMode && panViewport.canPan;
+  const panoramicCastZone = React.useMemo(
+    () => (hasCustomCastZone
+      ? baseCastZone
+      : centeredWorldCastZone(baseCastZone, panViewport.visibleWidth)),
+    [baseCastZone, hasCustomCastZone, panViewport.visibleWidth]
+  );
+  const panoramicCastArea = React.useMemo(() => castZoneBounds(panoramicCastZone), [panoramicCastZone]);
+  const activeCastZone = panoramicMode ? panoramicCastZone : baseCastZone;
+  const activeCastArea = panoramicMode ? panoramicCastArea : baseCastArea;
+  const cameraLimits = React.useMemo(
+    () => panoramicMode ? cameraLimitsForArea(panoramicCastArea, panViewport.visibleWidth) : { minLeft: 0, maxLeft: 0 },
+    [panoramicMode, panoramicCastArea, panViewport.visibleWidth]
+  );
+  const [cameraViewLeft, setCameraViewLeft] = React.useState(panViewport.centeredLeft);
+  React.useEffect(() => {
+    cameraViewLeftRef.current = cameraViewLeft;
+  }, [cameraViewLeft]);
+  const locationCameraKey = `${currentLocation?.id ?? me.locationId}:${bgUrl || bgAsset || ''}:${panoramicMode ? 'pan' : 'static'}`;
+  React.useEffect(() => {
+    setCameraViewLeft(panoramicMode ? clampCameraViewLeft(panViewport.centeredLeft, cameraLimits) : 0);
+  }, [locationCameraKey]);
+  React.useEffect(() => {
+    if (!panoramicMode) {
+      if (cameraViewLeftRef.current !== 0) {
+        setCameraViewLeft(0);
+      }
+      return;
+    }
+    const clamped = clampCameraViewLeft(cameraViewLeftRef.current, cameraLimits);
+    if (Math.abs(clamped - cameraViewLeftRef.current) > 0.0001) {
+      setCameraViewLeft(clamped);
+    }
+  }, [cameraLimits.minLeft, cameraLimits.maxLeft, panoramicMode]);
+  const visibleCastZone = React.useMemo(() => {
+    if (!panoramicMode) return baseCastZone;
+    return worldCastZoneToScreen(
+      visibleWorldCastZone(activeCastZone, cameraViewLeft, panViewport.visibleWidth),
+      cameraViewLeft,
+      panViewport.visibleWidth
+    );
+  }, [activeCastZone, baseCastZone, panoramicMode, cameraViewLeft, panViewport.visibleWidth]);
+  const visibleCastArea = React.useMemo(() => castZoneBounds(visibleCastZone), [visibleCastZone]);
+  const panByDirection = React.useCallback((direction) => {
+    if (!panoramicMode || casting || biting || tapping) return;
+    const step = Math.max(0.06, panViewport.visibleWidth * PAN_STEP_VIEWPORT_MULTIPLIER);
+    setCameraViewLeft(current => clampCameraViewLeft(current + direction * step, cameraLimits));
+  }, [biting, cameraLimits, casting, panoramicMode, panViewport.visibleWidth, tapping]);
+  const bgPositionX = React.useMemo(() => {
+    if (!panoramicMode || !(panViewport.maxPan > 0)) return '50%';
+    return `${(clampCameraViewLeft(cameraViewLeft, cameraLimits) / panViewport.maxPan) * 100}%`;
+  }, [cameraLimits, cameraViewLeft, panoramicMode, panViewport.maxPan]);
 
   React.useEffect(() => {
     if (casting) {
@@ -613,7 +1097,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         }
         let target;
         if (castSpot?.proMode || proMode) {
-          target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, proCastArea);
+          if (panoramicMode && castSpot?.panoramicAware) {
+            const worldTarget = proCastTargetFromSpot(castSpot, activeCastZone);
+            target = worldToScreenRel(worldTarget, cameraViewLeftRef.current, panViewport.visibleWidth);
+          } else {
+            target = proCastTargetFromSpot(castSpot || { xRoll: Math.random(), yRoll: Math.random() }, panoramicMode ? visibleCastZone : activeCastZone);
+          }
         } else {
           const minX = Math.max(0.05, tipRelX - 0.20);
           const maxX = Math.max(minX, tipRelX - 0.05);
@@ -648,17 +1137,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       setFloatRel(shorePosRel);
       prevCastingRef.current = false;
     }
-  }, [casting, shorePosRel, tipX, tweenTo, w, castSpot, proMode, proCastArea]);
-  const bgUrl = useAssetSrc(bgAsset);
-  const [bgLoaded, setBgLoaded] = React.useState(false);
-  React.useEffect(() => {
-    setBgLoaded(false);
-    if (!bgUrl) return;
-    const img = new Image();
-    img.src = bgUrl;
-    img.onload = () => setBgLoaded(true);
-    return () => { img.onload = null; };
-  }, [bgUrl]);
+  }, [activeCastZone, casting, panViewport.visibleWidth, panoramicMode, shorePosRel, tipX, tweenTo, visibleCastZone, w, castSpot, proMode]);
   const showRipple = castLanded && (biting || tapping);
   const proPointerRef = React.useRef(null);
   const handleProPointerDown = React.useCallback((event) => {
@@ -674,6 +1153,21 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       onTap?.();
       return;
     }
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (panoramicMode && castReady && !casting && touchPointsRef.current.size >= 2) {
+        proPointerRef.current = null;
+        const centroid = touchCentroid(touchPointsRef.current);
+        if (centroid) {
+          proPanRef.current = {
+            startCentroidX: centroid.x,
+            startViewLeft: cameraViewLeftRef.current,
+          };
+        }
+        event.preventDefault();
+        return;
+      }
+    }
     if (casting || !castReady) return;
     proPointerRef.current = {
       id: event.pointerId,
@@ -684,26 +1178,87 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       dy: 0,
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
-  }, [biting, castReady, casting, onHook, onTap, proMode, tapping]);
+  }, [biting, castReady, casting, onHook, onTap, panoramicMode, proMode, tapping]);
 
   const handleProPointerMove = React.useCallback((event) => {
+    if (event.pointerType === 'touch' && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (panoramicMode && proPanRef.current && w > 0) {
+        const centroid = touchCentroid(touchPointsRef.current);
+        if (centroid) {
+          const deltaX = centroid.x - proPanRef.current.startCentroidX;
+          const nextViewLeft = clampCameraViewLeft(
+            proPanRef.current.startViewLeft - (deltaX * panViewport.visibleWidth / Math.max(1, w)),
+            cameraLimits
+          );
+          setCameraViewLeft(nextViewLeft);
+        }
+        event.preventDefault();
+        return;
+      }
+    }
     const active = proPointerRef.current;
     if (!proMode || !active || active.id !== event.pointerId) return;
     active.dx = event.clientX - active.x;
     active.dy = event.clientY - active.y;
     event.preventDefault();
-  }, [proMode]);
+  }, [cameraLimits, panoramicMode, panViewport.visibleWidth, proMode, w]);
 
   const finishProPointer = React.useCallback((event, cancelled = false) => {
+    if (event.pointerType === 'touch') {
+      touchPointsRef.current.delete(event.pointerId);
+      if (proPanRef.current) {
+        if (touchPointsRef.current.size < 2) {
+          proPanRef.current = null;
+        }
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        return;
+      }
+    }
     const active = proPointerRef.current;
     if (!proMode || !active || active.id !== event.pointerId) return;
     proPointerRef.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     if (cancelled) return;
     const distance = Math.hypot(active.dx, active.dy);
+    const elapsedMs = performance.now() - active.startedAt;
+    if (
+      panoramicMode &&
+      distance <= PAN_EDGE_TAP_MAX_DISTANCE &&
+      elapsedMs <= PAN_EDGE_TAP_MAX_DURATION_MS &&
+      castReady &&
+      !casting
+    ) {
+      const stageRect = stageRef.current?.getBoundingClientRect?.();
+      if (stageRect && stageRect.width > 0) {
+        const localX = event.clientX - stageRect.left;
+        if (localX <= stageRect.width * PAN_EDGE_TAP_FRACTION) {
+          panByDirection(-1);
+          return;
+        }
+        if (localX >= stageRect.width * (1 - PAN_EDGE_TAP_FRACTION)) {
+          panByDirection(1);
+          return;
+        }
+      }
+    }
     if (distance < 40 || casting || !castReady) return;
-    onCast?.(proFishingCastSpotFromSwipe(active.dx, active.dy, w, h, performance.now() - active.startedAt, proCastArea));
-  }, [castReady, casting, h, onCast, proMode, proCastArea, w]);
+    onCast?.(proFishingCastSpotFromSwipe(
+      active.dx,
+      active.dy,
+      w,
+      h,
+      elapsedMs,
+      visibleCastZone,
+      panoramicMode
+        ? {
+            worldZone: activeCastZone,
+            viewLeft: cameraViewLeftRef.current,
+            viewportWidth: panViewport.visibleWidth,
+          }
+        : undefined
+    ));
+  }, [activeCastZone, castReady, casting, h, onCast, panByDirection, panViewport.visibleWidth, panoramicMode, proMode, visibleCastZone, w]);
 
   const handleProPointerUp = React.useCallback((event) => {
     finishProPointer(event, false);
@@ -750,7 +1305,6 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
       catchImage = img;
     }
   }
-
   return (
     <div
       className={`relative overflow-hidden ${proMode ? 'pro-fishing-stage rounded-none border-0' : 'rounded-2xl border border-white/10'}`}
@@ -763,7 +1317,12 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
     >
       <div
         className="absolute inset-0 transition-opacity duration-200"
-        style={{ backgroundImage: bgUrl ? `url(${bgUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center bottom', opacity: bgLoaded ? 1 : 0 }}
+        style={{
+          backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: `${bgPositionX} bottom`,
+          opacity: bgLoaded ? 1 : 0
+        }}
       ></div>
       <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/25 to-black/55"></div>
 
@@ -827,15 +1386,15 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             <path d="M10.1 20.2 6.4 18" fill="none" stroke="#f4ead6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M15.2 3.9 19 2.2" fill="none" stroke="#c8d8d4" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          {currentLureIcon && (
+          {(castReady || casting) && currentLureIcon && (
             <AssetImage
               src={currentLureIcon}
               alt=""
               className="absolute object-contain drop-shadow"
               onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }}
               style={{
-                left: rigCenterX - baitSize * 0.38,
-                top: rigLineHeight + hookSize * 0.16,
+                left: rigCenterX - baitSize * 0.42,
+                top: rigLineHeight + hookSize * 0.35 - baitSize * 0.45,
                 width: baitSize,
                 height: baitSize,
                 zIndex: 3
@@ -893,48 +1452,17 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
         </div>
       )}
 
-      {!proMode && <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe justify-center hidden md:flex">
-        {!casting ? (
-          castReady ? (
-            <button onClick={()=>onCast?.()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
-          ) : (
-            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
-              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
-            </div>
-          )
-        ) : tapping ? (
-          <TapChallengeButton
-            count={tapCount}
-            goal={tapGoal}
-            timeLeft={tapTimeLeft}
-            onTap={onTap}
-            className="w-full md:w-1/2"
-          />
-        ) : biting ? (
-          <button onClick={onHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
-        ) : (
-          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full md:w-1/2 rounded-2xl flex flex-col items-center justify-center gap-2`}>
-            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
-          </div>
-        )}
-      </div>}
-      {proMode && proMessage && (
+      {proMessage && (
         <div
           key={proMessage.id}
-          className="absolute left-1/2 pro-safe-bottom-center z-30 w-[min(86%,420px)] px-3 py-2 text-center text-sm font-semibold text-red-100 pointer-events-none pro-message-toast"
+          className={`absolute left-1/2 pro-safe-bottom-center z-30 w-[min(88%,460px)] px-3 py-2 text-center text-sm font-semibold pointer-events-none pro-message-toast ${proMessage.tone === 'error' ? 'text-red-100' : 'text-emerald-100'}`}
           aria-live="polite"
         >
-          {proMessage.text}
+          {(proMessage.lines || [proMessage.text]).map((line, index) => (
+            <div key={index}>{line}</div>
+          ))}
         </div>
       )}
-      <FishingOverlayToggle
-        label="Pro"
-        checked={!!proMode}
-        onClick={onToggleProMode}
-        className={`absolute ${proMode ? 'pro-safe-bottom-left' : 'bottom-3 left-3'}`}
-      />
       {me.autoFish && (
         <FishingOverlayToggle
           label={t('autoCast')}
@@ -948,7 +1476,7 @@ function FishingStage({ me, setMe, casting, biting, tapping, tapCount, tapGoal, 
             }
             setAutoCast(checked);
           }}
-          className={`absolute ${proMode ? 'pro-safe-bottom-right' : 'bottom-3 right-3'}`}
+          className="absolute pro-safe-bottom-right"
         />
       )}
     </div>
@@ -961,15 +1489,13 @@ function FishingTab({
   casting,
   biting,
   tapActive,
-  tapCount,
-  tapTimeLeft,
+  struggleIntensity,
   castReady,
   onCast,
   onHook,
   onTap,
   castSpot,
   proMode,
-  onToggleProMode,
   result,
   error,
   onClearError,
@@ -1032,16 +1558,13 @@ function FishingTab({
           casting={casting}
           biting={biting}
           tapping={tapActive}
-          tapCount={tapCount}
-          tapGoal={TAP_CHALLENGE_GOAL}
-          tapTimeLeft={tapTimeLeft}
+          struggleIntensity={struggleIntensity}
           castReady={castReady}
           onCast={handleCast}
           onHook={handleHook}
           onTap={onTap}
           castSpot={castSpot}
           proMode={proMode}
-          onToggleProMode={onToggleProMode}
           autoCast={autoCast}
           setAutoCast={setAutoCast}
           autoCastRef={autoCastRef}
@@ -1058,114 +1581,6 @@ function FishingTab({
           onOpenRods={onOpenRods}
         />
       </div>
-
-      {!proMode && <div className="md:hidden mt-3">
-        {!casting ? (
-          castReady ? (
-            <button onClick={()=>handleCast()} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-emerald-600 hover:bg-emerald-500 font-semibold shadow-lg`}>{t('castRod')}</button>
-          ) : (
-            <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
-              <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-              <div className="opacity-90 text-center px-2">{t('castCooldown')}</div>
-            </div>
-          )
-        ) : tapActive ? (
-          <TapChallengeButton
-            count={tapCount}
-            goal={TAP_CHALLENGE_GOAL}
-            timeLeft={tapTimeLeft}
-            onTap={onTap}
-            className="w-full"
-          />
-        ) : biting ? (
-          <button onClick={handleHook} className={`btn-lg ${ACTION_HEIGHT_CLASS} w-full bg-red-600 hover:bg-red-500 font-semibold shadow-lg`}>{t('hook')}</button>
-        ) : (
-          <div className={`glass ${ACTION_HEIGHT_CLASS} w-full rounded-2xl flex flex-col items-center justify-center gap-2`}>
-            <div className="h-6 w-6 rounded-full border-2 border-white/50 border-t-transparent animate-spin"></div>
-            <div className="opacity-90 text-center px-2">{t('waitingBite')}</div>
-          </div>
-        )}
-      </div>}
-
-      {!proMode && result && (
-        <button
-          type="button"
-          onClick={() => {
-            if (onCatchClick && result.id) {
-              onCatchClick({
-                ...result,
-                userId: result.userId ?? me.id,
-                user: result.user || me.username || t('you')
-              });
-            }
-          }}
-          className="mt-4 w-full text-left p-4 rounded-xl glass flex items-center gap-4"
-        >
-          <AssetImage src={FISH_IMG[result.fish]} alt={result.fish} className="w-16 h-16 object-contain" onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }} />
-          <div>
-            <div className="text-base">{t('catch')} {result.newFish && <span className="ml-1 text-yellow-300">{t('new')}</span>}</div>
-            <div className="text-lg font-bold mt-1"><span className={rarityColors[result.rarity] || ''}>{result.fish}</span> — {Number(result.weight).toFixed(2)} {t('kg')}</div>
-            <div className="text-xs opacity-70">{t('locationLabel')} {result.location}</div>
-            {typeof result.coins === 'number' && (
-              result.coins > 0
-                ? <div className="text-xs text-yellow-300">{t('coinsEarned', result.coins)}</div>
-                : <div className="text-xs opacity-70">{t('coinsCapReached')}</div>
-            )}
-            {result.newLocations && result.newLocations.map((n, i) => (
-              <div key={i} className="text-xs text-emerald-400">{t('newLocation')} {n}</div>
-            ))}
-            {result.newRods && result.newRods.length > 0 && (
-              <div className="text-xs text-emerald-400">{(result.newRods.length > 1 ? t('newRodPlural') : t('newRod'))} {result.newRods.join(', ')}</div>
-            )}
-            {Array.isArray(result.achievements) && result.achievements.map((a, i) => (
-              <div key={`ach-${i}`} className="text-xs text-amber-300">
-                {t('achievementUnlockedLine', { name: a.name || a.code, level: a.levelLabel || a.newLevelIndex })}
-              </div>
-            ))}
-            {Array.isArray(result.questUpdates) && result.questUpdates.map((q, i) => (
-              <div key={`quest-${i}`} className="text-xs text-emerald-300">
-                {t('questCompletedLine', { name: q.name || q.code, coins: q.rewardCoins || 0 })}
-              </div>
-            ))}
-          </div>
-        </button>
-      )}
-      {!proMode && error && <div className="mt-3 text-sm text-red-300">{error}</div>}
-
-      {!proMode && <div className="mt-6">
-        <div className="text-sm opacity-80 mb-2">{t('recentCatches')}</div>
-        {(me.recent || []).length === 0 ? (
-          <div className="text-sm opacity-60">{t('emptyCatches')}</div>
-        ) : (
-          <div className="space-y-2">
-            {me.recent.map((c, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => {
-                  if (onCatchClick && c.id) {
-                    onCatchClick({
-                      ...c,
-                      userId: c.userId ?? me.id,
-                      user: c.user || me.username || t('you')
-                    });
-                  }
-                }}
-                className="w-full p-3 rounded--xl border border-white/10 flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <AssetImage src={FISH_IMG[c.fish]} alt={c.fish} className="w-12 h-12 object-contain" onError={e => { if (e?.currentTarget) e.currentTarget.style.display = 'none'; }} />
-                  <div>
-                    <div className={`font-medium ${rarityColors[c.rarity] || ''}`}>{c.fish}</div>
-                    <div className="text-xs opacity-70">{c.location} — {new Date(c.at).toLocaleString()}</div>
-                  </div>
-                </div>
-                <div className="text-emerald-300 font-semibold">{Number(c.weight).toFixed(2)} {t('kg')}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>}
     </>
   );
 }

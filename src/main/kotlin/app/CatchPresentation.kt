@@ -6,6 +6,7 @@ import java.awt.GradientPaint
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -382,6 +383,26 @@ private fun fitFont(g2d: java.awt.Graphics2D, text: String, baseFont: Font, maxW
     return font
 }
 
+private fun drawCoverBackground(g2d: java.awt.Graphics2D, bgImage: BufferedImage, size: Int) {
+    val scale = max(size.toDouble() / bgImage.width, size.toDouble() / bgImage.height)
+    val newWidth = (bgImage.width * scale).roundToInt()
+    val newHeight = (bgImage.height * scale).roundToInt()
+    val offsetX = ((size - newWidth) / 2.0).roundToInt()
+    val offsetY = ((size - newHeight) / 2.0).roundToInt()
+    g2d.drawImage(
+        bgImage,
+        offsetX,
+        offsetY,
+        offsetX + newWidth,
+        offsetY + newHeight,
+        0,
+        0,
+        bgImage.width,
+        bgImage.height,
+        null,
+    )
+}
+
 fun generateCatchImage(
     fishInternalName: String,
     locationInternalName: String,
@@ -392,6 +413,7 @@ fun generateCatchImage(
     lang: String,
     anglerName: String? = null,
     caughtAt: Instant? = null,
+    locationBackgroundFile: File? = null,
 ): ByteArray? {
     val path = FISH_IMAGE_PATHS[fishInternalName] ?: return null
     val classLoader = Thread.currentThread().contextClassLoader
@@ -406,29 +428,18 @@ fun generateCatchImage(
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-        val backgroundPath = LOCATION_BACKGROUNDS[locationInternalName]
-            ?: displayLocationName?.let { LOCATION_BACKGROUNDS[it] }
-        backgroundPath?.let { bgPath ->
-            classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
-                val bgImage = ImageIO.read(bgStream)
-                if (bgImage != null) {
-                    val scale = max(size.toDouble() / bgImage.width, size.toDouble() / bgImage.height)
-                    val newWidth = (bgImage.width * scale).roundToInt()
-                    val newHeight = (bgImage.height * scale).roundToInt()
-                    val offsetX = ((size - newWidth) / 2.0).roundToInt()
-                    val offsetY = ((size - newHeight) / 2.0).roundToInt()
-                    g2d.drawImage(
-                        bgImage,
-                        offsetX,
-                        offsetY,
-                        offsetX + newWidth,
-                        offsetY + newHeight,
-                        0,
-                        0,
-                        bgImage.width,
-                        bgImage.height,
-                        null,
-                    )
+        val eventBackground = locationBackgroundFile
+            ?.takeIf { it.isFile }
+            ?.let { runCatching { ImageIO.read(it) }.getOrNull() }
+        if (eventBackground != null) {
+            drawCoverBackground(g2d, eventBackground, size)
+        } else {
+            val backgroundPath = LOCATION_BACKGROUNDS[locationInternalName]
+                ?: displayLocationName?.let { LOCATION_BACKGROUNDS[it] }
+            backgroundPath?.let { bgPath ->
+                classLoader.getResourceAsStream(bgPath)?.use { bgStream ->
+                    val bgImage = ImageIO.read(bgStream)
+                    if (bgImage != null) drawCoverBackground(g2d, bgImage, size)
                 }
             }
         }

@@ -256,6 +256,8 @@ fun AddServerDialog(
 fun DashboardScreen(
     serverName: String,
     onNavigateToTournaments: () -> Unit,
+    onNavigateToEvents: () -> Unit,
+    onNavigateToCastZones: () -> Unit,
     onNavigateToDiscounts: () -> Unit,
     onNavigateToBroadcast: () -> Unit,
     onSwitchServer: () -> Unit,
@@ -295,6 +297,8 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 DashboardCard("Tournaments", "Manage game tournaments", onNavigateToTournaments)
+                DashboardCard("Events", "Manage special club events", onNavigateToEvents)
+                DashboardCard("Cast Zones", "Edit castable areas for locations", onNavigateToCastZones)
                 DashboardCard("Discounts", "Manage shop discounts", onNavigateToDiscounts)
                 DashboardCard("Broadcast", "Send messages to users", onNavigateToBroadcast)
             }

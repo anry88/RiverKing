@@ -2,6 +2,7 @@ package app
 
 import io.ktor.server.application.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
 import service.*
 import java.time.*
 import kotlin.coroutines.coroutineContext
@@ -16,7 +17,8 @@ object Scheduler {
         val tournaments = TournamentService()
         val ratingPrizes = RatingPrizeService()
         val clubs = ClubService()
-        val prizeService = PrizeService(tournaments, ratingPrizes, clubs)
+        val events = SpecialEventService()
+        val prizeService = PrizeService(tournaments, ratingPrizes, clubs, events)
 
         val env = Env.fromConfig()
         val bot = TelegramBot(env.botToken)
@@ -140,13 +142,17 @@ object Scheduler {
     }
 
     private suspend fun runPrizeReminders(notifications: NotificationService, fishing: FishingService) {
+        var regularPrizeUsers = emptySet<Long>()
         val userIds = transaction {
             val fromPrizes = UserPrizes.slice(UserPrizes.userId).select { UserPrizes.claimed eq false }.map { it[UserPrizes.userId].value }
             val fromRating = RatingPrizes.slice(RatingPrizes.userId).select { RatingPrizes.claimed eq false }.map { it[RatingPrizes.userId].value }
             val fromReferral = ReferralRewards.slice(ReferralRewards.userId).select { ReferralRewards.claimed eq false }.map { it[ReferralRewards.userId].value }
             val fromClubs = ClubWeeklyRewards.slice(ClubWeeklyRewards.userId).select { ClubWeeklyRewards.claimed eq false }.map { it[ClubWeeklyRewards.userId].value }
+            val fromEvents = SpecialEventPrizes.slice(SpecialEventPrizes.userId).select { SpecialEventPrizes.claimed eq false }.map { it[SpecialEventPrizes.userId].value }
+            val fromAchievements = AchievementProgress.slice(AchievementProgress.userId).select { AchievementProgress.level greater AchievementProgress.claimedLevel }.map { it[AchievementProgress.userId].value }
             
-            (fromPrizes + fromRating + fromReferral + fromClubs).distinct()
+            regularPrizeUsers = (fromPrizes + fromRating + fromReferral + fromClubs + fromEvents).toSet()
+            (regularPrizeUsers + fromAchievements).distinct()
         }
 
         for (uid in userIds) {
@@ -160,9 +166,23 @@ object Scheduler {
             val lang = user[Users.language]
 
             val text = service.I18n.text("🎁 У тебя есть неполученные призы! Давай скорее их заберем.", lang)
-            val btnText = service.I18n.text("🎁 Мои призы", lang)
+            
+            val achievements = AchievementService.list(uid, lang).filter { it.claimable }
+            val buttons = mutableListOf<List<app.InlineKeyboardButton>>()
+            
+            if (uid in regularPrizeUsers) {
+                val btnText = service.I18n.text("🎁 Мои призы", lang)
+                buttons.add(listOf(app.InlineKeyboardButton(btnText, "/prizes")))
+            }
+            
+            achievements.forEach { ach ->
+                val label = "🎁 ${ach.name}"
+                buttons.add(listOf(app.InlineKeyboardButton(label, "/achvclaim $uid:${ach.code}")))
+            }
+            
+            val markup = kotlinx.serialization.json.Json.encodeToString(app.InlineKeyboardMarkup(buttons))
 
-            notifications.sendNotification(uid, tgId, text, btnText, "/prizes")
+            notifications.sendNotification(uid, tgId, text, markup = markup)
             delay(100)
         }
     }
