@@ -333,7 +333,7 @@ fun Application.botRoutes(env: Env) {
                         name = "event",
                         ruDescription = "Таблицы текущего клубного события",
                         enDescription = "View the current club event leaderboards",
-                        assetName = "tournament.png"
+                        assetName = "event.png"
                     ) { _, _ -> "/event" },
                     InlineCommandInfo(
                         name = "daily_rating",
