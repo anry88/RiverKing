@@ -8,7 +8,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 
 - Delivers an always-on immersive fishing scene in the Telegram Mini App and Android, with cast, hook, revealed hooked fish, and dynamic tap-to-land challenges.
 - Tracks progression across locations, rods, lures, fish discovery, achievements, quests, tournaments, and clubs.
-- Adds special club events in the Telegram Mini App and Android client: temporary event locations, club total-weight/count leaderboards, personal top-fish leaderboards, and event prize delivery.
+- Adds special club events in the Telegram Mini App and Android client: temporary event locations, club total-weight/count leaderboards, personal top-fish leaderboards, event prize delivery, and bot-visible active event standings.
 - Ships daily and weekly personal quests plus weekly club quests with pooled progress and split coin rewards for current club members.
 - Club screens in the Telegram Mini App and Android client now switch between weekly contribution ratings, weekly club quests, and a shared club chat feed, with per-member contribution views for each active club quest.
 - Connects the game backend to Telegram bot commands, referral flows, Stars payments, coin purchases, auto-casting, and operational metrics.

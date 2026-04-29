@@ -12,7 +12,7 @@ The shipped product includes:
 - provider-neutral account storage with Telegram identities, mobile password credentials, mobile refresh sessions, and shared player IDs
 - always-on immersive fishing flow with cast, hook, hooked-fish reveal, dynamic tap challenge, reaction timing, and catch presentation
 - progression through locations, rods, lure inventory, and fish discovery
-- regular tournaments plus special club events with temporary locations, club leaderboards, personal top-fish competition, and prize distribution
+- regular tournaments plus special club events with temporary locations, club leaderboards, personal top-fish competition, prize distribution, and bot-visible active event standings
 - daily rewards, daily and weekly quests, weekly club quests, achievements, and daily ratings
 - fishing clubs with recruiting, roles, weekly contribution tracking, shared weekly quests, special-event competition, and chat feed
 - referral links and referral rewards

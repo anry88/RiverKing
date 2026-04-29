@@ -43,6 +43,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.13.1")
     implementation("de.mkammerer:argon2-jvm:2.12")
     implementation("com.google.api-client:google-api-client:2.7.0")
     implementation("com.google.http-client:google-http-client-gson:1.45.0")
