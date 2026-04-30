@@ -6279,8 +6279,12 @@ private fun storeReferralLink(token: String, webFallbackLink: String): String {
         "${BuildConfig.PLAY_STORE_URL}$separator" +
             "referrer=${Uri.encode("ref=$token")}"
     } else {
-        BuildConfig.ITCH_PROJECT_URL.takeIf { it.isNotBlank() }
-            ?: webFallbackLink.ifBlank { BuildConfig.SUPPORT_URL }
+        val base = webFallbackLink.ifBlank { BuildConfig.SUPPORT_URL }
+        if (base.contains("://")) {
+            "${base.trimEnd('/')}/ref?token=$token"
+        } else {
+            BuildConfig.ITCH_PROJECT_URL.takeIf { it.isNotBlank() } ?: base
+        }
     }
 }
 
