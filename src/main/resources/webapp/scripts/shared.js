@@ -875,6 +875,13 @@
       3: '/app/assets/achievements/tournament_winner_gold.png',
       4: '/app/assets/achievements/tournament_winner_platinum.png',
     },
+    event_laureate: {
+      0: '/app/assets/achievements/event_laureate_grey.png',
+      1: '/app/assets/achievements/event_laureate_bronze.png',
+      2: '/app/assets/achievements/event_laureate_silver.png',
+      3: '/app/assets/achievements/event_laureate_gold.png',
+      4: '/app/assets/achievements/event_laureate_platinum.png',
+    },
     daily_rating_star: {
       0: '/app/assets/achievements/daily_rating_star_grey.png',
       1: '/app/assets/achievements/daily_rating_star_bronze.png',

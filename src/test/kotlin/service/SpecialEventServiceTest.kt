@@ -238,6 +238,19 @@ class SpecialEventServiceTest {
             prizes.filter { it.first == teammateId }.map { it.second.second }.sortedDescending(),
         )
         assertEquals(5, prizes.size, "Prize distribution must be idempotent.")
+
+        val winnerAchievement = AchievementService.list(winnerId, "ru")
+            .single { it.code == "event_laureate" }
+        val winnerAchievementEn = AchievementService.list(winnerId, "en")
+            .single { it.code == "event_laureate" }
+        val teammateAchievement = AchievementService.list(teammateId, "ru")
+            .single { it.code == "event_laureate" }
+        assertEquals("Призёр событий", winnerAchievement.name)
+        assertEquals("Event Laureate", winnerAchievementEn.name)
+        assertEquals(1.0, winnerAchievement.progress, "Multiple event prize categories must count as one event.")
+        assertEquals(1.0, teammateAchievement.progress, "Club prize categories from one event must count as one event.")
+        assertEquals(1, winnerAchievement.levelIndex)
+        assertEquals(3, winnerAchievement.target)
     }
 
     private fun createActiveEvent(events: SpecialEventService): Long {
