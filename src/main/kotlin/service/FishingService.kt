@@ -62,7 +62,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         private const val BEGINNER_CATCH_THRESHOLD = 6
         private const val MIN_CHALLENGE_TAPS = 3
         private const val MAX_CHALLENGE_TAPS = 22
-        private val CASTING_STALE_AFTER: Duration = Duration.ofMinutes(3)
+        private val CASTING_STALE_AFTER: Duration = Duration.ofMinutes(1)
 
         internal fun rarityTapCount(rarity: String): Int = when (rarity) {
             "common" -> 2
