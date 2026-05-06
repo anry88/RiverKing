@@ -131,10 +131,14 @@ function Guide({
       </div>
       {section==='locations' && (
         <div className="space-y-4">
-          <div className="glass rounded-xl p-1 flex gap-1">
-            <button onClick={()=>setLocationKind('regular')} className={`flex-1 py-2 rounded-lg ${locationKind==='regular'?'bg-emerald-600':'hover:bg-white/5'}`}>{t('regular')}</button>
-            <button onClick={()=>setLocationKind('special')} className={`flex-1 py-2 rounded-lg ${locationKind==='special'?'bg-emerald-600':'hover:bg-white/5'}`}>{t('special')}</button>
-          </div>
+          <SegmentedControl
+            value={locationKind}
+            onChange={setLocationKind}
+            items={[
+              {value:'regular', label:t('regular')},
+              {value:'special', label:t('special')},
+            ]}
+          />
           {(locationKind==='regular' ? data.locations : eventLocations).map(loc=>{
             const myLoc = me.locations.find(l=>l.id===loc.id) || {};
             const isEvent = loc.isEvent === true || locationKind==='special';

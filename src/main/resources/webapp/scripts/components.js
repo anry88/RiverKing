@@ -570,6 +570,28 @@ function DailyModal({streak,available,rewards,onClose,onClaim}){
   );
 }
 
+function SegmentedControl({items, value, onChange, className = ''}){
+  return (
+    <div className={`flex gap-1 rounded-xl glass p-1 text-sm ${className}`}>
+      {items.map(item => {
+        const selected = item.value === value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={()=>onChange?.(item.value)}
+            className={`flex-1 min-w-0 rounded-lg px-2 py-2 font-semibold transition whitespace-nowrap overflow-hidden text-ellipsis ${
+              selected ? (item.activeClass || 'bg-emerald-600 text-white') : 'text-white/70 hover:bg-white/10'
+            }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   const CLUB_CREATE_COST = 1000;
   const CLUB_MIN_WEIGHT = 1000;
@@ -615,11 +637,6 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   const [settingsSaving, setSettingsSaving] = React.useState(false);
   const [settingsError, setSettingsError] = React.useState(null);
   const coinLocale = (typeof document!=='undefined' && document.documentElement.lang==='en') ? 'en-US' : 'ru-RU';
-  const shopPacks = React.useMemo(
-    () => Array.isArray(shop) ? shop.reduce((acc, category) => acc.concat(Array.isArray(category?.packs) ? category.packs : []), []) : [],
-    [shop]
-  );
-
   const roleLabel = React.useCallback(role => {
     if(role === 'president') return t('clubRolePresident');
     if(role === 'heir') return t('clubRoleHeir');
@@ -637,21 +654,6 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
   }, []);
 
   const canCreate = (me?.totalWeight || 0) >= CLUB_MIN_WEIGHT;
-  const formatEventPrize = React.useCallback((prize) => {
-    if(!prize) return null;
-    const isCoins = prize.packageId === 'coins' || typeof prize.coins === 'number';
-    if(isCoins){
-      const amount = Number(prize.coins ?? prize.qty);
-      if(!Number.isFinite(amount) || amount <= 0) return null;
-      return `🪙 +${amount.toLocaleString(coinLocale)}`;
-    }
-    const packageId = prize.packageId;
-    if(!packageId) return null;
-    const pack = shopPacks.find(item => item.id === packageId);
-    const label = pack?.name || (packageId === 'autofish_week' ? t('autofishWeek') : packageId);
-    const qty = Math.max(1, Number(prize.qty) || 1);
-    return qty > 1 ? `${label} x${qty}` : label;
-  }, [coinLocale, shopPacks]);
 
   const resetState = React.useCallback(() => {
     setMode('hub');
@@ -1016,29 +1018,32 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
     const formatter = new Intl.DateTimeFormat(coinLocale, { day:'2-digit', month:'2-digit' });
     return `${formatter.format(start)}–${formatter.format(end)}`;
   };
-  const renderClubEventRows = (title, rows, mine, mode) => {
+  const renderClubMemberEventRows = (title, rows, mode) => {
     const list = Array.isArray(rows) ? rows : [];
-    const mineOutside = mine && !list.some(row => Number(row.rank) === Number(mine.rank));
-    const renderRow = (row, mineRow = false) => {
-      const prizeLabel = formatEventPrize(row.prize);
+    const renderRow = row => {
+      const isTopFish = mode === 'fish';
+      const hasFish = isTopFish && row.fish && Number(row.weight || 0) > 0;
+      const discovered = hasFish && ((me.caughtFishIds||[]).includes(row.fishId) || Number(row.userId) === Number(me.id));
       return (
-        <div key={`${title}:${row.rank}:${mineRow ? 'mine' : 'row'}`} className={`p-2 rounded-xl border ${mineRow ? 'border-emerald-400' : 'border-white/10'}`}>
+        <div key={`${title}:${row.rank}:${row.userId}`} className={`p-2 rounded-xl border ${Number(row.userId) === Number(me.id) ? 'border-emerald-400' : 'border-white/10'}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="font-semibold text-sm truncate">
-                {row.rank} {mode === 'fish' ? (row.user || t('you')) : row.club}
+                {row.rank} <bdi>{row.user || t('you')}</bdi>
               </div>
-              {mode === 'fish' && (
+              <div className="text-xs opacity-70 truncate">{roleLabel(row.role)}</div>
+              {isTopFish && (
                 <div className="text-xs opacity-70 truncate">
-                  {row.fish} · {Number(row.weight || 0).toFixed(2)} {t('kg')}
+                  {hasFish ? `${discovered ? row.fish : '???'} · ${Number(row.weight || 0).toFixed(2)} ${t('kg')}` : t('noData')}
                 </div>
-              )}
-              {prizeLabel && (
-                <div className="mt-1 text-xs text-amber-300 truncate">{prizeLabel}</div>
               )}
             </div>
             <div className="text-sm text-emerald-300 shrink-0">
-              {mode === 'count' ? Number(row.value || 0).toFixed(0) : `${Number(row.value || 0).toFixed(2)} ${t('kg')}`}
+              {isTopFish && !hasFish
+                ? '—'
+                : mode === 'count'
+                  ? Number(row.value || 0).toFixed(0)
+                  : `${Number(row.value || 0).toFixed(2)} ${t('kg')}`}
             </div>
           </div>
         </div>
@@ -1047,8 +1052,7 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
     return (
       <div className="space-y-2">
         <div className="text-xs font-semibold opacity-80">{title}</div>
-        {list.length === 0 ? <div className="text-sm opacity-70">{t('noData')}</div> : list.map(row => renderRow(row, mine && Number(row.rank) === Number(mine.rank)))}
-        {mineOutside && renderRow(mine, true)}
+        {list.length === 0 ? <div className="text-sm opacity-70">{t('noData')}</div> : list.map(row => renderRow(row))}
       </div>
     );
   };
@@ -1419,35 +1423,23 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
             )}
           </div>
 
-          <div className="flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={()=>setClubView('ratings')}
-              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='ratings' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('ratings')}</button>
-            <button
-              type="button"
-              onClick={()=>setClubView('tournament')}
-              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='tournament' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('clubTournament')}</button>
-            <button
-              type="button"
-              onClick={()=>setClubView('quests')}
-              className={`flex-1 min-w-0 px-2 py-2 rounded-xl text-sm whitespace-nowrap overflow-hidden text-ellipsis ${clubView==='quests' ? 'bg-emerald-600' : 'glass'}`}
-            >{t('quests')}</button>
-          </div>
-          <div className="flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={()=>setClubTab('current')}
-              className={`flex-1 py-2 rounded-xl ${clubTab==='current' ? 'bg-emerald-600' : 'glass'}`}
-            >{clubView === 'tournament' ? t('current') : t('clubCurrentWeek')}</button>
-            <button
-              type="button"
-              onClick={()=>setClubTab('previous')}
-              className={`flex-1 py-2 rounded-xl ${clubTab==='previous' ? 'bg-emerald-600' : 'glass'}`}
-            >{clubView === 'tournament' ? t('previous') : t('clubPreviousWeek')}</button>
-          </div>
+          <SegmentedControl
+            value={clubView}
+            onChange={setClubView}
+            items={[
+              {value:'ratings', label:t('ratings')},
+              {value:'tournament', label:t('clubTournament')},
+              {value:'quests', label:t('quests')},
+            ]}
+          />
+          <SegmentedControl
+            value={clubTab}
+            onChange={setClubTab}
+            items={[
+              {value:'current', label:clubView === 'tournament' ? t('current') : t('clubCurrentWeek')},
+              {value:'previous', label:clubView === 'tournament' ? t('previous') : t('clubPreviousWeek')},
+            ]}
+          />
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             <div className="text-xs opacity-70">
               {clubView === 'tournament'
@@ -1515,39 +1507,31 @@ function ClubScreen({active,onClose,me,onReloadProfile,shop=[]}){
                     <div className="font-semibold">{clubEventData.event.name}</div>
                     <div className="text-xs opacity-70">{t('specialEvent')}</div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-xs opacity-70">{t('eventLeaderboard')}</div>
-                    <select
-                      value={selectedEventBoardKey}
-                      onChange={e=>setSelectedEventBoardKey(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-black/20 border border-white/10"
-                    >
-                      <option value="weight">{t('eventTotalWeight')}</option>
-                      <option value="count">{t('eventTotalCount')}</option>
-                      <option value="fish">{t('eventTopFish')}</option>
-                    </select>
-                  </div>
+                  <SegmentedControl
+                    value={selectedEventBoardKey}
+                    onChange={setSelectedEventBoardKey}
+                    items={[
+                      {value:'weight', label:t('clubEventTotalWeight')},
+                      {value:'count', label:t('clubEventTotalCount')},
+                      {value:'fish', label:t('clubEventTopFish')},
+                    ]}
+                  />
                   {selectedEventBoardKey === 'count'
-                    ? renderClubEventRows(t('eventTotalCount'), clubEventData.leaderboards?.totalCount, clubEventData.leaderboards?.mineTotalCount, 'count')
+                    ? renderClubMemberEventRows(t('clubEventTotalCount'), clubEventData.clubMembers?.totalCount, 'count')
                     : selectedEventBoardKey === 'fish'
-                      ? renderClubEventRows(t('eventTopFish'), clubEventData.leaderboards?.personalFish, clubEventData.leaderboards?.minePersonalFish, 'fish')
-                      : renderClubEventRows(t('eventTotalWeight'), clubEventData.leaderboards?.totalWeight, clubEventData.leaderboards?.mineTotalWeight, 'weight')}
+                      ? renderClubMemberEventRows(t('clubEventTopFish'), clubEventData.clubMembers?.topFish, 'fish')
+                      : renderClubMemberEventRows(t('clubEventTotalWeight'), clubEventData.clubMembers?.totalWeight, 'weight')}
                 </>
               )
             ) : !questList.length ? (
               <div className="text-sm opacity-70">{t('noData')}</div>
             ) : (
               <>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {questList.map(quest => (
-                    <button
-                      key={quest.code}
-                      type="button"
-                      onClick={()=>setSelectedQuestCode(quest.code)}
-                      className={`px-3 py-2 rounded-xl whitespace-nowrap ${selectedQuest?.code===quest.code ? 'bg-emerald-600' : 'glass'}`}
-                    >{quest.name}</button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  value={selectedQuest?.code || ''}
+                  onChange={setSelectedQuestCode}
+                  items={questList.map(quest => ({value:quest.code, label:quest.name}))}
+                />
                 {selectedQuest && (
                   <>
                     <div className={`p-3 rounded-xl border ${selectedQuest.completed ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-white/10'}`}>

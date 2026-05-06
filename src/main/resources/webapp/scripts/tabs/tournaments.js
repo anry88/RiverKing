@@ -207,26 +207,26 @@ function TournamentsTab({
 
   return (
     <div className="mt-6 pb-safe">
-      <div className="flex mb-3 p-1 rounded-xl glass gap-1">
-        <button
-          onClick={()=>setTournamentKind?.('regular')}
-          className={`flex-1 py-2 rounded-lg ${tournamentKind==='regular'?'bg-emerald-600':'hover:bg-white/5'}`}
-        >
-          {t('regular')}
-        </button>
-        <button
-          onClick={()=>setTournamentKind?.('special')}
-          className={`flex-1 py-2 rounded-lg ${tournamentKind==='special'?'bg-emerald-600':'hover:bg-white/5'}`}
-        >
-          {t('special')}
-        </button>
-      </div>
+      <SegmentedControl
+        className="mb-3"
+        value={tournamentKind}
+        onChange={setTournamentKind}
+        items={[
+          {value:'regular', label:t('regular')},
+          {value:'special', label:t('special')},
+        ]}
+      />
       {tournamentKind === 'special' ? (
         <div>
-          <div className="flex mb-4">
-            <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${specialPeriod==='past'?'text-emerald-400':''}`}>{t('previous')}</button>
-            <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${specialPeriod==='current'?'text-emerald-400':''}`}>{t('current')}</button>
-          </div>
+          <SegmentedControl
+            className="mb-4"
+            value={specialPeriod}
+            onChange={setTournamentTab}
+            items={[
+              {value:'past', label:t('previous')},
+              {value:'current', label:t('current')},
+            ]}
+          />
           {selectedEvent ? (
             <div className="space-y-4">
               <div className="overflow-hidden rounded-xl glass text-left">
@@ -264,11 +264,16 @@ function TournamentsTab({
         </div>
       ) : (
       <>
-      <div className="flex mb-4">
-        <button onClick={()=>setTournamentTab('past')} className={`flex-1 py-2 ${tournamentTab==='past'?'text-emerald-400':''}`}>{t('past')}</button>
-        <button onClick={()=>setTournamentTab('current')} className={`flex-1 py-2 ${tournamentTab==='current'?'text-emerald-400':''}`}>{t('current')}</button>
-        <button onClick={()=>setTournamentTab('upcoming')} className={`flex-1 py-2 ${tournamentTab==='upcoming'?'text-emerald-400':''}`}>{t('upcoming')}</button>
-      </div>
+      <SegmentedControl
+        className="mb-4"
+        value={tournamentTab}
+        onChange={setTournamentTab}
+        items={[
+          {value:'past', label:t('past')},
+          {value:'current', label:t('current')},
+          {value:'upcoming', label:t('upcoming')},
+        ]}
+      />
       {tournamentTab==='current' ? (
         currentTournament ? (
           (

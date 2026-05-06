@@ -140,6 +140,37 @@ class SpecialEventServiceTest {
     }
 
     @Test
+    fun leaderboardIncludesCurrentClubMemberProgress() {
+        DB.init(testEnv("special-event-member-progress"))
+        val fishing = FishingService()
+        val events = SpecialEventService()
+        val eventId = createActiveEvent(events)
+        val locationId = events.eventLocationId(eventId) ?: error("event location missing")
+        val captainId = fishing.ensureUserByTgId(11_001L, username = "captain")
+        val memberId = fishing.ensureUserByTgId(11_002L, username = "member")
+        val idleId = fishing.ensureUserByTgId(11_003L, username = "idle")
+        val clubId = createClub(captainId, "Members")
+        addMember(memberId, clubId)
+        addMember(idleId, clubId, role = ClubService.ROLE_HEIR)
+        val caughtAt = Instant.parse("2026-04-01T12:00:00Z")
+
+        recordEventCatch(events, captainId, locationId, "Плотва", 5.5, caughtAt)
+        recordEventCatch(events, memberId, locationId, "Карась", 2.0, caughtAt.plusSeconds(10))
+        recordEventCatch(events, memberId, locationId, "Щука", 1.0, caughtAt.plusSeconds(20))
+
+        val members = events.leaderboard(eventId, captainId)?.clubMembers ?: error("club members missing")
+        assertEquals(listOf(captainId, memberId, idleId), members.totalWeight.map { it.userId })
+        assertEquals(5.5, members.totalWeight[0].value, 0.000001)
+        assertEquals(3.0, members.totalWeight[1].value, 0.000001)
+        assertEquals(0.0, members.totalWeight[2].value, 0.000001)
+        assertEquals(2.0, members.totalCount.first { it.userId == memberId }.value, 0.000001)
+        assertEquals(memberId, members.topFish.first().userId)
+        assertEquals("Щука", members.topFish.first().fish)
+        assertEquals(idleId, members.topFish.last().userId)
+        assertNull(members.topFish.last().fish)
+    }
+
+    @Test
     fun leavingClubSubtractsActiveProgressButKeepsPersonalTopFish() {
         DB.init(testEnv("special-event-leave"))
         val fishing = FishingService()
