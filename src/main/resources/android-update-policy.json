@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 4,
-  "latestVersionName": "0.4.0",
+  "latestVersionCode": 5,
+  "latestVersionName": "0.4.1",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Mandatory update: special club events add temporary event locations, club leaderboards, and event prizes.",
-      "Tournaments now have Regular and Special sections, and club screens include a Tournament tab for current and previous events."
+      "Club event screens now show member progress by total weight, fish count, and top fish.",
+      "Tournament and club switches now use the standard segmented controls."
     ],
     "ru": [
-      "Обязательное обновление: специальные клубные события добавляют временные локации, клубные рейтинги и event-награды.",
-      "В турнирах появились разделы Регулярные и Специальные, а в клубах добавлена вкладка Турнир для текущих и прошлых событий."
+      "Клубные события теперь показывают прогресс игроков по суммарному весу, количеству рыб и топ-рыбе.",
+      "Переключатели турниров и клуба приведены к стандартному segmented-виду."
     ]
   }
 }

@@ -334,13 +334,13 @@ class AuthRoutesTest {
         val directBody = json.decodeFromString<UpdateResponse>(directUpdate.bodyAsText())
         assertEquals(AndroidUpdateService.STATUS_UPDATE_REQUIRED, directBody.status)
         assertEquals(true, directBody.mandatory)
-        assertEquals(4, directBody.latestVersionCode)
-        assertEquals("0.4.0", directBody.latestVersionName)
+        assertEquals(5, directBody.latestVersionCode)
+        assertEquals("0.4.1", directBody.latestVersionName)
         assertEquals(4, directBody.minSupportedVersionCode)
         assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
         assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
         assertEquals("https://itch.example/riverking", directBody.fallbackUrl)
-        assertEquals(true, directBody.releaseNotes.any { it.contains("обнов", ignoreCase = true) })
+        assertEquals(true, directBody.releaseNotes.any { it.contains("клуб", ignoreCase = true) })
 
         val playUpdate = client.get("/api/mobile/update") {
             androidClientHeaders(versionCode = 0, channel = AndroidUpdateService.CHANNEL_PLAY)
@@ -423,6 +423,7 @@ class AuthRoutesTest {
         assertEquals(HttpStatusCode.OK, withoutClub.status)
         val withoutClubBody = json.parseToJsonElement(withoutClub.bodyAsText()).jsonObject
         val lockedEventLocation = withoutClubBody.getValue("locations").jsonArray.first().jsonObject
+        val selectedRegularLocationId = withoutClubBody.getValue("locationId").jsonPrimitive.content.toLong()
         assertEquals(eventId, lockedEventLocation.getValue("eventId").jsonPrimitive.content.toLong())
         assertEquals(true, lockedEventLocation.getValue("isEvent").jsonPrimitive.boolean)
         assertEquals(false, lockedEventLocation.getValue("unlocked").jsonPrimitive.boolean)
@@ -443,10 +444,7 @@ class AuthRoutesTest {
         assertEquals(eventId, unlockedEventLocation.getValue("eventId").jsonPrimitive.content.toLong())
         assertEquals(true, unlockedEventLocation.getValue("isEvent").jsonPrimitive.boolean)
         assertEquals(true, unlockedEventLocation.getValue("unlocked").jsonPrimitive.boolean)
-        assertEquals(
-            unlockedEventLocation.getValue("id").jsonPrimitive.content.toLong(),
-            withClubBody.getValue("locationId").jsonPrimitive.content.toLong(),
-        )
+        assertEquals(selectedRegularLocationId, withClubBody.getValue("locationId").jsonPrimitive.content.toLong())
 
         val eventGuide = client.get("/api/guide/event-locations?limit=10&offset=0") {
             bearerAuth(registered.accessToken)
@@ -731,8 +729,8 @@ class AuthRoutesTest {
     }
 
     private fun HttpRequestBuilder.androidClientHeaders(
-        versionCode: Int = 4,
-        versionName: String = "0.4.0",
+        versionCode: Int = 5,
+        versionName: String = "0.4.1",
         channel: String = AndroidUpdateService.CHANNEL_DIRECT,
     ) {
         header(AndroidUpdateService.HEADER_PLATFORM, AndroidUpdateService.PLATFORM_ANDROID)
