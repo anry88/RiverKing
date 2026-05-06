@@ -603,6 +603,39 @@ class AuthRoutesTest {
     }
 
     @Test
+    fun `profile reload during active cast does not clear cast`() = testApplication {
+        val env = testEnv("active-cast-profile-reload").copy(
+            botToken = "test-bot-token",
+            botName = "river_king_bot",
+            devMode = false,
+        )
+        application { installAuthTestModule(env) }
+        val registered = registerPasswordUser(client, "angler.active.cast", "password123")
+
+        val start = client.post("/api/start-cast") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, start.status)
+
+        val profile = client.get("/api/me") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+        }
+        assertEquals(HttpStatusCode.OK, profile.status)
+
+        val hook = client.post("/api/hook") {
+            bearerAuth(registered.accessToken)
+            androidClientHeaders()
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"wait":10,"reaction":5.0}""")
+        }
+        assertEquals(HttpStatusCode.OK, hook.status)
+        val hookBody = json.parseToJsonElement(hook.bodyAsText()).jsonObject
+        assertEquals(false, hookBody.getValue("success").jsonPrimitive.boolean)
+    }
+
+    @Test
     fun `quests api includes club section for members and non members`() = testApplication {
         val env = testEnv("quests-api-club-section").copy(
             botToken = "test-bot-token",

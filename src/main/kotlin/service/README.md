@@ -6,7 +6,7 @@ Services encapsulate business logic and database access through Exposed. Below a
 Manages the player lifecycle and fishing process.
 - **Initialization and profile:** `createUser`, `ensureUserById`, and `ensureUserByTgId` manage shared player records; `setNickname`, `setLanguage`, `userLanguage`, and `displayName` update profile data.
 - **Inventory:** `listLures` and `listRods` return available lures and rods; `currentLureId`/`currentRodId` are read/updated inside `startCast` and `buyPackage`.
-- **Fishing:** `startCast`, `hook`, `catch` manage the cast→hook→catch flow; `hook` now stores the pending catch and returns the hooked fish plus tap goal, duration, and struggle intensity for both clients; `resetCasting` and `restoreCastingLuresOnStartup` clear stuck states.
+- **Fishing:** `startCast`, `hook`, `catch` manage the cast→hook→catch flow; `hook` now stores the pending catch and returns the hooked fish plus tap goal, duration, and struggle intensity for both clients; `resetStaleCasting`, `resetCasting`, and `restoreCastingLuresOnStartup` clear stuck states without interrupting fresh active casts.
 - **Locations and progress:** `locations`, `unlockLocation`, `totalCaughtKg`, `todayCaughtKg`, and `recent` build stats and unlock zones; `locations` can prepend the active special-event location with lock metadata for users outside clubs; `userLanguage` drives localization.
 - **Daily rewards and auto‑fishing:** `dailyRewardSchedule`, `canClaimDaily`, `dailyReward` implement the reward chain; `autoFishUsers` and `applyAutoFishReward` grant scheduled automatic catches.
 - **Shop and monetization:** `listPackages`, `findPack`, `buyPackage`, `buyPackageWithCoins` handle purchases; `todayCoins` and `addCoins` track balances.

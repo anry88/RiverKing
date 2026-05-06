@@ -857,7 +857,7 @@ fun Application.apiRoutes(
         // Profile
         get("/api/me") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-            fishing.resetCasting(uid)
+            fishing.resetStaleCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures = fishing.listLures(uid).map {
                 it.copy(
