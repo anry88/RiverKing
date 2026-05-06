@@ -250,6 +250,28 @@ data class SpecialEventPersonalEntryDto(
 )
 
 @Serializable
+data class SpecialEventClubMemberEntryDto(
+    val rank: Int,
+    val userId: Long,
+    val user: String? = null,
+    val role: String = "",
+    val value: Double = 0.0,
+    val catchId: Long? = null,
+    val fish: String? = null,
+    val fishId: Long? = null,
+    val rarity: String? = null,
+    val weight: Double? = null,
+    val at: Long? = null,
+)
+
+@Serializable
+data class SpecialEventClubMemberLeaderboardsDto(
+    val totalWeight: List<SpecialEventClubMemberEntryDto> = emptyList(),
+    val totalCount: List<SpecialEventClubMemberEntryDto> = emptyList(),
+    val topFish: List<SpecialEventClubMemberEntryDto> = emptyList(),
+)
+
+@Serializable
 data class SpecialEventLeaderboardsDto(
     val totalWeight: List<SpecialEventClubEntryDto> = emptyList(),
     val totalCount: List<SpecialEventClubEntryDto> = emptyList(),
@@ -263,6 +285,7 @@ data class SpecialEventLeaderboardsDto(
 data class SpecialEventResponseDto(
     val event: SpecialEventDto,
     val leaderboards: SpecialEventLeaderboardsDto,
+    val clubMembers: SpecialEventClubMemberLeaderboardsDto? = null,
 )
 
 @Serializable

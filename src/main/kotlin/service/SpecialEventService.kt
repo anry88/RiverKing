@@ -65,6 +65,26 @@ data class SpecialEventPersonalEntry(
     val prize: PrizeSpec? = null,
 )
 
+data class SpecialEventClubMemberEntry(
+    val userId: Long,
+    val user: String?,
+    val role: String,
+    val value: Double,
+    val rank: Int,
+    val catchId: Long? = null,
+    val fish: String? = null,
+    val fishId: Long? = null,
+    val rarity: String? = null,
+    val weight: Double? = null,
+    val at: Instant? = null,
+)
+
+data class SpecialEventClubMemberLeaderboard(
+    val totalWeight: List<SpecialEventClubMemberEntry>,
+    val totalCount: List<SpecialEventClubMemberEntry>,
+    val topFish: List<SpecialEventClubMemberEntry>,
+)
+
 data class SpecialEventLeaderboard(
     val event: SpecialEvent,
     val weight: List<SpecialEventClubEntry>,
@@ -73,6 +93,7 @@ data class SpecialEventLeaderboard(
     val mineWeight: SpecialEventClubEntry?,
     val mineCount: SpecialEventClubEntry?,
     val mineFish: SpecialEventPersonalEntry?,
+    val clubMembers: SpecialEventClubMemberLeaderboard?,
 )
 
 class SpecialEventService {
@@ -408,6 +429,7 @@ class SpecialEventService {
             mineWeight = clubId?.let { weightRanked.all.firstOrNull { row -> row.clubId == it } },
             mineCount = clubId?.let { countRanked.all.firstOrNull { row -> row.clubId == it } },
             mineFish = fishRanked.all.firstOrNull { it.userId == userId },
+            clubMembers = clubId?.let { memberLeaderboardTx(event.id, it) },
         )
     }
 
@@ -659,6 +681,167 @@ class SpecialEventService {
         val all: List<SpecialEventPersonalEntry>,
     )
 
+    private data class EventClubMember(
+        val userId: Long,
+        val user: String?,
+        val role: String,
+    )
+
+    private data class EventMemberProgress(
+        val totalWeight: Double,
+        val totalCount: Int,
+        val progressIds: List<Long>,
+    )
+
+    private data class EventMemberTopCatch(
+        val userId: Long,
+        val catchId: Long?,
+        val fishId: Long,
+        val fish: String,
+        val rarity: String,
+        val rarityRank: Int,
+        val weight: Double,
+        val at: Instant,
+    )
+
+    private fun memberLeaderboardTx(eventId: Long, clubId: Long): SpecialEventClubMemberLeaderboard {
+        val members = (ClubMembers innerJoin Users)
+            .select { ClubMembers.clubId eq clubId }
+            .map { row ->
+                EventClubMember(
+                    userId = row[ClubMembers.userId].value,
+                    user = rowUser(row),
+                    role = row[ClubMembers.role],
+                )
+            }
+            .sortedWith(
+                compareBy<EventClubMember> { eventMemberRoleRank(it.role) }
+                    .thenBy { it.user ?: "" }
+                    .thenBy { it.userId }
+            )
+        if (members.isEmpty()) {
+            return SpecialEventClubMemberLeaderboard(emptyList(), emptyList(), emptyList())
+        }
+
+        val memberIds = members.map { it.userId }
+        val progressRows = SpecialEventUserProgress
+            .select {
+                (SpecialEventUserProgress.eventId eq eventId) and
+                    (SpecialEventUserProgress.clubId eq clubId) and
+                    (SpecialEventUserProgress.userId inList memberIds) and
+                    (SpecialEventUserProgress.active eq true)
+            }
+            .toList()
+        val progressByUser = progressRows
+            .groupBy { it[SpecialEventUserProgress.userId].value }
+            .mapValues { (_, rows) ->
+                EventMemberProgress(
+                    totalWeight = rows.sumOf { it[SpecialEventUserProgress.totalWeight] },
+                    totalCount = rows.sumOf { it[SpecialEventUserProgress.totalCount] },
+                    progressIds = rows.map { it[SpecialEventUserProgress.id].value },
+                )
+            }
+
+        val activeProgressIds = progressByUser.values.flatMap { it.progressIds }
+        val topCatchByUser = if (activeProgressIds.isEmpty()) {
+            emptyMap()
+        } else {
+            (SpecialEventCatches innerJoin Fish)
+                .select {
+                    (SpecialEventCatches.eventId eq eventId) and
+                        (SpecialEventCatches.progressId inList activeProgressIds)
+                }
+                .map { row ->
+                    EventMemberTopCatch(
+                        userId = row[SpecialEventCatches.userId].value,
+                        catchId = row[SpecialEventCatches.catchId]?.value,
+                        fishId = row[SpecialEventCatches.fishId].value,
+                        fish = row[Fish.name],
+                        rarity = row[SpecialEventCatches.rarity],
+                        rarityRank = row[SpecialEventCatches.rarityRank],
+                        weight = row[SpecialEventCatches.weight],
+                        at = row[SpecialEventCatches.createdAt],
+                    )
+                }
+                .groupBy { it.userId }
+                .mapValues { (_, rows) ->
+                    rows.maxWith(
+                        compareBy<EventMemberTopCatch> { it.rarityRank }
+                            .thenBy { it.weight }
+                            .thenBy { it.at }
+                    )
+                }
+        }
+
+        fun memberNameSort(member: EventClubMember): String = member.user ?: ""
+
+        val totalWeight = members
+            .sortedWith(
+                compareByDescending<EventClubMember> { progressByUser[it.userId]?.totalWeight ?: 0.0 }
+                    .thenBy { eventMemberRoleRank(it.role) }
+                    .thenBy { memberNameSort(it) }
+                    .thenBy { it.userId }
+            )
+            .mapIndexed { index, member ->
+                SpecialEventClubMemberEntry(
+                    userId = member.userId,
+                    user = member.user,
+                    role = member.role,
+                    value = progressByUser[member.userId]?.totalWeight ?: 0.0,
+                    rank = index + 1,
+                )
+            }
+
+        val totalCount = members
+            .sortedWith(
+                compareByDescending<EventClubMember> { progressByUser[it.userId]?.totalCount ?: 0 }
+                    .thenBy { eventMemberRoleRank(it.role) }
+                    .thenBy { memberNameSort(it) }
+                    .thenBy { it.userId }
+            )
+            .mapIndexed { index, member ->
+                SpecialEventClubMemberEntry(
+                    userId = member.userId,
+                    user = member.user,
+                    role = member.role,
+                    value = (progressByUser[member.userId]?.totalCount ?: 0).toDouble(),
+                    rank = index + 1,
+                )
+            }
+
+        val topFish = members
+            .sortedWith(
+                compareByDescending<EventClubMember> { topCatchByUser[it.userId]?.rarityRank ?: -1 }
+                    .thenByDescending { topCatchByUser[it.userId]?.weight ?: 0.0 }
+                    .thenBy { topCatchByUser[it.userId]?.at ?: Instant.MAX }
+                    .thenBy { eventMemberRoleRank(it.role) }
+                    .thenBy { memberNameSort(it) }
+                    .thenBy { it.userId }
+            )
+            .mapIndexed { index, member ->
+                val catch = topCatchByUser[member.userId]
+                SpecialEventClubMemberEntry(
+                    userId = member.userId,
+                    user = member.user,
+                    role = member.role,
+                    value = catch?.weight ?: 0.0,
+                    rank = index + 1,
+                    catchId = catch?.catchId,
+                    fish = catch?.fish,
+                    fishId = catch?.fishId,
+                    rarity = catch?.rarity,
+                    weight = catch?.weight,
+                    at = catch?.at,
+                )
+            }
+
+        return SpecialEventClubMemberLeaderboard(
+            totalWeight = totalWeight,
+            totalCount = totalCount,
+            topFish = topFish,
+        )
+    }
+
     private fun personalLeaderboardTx(
         eventId: Long,
         limit: Int,
@@ -735,6 +918,14 @@ class SpecialEventService {
             else -> null
         }
         return raw?.let { sanitizeName(it) }
+    }
+
+    private fun eventMemberRoleRank(role: String): Int = when (role) {
+        "president" -> 0
+        "heir" -> 1
+        "veteran" -> 2
+        "novice" -> 3
+        else -> 4
     }
 
     private fun decodePrizes(raw: String): List<PrizeSpec> =

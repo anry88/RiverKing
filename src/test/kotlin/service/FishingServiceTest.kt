@@ -2,6 +2,7 @@ package service
 
 import db.*
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -191,6 +192,37 @@ class FishingServiceTest {
     }
 
     @Test
+    fun staleCastingResetKeepsFreshCastAndRestoresExpiredBait() {
+        val clock = MutableClock(Instant.parse("2026-04-01T10:00:00Z"))
+        val svc = newService("testdb_stale_cast_reset", clock)
+        val userId = svc.ensureUserByTgId(3L)
+        val lureId = transaction {
+            Users.select { Users.id eq userId }.single()[Users.currentLureId]?.value
+                ?: error("current lure missing")
+        }
+        val qtyBefore = lureQty(userId, lureId)
+
+        svc.startCast(userId)
+        assertEquals(false, svc.resetStaleCasting(userId, Duration.ofMinutes(3)))
+        transaction {
+            val userRow = Users.select { Users.id eq userId }.single()
+            assertEquals(true, userRow[Users.isCasting])
+            assertEquals(lureId, userRow[Users.castLureId]?.value)
+            assertEquals(clock.instant(), userRow[Users.lastCastAt])
+        }
+        assertEquals(qtyBefore - 1, lureQty(userId, lureId))
+
+        clock.set(Instant.parse("2026-04-01T10:03:01Z"))
+        assertEquals(true, svc.resetStaleCasting(userId, Duration.ofMinutes(3)))
+        transaction {
+            val userRow = Users.select { Users.id eq userId }.single()
+            assertEquals(false, userRow[Users.isCasting])
+            assertEquals(null, userRow[Users.castLureId])
+        }
+        assertEquals(qtyBefore, lureQty(userId, lureId))
+    }
+
+    @Test
     fun shopDiscountsAppliedAndRemoved() {
         val svc = newService("testdb_shop_discount")
         val now = LocalDate.now(ZoneOffset.UTC)
@@ -359,5 +391,10 @@ class FishingServiceTest {
 
     private fun fishId(name: String): Long = transaction {
         Fish.select { Fish.name eq name }.single()[Fish.id].value
+    }
+
+    private fun lureQty(userId: Long, lureId: Long): Int = transaction {
+        InventoryLures.select { (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lureId) }
+            .single()[InventoryLures.qty]
     }
 }

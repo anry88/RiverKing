@@ -21,7 +21,7 @@ Core business logic lives in the services (`service/`), which talk to the databa
 
 Fishing is served as one immersive staged flow across the Mini App and Android client. `/api/start-cast` starts the cast, `/api/hook` now reveals the hooked fish plus a backend-computed tap challenge (`tapGoal`, `durationMs`, and `struggleIntensity`), and `/api/cast` finalizes the catch or escape using the existing success flag. The client scenes use the same challenge values to show fish rarity/weight and to scale the post-hook bobber struggle.
 
-Achievements are tracked through `AchievementService` and exposed via `/api/achievements` plus the `/achievements` bot command. The current catalog includes rarity ladders, traveler and trophy milestones, tournament and daily-rating progress, koi collection, and location-completion achievements with claimable rewards surfaced in both the mini-app and the bot.
+Achievements are tracked through `AchievementService` and exposed via `/api/achievements` plus the `/achievements` bot command. The current catalog includes rarity ladders, traveler and trophy milestones, tournament, special-event prize, and daily-rating progress, koi collection, and location-completion achievements with claimable rewards surfaced in both the mini-app and the bot.
 
 In the mini‑app client (`resources/webapp`), the Guide tab now contains an Achievements sub‑tab that shows tier art, localized descriptions, progress (e.g., `3/16`), and claim buttons for unlocked rewards. A red badge on the Guide navigation item highlights unclaimed achievement prizes.
 

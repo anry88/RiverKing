@@ -171,6 +171,30 @@ fun Application.publicPagesRoutes(env: Env) {
                 ContentType.Text.Html,
             )
         }
+        get("/ref") {
+            val token = call.request.queryParameters["token"]?.trim()?.takeIf { it.isNotEmpty() }
+            if (token == null) {
+                call.respondText("Missing token", status = HttpStatusCode.BadRequest)
+                return@get
+            }
+            val deepLink = "riverking://referral?token=$token"
+            val itchUrl = env.itchProjectUrl.takeIf { it.isNotBlank() } ?: supportUrl
+            call.respondText(
+                htmlPage(
+                    title = "RiverKing Referral",
+                    body = """
+                        <h1>You've been invited to RiverKing!</h1>
+                        <p>Join using the links below to receive your referral rewards.</p>
+                        <div style="display: flex; gap: 16px; margin-top: 24px; flex-wrap: wrap;">
+                            <a href="$itchUrl" style="text-decoration: none;"><button type="button">Download on itch.io</button></a>
+                            <a href="$deepLink" style="text-decoration: none;"><button type="button" style="background: linear-gradient(135deg, #a5ff99, #4db347); color: #05121a;">Open App</button></a>
+                        </div>
+                        <p class="muted" style="margin-top: 24px;">If you haven't installed the game yet, download it first, then click "Open App" to claim your rewards.</p>
+                    """.trimIndent()
+                ),
+                ContentType.Text.Html
+            )
+        }
     }
 }
 

@@ -7,6 +7,7 @@ import db.Fish
 import db.LocationFishWeights
 import db.Locations
 import db.RatingPrizes
+import db.SpecialEventPrizes
 import db.UserPrizes
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
@@ -88,6 +89,7 @@ object AchievementService {
     private const val TRAVELER_CODE = "traveler"
     private const val TROPHY_HUNTER_CODE = "trophy_hunter"
     private const val TOURNAMENT_WINNER_CODE = "tournament_winner"
+    private const val EVENT_LAUREATE_CODE = "event_laureate"
     private const val DAILY_RATING_STAR_CODE = "daily_rating_star"
     private data class LocationStats(val fishCount: Int, val waters: Set<String>)
     private data class LocationAchievementConfig(val code: String, val name: String, val stats: LocationStats)
@@ -146,6 +148,7 @@ object AchievementService {
     private val trophyHunterThresholds = listOf(0, 1, 10, 100, 1000)
     private val koiThresholds = listOf(0, 1, 3, 8, 16)
     private val tournamentWinnerThresholds = listOf(0, 1, 5, 25, 50)
+    private val eventLaureateThresholds = listOf(0, 1, 3, 6, 10)
     private val dailyRatingStarThresholds = listOf(0, 1, 10, 50, 100)
     private val simpleFisherRewards = listOf(
         PrizeSpec(pack = "", qty = 0),
@@ -269,6 +272,17 @@ object AchievementService {
             thresholds = tournamentWinnerThresholds,
             rewards = koiRewards,
             progress = ::tournamentPrizeCount,
+            isRelevantCatch = { false },
+        ),
+        AchievementDefinition(
+            code = EVENT_LAUREATE_CODE,
+            nameRu = "Призёр событий",
+            nameEn = "Event Laureate",
+            descRu = "Попадите в призы хотя бы одной категории события",
+            descEn = "Place in at least one event prize category",
+            thresholds = eventLaureateThresholds,
+            rewards = koiRewards,
+            progress = ::eventPrizeEventCount,
             isRelevantCatch = { false },
         ),
         AchievementDefinition(
@@ -584,6 +598,16 @@ object AchievementService {
     private fun legendaryCatchCount(userId: Long): Double = rarityCatchCount(userId, "legendary")
     private fun tournamentPrizeCount(userId: Long): Double = inTxn {
         UserPrizes.select { UserPrizes.userId eq userId }.count().toDouble()
+    }
+
+    private fun eventPrizeEventCount(userId: Long): Double = inTxn {
+        SpecialEventPrizes
+            .slice(SpecialEventPrizes.eventId)
+            .select { SpecialEventPrizes.userId eq userId }
+            .map { it[SpecialEventPrizes.eventId].value }
+            .toSet()
+            .size
+            .toDouble()
     }
 
     private fun dailyRatingPrizeCount(userId: Long): Double = inTxn {

@@ -45,6 +45,8 @@ import service.PayService
 import service.StarsPaymentService
 import service.SpecialEvent
 import service.SpecialEventClubEntry
+import service.SpecialEventClubMemberEntry
+import service.SpecialEventClubMemberLeaderboard
 import service.SpecialEventLeaderboard
 import service.SpecialEventPersonalEntry
 import service.SpecialEventService
@@ -428,6 +430,28 @@ fun Application.apiRoutes(
     )
 
     @Serializable
+    data class SpecialEventClubMemberEntryDTO(
+        val rank: Int,
+        val userId: Long,
+        val user: String? = null,
+        val role: String,
+        val value: Double,
+        val catchId: Long? = null,
+        val fish: String? = null,
+        val fishId: Long? = null,
+        val rarity: String? = null,
+        val weight: Double? = null,
+        val at: Long? = null,
+    )
+
+    @Serializable
+    data class SpecialEventClubMemberLeaderboardsDTO(
+        val totalWeight: List<SpecialEventClubMemberEntryDTO>,
+        val totalCount: List<SpecialEventClubMemberEntryDTO>,
+        val topFish: List<SpecialEventClubMemberEntryDTO>,
+    )
+
+    @Serializable
     data class SpecialEventLeaderboardsDTO(
         val totalWeight: List<SpecialEventClubEntryDTO>,
         val totalCount: List<SpecialEventClubEntryDTO>,
@@ -441,6 +465,7 @@ fun Application.apiRoutes(
     data class SpecialEventResponseDTO(
         val event: SpecialEventDTO,
         val leaderboards: SpecialEventLeaderboardsDTO,
+        val clubMembers: SpecialEventClubMemberLeaderboardsDTO? = null,
     )
 
     @Serializable
@@ -578,6 +603,28 @@ fun Application.apiRoutes(
             prize = prize?.toDtoOrNull(),
         )
 
+    fun SpecialEventClubMemberEntry.toDto(language: String): SpecialEventClubMemberEntryDTO =
+        SpecialEventClubMemberEntryDTO(
+            rank = rank,
+            userId = userId,
+            user = user,
+            role = role,
+            value = value,
+            catchId = catchId,
+            fish = fish?.let { I18n.fish(it, language) },
+            fishId = fishId,
+            rarity = rarity,
+            weight = weight,
+            at = at?.epochSecond,
+        )
+
+    fun SpecialEventClubMemberLeaderboard.toDto(language: String): SpecialEventClubMemberLeaderboardsDTO =
+        SpecialEventClubMemberLeaderboardsDTO(
+            totalWeight = totalWeight.map { it.toDto(language) },
+            totalCount = totalCount.map { it.toDto(language) },
+            topFish = topFish.map { it.toDto(language) },
+        )
+
     fun SpecialEventLeaderboard.toDto(language: String): SpecialEventResponseDTO =
         SpecialEventResponseDTO(
             event = event.toDto(language),
@@ -589,6 +636,7 @@ fun Application.apiRoutes(
                 mineTotalCount = mineCount?.toDto(),
                 minePersonalFish = mineFish?.toDto(language),
             ),
+            clubMembers = clubMembers?.toDto(language),
         )
 
     suspend fun ApplicationCall.requireUserId(): Long? {
@@ -809,7 +857,7 @@ fun Application.apiRoutes(
         // Profile
         get("/api/me") {
             val uid = call.requireUserId() ?: return@get call.respond(HttpStatusCode.Unauthorized)
-            fishing.resetCasting(uid)
+            fishing.resetStaleCasting(uid)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val lures = fishing.listLures(uid).map {
                 it.copy(

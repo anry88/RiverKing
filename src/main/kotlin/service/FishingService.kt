@@ -62,6 +62,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         private const val BEGINNER_CATCH_THRESHOLD = 6
         private const val MIN_CHALLENGE_TAPS = 3
         private const val MAX_CHALLENGE_TAPS = 22
+        private val CASTING_STALE_AFTER: Duration = Duration.ofMinutes(1)
 
         internal fun rarityTapCount(rarity: String): Int = when (rarity) {
             "common" -> 2
@@ -373,9 +374,28 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
     }
 
+    fun resetStaleCasting(userId: Long, staleAfter: Duration = CASTING_STALE_AFTER): Boolean = transaction {
+        val userRow = Users.select { Users.id eq userId }.singleOrNull() ?: return@transaction false
+        if (!userRow[Users.isCasting]) return@transaction false
+
+        val pending = PendingCatches.select { PendingCatches.userId eq userId }.singleOrNull()
+        val activityAt = pending?.get(PendingCatches.createdAt) ?: userRow[Users.lastCastAt]
+        val staleBefore = clock.instant().minus(staleAfter)
+        if (activityAt != null && activityAt.isAfter(staleBefore)) return@transaction false
+
+        restoreCastingLureTx(
+            userId = userId,
+            lureId = userRow.getOrNull(Users.castLureId)?.value ?: pending?.get(PendingCatches.lureId)?.value,
+        )
+        PendingCatches.deleteWhere { PendingCatches.userId eq userId }
+        Users.update({ Users.id eq userId }) {
+            it[Users.isCasting] = false
+            it[Users.castLureId] = null
+        }
+        true
+    }
+
     fun restoreCastingLuresOnStartup(): Int = transaction {
-        val fallbackLureId = Lures.select { Lures.name eq "Пресная хищная+" }
-            .single()[Lures.id].value
         val castingUsers = Users.select { Users.isCasting eq true }.toList()
         var restored = 0
         castingUsers.forEach { row ->
@@ -383,23 +403,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             val lastLureId = row.getOrNull(Users.castLureId)?.value
                 ?: PendingCatches.select { PendingCatches.userId eq userId }
                     .singleOrNull()?.get(PendingCatches.lureId)?.value
-                ?: fallbackLureId
-            val existingQty = InventoryLures.select {
-                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lastLureId)
-            }.singleOrNull()?.get(InventoryLures.qty)
-            if (existingQty == null) {
-                InventoryLures.insert {
-                    it[InventoryLures.userId] = userId
-                    it[InventoryLures.lureId] = lastLureId
-                    it[InventoryLures.qty] = 1
-                }
-            } else {
-                InventoryLures.update({
-                    (InventoryLures.userId eq userId) and (InventoryLures.lureId eq lastLureId)
-                }) {
-                    it[InventoryLures.qty] = existingQty + 1
-                }
-            }
+            restoreCastingLureTx(userId, lastLureId)
             PendingCatches.deleteWhere { PendingCatches.userId eq userId }
             Users.update({ Users.id eq userId }) {
                 it[Users.isCasting] = false
@@ -408,6 +412,27 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             restored += 1
         }
         restored
+    }
+
+    private fun restoreCastingLureTx(userId: Long, lureId: Long?) {
+        val restoredLureId = lureId ?: Lures.select { Lures.name eq "Пресная хищная+" }
+            .single()[Lures.id].value
+        val existingQty = InventoryLures.select {
+            (InventoryLures.userId eq userId) and (InventoryLures.lureId eq restoredLureId)
+        }.singleOrNull()?.get(InventoryLures.qty)
+        if (existingQty == null) {
+            InventoryLures.insert {
+                it[InventoryLures.userId] = userId
+                it[InventoryLures.lureId] = restoredLureId
+                it[InventoryLures.qty] = 1
+            }
+        } else {
+            InventoryLures.update({
+                (InventoryLures.userId eq userId) and (InventoryLures.lureId eq restoredLureId)
+            }) {
+                it[InventoryLures.qty] = existingQty + 1
+            }
+        }
     }
 
     private fun nameFromRow(row: ResultRow): String? {
@@ -1733,6 +1758,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         Users.update({ Users.id eq userId }) {
             it[Users.isCasting] = true
             it[Users.castLureId] = lureId
+            it[Users.lastCastAt] = clock.instant()
         }
         val lureChanged = newLure != lureId
         var newLureName: String? = null
