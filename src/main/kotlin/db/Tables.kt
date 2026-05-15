@@ -550,6 +550,7 @@ object DB {
         val fCommonPredatorFreshOkun  = upsertFish("Окунь", "common", 0.25, 0.07, true, "fresh")
         val fCommonPredatorFreshRotan  = upsertFish("Ротан", "common", 0.15, 0.05, true, "fresh")
         val fCommonPredatorFreshErsch  = upsertFish("Ёрш", "common", 0.08, 0.03, true, "fresh")
+        upsertFish("Жёлтый сомик", "common", 0.25, 0.10, true, "fresh")
         val fCommonPredatorFreshBersh = upsertFish("Берш", "common", 1.1, 0.5, true, "fresh")
         val fCommonPredatorFreshMecherotCommon = upsertFish("Мечерот обыкновенный", "common", 0.35, 0.15, true, "fresh")
         val fCommonPredatorFreshTatia = upsertFish("Татия леопардовая", "common", 0.08, 0.03, true, "fresh")
@@ -576,6 +577,7 @@ object DB {
         val fUncommonPredatorFreshNalim  = upsertFish("Налим", "uncommon", 1.5, 0.8, true, "fresh")
         val fUncommonPredatorFreshGolavl  = upsertFish("Голавль", "uncommon", 0.8, 0.4, true, "fresh")
         val fUncommonPredatorFreshYaz = upsertFish("Язь", "uncommon", 1.20, 0.50, true, "fresh")
+        upsertFish("Амурский сом", "uncommon", 2.0, 0.9, true, "fresh")
         val fUncommonPredatorFreshPiranhaRed = upsertFish("Пиранья краснобрюхая", "uncommon", 0.8, 0.4, true, "fresh")
         val fUncommonPredatorFreshGymnotus = upsertFish("Гимнотус угревидный", "uncommon", 0.30, 0.15, true, "fresh")
         val fUncommonPredatorFreshPimelodus = upsertFish("Пимелодус пятнистый", "uncommon", 0.20, 0.10, true, "fresh")
@@ -596,6 +598,7 @@ object DB {
         val fRarePredatorFreshHarius  = upsertFish("Хариус", "rare", 0.6, 0.25, true, "fresh")
         val fRarePredatorFreshForelStream  = upsertFish("Форель ручьевая", "rare", 1.2, 0.6, true, "fresh")
         val fRarePredatorFreshZhereh  = upsertFish("Жерех", "rare", 2.0, 1.0, true, "fresh")
+        upsertFish("Ауха", "rare", 1.4, 0.6, true, "fresh")
         val fRarePredatorFreshSchuka = upsertFish("Щука", "rare", 3.0, 1.2, true, "fresh")
         val fRarePredatorFreshBicuda = upsertFish("Бикуда", "rare", 1.0, 0.5, true, "fresh")
         val fRarePredatorFreshOscar  = upsertFish("Астронотус глазчатый", "rare", 1.5, 0.7, true, "fresh")
@@ -606,6 +609,7 @@ object DB {
 
         // --- Fish: epic пресные мирные---
         val fEpicPeaceFreshSterlyad= upsertFish("Стерлядь", "epic", 3.0, 1.2, false, "fresh")
+        upsertFish("Китайский чукучан", "epic", 3.0, 1.2, false, "fresh")
         val fEpicPeaceFreshPacuBrown = upsertFish("Паку бурый", "epic", 12.0, 6.0, false, "fresh")
         val fEpicPeaceFreshDiscus = upsertFish("Дискус обыкновенный", "epic", 0.20, 0.10, false, "fresh")
         val fEpicPeaceFreshAltum = upsertFish("Скалярия альтум", "epic", 0.35, 0.15, false, "fresh")
@@ -613,6 +617,7 @@ object DB {
         // --- Fish: epic пресные хищные---
         val fEpicPredatorFreshEelEuropean = upsertFish("Угорь европейский", "epic", 1.5, 0.7, true, "fresh")
         val fEpicPredatorFreshSom = upsertFish("Сом европейский", "epic", 8.0, 4.0, true, "fresh")
+        upsertFish("Желтощёк", "epic", 8.0, 3.5, true, "fresh")
         val fEpicPredatorFreshArcticGolets = upsertFish("Голец арктический", "epic", 2.8, 1.2, true, "fresh")
         val fEpicPredatorFreshForelKumzha = upsertFish("Форель кумжа", "epic", 4.0, 1.5, true, "fresh")
         val fEpicPredatorFreshElectricEel = upsertFish("Угорь электрический", "epic", 15.0, 5.0, true, "fresh")
@@ -655,9 +660,12 @@ object DB {
 
         // --- Fish: legendary пресные мирные---
         val fLegendaryPeaceFreshOsetr = upsertFish("Осётр европейский", "legendary", 12.0, 6.0, false, "fresh")
+        upsertFish("Янцзынский осётр", "legendary", 10.0, 5.0, false, "fresh")
+        upsertFish("Китайский осётр", "legendary", 18.0, 8.0, false, "fresh")
 
         // --- Fish: legendary пресные хищные---
         val fLegendaryPredatorFreshTaimen  = upsertFish("Таймень", "legendary", 15.0, 7.0, true, "fresh")
+        upsertFish("Китайский веслонос", "legendary", 60.0, 25.0, true, "fresh")
         val fLegendaryPredatorFreshArapaima = upsertFish("Арапайма", "legendary", 80.0, 30.0, true, "fresh")
         val fLegendaryPredatorFreshPiraiba = upsertFish("Пираиба", "legendary", 70.0, 35.0, true, "fresh")
         val fLegendaryPredatorFreshBlackArowana  = upsertFish("Аравана чёрная", "legendary", 6.0, 3.0, true, "fresh")
