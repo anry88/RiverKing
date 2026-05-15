@@ -398,6 +398,7 @@ function CatchDetailsModal({catchData, me, onClose}){
   const isOwnCatch = catchData.userId != null && me?.id != null && Number(catchData.userId) === Number(me.id);
   const canSend = Boolean(isOwnCatch && catchData.id && catchData.fish);
   const locationBg = React.useMemo(()=>{
+    if(catchData.locationImageUrl) return catchData.locationImageUrl;
     if(catchData.locationBg) return catchData.locationBg;
     const resolver = typeof window.getLocationBackground === 'function'
       ? window.getLocationBackground
@@ -426,7 +427,7 @@ function CatchDetailsModal({catchData, me, onClose}){
       }
     }
     return null;
-  }, [catchData.locationBg, catchData.locationId, catchData.location, me?.locations]);
+  }, [catchData.locationImageUrl, catchData.locationBg, catchData.locationId, catchData.location, me?.locations]);
   const locationBgIsRemote = typeof locationBg === 'string' && /^https?:\/\//i.test(locationBg);
 
   async function handleSend(){

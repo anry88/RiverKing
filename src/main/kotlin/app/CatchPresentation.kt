@@ -422,6 +422,7 @@ fun generateCatchImage(
     anglerName: String? = null,
     caughtAt: Instant? = null,
     locationBackgroundFile: File? = null,
+    locationBackgroundResourcePath: String? = null,
 ): ByteArray? {
     val path = FISH_IMAGE_PATHS[fishInternalName] ?: return null
     val classLoader = Thread.currentThread().contextClassLoader
@@ -436,9 +437,15 @@ fun generateCatchImage(
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
+        fun readResourceImage(resourcePath: String): BufferedImage? =
+            runCatching {
+                classLoader.getResourceAsStream(resourcePath)?.use { ImageIO.read(it) }
+            }.getOrNull()
+
         val eventBackground = locationBackgroundFile
             ?.takeIf { it.isFile }
             ?.let { runCatching { ImageIO.read(it) }.getOrNull() }
+            ?: locationBackgroundResourcePath?.let(::readResourceImage)
         if (eventBackground != null) {
             drawCoverBackground(g2d, eventBackground, size)
         } else {

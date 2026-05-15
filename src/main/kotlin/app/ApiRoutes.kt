@@ -569,6 +569,21 @@ fun Application.apiRoutes(
         return file.takeIf { it.isFile }
     }
 
+    fun eventAssetResourcePath(imagePath: String?): String? {
+        val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+        return "webapp/assets/backgrounds/$fileName"
+    }
+
+    fun localizedCatch(catch: CatchDTO, language: String): CatchDTO {
+        val location = fishing.catchLocationPresentation(catch.id, catch.location, language)
+        return catch.copy(
+            fish = I18n.fish(catch.fish, language),
+            location = location.name,
+            locationImageUrl = eventAssetUrl(location.imagePath),
+        )
+    }
+
     fun SpecialEvent.toDto(language: String): SpecialEventDTO =
         SpecialEventDTO(
             id = id,
@@ -903,7 +918,7 @@ fun Application.apiRoutes(
             val recent = fishing.recent(uid).map { r ->
                 r.copy(
                     fish = I18n.fish(r.fish, language),
-                    location = I18n.location(r.location, language)
+                    location = fishing.localizedLocationName(r.location, language)
                 )
             }
             val caughtFishIds = fishing.caughtFishIds(uid)
@@ -1974,10 +1989,7 @@ fun Application.apiRoutes(
                         "rarity" to c.rarity
                     )
                 )
-                c.copy(
-                    fish = I18n.fish(c.fish, language),
-                    location = I18n.location(c.location, language)
-                )
+                localizedCatch(c, language)
             }
             val localizedUnlocked = if (res.unlockedLocations.isEmpty()) {
                 emptyList()
@@ -2011,12 +2023,7 @@ fun Application.apiRoutes(
             val catch = fishing.catchById(uid, catchId)
                 ?: return@get call.respond(HttpStatusCode.NotFound)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
-            call.respond(
-                catch.copy(
-                    fish = I18n.fish(catch.fish, language),
-                    location = I18n.location(catch.location, language),
-                )
-            )
+            call.respond(localizedCatch(catch, language))
         }
 
         get("/api/catches/{id}/card") {
@@ -2027,9 +2034,10 @@ fun Application.apiRoutes(
                 ?: return@get call.respond(HttpStatusCode.NotFound)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val fishName = I18n.fish(catch.fish, language)
-            val locationName = I18n.location(catch.location, language)
+            val location = fishing.catchLocationPresentation(catch.id, catch.location, language)
+            val locationName = location.name
             val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
-            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
+            val locationBackgroundFile = eventAssetFile(location.imagePath)
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -2041,6 +2049,7 @@ fun Application.apiRoutes(
                 anglerName = catch.user,
                 caughtAt = caughtAt,
                 locationBackgroundFile = locationBackgroundFile,
+                locationBackgroundResourcePath = eventAssetResourcePath(location.imagePath),
             ) ?: return@get call.respond(HttpStatusCode.NotFound)
             call.response.header(HttpHeaders.CacheControl, "no-store")
             call.respondBytes(image, ContentType.Image.PNG)
@@ -2056,7 +2065,8 @@ fun Application.apiRoutes(
                 ?: return@post call.respond(HttpStatusCode.NotFound)
             val language = transaction { Users.select { Users.id eq uid }.single()[Users.language] }
             val fishName = I18n.fish(catch.fish, language)
-            val locationName = I18n.location(catch.location, language)
+            val location = fishing.catchLocationPresentation(catch.id, catch.location, language)
+            val locationName = location.name
             val caughtAt = catch.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
             val captionBase = buildCatchCaption(
                 lang = language,
@@ -2066,7 +2076,7 @@ fun Application.apiRoutes(
                 locationName = locationName,
             )
             val caption = appendCatchTags(captionBase, catch)
-            val locationBackgroundFile = eventAssetFile(fishing.eventImagePathForCatch(catchId))
+            val locationBackgroundFile = eventAssetFile(location.imagePath)
             val image = generateCatchImage(
                 catch.fish,
                 catch.location,
@@ -2078,6 +2088,7 @@ fun Application.apiRoutes(
                 anglerName = catch.user,
                 caughtAt = caughtAt,
                 locationBackgroundFile = locationBackgroundFile,
+                locationBackgroundResourcePath = eventAssetResourcePath(location.imagePath),
             )
             try {
                 if (image != null) {

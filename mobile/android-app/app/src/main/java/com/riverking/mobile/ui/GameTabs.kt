@@ -7325,10 +7325,11 @@ private fun CatchDetailsDialog(
 ) {
     val rarityKey = resolvedRarity?.takeIf { it.isNotBlank() }
     val accent = rarityColor(rarityKey)
-    val backgroundModel = remember(me.locations, catch.location) {
+    val backgroundModel = remember(me.locations, catch.location, catch.locationImageUrl) {
         val normalized = catch.location.trim().lowercase()
-        me.locations.firstOrNull { location -> location.name.trim().lowercase() == normalized }
-            ?.let { location -> location.imageUrl ?: locationBackgroundAsset(location.name) }
+        catch.locationImageUrl
+            ?: me.locations.firstOrNull { location -> location.name.trim().lowercase() == normalized }
+                ?.let { location -> location.imageUrl ?: locationBackgroundAsset(location.name) }
             ?: locationBackgroundAsset(catch.location)
     }
     Dialog(onDismissRequest = onDismiss) {
