@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 5,
-  "latestVersionName": "0.4.1",
+  "latestVersionCode": 6,
+  "latestVersionName": "0.4.2",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Club event screens now show member progress by total weight, fish count, and top fish.",
-      "Tournament and club switches now use the standard segmented controls."
+      "Added new Poyang and Yangtze event fish assets for upcoming club events.",
+      "Fixed event location names and catch-card backgrounds in English Android flows."
     ],
     "ru": [
-      "Клубные события теперь показывают прогресс игроков по суммарному весу, количеству рыб и топ-рыбе.",
-      "Переключатели турниров и клуба приведены к стандартному segmented-виду."
+      "Добавлены новые рыбы и ассеты Поянху/Янцзы для будущих клубных событий.",
+      "Исправлены названия ивентовых локаций и фоны карточек улова в английском Android-интерфейсе."
     ]
   }
 }
