@@ -196,6 +196,14 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Карп кои (Кумонрю)" to "webapp/assets/fish/koi_kumonryu.png",
     "Карп кои (Дойцу-гои)" to "webapp/assets/fish/koi_doitsu.png",
     "Амур чёрный" to "webapp/assets/fish/cherniy_amur.png",
+    "Жёлтый сомик" to "webapp/assets/fish/zheltyy_somik.png",
+    "Амурский сом" to "webapp/assets/fish/amurskiy_som.png",
+    "Ауха" to "webapp/assets/fish/auha.png",
+    "Желтощёк" to "webapp/assets/fish/zheltoschek.png",
+    "Китайский чукучан" to "webapp/assets/fish/kitayskiy_chukuchan.png",
+    "Янцзынский осётр" to "webapp/assets/fish/yangtze_sturgeon.png",
+    "Китайский осётр" to "webapp/assets/fish/chinese_sturgeon.png",
+    "Китайский веслонос" to "webapp/assets/fish/chinese_paddlefish.png",
     "Змееголов северный" to "webapp/assets/fish/zmeegolov_severniy.png",
     "Щука амурская" to "webapp/assets/fish/amurskaya_schuka.png",
     "Кристивомер" to "webapp/assets/fish/kristivomer.png",
@@ -414,6 +422,7 @@ fun generateCatchImage(
     anglerName: String? = null,
     caughtAt: Instant? = null,
     locationBackgroundFile: File? = null,
+    locationBackgroundResourcePath: String? = null,
 ): ByteArray? {
     val path = FISH_IMAGE_PATHS[fishInternalName] ?: return null
     val classLoader = Thread.currentThread().contextClassLoader
@@ -428,9 +437,15 @@ fun generateCatchImage(
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
+        fun readResourceImage(resourcePath: String): BufferedImage? =
+            runCatching {
+                classLoader.getResourceAsStream(resourcePath)?.use { ImageIO.read(it) }
+            }.getOrNull()
+
         val eventBackground = locationBackgroundFile
             ?.takeIf { it.isFile }
             ?.let { runCatching { ImageIO.read(it) }.getOrNull() }
+            ?: locationBackgroundResourcePath?.let(::readResourceImage)
         if (eventBackground != null) {
             drawCoverBackground(g2d, eventBackground, size)
         } else {

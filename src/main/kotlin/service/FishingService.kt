@@ -1853,6 +1853,12 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val at: String? = null,
         val rank: Int? = null,
         val prizeCoins: Int? = null,
+        val locationImageUrl: String? = null,
+    )
+
+    data class LocationPresentation(
+        val name: String,
+        val imagePath: String? = null,
     )
 
     @Serializable
@@ -2268,20 +2274,56 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .singleOrNull()
     }
 
-    fun eventImagePathForCatch(catchId: Long): String? = transaction {
+    private fun eventLocationPresentationForCatchTx(catchId: Long, language: String): LocationPresentation? {
         val eventId = (Catches innerJoin Locations)
             .slice(Locations.specialEventId)
             .select { Catches.id eq catchId }
             .limit(1)
             .singleOrNull()
             ?.get(Locations.specialEventId)
-            ?: return@transaction null
-        SpecialEvents
-            .slice(SpecialEvents.imagePath)
+            ?: return null
+        return SpecialEvents
+            .slice(SpecialEvents.nameRu, SpecialEvents.nameEn, SpecialEvents.imagePath)
             .select { SpecialEvents.id eq eventId }
             .limit(1)
             .singleOrNull()
-            ?.get(SpecialEvents.imagePath)
+            ?.let { row ->
+                LocationPresentation(
+                    name = if (language == "en") row[SpecialEvents.nameEn] else row[SpecialEvents.nameRu],
+                    imagePath = row[SpecialEvents.imagePath],
+                )
+            }
+    }
+
+    fun catchLocationPresentation(catchId: Long, fallbackLocation: String, language: String): LocationPresentation =
+        transaction {
+            eventLocationPresentationForCatchTx(catchId, language)
+                ?: LocationPresentation(I18n.location(fallbackLocation, language))
+        }
+
+    fun localizedLocationName(locationName: String, language: String): String = transaction {
+        val eventId = Locations
+            .slice(Locations.specialEventId)
+            .select { (Locations.name eq locationName) and Locations.specialEventId.isNotNull() }
+            .orderBy(Locations.id, SortOrder.DESC)
+            .limit(1)
+            .singleOrNull()
+            ?.get(Locations.specialEventId)
+        if (eventId != null) {
+            SpecialEvents
+                .slice(SpecialEvents.nameRu, SpecialEvents.nameEn)
+                .select { SpecialEvents.id eq eventId }
+                .limit(1)
+                .singleOrNull()
+                ?.let { row -> if (language == "en") row[SpecialEvents.nameEn] else row[SpecialEvents.nameRu] }
+                ?: I18n.location(locationName, language)
+        } else {
+            I18n.location(locationName, language)
+        }
+    }
+
+    fun eventImagePathForCatch(catchId: Long): String? = transaction {
+        eventLocationPresentationForCatchTx(catchId, "ru")?.imagePath
     }
 
     private fun rarityRank(r: String) = when (r) {

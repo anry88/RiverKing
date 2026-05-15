@@ -136,6 +136,7 @@ data class CatchDto(
     val at: String? = null,
     val rank: Int? = null,
     val prizeCoins: Int? = null,
+    val locationImageUrl: String? = null,
 )
 
 @Serializable

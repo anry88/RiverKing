@@ -146,6 +146,12 @@ private fun eventAssetFile(rootDir: String, imagePath: String?): File? {
     return file.takeIf { it.isFile }
 }
 
+private fun eventAssetResourcePath(imagePath: String?): String? {
+    val fileName = imagePath?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (fileName.contains('/') || fileName.contains('\\') || fileName.contains("..")) return null
+    return "webapp/assets/backgrounds/$fileName"
+}
+
 private fun parsePrizes(str: String): MutableList<PrizeSpec> {
     return try {
         Json.parseToJsonElement(str).jsonArray.map { el ->
@@ -575,15 +581,18 @@ fun Application.botRoutes(env: Env) {
                 Users.select { Users.id eq uid }.single()[Users.autoFishUntil]?.isAfter(Instant.now()) == true
             }
 
-            fun currentSetup(uid: Long): Pair<String?, String?> = transaction {
-                val userRow = Users.select { Users.id eq uid }.single()
-                val lureName = userRow[Users.currentLureId]?.value?.let { id ->
-                    Lures.select { Lures.id eq id }.singleOrNull()?.get(Lures.name)
+            fun currentSetup(uid: Long, lang: String): Pair<String?, String?> {
+                val (lureName, locationName) = transaction {
+                    val userRow = Users.select { Users.id eq uid }.single()
+                    val rawLureName = userRow[Users.currentLureId]?.value?.let { id ->
+                        Lures.select { Lures.id eq id }.singleOrNull()?.get(Lures.name)
+                    }
+                    val rawLocationName = userRow[Users.currentLocationId]?.value?.let { id ->
+                        Locations.select { Locations.id eq id }.singleOrNull()?.get(Locations.name)
+                    }
+                    rawLureName to rawLocationName
                 }
-                val locationName = userRow[Users.currentLocationId]?.value?.let { id ->
-                    Locations.select { Locations.id eq id }.singleOrNull()?.get(Locations.name)
-                }
-                lureName to locationName
+                return lureName to locationName?.let { fishing.localizedLocationName(it, lang) }
             }
 
             suspend fun performCastSequence(
@@ -763,7 +772,8 @@ fun Application.botRoutes(env: Env) {
                             return@launch
                         }
                         val fishName = I18n.fish(catch.fish, lang)
-                        val locationName = I18n.location(catch.location, lang)
+                        val location = fishing.catchLocationPresentation(catch.id, catch.location, lang)
+                        val locationName = location.name
                         val isNew = catch.fishId?.let { it !in knownFish } == true
                         if (isNew && catch.fishId != null) {
                             knownFish.add(catch.fishId)
@@ -835,7 +845,7 @@ fun Application.botRoutes(env: Env) {
                         val caughtAt = catch.at?.let { runCatching { Instant.parse(it) }.getOrNull() }
                         val locationBackgroundFile = eventAssetFile(
                             env.eventAssetsDir,
-                            fishing.eventImagePathForCatch(catch.id),
+                            location.imagePath,
                         )
                         val image = generateCatchImage(
                             fishInternalName = catch.fish,
@@ -848,6 +858,7 @@ fun Application.botRoutes(env: Env) {
                             anglerName = catch.user,
                             caughtAt = caughtAt,
                             locationBackgroundFile = locationBackgroundFile,
+                            locationBackgroundResourcePath = eventAssetResourcePath(location.imagePath),
                         )
                         if (image != null) {
                             try {
@@ -1178,7 +1189,7 @@ fun Application.botRoutes(env: Env) {
                 prefix: String? = null,
                 replyToMessageId: Long? = null,
             ) {
-                val locations = fishing.locations(uid)
+                val locations = fishing.locations(uid, lang)
                 val unlocked = locations.filter { it.unlocked }
                 val stored = transaction {
                     Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value
@@ -1192,7 +1203,9 @@ fun Application.botRoutes(env: Env) {
                     }
                 }
                 val currentName = currentId?.let { id ->
-                    unlocked.find { it.id == id }?.let { I18n.location(it.name, lang) }
+                    unlocked.find { it.id == id }?.let { loc ->
+                        if (loc.isEvent) loc.name else I18n.location(loc.name, lang)
+                    }
                 }
                 val header = if (lang == "ru") {
                     "Текущая локация: ${currentName ?: "не выбрана"}"
@@ -1220,7 +1233,7 @@ fun Application.botRoutes(env: Env) {
                 val buttons = unlocked
                     .map { loc ->
                         val label = buildString {
-                            append(I18n.location(loc.name, lang))
+                            append(if (loc.isEvent) loc.name else I18n.location(loc.name, lang))
                             if (loc.id == currentId) append(" ✅")
                         }
                         InlineKeyboardButton(label, "/location ${ownedData(uid, loc.id)}")
@@ -2292,7 +2305,7 @@ Available commands:
                                 "${englishOrdinal(rank)} place"
                             }
                             val body = positions.joinToString("\n") { pos ->
-                                val locationName = I18n.location(pos.location, lang)
+                                val locationName = fishing.localizedLocationName(pos.location, lang)
                                 val fishName = I18n.fish(pos.bestFish, lang)
                                 val rarityName = RARITY_LABELS[lang]?.get(pos.bestRarity)
                                     ?: RARITY_LABELS["en"]?.get(pos.bestRarity)
@@ -2760,9 +2773,9 @@ Available commands:
                             trySend(chatId, reply, replyToMessageId = replyTo)
                             return true
                         }
-                        val (lureNameRaw, locationNameRaw) = currentSetup(uid)
+                        val (lureNameRaw, locationNameRaw) = currentSetup(uid, lang)
                         val lureLabel = lureNameRaw?.let { I18n.lure(it, lang) } ?: "—"
-                        val locationLabel = locationNameRaw?.let { I18n.location(it, lang) } ?: "—"
+                        val locationLabel = locationNameRaw ?: "—"
                         val privateChatId = from?.id ?: chatId
                         val dmText = if (lang == "ru") {
                             "Запускаю автоловлю: приманка «$lureLabel», локация «$locationLabel»."
@@ -2810,9 +2823,9 @@ Available commands:
                                         logCommandMetric("autocast", mapOf("result" to "expired"), source)
                                         break
                                     }
-                                    val (currentLure, currentLocation) = currentSetup(uid)
+                                    val (currentLure, currentLocation) = currentSetup(uid, lang)
                                     val lureText = currentLure?.let { I18n.lure(it, lang) } ?: "—"
-                                    val locationText = currentLocation?.let { I18n.location(it, lang) } ?: "—"
+                                    val locationText = currentLocation ?: "—"
                                     val startNote = if (lang == "ru") {
                                         "🤖 Автоловля: заброс с приманкой «$lureText» на локации «$locationText»."
                                     } else {

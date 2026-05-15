@@ -225,6 +225,38 @@ class SpecialEventServiceTest {
     }
 
     @Test
+    fun eventCatchLocationPresentationUsesLocalizedEventNameAndImagePath() {
+        DB.init(testEnv("special-event-location-presentation"))
+        val fishing = FishingService()
+        val events = SpecialEventService()
+        val start = Instant.parse("2026-04-01T00:00:00Z")
+        val eventId = events.createEvent(
+            nameRu = "Пойменный залив",
+            nameEn = "Floodplain Bay",
+            start = start,
+            end = start.plusSeconds(7_200),
+            imagePath = "event-floodplain.png",
+            castZone = defaultCastZone,
+            fish = listOf(SpecialEventFishSpec(fishId("Плотва"), 1.0)),
+            weightPrizes = noPrizes,
+            countPrizes = noPrizes,
+            fishPrizes = noPrizes,
+        )
+        val locationId = events.eventLocationId(eventId) ?: error("event location missing")
+        val userId = fishing.ensureUserByTgId(50_001L, username = "event-presented")
+        createClub(userId, "Presenters")
+        val catchId = recordEventCatch(events, userId, locationId, "Плотва", 1.0, start.plusSeconds(600))
+
+        val en = fishing.catchLocationPresentation(catchId, "Пойменный залив", "en")
+        val ru = fishing.catchLocationPresentation(catchId, "Пойменный залив", "ru")
+
+        assertEquals("Floodplain Bay", en.name)
+        assertEquals("Пойменный залив", ru.name)
+        assertEquals("event-floodplain.png", en.imagePath)
+        assertEquals("event-floodplain.png", ru.imagePath)
+    }
+
+    @Test
     fun prizeDistributionGrantsClubRewardsToCurrentMembersAndPersonalRewardsToRankedPlayers() {
         DB.init(testEnv("special-event-prizes"))
         val fishing = FishingService()
