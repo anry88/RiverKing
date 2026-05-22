@@ -36,5 +36,7 @@ fun testEnv(name: String): Env {
     eventAssetsDir = Files.createTempDirectory("riverking-$name-event-assets-").toFile().apply {
         deleteOnExit()
     }.absolutePath,
+    playDeckGameToken = "test-playdeck-token",
+    playDeckTestPayments = true,
 )
 }

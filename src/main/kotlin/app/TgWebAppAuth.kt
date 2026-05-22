@@ -21,12 +21,7 @@ object TgWebAppAuth {
         // For signature verification we must decode each key/value before building the
         // data check string. Using encoded values leads to "bad hash" errors even for
         // valid initData.
-        val params = initData.split("&").associate {
-            val i = it.indexOf('=')
-            val key = URLDecoder.decode(it.substring(0, i), StandardCharsets.UTF_8)
-            val value = URLDecoder.decode(it.substring(i + 1), StandardCharsets.UTF_8)
-            key to value
-        }
+        val params = parseParams(initData)
         val hash = params["hash"] ?: error("no hash")
         val dataCheckString = params.filterKeys { it != "hash" }.toList().sortedBy { it.first }
             .joinToString("\n") { (k, v) -> "$k=$v" }
@@ -40,6 +35,23 @@ object TgWebAppAuth {
                 .joinToString("") { "%02x".format(it) }
         }
         require(calcHex.equals(hash, ignoreCase = true)) { "bad hash" }
+        return extractUser(params)
+    }
+
+    fun extractUser(initData: String): TgUser = extractUser(parseParams(initData))
+
+    private fun parseParams(initData: String): Map<String, String> =
+        initData.split("&")
+            .filter { it.isNotBlank() }
+            .associate {
+                val i = it.indexOf('=')
+                require(i > 0) { "bad initData pair" }
+                val key = URLDecoder.decode(it.substring(0, i), StandardCharsets.UTF_8)
+                val value = URLDecoder.decode(it.substring(i + 1), StandardCharsets.UTF_8)
+                key to value
+            }
+
+    private fun extractUser(params: Map<String, String>): TgUser {
         val userJson = params["user"] ?: error("no user")
         val obj = Json.parseToJsonElement(userJson).jsonObject
         return TgUser(

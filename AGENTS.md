@@ -18,7 +18,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `src/main/kotlin/service/`: gameplay systems, tournaments, special events, shop, referrals, clubs, achievements, quests, payments.
 - `src/main/kotlin/db/`: Exposed tables, schema creation, seed and migration helpers.
 - `src/main/kotlin/util/`: metrics, RNG helpers, profanity filtering, text sanitization, coin math.
-- `src/main/resources/webapp/`: Telegram Mini App frontend and shipped game assets.
+- `src/main/resources/webapp/`: Telegram Mini App / PlayDeck wrapper frontend and shipped game assets.
 - `mobile/android-app/`: nested Android project with its own Gradle setup, mobile auth flows, and shared-backend client shell.
 - `mobile/admin-app/`: nested internal Android admin project with saved server profiles, admin API access, tournaments, special events, discounts, and broadcasts.
 - `src/test/kotlin/`: service and route tests.
@@ -28,11 +28,12 @@ AI-oriented repository guide for coding assistants and code-review tools.
 
 - Runtime stack: Kotlin + Ktor + Netty.
 - Persistence: Exposed over SQLite by default, with PostgreSQL-style connection config fields also supported.
-- Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session.
+- Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session, with a PlayDeck `initdata/check` fallback for wrapper launches that carry third-party-signed `tgWebAppData`.
 - Mobile auth: password, Google, and Telegram sign-in can create bearer tokens plus refresh sessions for the Android client, and an authenticated Android profile can link a Telegram account for shared progression across mobile and Telegram surfaces.
 - Account deletion: `POST /api/account/delete` deletes the authenticated profile, and the backend also serves public compliance pages at `/privacy`, `/terms`, `/support`, and `/account/delete`.
 - Play Billing: `POST /api/shop/{id}/play/complete` is expected to verify Google Play purchase tokens before granting Android `play` entitlements.
-- Product surfaces: Telegram Mini App frontend, Telegram bot commands/admin flows, a nested Android player client project, and an internal Android admin app.
+- PlayDeck monetization: the Mini App frontend uses `scripts/playdeck.js` for wrapper `loading`, Stars `requestPayment`, payment status, analytics, `gameEnd`, and ad events; the backend creates signed `/api/playdeck/order` IDs and validates `/api/playdeck/postback` HMAC signatures with `PLAYDECK_GAME_TOKEN` before granting packages.
+- Product surfaces: Telegram Mini App frontend, PlayDeck wrapper surface, Telegram bot commands/admin flows, a nested Android player client project, and an internal Android admin app.
 - Fishing contract: `/api/hook` reveals the hooked fish and returns `challenge.tapGoal`, `challenge.durationMs`, and `challenge.struggleIntensity`; Telegram Mini App and Android both use the always-on immersive fishing scene rather than a user-selectable Pro mode.
 - Admin API: `mobile/admin-app` calls protected `/api/admin/*` endpoints with `ADMIN_API_TOKEN`; `/api/admin/catalog` supplies selectable metrics, fish, event fish, locations, tournament/event prizes, and discountable shop items for admin forms, while `/api/admin/cast-zones` and `/api/admin/locations/{id}/cast-zone` manage polygon cast zones for regular and event locations.
 - Special events: `/api/events/current`, `/api/events/previous`, and `/api/events/{id}` expose club events with temporary event locations, club total-weight/count leaderboards, personal top-fish leaderboards, and `EVENT` prizes for Mini App/Android clients; the bot also exposes the active event standings through `/event`.
@@ -44,7 +45,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Club chat: `/api/club/chat` stores messages and system events in `ClubChatMessages` and is rendered by the Mini App and Android club screens.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
-- Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values.
+- Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values, and PlayDeck wrapper analytics are sent when the Mini App runs inside PlayDeck.
 - GitHub release automation creates or updates a draft `develop -> main` Android release PR after pushes to `develop`, validates the Android update policy, and GitHub Release notes are label-driven through `.github/release.yml`; use `android-force-update` when a release raises `minSupportedVersionCode`.
 
 ## First Pass For Any Agent

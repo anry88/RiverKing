@@ -9,6 +9,9 @@ import io.ktor.server.sessions.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -35,6 +38,7 @@ import service.PrizeSource
 import service.PlayPurchaseService
 import service.PlayPurchaseVerifier
 import service.GooglePlayPurchaseVerifier
+import service.PlayDeckPaymentService
 import service.AccountDeletionService
 import service.AndroidUpdateService
 import service.CastZoneDTO
@@ -65,6 +69,7 @@ fun Application.apiRoutes(
     val telegramLinks = TelegramLinkService(env, fishing, auth)
     val log = LoggerFactory.getLogger("Api")
     val stars = StarsPaymentService(env, fishing)
+    val playDeckPayments = PlayDeckPaymentService(env, fishing)
     val playPurchases = PlayPurchaseService(
         fishing = fishing,
         verifier = playPurchaseVerifier ?: GooglePlayPurchaseVerifier.fromEnv(env),
@@ -194,6 +199,18 @@ fun Application.apiRoutes(
 
     @Serializable
     data class InvoiceResp(val invoice_url: String)
+
+    @Serializable
+    data class PlayDeckOrderReq(val productId: String)
+
+    @Serializable
+    data class PlayDeckOrderResp(
+        val externalId: String,
+        val amount: Int,
+        val description: String,
+        val photoUrl: String? = null,
+        val isTest: Boolean = false,
+    )
 
     @Serializable
     data class PrizeDTO(
@@ -726,8 +743,23 @@ fun Application.apiRoutes(
         post("/api/auth/telegram") {
             val initData = call.request.headers["Telegram-Init-Data"] ?: call.receiveText()
             if (initData.isBlank()) return@post call.respond(HttpStatusCode.BadRequest, "missing initData")
-            val tgUser = try { TgWebAppAuth.verifyAndExtractUser(initData, env.botToken) }
-            catch (_: Exception) { return@post call.respond(HttpStatusCode.Unauthorized, "bad initData") }
+            val tgUser = try {
+                TgWebAppAuth.verifyAndExtractUser(initData, env.botToken)
+            } catch (telegramError: Exception) {
+                if (!initData.contains("signature=")) {
+                    return@post call.respond(HttpStatusCode.Unauthorized, "bad initData")
+                }
+                try {
+                    PlayDeckAuth.verifyAndExtractUser(initData)
+                } catch (playDeckError: Exception) {
+                    log.warn(
+                        "telegram auth failed and playdeck fallback rejected initData: telegramErr={} playdeckErr={}",
+                        telegramError.message,
+                        playDeckError.message,
+                    )
+                    return@post call.respond(HttpStatusCode.Unauthorized, "bad initData")
+                }
+            }
             val ref = call.request.queryParameters["ref"]
             val userId = fishing.ensureUserByTgId(
                 tgUser.id,
@@ -1517,6 +1549,78 @@ fun Application.apiRoutes(
                 catch (_: Exception) { return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad package")) }
             Metrics.counter("create_invoice_total", mapOf("pack" to req.productId))
             call.respond(InvoiceResp(url))
+        }
+
+        post("/api/playdeck/order") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val req = try { call.receive<PlayDeckOrderReq>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest)
+            }
+            val language = fishing.userLanguage(uid)
+            val order = try {
+                playDeckPayments.createOrder(uid, req.productId, language)
+            } catch (e: Exception) {
+                val code = e.message ?: "bad_package"
+                val status = when (code) {
+                    "rod_unlocked" -> HttpStatusCode.Conflict
+                    "playdeck_unconfigured" -> HttpStatusCode.ServiceUnavailable
+                    else -> HttpStatusCode.BadRequest
+                }
+                return@post call.respond(status, mapOf("error" to code))
+            }
+            Metrics.counter(
+                "shop_purchase_click_total",
+                mapOf("pack" to req.productId, "currency" to "playdeck"),
+            )
+            call.respond(
+                PlayDeckOrderResp(
+                    externalId = order.externalId,
+                    amount = order.amount,
+                    description = order.description,
+                    photoUrl = order.photoUrl,
+                    isTest = order.isTest,
+                )
+            )
+        }
+
+        post("/api/playdeck/postback") {
+            val body = try { call.receive<JsonObject>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "bad_payload"))
+            }
+            val hash = body["hash"]?.jsonPrimitive?.content
+                ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "missing_hash"))
+            val checkout = body["checkout"]?.jsonObject
+            val payment = body["payment"]?.jsonObject
+            when {
+                checkout != null -> when (val result = playDeckPayments.validateCheckout(hash, checkout)) {
+                    PlayDeckPaymentService.CheckoutResult.Accepted -> call.respond(HttpStatusCode.OK)
+                    is PlayDeckPaymentService.CheckoutResult.Rejected -> {
+                        Metrics.counter(
+                            "shop_purchase_denied_total",
+                            mapOf("pack" to "unknown", "currency" to "playdeck", "reason" to result.code),
+                        )
+                        val status = if (result.code == "bad_signature") HttpStatusCode.Forbidden else HttpStatusCode.Conflict
+                        call.respond(status, mapOf("error" to result.code))
+                    }
+                }
+                payment != null -> when (val result = playDeckPayments.completePayment(hash, payment)) {
+                    is PlayDeckPaymentService.CompletionResult.Success -> {
+                        call.respond(ShopBuyResp(result.lures, result.currentLureId))
+                    }
+                    PlayDeckPaymentService.CompletionResult.Duplicate -> {
+                        call.respond(HttpStatusCode.OK, mapOf("status" to "duplicate"))
+                    }
+                    is PlayDeckPaymentService.CompletionResult.Failure -> {
+                        Metrics.counter(
+                            "shop_purchase_denied_total",
+                            mapOf("pack" to "unknown", "currency" to "playdeck", "reason" to result.code),
+                        )
+                        val status = if (result.code == "bad_signature") HttpStatusCode.Forbidden else HttpStatusCode.BadRequest
+                        call.respond(status, mapOf("error" to result.code))
+                    }
+                }
+                else -> call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_postback"))
+            }
         }
 
         // Shop
