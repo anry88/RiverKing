@@ -11,13 +11,15 @@ This document explains how the RiverKing backend and adjacent client projects ar
 
 ## Overview
 
-The server starts from `main()` in `Application.kt`: it loads the configuration, configures Ktor plugins, initializes the database, and registers HTTP routes for both the API and the Telegram bot. The `resources/webapp` directory contains the static mini‑app client that is served by the same server.
+The server starts from `main()` in `Application.kt`: it loads the configuration, configures Ktor plugins, initializes the database, and registers HTTP routes for both the API and the Telegram bot. The `resources/webapp` directory contains the static mini‑app client that is served by the same server and can also run inside the PlayDeck wrapper.
 
 `mobile/android-app/` is a separate nested Gradle project. It does not participate in the backend build graph, but it consumes the same backend contracts and account model through mobile auth endpoints, the shared gameplay API, and the Android update policy served at `/api/mobile/update`.
 
 `mobile/admin-app/` is a separate internal Gradle project for operators. It stores one or more backend server profiles locally and calls the protected `/api/admin/*` routes with `ADMIN_API_TOKEN` to manage tournaments, special events, cast zones for regular and event locations, shop discounts, and broadcasts. The admin app uses `/api/admin/catalog` to render selectable tournament metrics, fish, event fish, locations, prizes, and discountable shop items instead of relying on hand-entered IDs.
 
-Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, regular tournaments, special club events, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the Mini App, Android client, or bot. Protected operator routes live in `app/AdminApiRoutes.kt`. The auth/session layer now supports both Telegram cookie sessions and bearer tokens backed by refresh sessions.
+Core business logic lives in the services (`service/`), which talk to the database through Exposed (`db/`) and provide game operations (fishing, regular tournaments, special club events, shop, referrals). Routes in `app/ApiRoutes.kt` rely on these services and serializers to build responses for the Mini App, PlayDeck wrapper, Android client, or bot. Protected operator routes live in `app/AdminApiRoutes.kt`. The auth/session layer now supports Telegram cookie sessions, PlayDeck wrapper initData fallback, and bearer tokens backed by refresh sessions.
+
+PlayDeck integration is split between `resources/webapp/scripts/playdeck.js` and backend payment routes. The frontend sends wrapper `loading`, analytics, `gameEnd`, ad, and `requestPayment` messages. The backend creates signed external IDs through `/api/playdeck/order`, validates checkout/payment postbacks at `/api/playdeck/postback` with `PLAYDECK_GAME_TOKEN`, and records successful payments through the existing `Payments` table.
 
 Fishing is served as one immersive staged flow across the Mini App and Android client. `/api/start-cast` starts the cast, `/api/hook` now reveals the hooked fish plus a backend-computed tap challenge (`tapGoal`, `durationMs`, and `struggleIntensity`), and `/api/cast` finalizes the catch or escape using the existing success flag. The client scenes use the same challenge values to show fish rarity/weight and to scale the post-hook bobber struggle.
 

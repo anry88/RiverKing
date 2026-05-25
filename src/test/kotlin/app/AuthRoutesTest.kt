@@ -4,6 +4,7 @@ import db.Catches
 import db.DB
 import db.Fish
 import db.Locations
+import db.Payments
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
@@ -102,6 +103,15 @@ class AuthRoutesTest {
         val installUrl: String,
         val fallbackUrl: String? = null,
         val downloadFileName: String? = null,
+    )
+
+    @Serializable
+    private data class PlayDeckOrderResponse(
+        val externalId: String,
+        val amount: Int,
+        val description: String,
+        val photoUrl: String? = null,
+        val isTest: Boolean = false,
     )
 
     @Test
@@ -261,6 +271,81 @@ class AuthRoutesTest {
     }
 
     @Test
+    fun `playdeck order and signed payment postback grants package once`() = testApplication {
+        val env = testEnv("playdeck-payment-routes").copy(
+            botToken = "telegram-test-token",
+            botName = "river_king_bot",
+            publicBaseUrl = "https://riverking.example",
+            devMode = false,
+            playDeckGameToken = "playdeck-secret",
+            playDeckTestPayments = true,
+        )
+        application { installAuthTestModule(env) }
+
+        val initData = signedTelegramInitData(
+            botToken = env.botToken,
+            userJson = """
+                {"id":777,"first_name":"River","last_name":"King","username":"riverking","language_code":"en"}
+            """.trimIndent(),
+        )
+
+        val authResponse = client.post("/api/auth/telegram") {
+            header("Telegram-Init-Data", initData)
+        }
+        assertEquals(HttpStatusCode.OK, authResponse.status)
+        val sessionCookie = authResponse.headers[HttpHeaders.SetCookie]!!.substringBefore(';')
+
+        val orderResponse = client.post("/api/playdeck/order") {
+            header(HttpHeaders.Cookie, sessionCookie)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"productId":"fresh_topup_s"}""")
+        }
+        assertEquals(HttpStatusCode.OK, orderResponse.status)
+        val order = json.decodeFromString<PlayDeckOrderResponse>(orderResponse.bodyAsText())
+        assertEquals(20, order.amount)
+        assertEquals(true, order.isTest)
+        assertEquals(true, order.photoUrl?.endsWith("/app/assets/shop/fresh_topup_s.png") == true)
+
+        val paymentFields = linkedMapOf(
+            "amount" to order.amount.toString(),
+            "datetime" to "1710000000",
+            "externalId" to order.externalId,
+            "successful" to "true",
+            "telegramId" to "777",
+        )
+        val hash = signedPlayDeckPostbackHash(env.playDeckGameToken, paymentFields)
+        val postbackBody = """
+            {
+              "hash": "$hash",
+              "payment": {
+                "amount": ${order.amount},
+                "datetime": 1710000000,
+                "externalId": "${order.externalId}",
+                "successful": true,
+                "telegramId": 777
+              }
+            }
+        """.trimIndent()
+
+        val postback = client.post("/api/playdeck/postback") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(postbackBody)
+        }
+        assertEquals(HttpStatusCode.OK, postback.status)
+
+        val duplicate = client.post("/api/playdeck/postback") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(postbackBody)
+        }
+        assertEquals(HttpStatusCode.OK, duplicate.status)
+
+        val recordedCount = transaction {
+            Payments.select { Payments.telegramChargeId eq "playdeck:${order.externalId}" }.count()
+        }
+        assertEquals(1L, recordedCount)
+    }
+
+    @Test
     fun `android referral and play purchase contracts expose mobile fields`() = testApplication {
         val env = testEnv("android-referral-play").copy(
             botToken = "test-bot-token",
@@ -334,8 +419,8 @@ class AuthRoutesTest {
         val directBody = json.decodeFromString<UpdateResponse>(directUpdate.bodyAsText())
         assertEquals(AndroidUpdateService.STATUS_UPDATE_REQUIRED, directBody.status)
         assertEquals(true, directBody.mandatory)
-        assertEquals(5, directBody.latestVersionCode)
-        assertEquals("0.4.1", directBody.latestVersionName)
+        assertEquals(6, directBody.latestVersionCode)
+        assertEquals("0.4.2", directBody.latestVersionName)
         assertEquals(4, directBody.minSupportedVersionCode)
         assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
         assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
@@ -791,6 +876,18 @@ class AuthRoutesTest {
             "${urlEncode(key)}=${urlEncode(value)}"
         }
         return "$encodedParams&hash=$hash"
+    }
+
+    private fun signedPlayDeckPostbackHash(gameToken: String, fields: Map<String, String>): String {
+        val dataCheckString = fields.toList()
+            .sortedBy { it.first }
+            .joinToString("\n") { (key, value) -> "$key=$value" }
+        val secretKey = hmacSha256(
+            key = "WebAppData".toByteArray(StandardCharsets.UTF_8),
+            data = gameToken.toByteArray(StandardCharsets.UTF_8),
+        )
+        return hmacSha256(secretKey, dataCheckString.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
     }
 
     private fun hmacSha256(key: ByteArray, data: ByteArray): ByteArray {
