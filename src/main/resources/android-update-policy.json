@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 7,
-  "latestVersionName": "0.4.3",
+  "latestVersionCode": 8,
+  "latestVersionName": "0.4.4",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Updated the production backend links for the restored RiverKing service.",
-      "Aligned the operator admin app with the new production backend."
+      "Reduced post-catch stalls in the Android client by avoiding a full profile reload after every catch.",
+      "Kept tournament and event board refreshes off the critical fishing flow."
     ],
     "ru": [
-      "Обновлены production-ссылки на восстановленный сервис RiverKing.",
-      "Админское приложение синхронизировано с новым production-бэкендом."
+      "Уменьшены задержки после вылова в Android-клиенте: профиль больше не перезагружается полностью после каждой рыбы.",
+      "Обновление таблиц турниров и событий вынесено из критического пути рыбалки."
     ]
   }
 }

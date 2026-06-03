@@ -223,6 +223,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         touchUser(existing)
     }
 
+    fun touchAuthenticatedUserById(userId: Long): Long = transaction {
+        val existing = Users
+            .slice(Users.id, Users.lastSeenAt)
+            .select { Users.id eq userId }
+            .singleOrNull()
+            ?: error("unknown user")
+        touchSeenAt(existing)
+        userId
+    }
+
     fun ensureUserByTgId(
         tgId: Long,
         firstName: String? = null,
@@ -327,15 +337,20 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
     private fun touchUser(row: ResultRow): Long {
         val id = row[Users.id].value
+        touchSeenAt(row)
+        val total = totalKg(id)
+        ensureRodInventory(id, total)
+        ensureCurrentRod(id, total)
+        return id
+    }
+
+    private fun touchSeenAt(row: ResultRow) {
+        val id = row[Users.id].value
         val lastSeen = row[Users.lastSeenAt]
         val now = clock.instant()
         if (lastSeen == null || Duration.between(lastSeen, now) >= Duration.ofMinutes(1)) {
             Users.update({ Users.id eq id }) { it[Users.lastSeenAt] = now }
         }
-        val total = totalKg(id)
-        ensureRodInventory(id, total)
-        ensureCurrentRod(id, total)
-        return id
     }
 
     private fun upsertTelegramIdentity(userId: Long, tgId: Long) {

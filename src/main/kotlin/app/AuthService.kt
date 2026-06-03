@@ -52,7 +52,7 @@ class AuthService(
 
     fun resolveAccessToken(token: String): Long? {
         val userId = tokens.verifyAccessToken(token) ?: return null
-        return runCatching { fishing.ensureUserById(userId) }.getOrNull()
+        return runCatching { fishing.touchAuthenticatedUserById(userId) }.getOrNull()
     }
 
     fun issueTokens(userId: Long, deviceInfo: String? = null): AuthResult {
