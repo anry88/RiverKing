@@ -245,12 +245,12 @@ run_remote_deploy() {
 }
 
 smoke_test() {
-  [[ "$SKIP_SMOKE" == "0" ]] || return
-  [[ -n "$SEED_CONFIG" ]] || return
+  [[ "$SKIP_SMOKE" == "0" ]] || return 0
+  [[ -n "$SEED_CONFIG" ]] || return 0
 
   local public_base_url
   public_base_url="$(grep -E '^PUBLIC_BASE_URL=' "$SEED_CONFIG" | tail -1 | cut -d= -f2- | tr -d '\r' || true)"
-  [[ -n "$public_base_url" ]] || return
+  [[ -n "$public_base_url" ]] || return 0
 
   log "Smoke testing $public_base_url/health"
   curl -fsS "$public_base_url/health" >/dev/null
