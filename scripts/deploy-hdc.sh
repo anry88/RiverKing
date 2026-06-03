@@ -182,7 +182,7 @@ run_remote_ps() {
 
 read_remote_env_value() {
   local name="$1"
-  ssh "$REMOTE_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path -LiteralPath '$remote_env') { \\$line = Get-Content -LiteralPath '$remote_env' | Where-Object { \\$_ -match '^$name=' } | Select-Object -Last 1; if (\\$line) { \\$line.Substring($(( ${#name} + 1 ))) } }\"" 2>/dev/null | tr -d '\r' | tail -1 || true
+  ssh "$REMOTE_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path -LiteralPath '$remote_env') { \$line = Get-Content -LiteralPath '$remote_env' | Where-Object { \$_ -match '^$name=' } | Select-Object -Last 1; if (\$line) { \$line.Substring($(( ${#name} + 1 ))) } }\"" 2>/dev/null | tr -d '\r' | tail -1 || true
 }
 
 generate_postgres_password() {
