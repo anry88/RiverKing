@@ -80,7 +80,8 @@ data class BroadcastReq(
 @Serializable
 data class BroadcastResp(
     val status: String = "",
-    val count: Int = 0
+    val count: Int = 0,
+    val broadcastId: String? = null
 )
 
 @Serializable

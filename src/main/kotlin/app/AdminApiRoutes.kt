@@ -13,6 +13,7 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -33,14 +34,34 @@ import service.SpecialEventFishSpec
 import service.SpecialEventPrizeConfig
 import service.SpecialEventService
 import service.TournamentService
+import util.Metrics
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import org.slf4j.LoggerFactory
 
 private val broadcastScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+private val adminBroadcastLog = LoggerFactory.getLogger("AdminBroadcast")
 private val adminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private const val ADMIN_BROADCAST_DELAY_MS = 1_000L
+
+private data class AdminBroadcastRecipient(
+    val userId: Long,
+    val tgId: Long,
+    val language: String,
+)
+
+private data class AdminBroadcastStats(
+    val total: Int,
+    var sent: Int = 0,
+    var blocked: Int = 0,
+    var badRecipient: Int = 0,
+    var rateLimited: Int = 0,
+    var failed: Int = 0,
+    var skippedBlank: Int = 0,
+)
 
 private fun parseAdminDate(value: String): LocalDate {
     val trimmed = value.trim()
@@ -122,7 +143,8 @@ data class BroadcastReq(
 @Serializable
 data class BroadcastResp(
     val status: String,
-    val count: Int
+    val count: Int,
+    val broadcastId: String? = null
 )
 
 @Serializable
@@ -604,25 +626,159 @@ fun Application.adminApiRoutes(env: Env) {
 
             post("/broadcast") {
                 val req = call.receive<BroadcastReq>()
+                val broadcastId = UUID.randomUUID().toString()
                 val users = transaction {
                     Users.select { Users.tgId.isNotNull() }.map {
-                        it[Users.tgId]!! to (it[Users.language] ?: "en")
+                        AdminBroadcastRecipient(
+                            userId = it[Users.id].value,
+                            tgId = it[Users.tgId]!!,
+                            language = it[Users.language],
+                        )
                     }
                 }
+                Metrics.counter("admin_broadcast_runs_total", mapOf("result" to "started"))
+                Metrics.gauge("admin_broadcast_last_recipients", users.size)
+                adminBroadcastLog.info(
+                    "broadcast {} started recipients={} textRuLength={} textEnLength={} delayMs={}",
+                    broadcastId,
+                    users.size,
+                    req.textRu.length,
+                    req.textEn.length,
+                    ADMIN_BROADCAST_DELAY_MS
+                )
 
                 broadcastScope.launch {
-                    users.forEach { (tgId, lang) ->
-                        val msg = if (lang == "ru" && req.textRu.isNotBlank()) req.textRu else req.textEn
+                    val stats = AdminBroadcastStats(total = users.size)
+                    users.forEachIndexed { index, recipient ->
+                        val msg = if (recipient.language == "ru" && req.textRu.isNotBlank()) req.textRu else req.textEn
                         if (msg.isNotBlank()) {
                             try {
-                                bot.sendMessage(tgId, msg)
+                                bot.sendMessage(recipient.tgId, msg)
+                                stats.sent += 1
+                                Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "sent"))
+                            } catch (e: TelegramApiException) {
+                                when (e.code) {
+                                    403 -> {
+                                        stats.blocked += 1
+                                        Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "blocked"))
+                                        adminBroadcastLog.warn(
+                                            "broadcast {} userId={} chatId={} blocked bot; skipping",
+                                            broadcastId,
+                                            recipient.userId,
+                                            recipient.tgId
+                                        )
+                                    }
+                                    400, 404 -> {
+                                        stats.badRecipient += 1
+                                        Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "bad_recipient"))
+                                        adminBroadcastLog.warn(
+                                            "broadcast {} failed userId={} chatId={} code={} message={}",
+                                            broadcastId,
+                                            recipient.userId,
+                                            recipient.tgId,
+                                            e.code,
+                                            e.message
+                                        )
+                                    }
+                                    429 -> {
+                                        stats.rateLimited += 1
+                                        Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "rate_limited"))
+                                        val retryDelayMs = ((e.retryAfterSeconds ?: 1) + 1).coerceAtMost(60).toLong() * 1_000L
+                                        adminBroadcastLog.warn(
+                                            "broadcast {} rate limited userId={} chatId={} retryAfterSeconds={} message={}",
+                                            broadcastId,
+                                            recipient.userId,
+                                            recipient.tgId,
+                                            e.retryAfterSeconds,
+                                            e.message
+                                        )
+                                        delay(retryDelayMs)
+                                        try {
+                                            bot.sendMessage(recipient.tgId, msg)
+                                            stats.sent += 1
+                                            Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "sent_after_retry"))
+                                        } catch (retryError: Exception) {
+                                            stats.failed += 1
+                                            Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "failed_after_retry"))
+                                            adminBroadcastLog.error(
+                                                "broadcast {} retry failed userId={} chatId={}",
+                                                broadcastId,
+                                                recipient.userId,
+                                                recipient.tgId,
+                                                retryError
+                                            )
+                                        }
+                                    }
+                                    else -> {
+                                        stats.failed += 1
+                                        Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "failed"))
+                                        adminBroadcastLog.error(
+                                            "broadcast {} sendMessage failed userId={} chatId={} code={} message={}",
+                                            broadcastId,
+                                            recipient.userId,
+                                            recipient.tgId,
+                                            e.code,
+                                            e.message,
+                                            e
+                                        )
+                                    }
+                                }
                             } catch (e: Exception) {
-                                // Ignore errors for blocked users
+                                stats.failed += 1
+                                Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "failed"))
+                                adminBroadcastLog.error(
+                                    "broadcast {} sendMessage failed userId={} chatId={}",
+                                    broadcastId,
+                                    recipient.userId,
+                                    recipient.tgId,
+                                    e
+                                )
                             }
+                        } else {
+                            stats.skippedBlank += 1
+                            Metrics.counter("admin_broadcast_messages_total", mapOf("result" to "skipped_blank"))
+                        }
+                        if ((index + 1) % 100 == 0 || index == users.lastIndex) {
+                            adminBroadcastLog.info(
+                                "broadcast {} progress processed={}/{} sent={} blocked={} badRecipient={} rateLimited={} failed={} skippedBlank={}",
+                                broadcastId,
+                                index + 1,
+                                stats.total,
+                                stats.sent,
+                                stats.blocked,
+                                stats.badRecipient,
+                                stats.rateLimited,
+                                stats.failed,
+                                stats.skippedBlank
+                            )
+                        }
+                        if (index < users.lastIndex) {
+                            delay(ADMIN_BROADCAST_DELAY_MS)
                         }
                     }
+                    Metrics.counter("admin_broadcast_runs_total", mapOf("result" to "completed"))
+                    Metrics.gauge("admin_broadcast_last_sent", stats.sent)
+                    Metrics.gauge("admin_broadcast_last_blocked", stats.blocked)
+                    Metrics.gauge("admin_broadcast_last_bad_recipients", stats.badRecipient)
+                    Metrics.gauge("admin_broadcast_last_rate_limited", stats.rateLimited)
+                    Metrics.gauge("admin_broadcast_last_failed", stats.failed)
+                    Metrics.gauge("admin_broadcast_last_skipped_blank", stats.skippedBlank)
+                    adminBroadcastLog.info(
+                        "broadcast {} complete total={} sent={} blocked={} badRecipient={} rateLimited={} failed={} skippedBlank={}",
+                        broadcastId,
+                        stats.total,
+                        stats.sent,
+                        stats.blocked,
+                        stats.badRecipient,
+                        stats.rateLimited,
+                        stats.failed,
+                        stats.skippedBlank
+                    )
                 }
-                call.respond(HttpStatusCode.Accepted, BroadcastResp(status = "Broadcast started", count = users.size))
+                call.respond(
+                    HttpStatusCode.Accepted,
+                    BroadcastResp(status = "Broadcast started", count = users.size, broadcastId = broadcastId)
+                )
             }
         }
     }

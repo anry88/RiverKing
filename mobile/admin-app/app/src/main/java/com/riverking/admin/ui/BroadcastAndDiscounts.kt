@@ -82,7 +82,8 @@ fun BroadcastScreen(apiClient: AdminApiClient, onBack: () -> Unit) {
                             isSending = true
                             try {
                                 val resp = apiClient.sendBroadcast(BroadcastReq(textRu, textEn))
-                                snackbarHostState.showSnackbar("✅ Broadcast queued to ${resp.count} users")
+                                val suffix = resp.broadcastId?.let { " ($it)" }.orEmpty()
+                                snackbarHostState.showSnackbar("✅ Broadcast queued to ${resp.count} users$suffix")
                                 textRu = ""
                                 textEn = ""
                             } catch (e: Exception) {
