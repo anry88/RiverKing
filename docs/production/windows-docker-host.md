@@ -61,7 +61,7 @@ Use a two-stage rollout to keep downtime short:
    scripts/migrate-hdc-sqlite-to-postgres.sh --environment prod
    ```
 
-   The migration script pulls the pgloader image and starts PostgreSQL before stopping the app. During downtime it stops only the app, backs up `riverking.db`, imports the final SQLite snapshot into PostgreSQL, switches `DATABASE_URL` in the Windows env file, and starts the app again.
+   The migration script pulls the pgloader image and starts PostgreSQL before stopping the app. During downtime it stops only the app, backs up `riverking.db`, imports the final SQLite snapshot into PostgreSQL, normalizes SQLite date/time text columns to PostgreSQL `timestamp` and `date` types, switches `DATABASE_URL` in the Windows env file, and starts the app again.
 
 4. Verify:
 

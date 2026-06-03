@@ -125,6 +125,39 @@ $dbFile = Join-Path $dataDir "riverking.db"
 $loadFile = Join-Path $dataDir "sqlite-to-postgres.load"
 $networkName = "${projectName}_default"
 $postgresJdbcUrl = "jdbc:postgresql://postgres:5432/$postgresDb"
+$normalizeTemporalColumnsSql = @"
+ALTER TABLE accountdeletionrequests ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE accountlinksessions ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp, ALTER COLUMN expires_at TYPE timestamp USING NULLIF(expires_at,'')::timestamp, ALTER COLUMN completed_at TYPE timestamp USING NULLIF(completed_at,'')::timestamp, ALTER COLUMN consumed_at TYPE timestamp USING NULLIF(consumed_at,'')::timestamp;
+ALTER TABLE achievementprogress ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE authidentities ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp, ALTER COLUMN last_login_at TYPE timestamp USING NULLIF(last_login_at,'')::timestamp;
+ALTER TABLE authsessions ALTER COLUMN expires_at TYPE timestamp USING NULLIF(expires_at,'')::timestamp, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE catches ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE clubchatmessages ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE clubmembers ALTER COLUMN joined_at TYPE timestamp USING NULLIF(joined_at,'')::timestamp;
+ALTER TABLE clubquestprogress ALTER COLUMN period_start TYPE date USING NULLIF(period_start,'')::date, ALTER COLUMN completed_at TYPE timestamp USING NULLIF(completed_at,'')::timestamp, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp, ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE clubquestmemberprogress ALTER COLUMN period_start TYPE date USING NULLIF(period_start,'')::date, ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE clubquestrewardrecipients ALTER COLUMN period_start TYPE date USING NULLIF(period_start,'')::date, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE clubs ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE clubweeklycontributions ALTER COLUMN week_start TYPE date USING NULLIF(week_start,'')::date;
+ALTER TABLE clubweeklysnapshots ALTER COLUMN week_start TYPE date USING NULLIF(week_start,'')::date;
+ALTER TABLE clubweeklyrewards ALTER COLUMN week_start TYPE date USING NULLIF(week_start,'')::date, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE passwordcredentials ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp, ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE payments ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE paysupportrequests ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE pendingcatches ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE questprogress ALTER COLUMN period_start TYPE date USING NULLIF(period_start,'')::date, ALTER COLUMN completed_at TYPE timestamp USING NULLIF(completed_at,'')::timestamp, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp, ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE ratingprizes ALTER COLUMN prize_date TYPE date USING NULLIF(prize_date,'')::date, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE referrallinks ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE shopdiscounts ALTER COLUMN start_date TYPE date USING NULLIF(start_date,'')::date, ALTER COLUMN end_date TYPE date USING NULLIF(end_date,'')::date;
+ALTER TABLE specialeventcatches ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE specialeventclubprogress ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE specialeventprizes ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE specialeventrewardruns ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE specialevents ALTER COLUMN start_time TYPE timestamp USING NULLIF(start_time,'')::timestamp, ALTER COLUMN end_time TYPE timestamp USING NULLIF(end_time,'')::timestamp, ALTER COLUMN created_at TYPE timestamp USING NULLIF(created_at,'')::timestamp;
+ALTER TABLE specialeventuserprogress ALTER COLUMN started_at TYPE timestamp USING NULLIF(started_at,'')::timestamp, ALTER COLUMN updated_at TYPE timestamp USING NULLIF(updated_at,'')::timestamp;
+ALTER TABLE subscriptionnotifications ALTER COLUMN expires_at TYPE timestamp USING NULLIF(expires_at,'')::timestamp, ALTER COLUMN sent_at TYPE timestamp USING NULLIF(sent_at,'')::timestamp;
+ALTER TABLE tournaments ALTER COLUMN start_time TYPE timestamp USING NULLIF(start_time,'')::timestamp, ALTER COLUMN end_time TYPE timestamp USING NULLIF(end_time,'')::timestamp;
+"@
 
 Assert-PathExists $dbFile
 New-Item -ItemType Directory -Force -Path $postgresDataDir | Out-Null
@@ -180,6 +213,18 @@ try {
 } finally {
   Remove-Item -Force -LiteralPath $loadFile -ErrorAction SilentlyContinue
 }
+
+Write-Host "Normalizing SQLite date/time columns in PostgreSQL..."
+Invoke-Compose @(
+  "exec",
+  "-T",
+  "postgres",
+  "psql",
+  "-v", "ON_ERROR_STOP=1",
+  "-U", $postgresUser,
+  "-d", $postgresDb,
+  "-c", $normalizeTemporalColumnsSql
+)
 
 $envBackup = "$envFile.before-postgres-switch-$timestamp"
 Copy-Item -Force -LiteralPath $envFile -Destination $envBackup
