@@ -24,6 +24,7 @@ import com.riverking.mobile.auth.PrizeDto
 import com.riverking.mobile.auth.QuestListDto
 import com.riverking.mobile.auth.ReferralInfoDto
 import com.riverking.mobile.auth.ReferralRewardDto
+import com.riverking.mobile.auth.RecentDto
 import com.riverking.mobile.auth.ShopCategoryDto
 import com.riverking.mobile.auth.SpecialEventResponseDto
 import com.riverking.mobile.auth.StartCastResultDto
@@ -1929,8 +1930,7 @@ class RiverKingViewModel(
                     success = success,
                 )
                 val isNewFish = cast.catch?.fishId?.let { fishId -> fishId !in previousCaughtFishIds } == true
-                val me = repository.refreshProfile()
-                applyProfileUpdate(me)
+                applyPostCatchProfileUpdate(cast, isNewFish)
                 _state.update {
                     it.copy(
                         fishing = it.fishing.copy(
@@ -1948,7 +1948,7 @@ class RiverKingViewModel(
                     loadTournaments(force = true)
                     if (state.value.club.loaded) loadClub(force = true)
                 }
-                startCooldown(triggerAutoCast = cast.caught && me.autoFish && state.value.fishing.autoCastEnabled)
+                startCooldown(triggerAutoCast = cast.caught && cast.autoFish && state.value.fishing.autoCastEnabled)
                 val caught = cast.catch
                 if (caught != null) {
                     delay(CATCH_DETAILS_OPEN_DELAY_MILLIS)
@@ -1965,6 +1965,61 @@ class RiverKingViewModel(
                 _state.update { it.copy(error = message) }
                 startCooldown(triggerAutoCast = false)
             }
+        }
+    }
+
+    private fun applyPostCatchProfileUpdate(cast: CastResultDto, isNewFish: Boolean) {
+        _state.update { current ->
+            val me = current.me ?: return@update current
+            val caught = cast.catch
+            val nextMe = if (cast.caught && caught != null) {
+                val nextTotalWeight = me.totalWeight + caught.weight
+                val nextTodayWeight = me.todayWeight + caught.weight
+                val nextRecent = RecentDto(
+                    id = caught.id,
+                    fish = caught.fish,
+                    weight = caught.weight,
+                    location = caught.location,
+                    rarity = caught.rarity,
+                    at = caught.at ?: java.time.Instant.now().toString(),
+                )
+                val nextCaughtFishIds = caught.fishId
+                    ?.takeIf { isNewFish }
+                    ?.let { fishId -> me.caughtFishIds + fishId }
+                    ?: me.caughtFishIds
+                me.copy(
+                    totalWeight = nextTotalWeight,
+                    todayWeight = nextTodayWeight,
+                    locations = me.locations.map { location ->
+                        if (location.unlocked || location.isEvent || nextTotalWeight < location.unlockKg) {
+                            location
+                        } else {
+                            location.copy(unlocked = true)
+                        }
+                    },
+                    rods = me.rods.map { rod ->
+                        if (rod.unlocked || nextTotalWeight < rod.unlockKg) {
+                            rod
+                        } else {
+                            rod.copy(unlocked = true)
+                        }
+                    },
+                    caughtFishIds = nextCaughtFishIds,
+                    recent = (listOf(nextRecent) + me.recent).take(5),
+                    coins = cast.totalCoins ?: (me.coins + cast.coins + cast.questUpdates.sumOf { it.rewardCoins }),
+                    todayCoins = cast.todayCoins ?: (me.todayCoins + cast.coins),
+                    autoFish = cast.autoFish,
+                )
+            } else {
+                me.copy(autoFish = cast.autoFish)
+            }
+            current.copy(
+                me = nextMe,
+                fishing = current.fishing.copy(autoCastEnabled = current.fishing.autoCastEnabled && cast.autoFish),
+                ratings = current.ratings.copy(
+                    locationId = normalizeSelectedLocation(current.ratings.locationId, nextMe),
+                ),
+            )
         }
     }
 

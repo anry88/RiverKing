@@ -721,7 +721,7 @@ fun Application.apiRoutes(
         )
 
     suspend fun ApplicationCall.requireUserId(): Long? {
-        sessions.get<AppSession>()?.userId?.let { return fishing.ensureUserById(it) }
+        sessions.get<AppSession>()?.userId?.let { return fishing.touchAuthenticatedUserById(it) }
         bearerToken()?.let { token ->
             auth.resolveAccessToken(token)?.let { return it }
         }

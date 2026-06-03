@@ -1166,20 +1166,7 @@ function App(){
           })),
           { level: progressLevel, xp: Math.round(newTotal) }
         );
-        try{
-          const ct = await fetch(`/api/tournament/current`,{credentials:'include'});
-          if(ct.status===200){
-            setCurrentTournament(await ct.json());
-          } else {
-            setCurrentTournament(null);
-          }
-          const ce = await fetch(`/api/events/current`,{credentials:'include'});
-          if(ce.status===200){
-            setCurrentEvent(await ce.json());
-          } else {
-            setCurrentEvent(null);
-          }
-        }catch(e){}
+        refreshPostCatchBoards();
       } else {
         setError(t('fishEscaped'));
       }
@@ -1244,6 +1231,29 @@ function App(){
     if(next >= tapGoalRef.current){
       finishTap(true);
     }
+  }
+
+  async function refreshPostCatchBoards(){
+    try{
+      const [ct, ce] = await Promise.all([
+        fetch(`/api/tournament/current`,{credentials:'include'}).catch(()=>null),
+        fetch(`/api/events/current`,{credentials:'include'}).catch(()=>null)
+      ]);
+      if(ct){
+        if(ct.status===200){
+          setCurrentTournament(await ct.json());
+        } else {
+          setCurrentTournament(null);
+        }
+      }
+      if(ce){
+        if(ce.status===200){
+          setCurrentEvent(await ce.json());
+        } else {
+          setCurrentEvent(null);
+        }
+      }
+    }catch(e){}
   }
 
   async function cast(auto=false, visualSpot=null){
