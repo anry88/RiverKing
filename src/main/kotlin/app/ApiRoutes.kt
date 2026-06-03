@@ -106,8 +106,29 @@ fun Application.apiRoutes(
     // when logging each incoming request. Intercepting earlier can
     // cause SessionNotYetConfiguredException for routes like `/app`
     // that are served before the Sessions plugin runs.
+    suspend fun ApplicationCall.requestBodyForLog(path: String): String {
+        if (request.httpMethod !in listOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch)) return ""
+        if (path == "/bot") {
+            val length = request.headers[HttpHeaders.ContentLength]
+            return if (length == null) "<redacted>" else "<redacted:${length}b>"
+        }
+        return try {
+            val text = receiveText()
+            if (text.length <= 512) {
+                text
+            } else {
+                text.take(512) + "...[truncated ${text.length} chars]"
+            }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     intercept(ApplicationCallPipeline.Plugins) {
         val path = call.request.path()
+        val method = call.request.httpMethod.value
+        val trackRequest = path != "/metrics"
+        val startedAtNanos = System.nanoTime()
         if (
             path.startsWith("/api/") &&
             path != "/api/mobile/update" &&
@@ -116,20 +137,25 @@ fun Application.apiRoutes(
             val update = androidUpdates.checkFromHeaders(call.request.headers)
             if (update.mandatory) {
                 call.respond(HttpStatusCode.UpgradeRequired, update)
+                if (trackRequest) {
+                    Metrics.counter("api_call_total", mapOf("path" to path, "method" to method))
+                    Metrics.counter(
+                        "api_call_status_total",
+                        mapOf("path" to path, "method" to method, "status" to HttpStatusCode.UpgradeRequired.value.toString()),
+                    )
+                }
                 finish()
                 return@intercept
             }
         }
-        if (path != "/metrics") {
+        if (trackRequest) {
             val session = call.sessions.get<AppSession>()
             val userId = session?.userId
             val params = call.parameters.entries().associate { it.key to it.value.joinToString(",") }
-            val body = if (call.request.httpMethod in listOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch)) {
-                try { call.receiveText() } catch (_: Exception) { "" }
-            } else ""
+            val body = call.requestBodyForLog(path)
             log.info(
                 "call {} {} userId={} params={} body={}",
-                call.request.httpMethod.value,
+                method,
                 call.request.uri,
                 userId,
                 params,
@@ -139,11 +165,34 @@ fun Application.apiRoutes(
                 "api_call_total",
                 mapOf(
                     "path" to path,
-                    "method" to call.request.httpMethod.value
+                    "method" to method
                 )
             )
         }
-        proceed()
+        try {
+            proceed()
+        } finally {
+            if (trackRequest) {
+                val durationMs = (System.nanoTime() - startedAtNanos) / 1_000_000.0
+                val tags = mapOf("path" to path, "method" to method)
+                Metrics.counter("api_call_duration_ms_count", tags)
+                Metrics.counter("api_call_duration_ms_sum", tags, durationMs)
+                Metrics.gauge("api_call_duration_ms_last", durationMs, tags)
+                call.response.status()?.let { status ->
+                    Metrics.counter(
+                        "api_call_status_total",
+                        tags + ("status" to status.value.toString()),
+                    )
+                }
+                log.info(
+                    "done {} {} status={} durationMs={}",
+                    method,
+                    call.request.uri,
+                    call.response.status()?.value ?: 0,
+                    "%.1f".format(java.util.Locale.US, durationMs),
+                )
+            }
+        }
     }
 
     @Serializable

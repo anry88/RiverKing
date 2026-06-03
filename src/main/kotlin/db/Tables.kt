@@ -90,6 +90,7 @@ object DB {
                 ClubChatMessages,
                 SubscriptionNotifications,
             )
+            ensurePerformanceIndexes(env)
             migrateFishNames()
             seedIfEmpty()
             seedAchievements()
@@ -98,6 +99,59 @@ object DB {
             sanitizeExistingNicknames()
             backfillTelegramIdentities()
         }
+    }
+
+    private fun ensurePerformanceIndexes(env: Env) {
+        if (!env.dbUrl.startsWith("jdbc:sqlite:", ignoreCase = true)) return
+        val tx = TransactionManager.current()
+        val catches = Catches.tableName
+        val achievementProgress = AchievementProgress.tableName
+        val questProgress = QuestProgress.tableName
+        val ratingPrizes = RatingPrizes.tableName
+        val userPrizes = UserPrizes.tableName
+        val specialEventCatches = SpecialEventCatches.tableName
+        val specialEventPrizes = SpecialEventPrizes.tableName
+        val specialEventUserProgress = SpecialEventUserProgress.tableName
+        val clubChatMessages = ClubChatMessages.tableName
+        val clubWeeklyRewards = ClubWeeklyRewards.tableName
+        val payments = Payments.tableName
+        val referralLinks = ReferralLinks.tableName
+        val referralRewards = ReferralRewards.tableName
+        val users = Users.tableName
+        val authSessions = AuthSessions.tableName
+        val accountLinkSessions = AccountLinkSessions.tableName
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_created_at ON $catches(user_id, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_created_at ON $catches(created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_location_created_at ON $catches(location_id, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_fish_created_at ON $catches(fish_id, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_location_created_at ON $catches(user_id, location_id, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_fish_created_at ON $catches(user_id, fish_id, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_weight ON $catches(user_id, weight)")
+        tx.exec("CREATE INDEX IF NOT EXISTS AchievementProgress_user_achievement ON $achievementProgress(user_id, achievement_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS QuestProgress_user_period_start ON $questProgress(user_id, period, period_start)")
+        tx.exec("CREATE INDEX IF NOT EXISTS RatingPrizes_prize_date ON $ratingPrizes(prize_date)")
+        tx.exec("CREATE INDEX IF NOT EXISTS RatingPrizes_user_claimed ON $ratingPrizes(user_id, claimed)")
+        tx.exec("CREATE INDEX IF NOT EXISTS UserPrizes_user ON $userPrizes(user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventCatches_event_progress ON $specialEventCatches(event_id, progress_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventCatches_event_user ON $specialEventCatches(event_id, user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_event ON $specialEventPrizes(event_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_user_claimed ON $specialEventPrizes(user_id, claimed)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_user_event ON $specialEventPrizes(user_id, event_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventUserProgress_event_club_user_active ON $specialEventUserProgress(event_id, club_id, user_id, active)")
+        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventUserProgress_user_event_active ON $specialEventUserProgress(user_id, event_id, active)")
+        tx.exec("CREATE INDEX IF NOT EXISTS ClubChatMessages_club_id ON $clubChatMessages(club_id, id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS ClubWeeklyRewards_club_week ON $clubWeeklyRewards(club_id, week_start)")
+        tx.exec("CREATE INDEX IF NOT EXISTS ClubWeeklyRewards_user_claimed ON $clubWeeklyRewards(user_id, claimed)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Payments_user_refunded_created_at ON $payments(user_id, refunded, created_at)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Payments_provider_charge_refunded ON $payments(provider_charge_id, refunded)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Payments_telegram_charge_refunded ON $payments(telegram_charge_id, refunded)")
+        tx.exec("CREATE INDEX IF NOT EXISTS ReferralLinks_user ON $referralLinks(user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS ReferralRewards_user_claimed ON $referralRewards(user_id, claimed)")
+        tx.exec("CREATE INDEX IF NOT EXISTS Users_referred_by ON $users(referred_by)")
+        tx.exec("CREATE INDEX IF NOT EXISTS AuthSessions_user ON $authSessions(user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_requester_user ON $accountLinkSessions(requester_user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_resolved_user ON $accountLinkSessions(resolved_user_id)")
+        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_telegram_user ON $accountLinkSessions(telegram_user_id)")
     }
 
     private fun ensureUsersTableAllowsNullableTelegramId(env: Env) {
