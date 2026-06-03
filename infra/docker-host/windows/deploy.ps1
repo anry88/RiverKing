@@ -2,7 +2,7 @@ param(
   [ValidateSet("prod", "test")]
   [string]$Environment = "prod",
 
-  [string]$Root = "D:\riverking",
+  [string]$Root = "D:\Apps\RiverKing",
 
   [string]$DockerConfig = "D:\HomeDataCenter\.docker-empty",
 
