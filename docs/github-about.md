@@ -21,4 +21,4 @@ Suggested topics:
 
 Website:
 
-- `https://t.me/river_king_bot/app`
+- `https://riverking.tg-games.com/app`

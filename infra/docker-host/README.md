@@ -18,10 +18,10 @@ The stack intentionally keeps runtime state outside Docker:
 ## Default Windows Layout
 
 ```text
-D:\riverking\env\prod.env
-D:\riverking\config\prod\config.properties
-D:\riverking\state\prod\riverking.db
-D:\riverking\deploy\prod\repo\infra\docker-host
+D:\Apps\RiverKing\env\prod.env
+D:\Apps\RiverKing\config\prod\config.properties
+D:\Apps\RiverKing\state\prod\riverking.db
+D:\Apps\RiverKing\deploy\prod\repo\infra\docker-host
 ```
 
 Use the same layout with `test` for a parallel test environment.

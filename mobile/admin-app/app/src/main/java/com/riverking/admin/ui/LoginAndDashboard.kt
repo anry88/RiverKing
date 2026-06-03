@@ -33,11 +33,21 @@ data class ServerEntry(
 )
 
 private val json = Json { ignoreUnknownKeys = true }
+private const val productionServerName = "Production"
+private const val productionServerUrl = "https://riverking.tg-games.com"
+private val retiredProductionServerUrls = setOf(
+    "https://v706947.hosted-by-vdsina.com",
+)
 
 fun loadServers(context: Context): List<ServerEntry> {
     val prefs = context.getSharedPreferences("AdminPrefs", Context.MODE_PRIVATE)
     val raw = prefs.getString("servers_json", null) ?: return emptyList()
-    return try { json.decodeFromString(raw) } catch (_: Exception) { emptyList() }
+    val servers = try { json.decodeFromString<List<ServerEntry>>(raw) } catch (_: Exception) { emptyList() }
+    val migrated = migrateServers(servers)
+    if (migrated != servers) {
+        saveServers(context, migrated)
+    }
+    return migrated
 }
 
 fun saveServers(context: Context, servers: List<ServerEntry>) {
@@ -45,6 +55,24 @@ fun saveServers(context: Context, servers: List<ServerEntry>) {
         .edit()
         .putString("servers_json", json.encodeToString(servers))
         .apply()
+}
+
+private fun migrateServers(servers: List<ServerEntry>): List<ServerEntry> {
+    return servers.map { server ->
+        val normalizedUrl = server.url.trimEnd('/')
+        if (normalizedUrl in retiredProductionServerUrls) {
+            server.copy(
+                name = if (server.name == normalizedUrl || server.name.contains("v706947")) {
+                    productionServerName
+                } else {
+                    server.name
+                },
+                url = productionServerUrl,
+            )
+        } else {
+            server.copy(url = normalizedUrl)
+        }
+    }
 }
 
 fun getActiveServerIndex(context: Context): Int {
@@ -192,8 +220,8 @@ fun AddServerDialog(
     onDismiss: () -> Unit,
     onAdd: (ServerEntry) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("https://") }
+    var name by remember { mutableStateOf(productionServerName) }
+    var url by remember { mutableStateOf(productionServerUrl) }
     var token by remember { mutableStateOf("") }
     var tokenVisible by remember { mutableStateOf(false) }
 

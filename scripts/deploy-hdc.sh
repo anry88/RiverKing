@@ -12,7 +12,7 @@ Options:
   --tag TAG                Image tag. Default: hdc-<current-git-short-sha>.
   --remote HOST            SSH host alias for the Windows machine. Default: hdc.
   --docker-context NAME    Docker context for the Windows Docker engine. Default: hdc.
-  --root PATH              Windows root directory. Default: D:\riverking.
+  --root PATH              Windows root directory. Default: D:\Apps\RiverKing.
   --docker-config PATH     Windows Docker config path. Default: D:\HomeDataCenter\.docker-empty.
   --seed-config PATH       Copy an external config.properties to the Windows host before deploy.
   --seed-db PATH           Copy a SQLite backup to riverking.db before deploy.
@@ -40,7 +40,7 @@ require_cmd() {
 ENVIRONMENT="prod"
 REMOTE_HOST="${HDC_REMOTE_HOST:-hdc}"
 DOCKER_CONTEXT="${HDC_DOCKER_CONTEXT:-hdc}"
-WINDOWS_ROOT="${HDC_RIVERKING_ROOT:-D:\\riverking}"
+WINDOWS_ROOT="${HDC_RIVERKING_ROOT:-D:\\Apps\\RiverKing}"
 WINDOWS_DOCKER_CONFIG="${HDC_WINDOWS_DOCKER_CONFIG:-D:\\HomeDataCenter\\.docker-empty}"
 IMAGE_TAG=""
 SEED_CONFIG=""
