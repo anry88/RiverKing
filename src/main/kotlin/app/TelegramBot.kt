@@ -27,7 +27,11 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class TelegramApiException(val code: Int, message: String) : IOException(message)
+class TelegramApiException(
+    val code: Int,
+    message: String,
+    val retryAfterSeconds: Int? = null,
+) : IOException(message)
 
 @Serializable
 data class BotCommand(val command: String, val description: String)
@@ -64,25 +68,28 @@ class TelegramBot(
 
     private suspend fun HttpResponse.ensureSuccess() {
         val body = bodyAsText()
+        val payload = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
+        val description = payload?.get("description")?.jsonPrimitive?.content
+        val errorCode = payload?.get("error_code")?.jsonPrimitive?.intOrNull
+        val retryAfterSeconds = payload
+            ?.get("parameters")
+            ?.jsonObject
+            ?.get("retry_after")
+            ?.jsonPrimitive
+            ?.intOrNull
         if (!status.isSuccess()) {
-            val desc = runCatching {
-                Json.parseToJsonElement(body).jsonObject["description"]?.jsonPrimitive?.content
-            }.getOrNull()
             val message = buildString {
                 append("HTTP ${status.value}")
-                if (!desc.isNullOrBlank()) append(": ").append(desc)
+                if (!description.isNullOrBlank()) append(": ").append(description)
             }
-            throw TelegramApiException(status.value, message)
+            throw TelegramApiException(errorCode ?: status.value, message, retryAfterSeconds)
         }
 
-        val payload = runCatching { Json.parseToJsonElement(body).jsonObject }.getOrNull()
         if (payload?.get("ok")?.jsonPrimitive?.booleanOrNull == false) {
-            val description = payload["description"]?.jsonPrimitive?.content
-            val errorCode = payload["error_code"]?.jsonPrimitive?.intOrNull
             val message = description?.let { desc ->
                 if (errorCode != null) "HTTP ${status.value} $errorCode: $desc" else desc
             } ?: "Telegram returned ok=false"
-            throw TelegramApiException(errorCode ?: status.value, message)
+            throw TelegramApiException(errorCode ?: status.value, message, retryAfterSeconds)
         }
     }
 
