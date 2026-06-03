@@ -14,6 +14,8 @@ Options:
   --docker-context NAME    Docker context for the Windows Docker engine. Default: hdc.
   --root PATH              Windows root directory. Default: D:\Apps\RiverKing.
   --docker-config PATH     Windows Docker config path. Default: D:\HomeDataCenter\.docker-empty.
+  --database sqlite|postgres
+                           Runtime database for the app. Default: sqlite.
   --seed-config PATH       Copy an external config.properties to the Windows host before deploy.
   --seed-db PATH           Copy a SQLite backup to riverking.db before deploy.
   --force-seed-db          Allow --seed-db to replace an existing remote riverking.db.
@@ -43,6 +45,7 @@ DOCKER_CONTEXT="${HDC_DOCKER_CONTEXT:-hdc}"
 WINDOWS_ROOT="${HDC_RIVERKING_ROOT:-D:\\Apps\\RiverKing}"
 WINDOWS_DOCKER_CONFIG="${HDC_WINDOWS_DOCKER_CONFIG:-D:\\HomeDataCenter\\.docker-empty}"
 IMAGE_TAG=""
+DATABASE_ENGINE="${HDC_RIVERKING_DATABASE:-sqlite}"
 SEED_CONFIG=""
 SEED_DB=""
 FORCE_SEED_DB=0
@@ -80,6 +83,11 @@ while [[ $# -gt 0 ]]; do
     --docker-config)
       [[ $# -ge 2 ]] || die "--docker-config requires a Windows path."
       WINDOWS_DOCKER_CONFIG="$2"
+      shift 2
+      ;;
+    --database)
+      [[ $# -ge 2 ]] || die "--database requires sqlite or postgres."
+      DATABASE_ENGINE="$2"
       shift 2
       ;;
     --seed-config)
@@ -123,6 +131,11 @@ case "$ENVIRONMENT" in
   *) die "--environment must be prod or test." ;;
 esac
 
+case "$DATABASE_ENGINE" in
+  sqlite|postgres) ;;
+  *) die "--database must be sqlite or postgres." ;;
+esac
+
 require_cmd docker
 require_cmd git
 require_cmd scp
@@ -136,6 +149,7 @@ remote_env="$WINDOWS_ROOT\\env\\$ENVIRONMENT.env"
 remote_config_dir="$WINDOWS_ROOT\\config\\$ENVIRONMENT"
 remote_config="$remote_config_dir\\config.properties"
 remote_data_dir="$WINDOWS_ROOT\\state\\$ENVIRONMENT"
+remote_postgres_data_dir="$remote_data_dir\\postgres"
 remote_db="$remote_data_dir\\riverking.db"
 remote_deploy_ps1="$remote_repo\\infra\\docker-host\\windows\\deploy.ps1"
 remote_infra_dir="$remote_repo\\infra\\docker-host"
@@ -161,12 +175,55 @@ windows_to_scp_path() {
   printf '%s' "${1//\\//}"
 }
 
+run_remote_ps() {
+  local command="$1"
+  ssh "$REMOTE_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$command\""
+}
+
+read_remote_env_value() {
+  local name="$1"
+  ssh "$REMOTE_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path -LiteralPath '$remote_env') { \\$line = Get-Content -LiteralPath '$remote_env' | Where-Object { \\$_ -match '^$name=' } | Select-Object -Last 1; if (\\$line) { \\$line.Substring($(( ${#name} + 1 ))) } }\"" 2>/dev/null | tr -d '\r' | tail -1 || true
+}
+
+generate_postgres_password() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 24
+  elif command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr -d '-'
+  else
+    printf 'riverking%s%s' "$(date +%s)" "$RANDOM"
+  fi
+}
+
 write_build_env() {
   local default_alias
+  local postgres_db
+  local postgres_user
+  local postgres_password
+  local database_url
   if [[ "$ENVIRONMENT" == "prod" ]]; then
     default_alias="riverking-prod-app"
   else
     default_alias="riverking-test-app"
+  fi
+
+  postgres_db="${RIVERKING_POSTGRES_DB:-riverking}"
+  postgres_user="${RIVERKING_POSTGRES_USER:-riverking}"
+  postgres_password="${RIVERKING_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-}}"
+  if [[ -z "$postgres_password" ]]; then
+    postgres_password="$(read_remote_env_value "POSTGRES_PASSWORD")"
+  fi
+  if [[ -z "$postgres_password" ]]; then
+    postgres_password="$(read_remote_env_value "DATABASE_PASSWORD")"
+  fi
+  if [[ -z "$postgres_password" ]]; then
+    postgres_password="$(generate_postgres_password)"
+  fi
+
+  if [[ "$DATABASE_ENGINE" == "postgres" ]]; then
+    database_url="jdbc:postgresql://postgres:5432/$postgres_db"
+  else
+    database_url="jdbc:sqlite:/data/riverking.db"
   fi
 
   cat > "$build_env" <<EOF
@@ -175,17 +232,19 @@ IMAGE_TAG=$IMAGE_TAG
 RIVERKING_IMAGE=riverking:$IMAGE_TAG
 RIVERKING_CONFIG_FILE=$remote_config
 RIVERKING_DATA_DIR=$remote_data_dir
+RIVERKING_POSTGRES_DATA_DIR=$remote_postgres_data_dir
+POSTGRES_DB=$postgres_db
+POSTGRES_USER=$postgres_user
+POSTGRES_PASSWORD=$postgres_password
+DATABASE_URL=$database_url
+DATABASE_USER=$postgres_user
+DATABASE_PASSWORD=$postgres_password
 EVENT_ASSETS_DIR=/data/event-assets
 PORT=5005
 JAVA_OPTS=-Xms256m -Xmx1024m -XX:+UseG1GC
 HDC_TUNNEL_NETWORK=hdc-tunnel
 TUNNEL_APP_ALIAS=$default_alias
 EOF
-}
-
-run_remote_ps() {
-  local command="$1"
-  ssh "$REMOTE_HOST" "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$command\""
 }
 
 sync_remote_env() {
@@ -201,10 +260,11 @@ sync_remote_infra() {
   scp "$repo_root/infra/docker-host/compose.yml" "$REMOTE_HOST:$(windows_to_scp_path "$remote_infra_dir")/compose.yml"
   scp "$repo_root/infra/docker-host/Dockerfile" "$REMOTE_HOST:$(windows_to_scp_path "$remote_infra_dir")/Dockerfile"
   scp "$repo_root/infra/docker-host/windows/deploy.ps1" "$REMOTE_HOST:$(windows_to_scp_path "$remote_infra_windows_dir")/deploy.ps1"
+  scp "$repo_root/infra/docker-host/windows/migrate-sqlite-to-postgres.ps1" "$REMOTE_HOST:$(windows_to_scp_path "$remote_infra_windows_dir")/migrate-sqlite-to-postgres.ps1"
 }
 
 seed_remote_files() {
-  run_remote_ps "New-Item -ItemType Directory -Force -Path '$remote_config_dir' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir\\logs' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir\\event-assets' | Out-Null"
+  run_remote_ps "New-Item -ItemType Directory -Force -Path '$remote_config_dir' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir\\logs' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_data_dir\\event-assets' | Out-Null; New-Item -ItemType Directory -Force -Path '$remote_postgres_data_dir' | Out-Null"
 
   if [[ -n "$SEED_CONFIG" ]]; then
     log "Seeding config to $remote_config"
@@ -256,7 +316,7 @@ smoke_test() {
   curl -fsS "$public_base_url/health" >/dev/null
 }
 
-log "Deploy target: environment=$ENVIRONMENT host=$REMOTE_HOST docker_context=$DOCKER_CONTEXT tag=$IMAGE_TAG"
+log "Deploy target: environment=$ENVIRONMENT host=$REMOTE_HOST docker_context=$DOCKER_CONTEXT database=$DATABASE_ENGINE tag=$IMAGE_TAG"
 write_build_env
 sync_remote_env
 sync_remote_infra

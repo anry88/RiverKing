@@ -1,6 +1,33 @@
 name: ${COMPOSE_PROJECT_NAME:-riverking-prod}
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-riverking}
+      POSTGRES_USER: ${POSTGRES_USER:-riverking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - type: bind
+        source: ${RIVERKING_POSTGRES_DATA_DIR:?RIVERKING_POSTGRES_DATA_DIR is required}
+        target: /var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - default
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-riverking} -d $${POSTGRES_DB:-riverking}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   app:
     image: ${RIVERKING_IMAGE:-riverking:${IMAGE_TAG:-local}}
     build:
@@ -10,6 +37,9 @@ services:
     restart: unless-stopped
     environment:
       CONFIG_PATH: /config/config.properties
+      DATABASE_URL: ${DATABASE_URL:-jdbc:sqlite:/data/riverking.db}
+      DATABASE_USER: ${DATABASE_USER:-postgres}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       EVENT_ASSETS_DIR: ${EVENT_ASSETS_DIR:-/data/event-assets}
       PORT: ${PORT:-5005}
       JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx1024m -XX:+UseG1GC}

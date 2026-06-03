@@ -90,19 +90,31 @@ Assert-PathExists $composeFile
 $envMap = Get-EnvMap -Path $envFile
 $configFile = $envMap["RIVERKING_CONFIG_FILE"]
 $dataDir = $envMap["RIVERKING_DATA_DIR"]
+$postgresDataDir = $envMap["RIVERKING_POSTGRES_DATA_DIR"]
+$databaseUrl = $envMap["DATABASE_URL"]
 if ([string]::IsNullOrWhiteSpace($configFile)) {
   throw "RIVERKING_CONFIG_FILE is required in $envFile"
 }
 if ([string]::IsNullOrWhiteSpace($dataDir)) {
   throw "RIVERKING_DATA_DIR is required in $envFile"
 }
+if ([string]::IsNullOrWhiteSpace($postgresDataDir)) {
+  $postgresDataDir = Join-Path $dataDir "postgres"
+}
+if ([string]::IsNullOrWhiteSpace($databaseUrl)) {
+  $databaseUrl = "jdbc:sqlite:/data/riverking.db"
+}
+$usesPostgres = $databaseUrl.StartsWith("jdbc:postgresql:", [System.StringComparison]::OrdinalIgnoreCase)
 
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $dataDir "logs") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $dataDir "event-assets") | Out-Null
+New-Item -ItemType Directory -Force -Path $postgresDataDir | Out-Null
 
 Assert-PathExists $configFile
-Assert-PathExists (Join-Path $dataDir "riverking.db")
+if (-not $usesPostgres) {
+  Assert-PathExists (Join-Path $dataDir "riverking.db")
+}
 
 if ($CheckOnly) {
   Write-Host "Docker-host deploy check passed."
@@ -111,6 +123,8 @@ if ($CheckOnly) {
   Write-Host "Compose file: $composeFile"
   Write-Host "Config file: $configFile"
   Write-Host "Data dir: $dataDir"
+  Write-Host "Postgres data dir: $postgresDataDir"
+  Write-Host "Database URL: $databaseUrl"
   Write-Host "Image tag: $ImageTag"
   exit 0
 }
@@ -122,12 +136,19 @@ Set-EnvValue -Path $envFile -Name "IMAGE_TAG" -Value $ImageTag
 Set-EnvValue -Path $envFile -Name "RIVERKING_IMAGE" -Value "riverking:$ImageTag"
 
 $dbFile = Join-Path $dataDir "riverking.db"
-$dbBackup = "$dbFile.before-deploy-$timestamp"
-Copy-Item -Force -LiteralPath $dbFile -Destination $dbBackup
+$dbBackup = $null
+if (-not $usesPostgres) {
+  $dbBackup = "$dbFile.before-deploy-$timestamp"
+  Copy-Item -Force -LiteralPath $dbFile -Destination $dbBackup
+}
 
 Write-Host "Updated IMAGE_TAG=$ImageTag"
 Write-Host "Env backup: $envBackup"
-Write-Host "Database backup: $dbBackup"
+if ($dbBackup) {
+  Write-Host "SQLite database backup: $dbBackup"
+} else {
+  Write-Host "SQLite database backup: skipped; runtime database is PostgreSQL"
+}
 
 Push-Location $composeDir
 try {
@@ -136,6 +157,9 @@ try {
     $upArgs += "--wait"
   }
 
+  if ($usesPostgres) {
+    Invoke-Compose ($upArgs + @("postgres"))
+  }
   Invoke-Compose ($upArgs + @("app"))
 } finally {
   Pop-Location

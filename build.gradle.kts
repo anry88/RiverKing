@@ -35,12 +35,13 @@ dependencies {
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.6")
 
-    // Exposed + SQLite
+    // Exposed + database drivers
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
+    implementation("org.postgresql:postgresql:42.7.4")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.twelvemonkeys.imageio:imageio-webp:3.13.1")

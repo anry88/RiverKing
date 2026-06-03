@@ -54,6 +54,15 @@ data class Env(
                 }
                 return null
             }
+            fun environmentOverrideValue(vararg names: String): String? {
+                names.forEach { name ->
+                    System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+                }
+                names.forEach { name ->
+                    props.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+                }
+                return null
+            }
             return Env(
                 botToken = configuredValue("BOT_TOKEN") ?: error("BOT_TOKEN required"),
                 telegramWebhookSecret =
@@ -67,9 +76,9 @@ data class Env(
                 androidDirectDownloadUrl =
                     configuredValue("RIVERKING_ANDROID_DIRECT_DOWNLOAD_URL", "ANDROID_DIRECT_DOWNLOAD_URL")
                         ?: "",
-                dbUrl = configuredValue("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
-                dbUser = configuredValue("DATABASE_USER") ?: "postgres",
-                dbPass = configuredValue("DATABASE_PASSWORD") ?: "postgres",
+                dbUrl = environmentOverrideValue("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
+                dbUser = environmentOverrideValue("DATABASE_USER") ?: "postgres",
+                dbPass = environmentOverrideValue("DATABASE_PASSWORD") ?: "postgres",
                 port = configuredValue("PORT")?.toIntOrNull() ?: 8080,
                 devMode = configuredValue("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
                 adminTgId = configuredValue("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,

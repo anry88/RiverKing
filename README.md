@@ -141,7 +141,7 @@ Admin-side tooling exists in bot flows and the internal Android admin app, but i
 
 - JDK 17+
 - Telegram bot token for real Telegram integration
-- A writable SQLite path or another configured database target
+- A writable SQLite path for local restores or a PostgreSQL database target
 - Android SDK, if you want to build the nested Android player client or admin app
 - `ADMIN_API_TOKEN`, if you want to use the internal admin Android app
 
@@ -220,7 +220,7 @@ Use [config.example.properties](config.example.properties) as the starting point
 
 ## Docker Host Deployment
 
-Windows Docker-host deployment files live in [infra/docker-host](infra/docker-host). The stack mounts `config.properties` and SQLite data from the host so runtime state is not stored inside Docker.
+Windows Docker-host deployment files live in [infra/docker-host](infra/docker-host). The stack mounts `config.properties`, app state, event assets, and PostgreSQL data from the host so runtime state is not stored inside Docker.
 
 See [docs/production/windows-docker-host.md](docs/production/windows-docker-host.md) for the `develop` -> `main` release flow and first restore from a VDS backup.
 

@@ -18,7 +18,8 @@ import org.jetbrains.exposed.sql.SortOrder
 
 object DB {
     fun init(env: Env) {
-        val databaseConfig = if (env.dbUrl.startsWith("jdbc:sqlite:")) {
+        val isSqlite = isSqliteUrl(env.dbUrl)
+        val databaseConfig = if (isSqlite) {
             DatabaseConfig {
                 defaultRepetitionAttempts = 10
                 defaultMinRepetitionDelay = 50
@@ -27,12 +28,14 @@ object DB {
         } else {
             DatabaseConfig {}
         }
-        // SQLite single-file DB. Path from env.DATABASE_URL, e.g. jdbc:sqlite:/data/riverking.db
+        // SQLite stays supported for local/test restores; production Docker can use PostgreSQL.
         Database.connect(
             url = env.dbUrl,
-            driver = "org.sqlite.JDBC",
+            driver = jdbcDriver(env.dbUrl),
+            user = if (isSqlite) "" else env.dbUser,
+            password = if (isSqlite) "" else env.dbPass,
             setupConnection = { connection ->
-                if (env.dbUrl.startsWith("jdbc:sqlite:")) {
+                if (isSqlite) {
                     connection.createStatement().use { stmt ->
                         stmt.execute("PRAGMA journal_mode=WAL")
                         stmt.execute("PRAGMA synchronous=NORMAL")
@@ -101,57 +104,69 @@ object DB {
         }
     }
 
+    private fun isSqliteUrl(dbUrl: String): Boolean =
+        dbUrl.startsWith("jdbc:sqlite:", ignoreCase = true)
+
+    private fun isPostgresUrl(dbUrl: String): Boolean =
+        dbUrl.startsWith("jdbc:postgresql:", ignoreCase = true)
+
+    private fun jdbcDriver(dbUrl: String): String =
+        when {
+            isSqliteUrl(dbUrl) -> "org.sqlite.JDBC"
+            isPostgresUrl(dbUrl) -> "org.postgresql.Driver"
+            else -> error("Unsupported DATABASE_URL driver: $dbUrl")
+        }
+
     private fun ensurePerformanceIndexes(env: Env) {
-        if (!env.dbUrl.startsWith("jdbc:sqlite:", ignoreCase = true)) return
+        if (!isSqliteUrl(env.dbUrl) && !isPostgresUrl(env.dbUrl)) return
         val tx = TransactionManager.current()
-        val catches = Catches.tableName
-        val achievementProgress = AchievementProgress.tableName
-        val questProgress = QuestProgress.tableName
-        val ratingPrizes = RatingPrizes.tableName
-        val userPrizes = UserPrizes.tableName
-        val specialEventCatches = SpecialEventCatches.tableName
-        val specialEventPrizes = SpecialEventPrizes.tableName
-        val specialEventUserProgress = SpecialEventUserProgress.tableName
-        val clubChatMessages = ClubChatMessages.tableName
-        val clubWeeklyRewards = ClubWeeklyRewards.tableName
-        val payments = Payments.tableName
-        val referralLinks = ReferralLinks.tableName
-        val referralRewards = ReferralRewards.tableName
-        val users = Users.tableName
-        val authSessions = AuthSessions.tableName
-        val accountLinkSessions = AccountLinkSessions.tableName
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_created_at ON $catches(user_id, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_created_at ON $catches(created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_location_created_at ON $catches(location_id, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_fish_created_at ON $catches(fish_id, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_location_created_at ON $catches(user_id, location_id, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_fish_created_at ON $catches(user_id, fish_id, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Catches_user_weight ON $catches(user_id, weight)")
-        tx.exec("CREATE INDEX IF NOT EXISTS AchievementProgress_user_achievement ON $achievementProgress(user_id, achievement_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS QuestProgress_user_period_start ON $questProgress(user_id, period, period_start)")
-        tx.exec("CREATE INDEX IF NOT EXISTS RatingPrizes_prize_date ON $ratingPrizes(prize_date)")
-        tx.exec("CREATE INDEX IF NOT EXISTS RatingPrizes_user_claimed ON $ratingPrizes(user_id, claimed)")
-        tx.exec("CREATE INDEX IF NOT EXISTS UserPrizes_user ON $userPrizes(user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventCatches_event_progress ON $specialEventCatches(event_id, progress_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventCatches_event_user ON $specialEventCatches(event_id, user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_event ON $specialEventPrizes(event_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_user_claimed ON $specialEventPrizes(user_id, claimed)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventPrizes_user_event ON $specialEventPrizes(user_id, event_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventUserProgress_event_club_user_active ON $specialEventUserProgress(event_id, club_id, user_id, active)")
-        tx.exec("CREATE INDEX IF NOT EXISTS SpecialEventUserProgress_user_event_active ON $specialEventUserProgress(user_id, event_id, active)")
-        tx.exec("CREATE INDEX IF NOT EXISTS ClubChatMessages_club_id ON $clubChatMessages(club_id, id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS ClubWeeklyRewards_club_week ON $clubWeeklyRewards(club_id, week_start)")
-        tx.exec("CREATE INDEX IF NOT EXISTS ClubWeeklyRewards_user_claimed ON $clubWeeklyRewards(user_id, claimed)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Payments_user_refunded_created_at ON $payments(user_id, refunded, created_at)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Payments_provider_charge_refunded ON $payments(provider_charge_id, refunded)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Payments_telegram_charge_refunded ON $payments(telegram_charge_id, refunded)")
-        tx.exec("CREATE INDEX IF NOT EXISTS ReferralLinks_user ON $referralLinks(user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS ReferralRewards_user_claimed ON $referralRewards(user_id, claimed)")
-        tx.exec("CREATE INDEX IF NOT EXISTS Users_referred_by ON $users(referred_by)")
-        tx.exec("CREATE INDEX IF NOT EXISTS AuthSessions_user ON $authSessions(user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_requester_user ON $accountLinkSessions(requester_user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_resolved_user ON $accountLinkSessions(resolved_user_id)")
-        tx.exec("CREATE INDEX IF NOT EXISTS AccountLinkSessions_telegram_user ON $accountLinkSessions(telegram_user_id)")
+        fun createIndex(name: String, tableName: String, columns: List<String>) {
+            tx.exec(
+                "CREATE INDEX IF NOT EXISTS $name ON $tableName " +
+                    columns.joinToString(prefix = "(", postfix = ")")
+            )
+        }
+
+        createIndex("Catches_user_created_at", Catches.tableName, listOf("user_id", "created_at"))
+        createIndex("Catches_created_at", Catches.tableName, listOf("created_at"))
+        createIndex("Catches_location_created_at", Catches.tableName, listOf("location_id", "created_at"))
+        createIndex("Catches_fish_created_at", Catches.tableName, listOf("fish_id", "created_at"))
+        createIndex("Catches_user_location_created_at", Catches.tableName, listOf("user_id", "location_id", "created_at"))
+        createIndex("Catches_user_fish_created_at", Catches.tableName, listOf("user_id", "fish_id", "created_at"))
+        createIndex("Catches_user_weight", Catches.tableName, listOf("user_id", "weight"))
+        createIndex("AchievementProgress_user_achievement", AchievementProgress.tableName, listOf("user_id", "achievement_id"))
+        createIndex("QuestProgress_user_period_start", QuestProgress.tableName, listOf("user_id", "period", "period_start"))
+        createIndex("RatingPrizes_prize_date", RatingPrizes.tableName, listOf("prize_date"))
+        createIndex("RatingPrizes_user_claimed", RatingPrizes.tableName, listOf("user_id", "claimed"))
+        createIndex("UserPrizes_user", UserPrizes.tableName, listOf("user_id"))
+        createIndex("SpecialEventCatches_event_progress", SpecialEventCatches.tableName, listOf("event_id", "progress_id"))
+        createIndex("SpecialEventCatches_event_user", SpecialEventCatches.tableName, listOf("event_id", "user_id"))
+        createIndex("SpecialEventPrizes_event", SpecialEventPrizes.tableName, listOf("event_id"))
+        createIndex("SpecialEventPrizes_user_claimed", SpecialEventPrizes.tableName, listOf("user_id", "claimed"))
+        createIndex("SpecialEventPrizes_user_event", SpecialEventPrizes.tableName, listOf("user_id", "event_id"))
+        createIndex(
+            "SpecialEventUserProgress_event_club_user_active",
+            SpecialEventUserProgress.tableName,
+            listOf("event_id", "club_id", "user_id", "active"),
+        )
+        createIndex(
+            "SpecialEventUserProgress_user_event_active",
+            SpecialEventUserProgress.tableName,
+            listOf("user_id", "event_id", "active"),
+        )
+        createIndex("ClubChatMessages_club_id", ClubChatMessages.tableName, listOf("club_id", "id"))
+        createIndex("ClubWeeklyRewards_club_week", ClubWeeklyRewards.tableName, listOf("club_id", "week_start"))
+        createIndex("ClubWeeklyRewards_user_claimed", ClubWeeklyRewards.tableName, listOf("user_id", "claimed"))
+        createIndex("Payments_user_refunded_created_at", Payments.tableName, listOf("user_id", "refunded", "created_at"))
+        createIndex("Payments_provider_charge_refunded", Payments.tableName, listOf("provider_charge_id", "refunded"))
+        createIndex("Payments_telegram_charge_refunded", Payments.tableName, listOf("telegram_charge_id", "refunded"))
+        createIndex("ReferralLinks_user", ReferralLinks.tableName, listOf("user_id"))
+        createIndex("ReferralRewards_user_claimed", ReferralRewards.tableName, listOf("user_id", "claimed"))
+        createIndex("Users_referred_by", Users.tableName, listOf("referred_by"))
+        createIndex("AuthSessions_user", AuthSessions.tableName, listOf("user_id"))
+        createIndex("AccountLinkSessions_requester_user", AccountLinkSessions.tableName, listOf("requester_user_id"))
+        createIndex("AccountLinkSessions_resolved_user", AccountLinkSessions.tableName, listOf("resolved_user_id"))
+        createIndex("AccountLinkSessions_telegram_user", AccountLinkSessions.tableName, listOf("telegram_user_id"))
     }
 
     private fun ensureUsersTableAllowsNullableTelegramId(env: Env) {
