@@ -152,6 +152,12 @@ Admin-side tooling exists in bot flows and the internal Android admin app, but i
    cp config.example.properties src/main/resources/config.properties
    ```
 
+   Alternatively, keep the config outside the classpath and point the app to it:
+
+   ```bash
+   CONFIG_PATH=/absolute/path/to/config.properties ./gradlew run
+   ```
+
 2. For local development, at minimum keep these values:
 
    ```properties
@@ -206,6 +212,14 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `TG_ANALYTICS_APP_NAME`
 - `PLAYDECK_GAME_TOKEN`
 - `PLAYDECK_TEST_PAYMENTS`
+
+`CONFIG_PATH` is supported for Docker and host-managed deployments where secrets must stay outside the repository.
+
+## Docker Host Deployment
+
+Windows Docker-host deployment files live in [infra/docker-host](infra/docker-host). The stack mounts `config.properties` and SQLite data from the host so runtime state is not stored inside Docker.
+
+See [docs/production/windows-docker-host.md](docs/production/windows-docker-host.md) for the `develop` -> `main` release flow and first restore from a VDS backup.
 
 ## Checks
 

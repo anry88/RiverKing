@@ -35,6 +35,7 @@ replay_pid*
 
 # Gradle
 .gradle/
+.gradle-home/
 build/
 
 # Конфиг файл
