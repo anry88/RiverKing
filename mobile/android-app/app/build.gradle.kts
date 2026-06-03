@@ -23,7 +23,7 @@ val useCanonicalApplicationId = (findProperty("RIVERKING_CANONICAL_APPLICATION_I
     ?.toBooleanStrictOrNull()
     ?: false
 val apiBaseUrl = (findProperty("RIVERKING_API_BASE_URL") as String?)
-    ?: "https://v759468.hosted-by-vdsina.com"
+    ?: "https://riverking.tg-games.com"
 val publicWebUrl = ((findProperty("RIVERKING_PUBLIC_WEB_URL") as String?) ?: apiBaseUrl).trimEnd('/')
 val googleClientId = (findProperty("RIVERKING_GOOGLE_AUTH_CLIENT_ID") as String?) ?: ""
 val versionCodeValue = ((findProperty("RIVERKING_VERSION_CODE") as String?) ?: trackedVersionProperty("RIVERKING_VERSION_CODE"))

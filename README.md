@@ -28,6 +28,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 
 **Quick links**
 
+- Production web app: [riverking.tg-games.com/app](https://riverking.tg-games.com/app)
 - Mini App: [t.me/river_king_bot/app](https://t.me/river_king_bot/app)
 - Bot: [t.me/river_king_bot](https://t.me/river_king_bot)
 - Product overview: [docs/product-overview.md](docs/product-overview.md)
@@ -181,6 +182,8 @@ With `DEV_MODE=true`, the Mini App can boot without a real Telegram session and 
 With `DEV_MODE=false`, opening `/app` in a regular browser keeps the Mini App blocked until valid Telegram `initData` is present.
 
 To work on the Android player client, use [mobile/android-app/README.md](mobile/android-app/README.md). To work on the internal admin app, use [mobile/admin-app/README.md](mobile/admin-app/README.md).
+
+Production runs on `https://riverking.tg-games.com`. Use `https://riverking.tg-games.com/app` as the Telegram BotFather Mini App URL, `https://riverking.tg-games.com/bot` as the bot webhook URL, and `https://riverking.tg-games.com` as `PUBLIC_BASE_URL`.
 
 ## Configuration
 

@@ -37,6 +37,8 @@ X-RiverKing-App-Version-Code: <versionCode>
 X-RiverKing-App-Version-Name: <versionName>
 ```
 
+The production backend URL is `https://riverking.tg-games.com`. New server dialogs are prefilled with that URL, and saved profiles pointing at the retired production VDS are migrated to the new URL while keeping the stored admin token.
+
 The version headers follow the player app's convention. The backend uses `X-RiverKing-App-Version-Code` to enforce the update policy — when it is below `minSupportedVersionCode`, the server replies `426 Upgrade Required` and the client shows an upgrade prompt.
 
 Key endpoints:

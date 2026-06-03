@@ -2,6 +2,14 @@
 
 RiverKing can run on the Home Data Center Windows Docker host with the same develop-to-main release flow as the other games.
 
+Production public endpoints:
+
+- Public base URL: `https://riverking.tg-games.com`
+- Telegram BotFather Mini App URL: `https://riverking.tg-games.com/app`
+- Telegram bot webhook URL: `https://riverking.tg-games.com/bot`
+- Telegram direct Mini App link: `https://t.me/river_king_bot/app`
+- Cloudflare Tunnel target: `http://riverking-prod-app:5005`
+
 ## Release Flow
 
 1. Commit changes on `develop`.
@@ -16,7 +24,7 @@ RiverKing can run on the Home Data Center Windows Docker host with the same deve
 
 ## First Restore From VDS Backup
 
-Use the latest external config and SQLite backup. The database remains outside Docker under `D:\riverking\state\<env>`.
+Use the latest external config and SQLite backup. The database remains outside Docker under `D:\Apps\RiverKing\state\<env>`.
 
 ```bash
 scripts/deploy-hdc.sh \
@@ -31,11 +39,11 @@ The script backs up replaced remote config and database files before copying the
 ## Runtime Layout
 
 ```text
-D:\riverking\env\prod.env
-D:\riverking\config\prod\config.properties
-D:\riverking\state\prod\riverking.db
-D:\riverking\state\prod\logs\
-D:\riverking\state\prod\event-assets\
+D:\Apps\RiverKing\env\prod.env
+D:\Apps\RiverKing\config\prod\config.properties
+D:\Apps\RiverKing\state\prod\riverking.db
+D:\Apps\RiverKing\state\prod\logs\
+D:\Apps\RiverKing\state\prod\event-assets\
 ```
 
 `scripts/deploy-hdc.sh` syncs tracked files from `data/event-assets` into the environment data directory before Compose starts.

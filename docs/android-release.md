@@ -179,6 +179,14 @@ Required GitHub repository variables for the prod profile:
 - `RIVERKING_PROD_API_BASE_URL`
 - `RIVERKING_PROD_PUBLIC_WEB_URL`
 
+Current production values:
+
+- `RIVERKING_PROD_API_BASE_URL=https://riverking.tg-games.com`
+- `RIVERKING_PROD_PUBLIC_WEB_URL=https://riverking.tg-games.com`
+- `RIVERKING_PROD_SUPPORT_URL=https://riverking.tg-games.com/support`
+- `RIVERKING_PROD_PRIVACY_POLICY_URL=https://riverking.tg-games.com/privacy`
+- `RIVERKING_PROD_ACCOUNT_DELETION_URL=https://riverking.tg-games.com/account/delete`
+
 Optional GitHub repository variables for the prod profile:
 
 - `RIVERKING_PROD_ITCH_PROJECT_URL`

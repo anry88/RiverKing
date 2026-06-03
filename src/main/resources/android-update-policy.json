@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 6,
-  "latestVersionName": "0.4.2",
+  "latestVersionCode": 7,
+  "latestVersionName": "0.4.3",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added new Poyang and Yangtze event fish assets for upcoming club events.",
-      "Fixed event location names and catch-card backgrounds in English Android flows."
+      "Updated the production backend links for the restored RiverKing service.",
+      "Aligned the operator admin app with the new production backend."
     ],
     "ru": [
-      "Добавлены новые рыбы и ассеты Поянху/Янцзы для будущих клубных событий.",
-      "Исправлены названия ивентовых локаций и фоны карточек улова в английском Android-интерфейсе."
+      "Обновлены production-ссылки на восстановленный сервис RiverKing.",
+      "Админское приложение синхронизировано с новым production-бэкендом."
     ]
   }
 }
