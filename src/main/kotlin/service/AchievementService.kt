@@ -11,7 +11,9 @@ import db.SpecialEventPrizes
 import db.UserPrizes
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.innerJoin
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.select
@@ -63,6 +65,7 @@ object AchievementService {
         val rewards: List<PrizeSpec>,
         val progress: (Long) -> Double,
         val isRelevantCatch: (CatchContext) -> Boolean = { true },
+        val locationId: Long? = null,
     )
 
     private data class CatchContext(
@@ -93,6 +96,11 @@ object AchievementService {
     private const val DAILY_RATING_STAR_CODE = "daily_rating_star"
     private data class LocationStats(val fishCount: Int, val waters: Set<String>)
     private data class LocationAchievementConfig(val code: String, val name: String, val stats: LocationStats)
+    private data class AchievementProgressSnapshot(val rowId: Long, val level: Int, val claimedLevel: Int)
+    private data class AchievementListState(
+        val progressByCode: Map<String, Double>,
+        val progressRowsByCode: Map<String, AchievementProgressSnapshot>,
+    )
 
     private val locationAchievementConfigs = listOf(
         LocationAchievementConfig("pond_all_fish", "Пруд", LocationStats(fishCount = 35, waters = setOf("fresh"))),
@@ -375,6 +383,7 @@ object AchievementService {
             rewards = rewards,
             progress = { userId -> uniqueFishCaughtAtLocation(userId, loc.locationId) },
             isRelevantCatch = { ctx -> ctx.locationId == loc.locationId },
+            locationId = loc.locationId,
         )
     }
 
@@ -410,9 +419,10 @@ object AchievementService {
         userId: Long,
         language: String,
         definition: AchievementDefinition,
+        state: AchievementListState? = null,
     ): AchievementDTO {
         val langIsRu = language.lowercase().startsWith("ru")
-        val progressValue = definition.progress(userId)
+        val progressValue = state?.progressByCode?.get(definition.code) ?: definition.progress(userId)
         val roundedProgress = roundForDisplay(definition.code, progressValue)
         val level = levelIndex(definition.thresholds, progressValue)
         val uiLevel = minOf(level, 4)
@@ -422,12 +432,18 @@ object AchievementService {
         } else {
             target
         }
-        val rowId = ensureProgressRow(userId, definition)
-        val progressRow = inTxn {
-            AchievementProgress.select { AchievementProgress.id eq rowId }.singleOrNull()
+        val progressRow = state?.progressRowsByCode?.get(definition.code)
+        val rowId = progressRow?.rowId ?: ensureProgressRow(userId, definition)
+        val (claimed, storedLevel) = if (progressRow != null) {
+            progressRow.claimedLevel to progressRow.level
+        } else {
+            inTxn {
+                AchievementProgress.select { AchievementProgress.id eq rowId }
+                    .singleOrNull()
+                    ?.let { it[AchievementProgress.claimedLevel] to it[AchievementProgress.level] }
+                    ?: (0 to 0)
+            }
         }
-        val claimed = progressRow?.get(AchievementProgress.claimedLevel) ?: 0
-        val storedLevel = progressRow?.get(AchievementProgress.level) ?: 0
         if (level > storedLevel) {
             inTxn {
                 AchievementProgress.update({ AchievementProgress.id eq rowId }) {
@@ -450,7 +466,11 @@ object AchievementService {
         )
     }
 
-    fun list(userId: Long, language: String): List<AchievementDTO> = definitions.map { progress(userId, language, it) }
+    fun list(userId: Long, language: String): List<AchievementDTO> = inTxn {
+        val defs = definitions
+        val state = achievementListState(userId, defs)
+        defs.map { progress(userId, language, it, state) }
+    }
 
     fun claim(userId: Long, code: String): AchievementRewardDTO? {
         val definition = definitionFor(code) ?: return null
@@ -522,6 +542,127 @@ object AchievementService {
                 "Achievement unlocked: \"$name\" — $level"
             }
         }
+    }
+
+    private fun achievementListState(
+        userId: Long,
+        defs: List<AchievementDefinition>,
+    ): AchievementListState = inTxn {
+        val achievementIdsByCode = Achievements
+            .slice(Achievements.id, Achievements.code)
+            .select { Achievements.code inList defs.map { it.code } }
+            .associate { row -> row[Achievements.code] to row[Achievements.id].value }
+        val achievementIds = achievementIdsByCode.values.toList()
+        var rowsByAchievementId = achievementProgressRows(userId, achievementIds)
+        val missingAchievementIds = achievementIds.filter { it !in rowsByAchievementId }
+        if (missingAchievementIds.isNotEmpty()) {
+            val now = Instant.now()
+            missingAchievementIds.forEach { achievementId ->
+                AchievementProgress.insertIgnore { row ->
+                    row[AchievementProgress.userId] = userId
+                    row[AchievementProgress.achievementId] = achievementId
+                    row[level] = 0
+                    row[claimedLevel] = 0
+                    row[updatedAt] = now
+                }
+            }
+            rowsByAchievementId = achievementProgressRows(userId, achievementIds)
+        }
+        val rowsByCode = achievementIdsByCode.mapNotNull { (code, achievementId) ->
+            rowsByAchievementId[achievementId]?.let { code to it }
+        }.toMap()
+        AchievementListState(
+            progressByCode = achievementProgressValues(userId, defs),
+            progressRowsByCode = rowsByCode,
+        )
+    }
+
+    private fun achievementProgressRows(
+        userId: Long,
+        achievementIds: List<Long>,
+    ): Map<Long, AchievementProgressSnapshot> {
+        if (achievementIds.isEmpty()) return emptyMap()
+        return AchievementProgress
+            .select {
+                (AchievementProgress.userId eq userId) and
+                    (AchievementProgress.achievementId inList achievementIds)
+            }
+            .associate { row ->
+                row[AchievementProgress.achievementId].value to AchievementProgressSnapshot(
+                    rowId = row[AchievementProgress.id].value,
+                    level = row[AchievementProgress.level],
+                    claimedLevel = row[AchievementProgress.claimedLevel],
+                )
+            }
+    }
+
+    private fun achievementProgressValues(
+        userId: Long,
+        defs: List<AchievementDefinition>,
+    ): Map<String, Double> {
+        val result = mutableMapOf<String, Double>()
+
+        val rarityCount = Catches.id.count()
+        val rarityCounts = (Catches innerJoin Fish)
+            .slice(Fish.rarity, rarityCount)
+            .select { Catches.userId eq userId }
+            .groupBy(Fish.rarity)
+            .associate { row -> row[Fish.rarity] to row[rarityCount].toDouble() }
+        result[SIMPLE_FISHER_CODE] = rarityCounts["common"] ?: 0.0
+        result[UNCOMMON_FISHER_CODE] = rarityCounts["uncommon"] ?: 0.0
+        result[RARE_FISHER_CODE] = rarityCounts["rare"] ?: 0.0
+        result[EPIC_FISHER_CODE] = rarityCounts["epic"] ?: 0.0
+        result[MYTHIC_FISHER_CODE] = rarityCounts["mythic"] ?: 0.0
+        result[LEGENDARY_FISHER_CODE] = rarityCounts["legendary"] ?: 0.0
+
+        val koiCount = (Catches innerJoin Fish)
+            .slice(Catches.fishId)
+            .select { (Catches.userId eq userId) and (Fish.name inList koiFishNames) }
+            .groupBy(Catches.fishId)
+            .count()
+            .toDouble()
+        result[KOI_COLLECTOR_CODE] = koiCount
+
+        val locationIdsByCode = defs.mapNotNull { def -> def.locationId?.let { def.code to it } }
+        if (locationIdsByCode.isNotEmpty()) {
+            val locationIds = locationIdsByCode.map { it.second }
+            val uniqueFishByLocation = mutableMapOf<Long, MutableSet<Long>>()
+            Catches
+                .slice(Catches.locationId, Catches.fishId)
+                .select { (Catches.userId eq userId) and (Catches.locationId inList locationIds) }
+                .groupBy(Catches.locationId, Catches.fishId)
+                .forEach { row ->
+                    val locationId = row[Catches.locationId].value
+                    uniqueFishByLocation.getOrPut(locationId) { mutableSetOf() }
+                        .add(row[Catches.fishId].value)
+                }
+            locationIdsByCode.forEach { (code, locationId) ->
+                result[code] = uniqueFishByLocation[locationId]?.size?.toDouble() ?: 0.0
+            }
+        }
+
+        val totalWeight = Catches.weight.sum()
+        val totalKg = Catches
+            .slice(totalWeight)
+            .select { Catches.userId eq userId }
+            .singleOrNull()
+            ?.get(totalWeight) ?: 0.0
+        result[TRAVELER_CODE] = Locations
+            .select { (Locations.unlockKg lessEq totalKg) and Locations.specialEventId.isNull() }
+            .count()
+            .toDouble()
+
+        result[TROPHY_HUNTER_CODE] = heaviestCatchKg(userId)
+        result[TOURNAMENT_WINNER_CODE] = UserPrizes.select { UserPrizes.userId eq userId }.count().toDouble()
+        result[EVENT_LAUREATE_CODE] = SpecialEventPrizes
+            .slice(SpecialEventPrizes.eventId)
+            .select { SpecialEventPrizes.userId eq userId }
+            .map { it[SpecialEventPrizes.eventId].value }
+            .toSet()
+            .size
+            .toDouble()
+        result[DAILY_RATING_STAR_CODE] = RatingPrizes.select { RatingPrizes.userId eq userId }.count().toDouble()
+        return result
     }
 
     private fun uniqueFishCaughtAtLocation(userId: Long, locationId: Long): Double = inTxn {
