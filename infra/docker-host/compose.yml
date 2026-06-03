@@ -1,0 +1,45 @@
+name: ${COMPOSE_PROJECT_NAME:-riverking-prod}
+
+services:
+  app:
+    image: ${RIVERKING_IMAGE:-riverking:${IMAGE_TAG:-local}}
+    build:
+      context: ../..
+      dockerfile: infra/docker-host/Dockerfile
+      target: prod
+    restart: unless-stopped
+    environment:
+      CONFIG_PATH: /config/config.properties
+      EVENT_ASSETS_DIR: ${EVENT_ASSETS_DIR:-/data/event-assets}
+      PORT: ${PORT:-5005}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx1024m -XX:+UseG1GC}
+    volumes:
+      - type: bind
+        source: ${RIVERKING_CONFIG_FILE:?RIVERKING_CONFIG_FILE is required}
+        target: /config/config.properties
+        read_only: true
+      - type: bind
+        source: ${RIVERKING_DATA_DIR:?RIVERKING_DATA_DIR is required}
+        target: /data
+    expose:
+      - "5005"
+    networks:
+      default:
+      tunnel:
+        aliases:
+          - ${TUNNEL_APP_ALIAS:-riverking-prod-app}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:$${PORT:-5005}/health >/dev/null || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+networks:
+  tunnel:
+    external: true
+    name: ${HDC_TUNNEL_NETWORK:-hdc-tunnel}

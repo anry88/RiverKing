@@ -1,5 +1,6 @@
 package app
 
+import java.io.File
 import java.util.Properties
 
 data class Env(
@@ -34,10 +35,16 @@ data class Env(
     companion object {
         private const val DEFAULT_ITCH_PROJECT_URL = "https://anry88.itch.io/river-king"
 
-        fun fromConfig(path: String = "config.properties"): Env {
+        fun fromConfig(
+            path: String = System.getenv("CONFIG_PATH")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: "config.properties"
+        ): Env {
             val props = Properties()
-            Env::class.java.classLoader.getResourceAsStream(path)?.use { props.load(it) }
-                ?: error("config file $path not found")
+            val loaded = loadProperties(path, props)
+            if (!loaded && System.getenv("CONFIG_PATH")?.trim()?.isNotEmpty() == true) {
+                error("config file $path not found")
+            }
+
             fun configuredValue(vararg names: String): String? {
                 names.forEach { name ->
                     props.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -85,6 +92,21 @@ data class Env(
                 playDeckTestPayments =
                     configuredValue("PLAYDECK_TEST_PAYMENTS")?.equals("true", ignoreCase = true) ?: false,
             )
+        }
+
+        private fun loadProperties(path: String, props: Properties): Boolean {
+            val file = File(path)
+            if (file.isFile) {
+                file.inputStream().use { props.load(it) }
+                return true
+            }
+
+            Env::class.java.classLoader.getResourceAsStream(path)?.use {
+                props.load(it)
+                return true
+            }
+
+            return false
         }
     }
 }
