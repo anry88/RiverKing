@@ -98,6 +98,7 @@ object DB {
             seedIfEmpty()
             seedAchievements()
             migrateCoins()
+            backfillTotalCaughtKg()
             backfillLastSeenAt()
             sanitizeExistingNicknames()
             backfillTelegramIdentities()
@@ -139,6 +140,8 @@ object DB {
         createIndex("RatingPrizes_prize_date", RatingPrizes.tableName, listOf("prize_date"))
         createIndex("RatingPrizes_user_claimed", RatingPrizes.tableName, listOf("user_id", "claimed"))
         createIndex("UserPrizes_user", UserPrizes.tableName, listOf("user_id"))
+        createIndex("UserPrizes_user_claimed", UserPrizes.tableName, listOf("user_id", "claimed"))
+        createIndex("UserPrizes_tournament", UserPrizes.tableName, listOf("tournament_id"))
         createIndex("SpecialEventCatches_event_progress", SpecialEventCatches.tableName, listOf("event_id", "progress_id"))
         createIndex("SpecialEventCatches_event_user", SpecialEventCatches.tableName, listOf("event_id", "user_id"))
         createIndex("SpecialEventPrizes_event", SpecialEventPrizes.tableName, listOf("event_id"))
@@ -284,6 +287,25 @@ object DB {
             stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_tg_id_unique ON $tableName(tg_id)")
             stmt.execute("PRAGMA foreign_keys=ON")
         }
+    }
+
+    private fun backfillTotalCaughtKg() {
+        TransactionManager.current().exec(
+            """
+            UPDATE ${Users.tableName}
+            SET total_caught_kg = COALESCE((
+                SELECT SUM(weight)
+                FROM ${Catches.tableName}
+                WHERE ${Catches.tableName}.user_id = ${Users.tableName}.id
+            ), 0)
+            WHERE total_caught_kg = 0
+              AND EXISTS (
+                SELECT 1
+                FROM ${Catches.tableName}
+                WHERE ${Catches.tableName}.user_id = ${Users.tableName}.id
+              )
+            """.trimIndent()
+        )
     }
 
     private fun sanitizeExistingNicknames() {
@@ -1552,6 +1574,7 @@ object Users : LongIdTable() {
     val level = integer("level")
     val xp = integer("xp")
     val coins = long("coins").default(0L)
+    val totalCaughtKg = double("total_caught_kg").default(0.0)
     val createdAt = timestamp("created_at")
     val lastSeenAt = timestamp("last_seen_at").nullable()
     val lastDailyAt = timestamp("last_daily_at").nullable()
@@ -1836,6 +1859,7 @@ object UserPrizes : LongIdTable() {
     val tournamentId = reference("tournament_id", Tournaments)
     val packageId = varchar("package_id", 100)
     val qty = integer("qty").default(1)
+    val rank = integer("rank").default(0)
     val claimed = bool("claimed").default(false)
 }
 
