@@ -295,30 +295,40 @@ class TournamentService {
     }
 
     fun pendingPrizes(userId: Long, language: String = "ru"): List<UserPrize> {
-        data class PrizeRow(val id: Long, val packageId: String, val qty: Int, val tournamentId: Long)
+        data class PrizeRow(
+            val id: Long,
+            val packageId: String,
+            val qty: Int,
+            val rank: Int,
+            val tournament: Tournament,
+            val sourceLabel: String,
+        )
         val rows = transaction {
-            UserPrizes.select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
-                .map {
+            (UserPrizes innerJoin Tournaments)
+                .select { (UserPrizes.userId eq userId) and (UserPrizes.claimed eq false) }
+                .map { row ->
                     PrizeRow(
-                        it[UserPrizes.id].value,
-                        it[UserPrizes.packageId],
-                        it[UserPrizes.qty],
-                        it[UserPrizes.tournamentId].value
+                        id = row[UserPrizes.id].value,
+                        packageId = row[UserPrizes.packageId],
+                        qty = row[UserPrizes.qty],
+                        rank = row[UserPrizes.rank],
+                        tournament = row.toTournament(),
+                        sourceLabel = if (language == "en") row[Tournaments.nameEn] else row[Tournaments.nameRu],
                     )
                 }
         }
         return rows.map { row ->
-            val t = getTournament(row.tournamentId)
-            val rank = t?.let { leaderboard(it, userId).second?.rank } ?: 0
-            val coins = if (row.packageId == COIN_PRIZE_ID) row.qty else null
+            val rank = row.rank.takeIf { it > 0 }
+                ?: leaderboard(row.tournament, userId).second?.rank
+                ?: 0
             UserPrize(
                 id = row.id,
                 packageId = row.packageId,
                 qty = row.qty,
                 rank = rank,
-                coins = coins,
+                coins = if (row.packageId == COIN_PRIZE_ID) row.qty else null,
                 source = PrizeSource.TOURNAMENT,
-                sourceLabel = t?.let { if (language == "en") it.nameEn else it.nameRu },
+                sourceLabel = row.sourceLabel,
             )
         }
     }
@@ -377,6 +387,7 @@ class TournamentService {
                         it[UserPrizes.tournamentId] = t.id
                         it[UserPrizes.packageId] = packageId
                         it[UserPrizes.qty] = qty
+                        it[UserPrizes.rank] = lb.rank
                         it[UserPrizes.claimed] = false
                     }
                 }

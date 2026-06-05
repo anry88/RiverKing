@@ -274,4 +274,59 @@ class TournamentServiceTest {
         assertEquals(2, mine2?.rank)
         assertEquals(true, top2.any { it.userId == uids[1] })
     }
+
+    @Test
+    fun distributePrizesStoresRanksForPendingPrizeReads() {
+        val env = testEnv("testdb-prize-ranks")
+        DB.init(env)
+        val svc = TournamentService()
+        val start = Instant.parse("2026-05-01T10:00:00Z")
+        val end = start.plusSeconds(60)
+        val tournamentId = svc.createTournament(
+            nameRu = "Призы",
+            nameEn = "Prizes",
+            start = start,
+            end = end,
+            fish = null,
+            location = null,
+            metric = "largest",
+            prizePlaces = 2,
+            prizes = """[{"pack":"coins","qty":100,"coins":100},{"pack":"coins","qty":50,"coins":50}]""",
+        )
+        val locId = transaction { Locations.select { Locations.name eq "Пруд" }.single()[Locations.id].value }
+        val fishId = transaction { Fish.select { Fish.name eq "Плотва" }.single()[Fish.id].value }
+        val uids = listOf(1L, 2L).map { tg ->
+            transaction {
+                Users.insertAndGetId {
+                    it[Users.tgId] = tg
+                    it[level] = 1
+                    it[xp] = 0
+                    it[createdAt] = start
+                }.value
+            }
+        }
+        val weights = listOf(10.0, 20.0)
+        uids.forEachIndexed { idx, uid ->
+            transaction {
+                Catches.insert {
+                    it[Catches.userId] = uid
+                    it[Catches.fishId] = fishId
+                    it[Catches.weight] = weights[idx]
+                    it[Catches.locationId] = locId
+                    it[Catches.createdAt] = start.plusSeconds(idx.toLong())
+                }
+            }
+        }
+
+        svc.distributePrizes(end.plusSeconds(1))
+
+        val ranks = transaction {
+            UserPrizes
+                .select { UserPrizes.tournamentId eq tournamentId }
+                .associate { row -> row[UserPrizes.userId].value to row[UserPrizes.rank] }
+        }
+        assertEquals(1, ranks[uids[1]])
+        assertEquals(2, ranks[uids[0]])
+        assertEquals(1, svc.pendingPrizes(uids[1]).single().rank)
+    }
 }

@@ -478,9 +478,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
     private fun isBeginnerUser(userId: Long): Boolean =
         totalCatchCount(userId) < BEGINNER_CATCH_THRESHOLD
 
-    private fun totalKg(userId: Long) =
-        Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
+    private fun totalKg(userId: Long): Double {
+        val cached = Users
+            .slice(Users.totalCaughtKg)
+            .select { Users.id eq userId }
+            .singleOrNull()
+            ?.get(Users.totalCaughtKg) ?: 0.0
+        if (cached > 0.0) return cached
+        return Catches.slice(Catches.weight.sum()).selectAll().where { Catches.userId eq userId }
             .singleOrNull()?.get(Catches.weight.sum()) ?: 0.0
+    }
 
     fun totalCaughtKg(userId: Long): Double = transaction { totalKg(userId) }
 
@@ -679,18 +686,22 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             .slice(Rods.id)
             .select { Rods.unlockKg lessEq total }
             .map { it[Rods.id].value }
-        unlockedIds.forEach { rodId ->
-            val has = InventoryRods.select {
-                (InventoryRods.userId eq userId) and (InventoryRods.rodId eq rodId)
-            }.any()
-            if (!has) {
-                InventoryRods.insert {
+        if (unlockedIds.isEmpty()) return
+        val ownedIds = InventoryRods
+            .slice(InventoryRods.rodId)
+            .select { (InventoryRods.userId eq userId) and (InventoryRods.rodId inList unlockedIds) }
+            .map { it[InventoryRods.rodId].value }
+            .toSet()
+        unlockedIds
+            .asSequence()
+            .filterNot { it in ownedIds }
+            .forEach { rodId ->
+                InventoryRods.insertIgnore {
                     it[InventoryRods.userId] = userId
                     it[InventoryRods.rodId] = rodId
                     it[InventoryRods.qty] = 1
                 }
             }
-        }
     }
 
     private fun ensureCurrentRod(userId: Long, totalWeight: Double? = null): Long {
@@ -2194,6 +2205,9 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Catches.locationId] = locId
             it[Catches.createdAt] = caughtAt
             it[Catches.coins] = coinsAwarded
+        }
+        Users.update({ Users.id eq userId }) {
+            it[Users.totalCaughtKg] = totalAfter
         }
         specialEvents.recordCatchTx(userId, catchId.value, fishId, rarity, weight, locId, caughtAt)
 
