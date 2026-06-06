@@ -116,6 +116,13 @@ private data class BroadcastDraft(
 
 private enum class BroadcastStep { TEXT_RU, TEXT_EN }
 
+private data class ClubTextDraft(
+    var step: ClubTextStep,
+    var recruitingOpen: Boolean = true,
+)
+
+private enum class ClubTextStep { CREATE_NAME, INFO, MIN_WEIGHT }
+
 private val METRIC_OPTIONS = listOf("largest", "smallest", "count", "total_weight")
 private const val METRIC_KEYBOARD = """{"keyboard":[["largest","smallest"],["count","total_weight"]],"one_time_keyboard":true,"resize_keyboard":true}"""
 private const val REMOVE_KEYBOARD = """{"remove_keyboard":true}"""
@@ -209,6 +216,7 @@ fun Application.botRoutes(env: Env) {
     val adminStates = mutableMapOf<Long, AdminDraft>()
     val discountStates = mutableMapOf<Long, DiscountDraft>()
     val broadcastStates = mutableMapOf<Long, BroadcastDraft>()
+    val clubStates = mutableMapOf<Long, ClubTextDraft>()
     data class AutoCastState(
         var currentCast: Job? = null,
         var loopJob: Job = Job(),
@@ -347,6 +355,12 @@ fun Application.botRoutes(env: Env) {
                         enDescription = "View your positions in today's daily rating",
                         assetName = "daily_ratings.png"
                     ) { _, _ -> "/daily_rating" },
+                    InlineCommandInfo(
+                        name = "club",
+                        ruDescription = "Вступить в клуб или управлять участниками",
+                        enDescription = "Join a club or manage members",
+                        assetName = "club.png"
+                    ) { _, _ -> "/club" },
                     InlineCommandInfo(
                         name = "club_rating",
                         ruDescription = "Рейтинг клуба за текущую неделю",
@@ -1191,6 +1205,7 @@ fun Application.botRoutes(env: Env) {
             ) {
                 val locations = fishing.locations(uid, lang)
                 val unlocked = locations.filter { it.unlocked }
+                val visibleLocations = locations.filter { it.unlocked || it.isEvent }
                 val stored = transaction {
                     Users.select { Users.id eq uid }.single()[Users.currentLocationId]?.value
                 }
@@ -1225,16 +1240,25 @@ fun Application.botRoutes(env: Env) {
                     append(header)
                     append("\n")
                     append(prompt)
+                    val lockedEventReason = visibleLocations
+                        .firstOrNull { it.isEvent && !it.unlocked }
+                        ?.lockedReason
+                    if (!lockedEventReason.isNullOrBlank()) {
+                        append("\n")
+                        append(lockedEventReason)
+                        append(" /club")
+                    }
                 }
-                if (unlocked.isEmpty()) {
+                if (visibleLocations.isEmpty()) {
                     trySend(chatId, text, replyToMessageId = replyToMessageId)
                     return
                 }
-                val buttons = unlocked
+                val buttons = visibleLocations
                     .map { loc ->
                         val label = buildString {
                             append(if (loc.isEvent) loc.name else I18n.location(loc.name, lang))
                             if (loc.id == currentId) append(" ✅")
+                            if (!loc.unlocked) append(" 🔒")
                         }
                         InlineKeyboardButton(label, "/location ${ownedData(uid, loc.id)}")
                     }
@@ -1459,6 +1483,448 @@ fun Application.botRoutes(env: Env) {
                     }
                 }
                 trySend(chatId, text, replyToMessageId = replyToMessageId)
+            }
+
+            fun clubRoleLabel(role: String, lang: String): String = when (role) {
+                ClubService.ROLE_PRESIDENT -> if (lang == "ru") "Президент" else "President"
+                ClubService.ROLE_HEIR -> if (lang == "ru") "Наследник" else "Heir"
+                ClubService.ROLE_VETERAN -> if (lang == "ru") "Ветеран" else "Veteran"
+                ClubService.ROLE_NOVICE -> if (lang == "ru") "Новичок" else "Novice"
+                else -> role
+            }
+
+            fun clubFallbackMemberName(lang: String): String =
+                if (lang == "ru") "Участник" else "Member"
+
+            fun clubMemberName(member: ClubService.ClubMemberContribution, lang: String): String =
+                member.name?.takeIf { it.isNotBlank() } ?: clubFallbackMemberName(lang)
+
+            fun formatClubKg(value: Double): String =
+                if (value % 1.0 == 0.0) value.toLong().toString() else "%.1f".format(Locale.US, value)
+
+            fun clubCanManage(role: String): Boolean =
+                role == ClubService.ROLE_PRESIDENT || role == ClubService.ROLE_HEIR
+
+            fun clubCanActOnMember(actorRole: String, targetRole: String, actorId: Long, targetId: Long): Boolean {
+                if (actorId == targetId) return false
+                return when (actorRole) {
+                    ClubService.ROLE_PRESIDENT -> targetRole != ClubService.ROLE_PRESIDENT
+                    ClubService.ROLE_HEIR -> targetRole == ClubService.ROLE_VETERAN || targetRole == ClubService.ROLE_NOVICE
+                    else -> false
+                }
+            }
+
+            fun clubCanPromote(actorRole: String, targetRole: String, actorId: Long, targetId: Long): Boolean =
+                clubCanActOnMember(actorRole, targetRole, actorId, targetId) &&
+                    (targetRole == ClubService.ROLE_NOVICE || targetRole == ClubService.ROLE_VETERAN)
+
+            fun clubCanDemote(actorRole: String, targetRole: String, actorId: Long, targetId: Long): Boolean =
+                clubCanActOnMember(actorRole, targetRole, actorId, targetId) &&
+                    (targetRole == ClubService.ROLE_HEIR || targetRole == ClubService.ROLE_VETERAN)
+
+            fun clubCanAppointPresident(actorRole: String, targetRole: String, actorId: Long, targetId: Long): Boolean =
+                actorId != targetId && actorRole == ClubService.ROLE_PRESIDENT && targetRole == ClubService.ROLE_HEIR
+
+            fun clubErrorText(code: String, lang: String): String {
+                if (code.startsWith("weight_required")) {
+                    val weight = code.substringAfter(':', ClubService.MIN_CREATE_WEIGHT_KG.toLong().toString())
+                    return if (lang == "ru") {
+                        "Нужно наловить минимум $weight кг рыбы."
+                    } else {
+                        "You need at least $weight kg of caught fish."
+                    }
+                }
+                return when (code) {
+                    "already_in_club" -> if (lang == "ru") "Ты уже состоишь в клубе." else "You are already in a club."
+                    "club_full" -> if (lang == "ru") "В клубе нет свободных мест." else "The club is full."
+                    "recruitment_closed" -> if (lang == "ru") "Набор в этот клуб закрыт." else "Recruitment is closed for this club."
+                    "not_enough_coins" -> if (lang == "ru") "Недостаточно монет для создания клуба." else "Not enough coins to create a club."
+                    "name_empty" -> if (lang == "ru") "Введите название клуба." else "Enter a club name."
+                    "name_too_long" -> if (lang == "ru") "Название клуба слишком длинное." else "Club name is too long."
+                    "name_profanity" -> if (lang == "ru") "Название клуба содержит недопустимые слова." else "Club name contains prohibited words."
+                    "not_in_club" -> if (lang == "ru") "Ты пока не состоишь в клубе." else "You are not in a club yet."
+                    "not_found" -> if (lang == "ru") "Клуб не найден." else "Club not found."
+                    "member_not_found" -> if (lang == "ru") "Участник не найден в клубе." else "Member not found in the club."
+                    "forbidden" -> if (lang == "ru") "Недостаточно прав для этого действия." else "You do not have permission for this action."
+                    "invalid_role" -> if (lang == "ru") "Это действие недоступно для текущей роли." else "This action is not available for this role."
+                    "invalid_target" -> if (lang == "ru") "Нельзя выполнить действие над собой." else "You cannot perform this action on yourself."
+                    "info_too_long" -> if (lang == "ru") "Описание клуба слишком длинное." else "Club description is too long."
+                    "invalid_min_weight" -> if (lang == "ru") "Введите корректный минимальный улов." else "Enter a valid minimum catch weight."
+                    else -> if (lang == "ru") "Не удалось выполнить действие." else "Couldn't complete the action."
+                }
+            }
+
+            suspend fun sendClubOverview(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                details: ClubService.ClubDetails? = clubs.clubDetails(uid),
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                if (details == null) {
+                    val text = buildString {
+                        if (!prefix.isNullOrBlank()) {
+                            append(prefix)
+                            append("\n\n")
+                        }
+                        append(
+                            if (lang == "ru") {
+                                "Ты пока не состоишь в клубе. Можно создать свой клуб или найти клуб со свободными местами."
+                            } else {
+                                "You are not in a club yet. You can create your own club or find a club with open slots."
+                            }
+                        )
+                    }
+                    val createLabel = if (lang == "ru") "Создать клуб" else "Create club"
+                    val searchLabel = if (lang == "ru") "Найти клуб" else "Find club"
+                    val markup = Json.encodeToString(
+                        InlineKeyboardMarkup(
+                            listOf(
+                                listOf(InlineKeyboardButton(createLabel, "/club_create ${ownedData(uid, "open")}")),
+                                listOf(InlineKeyboardButton(searchLabel, "/club_search ${ownedData(uid, "open")}")),
+                            )
+                        )
+                    )
+                    trySend(chatId, text, markup, replyToMessageId)
+                    return
+                }
+
+                val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                val numberFormat = NumberFormat.getIntegerInstance(locale)
+                val coinLabel = if (lang == "ru") "монет" else "coins"
+                val membersHeader = if (lang == "ru") "Участники клуба:" else "Club members:"
+                val memberLines = details.currentWeek.members.mapIndexed { index, member ->
+                    val coins = numberFormat.format(member.coins)
+                    "${index + 1}. ${clubMemberName(member, lang)} — ${clubRoleLabel(member.role, lang)}, $coins $coinLabel"
+                }
+                val recruiting = if (details.recruitingOpen) {
+                    if (lang == "ru") "открыт" else "open"
+                } else {
+                    if (lang == "ru") "закрыт" else "closed"
+                }
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix)
+                        append("\n\n")
+                    }
+                    if (lang == "ru") {
+                        appendLine("Клуб «${details.name}»")
+                        appendLine("Твоя роль: ${clubRoleLabel(details.role, lang)}")
+                        appendLine("Участники: ${details.memberCount}/${details.capacity}")
+                        appendLine("Набор: $recruiting")
+                        appendLine("Минимальный улов для вступления: ${formatClubKg(details.minJoinWeightKg)} кг")
+                    } else {
+                        appendLine("Club \"${details.name}\"")
+                        appendLine("Your role: ${clubRoleLabel(details.role, lang)}")
+                        appendLine("Members: ${details.memberCount}/${details.capacity}")
+                        appendLine("Recruitment: $recruiting")
+                        appendLine("Minimum catch to join: ${formatClubKg(details.minJoinWeightKg)} kg")
+                    }
+                    details.info.takeIf { it.isNotBlank() }?.let { info ->
+                        appendLine()
+                        appendLine(info)
+                    }
+                    appendLine()
+                    append(membersHeader)
+                    if (memberLines.isEmpty()) {
+                        append('\n')
+                        append(if (lang == "ru") "Список пуст." else "The roster is empty.")
+                    } else {
+                        append('\n')
+                        append(memberLines.joinToString("\n"))
+                    }
+                }
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                if (clubCanManage(details.role)) {
+                    val manageLabel = if (lang == "ru") "Управление клубом" else "Manage club"
+                    buttons += listOf(InlineKeyboardButton(manageLabel, "/club_manage ${ownedData(uid, "open")}"))
+                }
+                val leaveLabel = if (lang == "ru") "Покинуть клуб" else "Leave club"
+                buttons += listOf(InlineKeyboardButton(leaveLabel, "/club_leave ${ownedData(uid, "ask")}"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun sendClubSearch(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val available = clubs.searchClubs(uid, limit = 10)
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix)
+                        append("\n\n")
+                    }
+                    append(
+                        if (lang == "ru") {
+                            "Клубы, доступные для вступления по твоему улову и свободным местам:"
+                        } else {
+                            "Clubs available for your catch weight and open slots:"
+                        }
+                    )
+                    if (available.isEmpty()) {
+                        append("\n")
+                        append(if (lang == "ru") "Пока нет подходящих клубов." else "No matching clubs right now.")
+                    } else {
+                        available.forEachIndexed { index, club ->
+                            append("\n\n")
+                            append("${index + 1}. ${club.name} — ${club.memberCount}/${club.capacity}")
+                            append("\n")
+                            append(
+                                if (lang == "ru") {
+                                    "Мин. улов: ${formatClubKg(club.minJoinWeightKg)} кг"
+                                } else {
+                                    "Min catch: ${formatClubKg(club.minJoinWeightKg)} kg"
+                                }
+                            )
+                            club.info.takeIf { it.isNotBlank() }?.let { info ->
+                                append("\n")
+                                append(info)
+                            }
+                        }
+                    }
+                }
+                val buttons = available.map { club ->
+                    val label = if (lang == "ru") "Вступить: ${club.name}" else "Join: ${club.name}"
+                    listOf(InlineKeyboardButton(label.take(60), "/club_join ${ownedData(uid, club.id)}"))
+                }.toMutableList()
+                val refreshLabel = if (lang == "ru") "Обновить поиск" else "Refresh search"
+                val backLabel = if (lang == "ru") "Назад" else "Back"
+                buttons += listOf(
+                    InlineKeyboardButton(refreshLabel, "/club_search ${ownedData(uid, "open")}"),
+                    InlineKeyboardButton(backLabel, "/club ${ownedData(uid, "open")}"),
+                )
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun sendClubCreatePrompt(
+                uid: Long,
+                stateKey: Long,
+                chatId: Long,
+                lang: String,
+                replyToMessageId: Long? = null,
+            ) {
+                val totalWeight = fishing.totalCaughtKg(uid)
+                val balance = transaction { Users.select { Users.id eq uid }.single()[Users.coins] }
+                val enoughWeight = totalWeight >= ClubService.MIN_CREATE_WEIGHT_KG
+                val enoughCoins = balance >= ClubService.CREATE_COST_COINS
+                val canCreate = enoughWeight && enoughCoins
+                val locale = if (lang == "ru") Locale("ru", "RU") else Locale.US
+                val numberFormat = NumberFormat.getIntegerInstance(locale)
+                val text = buildString {
+                    if (lang == "ru") {
+                        appendLine("Условия создания клуба:")
+                        appendLine("• общий улов от ${formatClubKg(ClubService.MIN_CREATE_WEIGHT_KG)} кг")
+                        appendLine("• стоимость ${numberFormat.format(ClubService.CREATE_COST_COINS)} монет")
+                        appendLine("• название до ${ClubService.MAX_NAME_LENGTH} символов без ругательств")
+                        appendLine()
+                        appendLine("Твой улов: ${formatClubKg(totalWeight)} кг")
+                        appendLine("Твой баланс: ${numberFormat.format(balance)} монет")
+                        appendLine()
+                        append(
+                            if (canCreate) {
+                                "Отправь название клуба следующим сообщением. Отмена: /cancel"
+                            } else {
+                                "Пока условия не выполнены."
+                            }
+                        )
+                    } else {
+                        appendLine("Club creation requirements:")
+                        appendLine("• total catch from ${formatClubKg(ClubService.MIN_CREATE_WEIGHT_KG)} kg")
+                        appendLine("• cost ${numberFormat.format(ClubService.CREATE_COST_COINS)} coins")
+                        appendLine("• name up to ${ClubService.MAX_NAME_LENGTH} characters, no profanity")
+                        appendLine()
+                        appendLine("Your catch: ${formatClubKg(totalWeight)} kg")
+                        appendLine("Your balance: ${numberFormat.format(balance)} coins")
+                        appendLine()
+                        append(
+                            if (canCreate) {
+                                "Send the club name in your next message. Cancel: /cancel"
+                            } else {
+                                "You do not meet the requirements yet."
+                            }
+                        )
+                    }
+                }
+                if (canCreate) {
+                    clubStates[stateKey] = ClubTextDraft(ClubTextStep.CREATE_NAME)
+                }
+                val backLabel = if (lang == "ru") "Назад" else "Back"
+                val markup = Json.encodeToString(
+                    InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton(backLabel, "/club ${ownedData(uid, "open")}"))))
+                )
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun sendClubManage(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val details = clubs.clubDetails(uid)
+                if (details == null) {
+                    sendClubOverview(uid, chatId, lang, prefix = clubErrorText("not_in_club", lang), replyToMessageId = replyToMessageId)
+                    return
+                }
+                if (!clubCanManage(details.role)) {
+                    sendClubOverview(uid, chatId, lang, details, clubErrorText("forbidden", lang), replyToMessageId)
+                    return
+                }
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix)
+                        append("\n\n")
+                    }
+                    append(
+                        if (lang == "ru") {
+                            "Управление клубом «${details.name}». Выбери участника или настройки клуба."
+                        } else {
+                            "Managing club \"${details.name}\". Choose a member or club settings."
+                        }
+                    )
+                }
+                val memberButtons = details.currentWeek.members.map { member ->
+                    val self = if (member.userId == uid) {
+                        if (lang == "ru") " (ты)" else " (you)"
+                    } else {
+                        ""
+                    }
+                    val label = "${clubMemberName(member, lang)}$self · ${clubRoleLabel(member.role, lang)}"
+                    listOf(InlineKeyboardButton(label.take(60), "/club_member ${ownedData(uid, member.userId)}"))
+                }
+                val settingsLabel = if (lang == "ru") "Настройки клуба" else "Club settings"
+                val backLabel = if (lang == "ru") "Назад" else "Back"
+                val buttons = memberButtons.toMutableList()
+                buttons += listOf(InlineKeyboardButton(settingsLabel, "/club_settings ${ownedData(uid, "open")}"))
+                buttons += listOf(InlineKeyboardButton(backLabel, "/club ${ownedData(uid, "open")}"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun sendClubMemberActions(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                targetId: Long,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val details = clubs.clubDetails(uid)
+                if (details == null) {
+                    sendClubOverview(uid, chatId, lang, prefix = clubErrorText("not_in_club", lang), replyToMessageId = replyToMessageId)
+                    return
+                }
+                val member = details.currentWeek.members.firstOrNull { it.userId == targetId }
+                if (member == null) {
+                    sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyToMessageId)
+                    return
+                }
+                val actionAllowed = clubCanActOnMember(details.role, member.role, uid, targetId)
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix)
+                        append("\n\n")
+                    }
+                    if (lang == "ru") {
+                        appendLine("${clubMemberName(member, lang)}")
+                        appendLine("Роль: ${clubRoleLabel(member.role, lang)}")
+                        append("Действия:")
+                    } else {
+                        appendLine("${clubMemberName(member, lang)}")
+                        appendLine("Role: ${clubRoleLabel(member.role, lang)}")
+                        append("Actions:")
+                    }
+                    if (!actionAllowed && !clubCanAppointPresident(details.role, member.role, uid, targetId)) {
+                        append("\n")
+                        append(if (lang == "ru") "Нет доступных действий." else "No available actions.")
+                    }
+                }
+                val buttons = mutableListOf<List<InlineKeyboardButton>>()
+                if (clubCanPromote(details.role, member.role, uid, targetId)) {
+                    val label = if (lang == "ru") "Повысить" else "Promote"
+                    buttons += listOf(InlineKeyboardButton(label, "/club_promote ${ownedData(uid, targetId)}"))
+                }
+                if (clubCanDemote(details.role, member.role, uid, targetId)) {
+                    val label = if (lang == "ru") "Понизить" else "Demote"
+                    buttons += listOf(InlineKeyboardButton(label, "/club_demote ${ownedData(uid, targetId)}"))
+                }
+                if (clubCanActOnMember(details.role, member.role, uid, targetId)) {
+                    val label = if (lang == "ru") "Исключить" else "Kick"
+                    buttons += listOf(InlineKeyboardButton(label, "/club_kick ${ownedData(uid, targetId)}"))
+                }
+                if (clubCanAppointPresident(details.role, member.role, uid, targetId)) {
+                    val label = if (lang == "ru") "Назначить президентом" else "Appoint president"
+                    buttons += listOf(InlineKeyboardButton(label, "/club_appoint ${ownedData(uid, targetId)}"))
+                }
+                val settingsLabel = if (lang == "ru") "Настройки клуба" else "Club settings"
+                val backLabel = if (lang == "ru") "К списку участников" else "Back to members"
+                buttons += listOf(InlineKeyboardButton(settingsLabel, "/club_settings ${ownedData(uid, "open")}"))
+                buttons += listOf(InlineKeyboardButton(backLabel, "/club_manage ${ownedData(uid, "open")}"))
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
+            }
+
+            suspend fun sendClubSettings(
+                uid: Long,
+                chatId: Long,
+                lang: String,
+                prefix: String? = null,
+                replyToMessageId: Long? = null,
+            ) {
+                val details = clubs.clubDetails(uid)
+                if (details == null) {
+                    sendClubOverview(uid, chatId, lang, prefix = clubErrorText("not_in_club", lang), replyToMessageId = replyToMessageId)
+                    return
+                }
+                if (!clubCanManage(details.role)) {
+                    sendClubOverview(uid, chatId, lang, details, clubErrorText("forbidden", lang), replyToMessageId)
+                    return
+                }
+                val recruiting = if (details.recruitingOpen) {
+                    if (lang == "ru") "открыт" else "open"
+                } else {
+                    if (lang == "ru") "закрыт" else "closed"
+                }
+                val text = buildString {
+                    if (!prefix.isNullOrBlank()) {
+                        append(prefix)
+                        append("\n\n")
+                    }
+                    if (lang == "ru") {
+                        appendLine("Настройки клуба «${details.name}»")
+                        appendLine("Набор: $recruiting")
+                        appendLine("Минимальный улов: ${formatClubKg(details.minJoinWeightKg)} кг")
+                        appendLine("Описание: ${details.info.ifBlank { "не задано" }}")
+                    } else {
+                        appendLine("Club \"${details.name}\" settings")
+                        appendLine("Recruitment: $recruiting")
+                        appendLine("Minimum catch: ${formatClubKg(details.minJoinWeightKg)} kg")
+                        appendLine("Description: ${details.info.ifBlank { "not set" }}")
+                    }
+                }
+                val infoLabel = if (lang == "ru") "Изменить описание" else "Edit description"
+                val weightLabel = if (lang == "ru") "Изменить минимум улова" else "Edit minimum catch"
+                val toggleLabel = if (details.recruitingOpen) {
+                    if (lang == "ru") "Закрыть набор" else "Close recruitment"
+                } else {
+                    if (lang == "ru") "Открыть набор" else "Open recruitment"
+                }
+                val backLabel = if (lang == "ru") "Назад" else "Back"
+                val buttons = listOf(
+                    listOf(InlineKeyboardButton(infoLabel, "/club_info ${ownedData(uid, "open")}")),
+                    listOf(InlineKeyboardButton(weightLabel, "/club_weight ${ownedData(uid, "open")}")),
+                    listOf(InlineKeyboardButton(toggleLabel, "/club_toggle_recruiting ${ownedData(uid, "open")}")),
+                    listOf(InlineKeyboardButton(backLabel, "/club_manage ${ownedData(uid, "open")}")),
+                )
+                val markup = Json.encodeToString(InlineKeyboardMarkup(buttons))
+                trySend(chatId, text, markup, replyToMessageId)
             }
 
             fun packNamesRu(): MutableMap<String, String> {
@@ -1894,8 +2360,10 @@ fun Application.botRoutes(env: Env) {
                 "рейтинг" to "/daily_rating",
                 "rating" to "/daily_rating",
                 "leaderboard" to "/daily_rating",
-                "клуб" to "/club_rating",
-                "club" to "/club_rating",
+                "клуб" to "/club",
+                "club" to "/club",
+                "клубный рейтинг" to "/club_rating",
+                "club rating" to "/club_rating",
                 "турнир" to "/tournament",
                 "tournament" to "/tournament",
                 "ивент" to "/event",
@@ -2020,6 +2488,7 @@ fun Application.botRoutes(env: Env) {
 /tournament — таблица текущего турнира и твоя позиция
 /event — таблицы текущего клубного события
 /daily_rating — текущее место твоего лучшего улова в ежедневном рейтинге
+/club — вступить в клуб или управлять клубом
 /club_rating — таблица текущей недели клуба
 /stats — статистика по пойманной рыбе
 /language — выбрать язык
@@ -2044,6 +2513,7 @@ Available commands:
 /tournament — view the current tournament leaderboard and your rank
 /event — view the current club event leaderboards
 /daily_rating — view the current placement of your best catch in today's daily rating
+/club — join or manage your club
 /club_rating — view the current club weekly rating
 /stats — your fishing stats
 /language — choose your language
@@ -2325,6 +2795,342 @@ Available commands:
                         }
                         logCommandMetric("daily_rating", source = source)
                         trySend(chatId, reply, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        logCommandMetric("club", mapOf("action" to "show"), source)
+                        sendClubOverview(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_create" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val details = clubs.clubDetails(uid)
+                        if (details != null) {
+                            val prefix = if (lang == "ru") {
+                                "Ты уже состоишь в клубе."
+                            } else {
+                                "You are already in a club."
+                            }
+                            sendClubOverview(uid, chatId, lang, details, prefix, replyTo)
+                            return true
+                        }
+                        logCommandMetric("club", mapOf("action" to "create_prompt"), source)
+                        sendClubCreatePrompt(uid, from?.id ?: uid, chatId, lang, replyTo)
+                        return true
+                    }
+                    "/club_search" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        if (clubs.clubDetails(uid) != null) {
+                            sendClubOverview(uid, chatId, lang, prefix = clubErrorText("already_in_club", lang), replyToMessageId = replyTo)
+                            return true
+                        }
+                        logCommandMetric("club", mapOf("action" to "search"), source)
+                        sendClubSearch(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_join" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val clubId = value?.toLongOrNull()
+                        if (clubId == null) {
+                            logCommandMetric("club", mapOf("action" to "join", "result" to "invalid"), source)
+                            sendClubSearch(uid, chatId, lang, clubErrorText("not_found", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            val details = clubs.joinClub(uid, clubId)
+                            logCommandMetric("club", mapOf("action" to "join", "result" to "success"), source)
+                            val prefix = if (lang == "ru") {
+                                "Ты вступил в клуб «${details.name}»."
+                            } else {
+                                "You joined club \"${details.name}\"."
+                            }
+                            sendClubOverview(uid, chatId, lang, details, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "join", "result" to "error", "reason" to e.code), source)
+                            sendClubSearch(uid, chatId, lang, clubErrorText(e.code, lang), replyTo)
+                        }
+                        return true
+                    }
+                    "/club_leave" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val details = clubs.clubDetails(uid)
+                        if (details == null) {
+                            sendClubOverview(uid, chatId, lang, prefix = clubErrorText("not_in_club", lang), replyToMessageId = replyTo)
+                            return true
+                        }
+                        val leavePrompt = if (lang == "ru") {
+                            "Покинуть клуб «${details.name}»? Это действие требует подтверждения."
+                        } else {
+                            "Leave club \"${details.name}\"? This action requires confirmation."
+                        }
+                        val yesLabel = if (lang == "ru") "Да, покинуть" else "Yes, leave"
+                        val noLabel = if (lang == "ru") "Отмена" else "Cancel"
+                        val markup = Json.encodeToString(
+                            InlineKeyboardMarkup(
+                                listOf(
+                                    listOf(InlineKeyboardButton(yesLabel, "/club_leave_confirm ${ownedData(uid, "yes")}")),
+                                    listOf(InlineKeyboardButton(noLabel, "/club ${ownedData(uid, "open")}")),
+                                )
+                            )
+                        )
+                        logCommandMetric("club", mapOf("action" to "leave_prompt"), source)
+                        trySend(chatId, leavePrompt, markup, replyTo)
+                        return true
+                    }
+                    "/club_leave_confirm" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        try {
+                            clubs.leaveClub(uid)
+                            clubStates.remove(from?.id ?: uid)
+                            logCommandMetric("club", mapOf("action" to "leave", "result" to "success"), source)
+                            val prefix = if (lang == "ru") "Ты покинул клуб." else "You left the club."
+                            sendClubOverview(uid, chatId, lang, prefix = prefix, replyToMessageId = replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "leave", "result" to "error", "reason" to e.code), source)
+                            sendClubOverview(uid, chatId, lang, prefix = clubErrorText(e.code, lang), replyToMessageId = replyTo)
+                        }
+                        return true
+                    }
+                    "/club_manage" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        logCommandMetric("club", mapOf("action" to "manage"), source)
+                        sendClubManage(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_member" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        if (targetId == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        logCommandMetric("club", mapOf("action" to "member"), source)
+                        sendClubMemberActions(uid, chatId, lang, targetId, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_promote" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        if (targetId == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            clubs.promoteMember(uid, targetId)
+                            logCommandMetric("club", mapOf("action" to "promote", "result" to "success"), source)
+                            val prefix = if (lang == "ru") "Участник повышен." else "Member promoted."
+                            sendClubMemberActions(uid, chatId, lang, targetId, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "promote", "result" to "error", "reason" to e.code), source)
+                            sendClubMemberActions(uid, chatId, lang, targetId, clubErrorText(e.code, lang), replyTo)
+                        }
+                        return true
+                    }
+                    "/club_demote" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        if (targetId == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            clubs.demoteMember(uid, targetId)
+                            logCommandMetric("club", mapOf("action" to "demote", "result" to "success"), source)
+                            val prefix = if (lang == "ru") "Участник понижен." else "Member demoted."
+                            sendClubMemberActions(uid, chatId, lang, targetId, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "demote", "result" to "error", "reason" to e.code), source)
+                            sendClubMemberActions(uid, chatId, lang, targetId, clubErrorText(e.code, lang), replyTo)
+                        }
+                        return true
+                    }
+                    "/club_kick" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        val details = clubs.clubDetails(uid)
+                        val member = details?.currentWeek?.members?.firstOrNull { it.userId == targetId }
+                        if (targetId == null || details == null || member == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        val kickPrompt = if (lang == "ru") {
+                            "Исключить ${clubMemberName(member, lang)} из клуба?"
+                        } else {
+                            "Kick ${clubMemberName(member, lang)} from the club?"
+                        }
+                        val yesLabel = if (lang == "ru") "Да, исключить" else "Yes, kick"
+                        val noLabel = if (lang == "ru") "Отмена" else "Cancel"
+                        val markup = Json.encodeToString(
+                            InlineKeyboardMarkup(
+                                listOf(
+                                    listOf(InlineKeyboardButton(yesLabel, "/club_kick_confirm ${ownedData(uid, targetId)}")),
+                                    listOf(InlineKeyboardButton(noLabel, "/club_member ${ownedData(uid, targetId)}")),
+                                )
+                            )
+                        )
+                        logCommandMetric("club", mapOf("action" to "kick_prompt"), source)
+                        trySend(chatId, kickPrompt, markup, replyTo)
+                        return true
+                    }
+                    "/club_kick_confirm" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        if (targetId == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            clubs.kickMember(uid, targetId)
+                            logCommandMetric("club", mapOf("action" to "kick", "result" to "success"), source)
+                            val prefix = if (lang == "ru") "Участник исключён." else "Member kicked."
+                            sendClubManage(uid, chatId, lang, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "kick", "result" to "error", "reason" to e.code), source)
+                            sendClubMemberActions(uid, chatId, lang, targetId, clubErrorText(e.code, lang), replyTo)
+                        }
+                        return true
+                    }
+                    "/club_appoint" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (value, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val targetId = value?.toLongOrNull()
+                        if (targetId == null) {
+                            sendClubManage(uid, chatId, lang, clubErrorText("member_not_found", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            val details = clubs.appointPresident(uid, targetId)
+                            logCommandMetric("club", mapOf("action" to "appoint_president", "result" to "success"), source)
+                            val prefix = if (lang == "ru") {
+                                "Президент клуба изменён."
+                            } else {
+                                "Club president changed."
+                            }
+                            sendClubOverview(uid, chatId, lang, details, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "appoint_president", "result" to "error", "reason" to e.code), source)
+                            sendClubMemberActions(uid, chatId, lang, targetId, clubErrorText(e.code, lang), replyTo)
+                        }
+                        return true
+                    }
+                    "/club_settings" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        logCommandMetric("club", mapOf("action" to "settings"), source)
+                        sendClubSettings(uid, chatId, lang, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_info" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val details = clubs.clubDetails(uid)
+                        if (details == null || !clubCanManage(details.role)) {
+                            sendClubSettings(uid, chatId, lang, clubErrorText(if (details == null) "not_in_club" else "forbidden", lang), replyTo)
+                            return true
+                        }
+                        clubStates[from?.id ?: uid] = ClubTextDraft(
+                            step = ClubTextStep.INFO,
+                            recruitingOpen = details.recruitingOpen,
+                        )
+                        val current = details.info.takeIf { it.isNotBlank() } ?: if (lang == "ru") "не задано" else "not set"
+                        val infoPrompt = if (lang == "ru") {
+                            "Текущее описание: $current\nОтправь новое описание клуба следующим сообщением. Отмена: /cancel"
+                        } else {
+                            "Current description: $current\nSend the new club description in your next message. Cancel: /cancel"
+                        }
+                        logCommandMetric("club", mapOf("action" to "info_prompt"), source)
+                        trySend(chatId, infoPrompt, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_weight" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val details = clubs.clubDetails(uid)
+                        if (details == null || !clubCanManage(details.role)) {
+                            sendClubSettings(uid, chatId, lang, clubErrorText(if (details == null) "not_in_club" else "forbidden", lang), replyTo)
+                            return true
+                        }
+                        clubStates[from?.id ?: uid] = ClubTextDraft(
+                            step = ClubTextStep.MIN_WEIGHT,
+                            recruitingOpen = details.recruitingOpen,
+                        )
+                        val weightPrompt = if (lang == "ru") {
+                            "Текущий минимум: ${formatClubKg(details.minJoinWeightKg)} кг.\nОтправь новый минимум улова числом. Отмена: /cancel"
+                        } else {
+                            "Current minimum: ${formatClubKg(details.minJoinWeightKg)} kg.\nSend the new minimum catch as a number. Cancel: /cancel"
+                        }
+                        logCommandMetric("club", mapOf("action" to "weight_prompt"), source)
+                        trySend(chatId, weightPrompt, replyToMessageId = replyTo)
+                        return true
+                    }
+                    "/club_toggle_recruiting" -> {
+                        val uid = ensureUserId(from) ?: return false
+                        val lang = fishing.userLanguage(uid)
+                        val (_, mismatch) = ownedArg(arg, uid)
+                        if (mismatch) return true
+                        val details = clubs.clubDetails(uid)
+                        if (details == null || !clubCanManage(details.role)) {
+                            sendClubSettings(uid, chatId, lang, clubErrorText(if (details == null) "not_in_club" else "forbidden", lang), replyTo)
+                            return true
+                        }
+                        try {
+                            val updated = clubs.updateClubSettings(uid, details.minJoinWeightKg, !details.recruitingOpen)
+                            logCommandMetric("club", mapOf("action" to "toggle_recruiting", "result" to "success"), source)
+                            val prefix = if (updated.recruitingOpen) {
+                                if (lang == "ru") "Набор в клуб открыт." else "Club recruitment opened."
+                            } else {
+                                if (lang == "ru") "Набор в клуб закрыт." else "Club recruitment closed."
+                            }
+                            sendClubSettings(uid, chatId, lang, prefix, replyTo)
+                        } catch (e: ClubService.ClubException) {
+                            logCommandMetric("club", mapOf("action" to "toggle_recruiting", "result" to "error", "reason" to e.code), source)
+                            sendClubSettings(uid, chatId, lang, clubErrorText(e.code, lang), replyTo)
+                        }
                         return true
                     }
                     "/club_rating" -> {
@@ -3082,9 +3888,24 @@ Available commands:
                                         "casting" -> if (lang == "ru") "Нельзя менять локацию во время заброса" else "You can't change location while casting"
                                         "locked" -> if (lang == "ru") "Локация еще недоступна" else "Location is still locked"
                                         "bad location" -> if (lang == "ru") "Локация не найдена" else "Location not found"
+                                        "event_requires_club" -> if (lang == "ru") {
+                                            "Ивентовая локация доступна только участникам клуба. Вступить или создать клуб можно через /club."
+                                        } else {
+                                            "The event location is available only to club members. Join or create a club with /club."
+                                        }
                                         else -> if (lang == "ru") "Не удалось сменить локацию" else "Failed to change location"
                                     }
-                                    trySend(chatId, msg, replyToMessageId = replyTo)
+                                    val markup = if (reason == "event_requires_club") {
+                                        val label = if (lang == "ru") "Клуб" else "Club"
+                                        Json.encodeToString(
+                                            InlineKeyboardMarkup(
+                                                listOf(listOf(InlineKeyboardButton(label, "/club ${ownedData(uid, "open")}")))
+                                            )
+                                        )
+                                    } else {
+                                        null
+                                    }
+                                    trySend(chatId, msg, markup, replyToMessageId = replyTo)
                                 }
                             }
                         }
@@ -3617,6 +4438,117 @@ Available commands:
             val userId = message.from?.id ?: return@post call.respond(HttpStatusCode.OK)
             val text = message.text ?: ""
             val commandSource = if (message.viaBot != null) "inline" else "message"
+
+            val clubDraft = clubStates[userId]
+            val clubStateUid = if (clubDraft != null) ensureUserId(message.from) else null
+            if (clubStateUid != null && clubDraft != null) {
+                val lang = fishing.userLanguage(clubStateUid)
+                val trimmed = text.trim()
+                if (trimmed == "/cancel") {
+                    clubStates.remove(userId)
+                    val reply = if (lang == "ru") "Действие с клубом отменено." else "Club action cancelled."
+                    trySend(chatId, reply, replyToMessageId = message.message_id)
+                    return@post call.respond(HttpStatusCode.OK)
+                }
+                if (trimmed.startsWith("/")) {
+                    clubStates.remove(userId)
+                    if (processUserCommand(
+                            text,
+                            message.from,
+                            chatId,
+                            messageId = message.message_id,
+                            sourceOverride = commandSource,
+                        )
+                    ) {
+                        return@post call.respond(HttpStatusCode.OK)
+                    }
+                } else {
+                    when (clubDraft.step) {
+                        ClubTextStep.CREATE_NAME -> {
+                            try {
+                                val details = clubs.createClub(clubStateUid, trimmed)
+                                clubStates.remove(userId)
+                                logCommandMetric("club", mapOf("action" to "create", "result" to "success"), commandSource)
+                                val prefix = if (lang == "ru") {
+                                    "Клуб «${details.name}» создан."
+                                } else {
+                                    "Club \"${details.name}\" created."
+                                }
+                                sendClubOverview(clubStateUid, chatId, lang, details, prefix, message.message_id)
+                            } catch (e: ClubService.ClubException) {
+                                logCommandMetric(
+                                    "club",
+                                    mapOf("action" to "create", "result" to "error", "reason" to e.code),
+                                    commandSource,
+                                )
+                                val retry = e.code == "name_empty" || e.code == "name_too_long" || e.code == "name_profanity"
+                                if (!retry) clubStates.remove(userId)
+                                val suffix = if (retry) {
+                                    if (lang == "ru") "\nОтправь другое название или /cancel." else "\nSend another name or /cancel."
+                                } else {
+                                    ""
+                                }
+                                trySend(chatId, clubErrorText(e.code, lang) + suffix, replyToMessageId = message.message_id)
+                            }
+                        }
+                        ClubTextStep.INFO -> {
+                            try {
+                                clubs.updateClubInfo(clubStateUid, trimmed)
+                                clubStates.remove(userId)
+                                logCommandMetric("club", mapOf("action" to "info", "result" to "success"), commandSource)
+                                val prefix = if (lang == "ru") "Описание клуба обновлено." else "Club description updated."
+                                sendClubSettings(clubStateUid, chatId, lang, prefix, message.message_id)
+                            } catch (e: ClubService.ClubException) {
+                                logCommandMetric(
+                                    "club",
+                                    mapOf("action" to "info", "result" to "error", "reason" to e.code),
+                                    commandSource,
+                                )
+                                trySend(
+                                    chatId,
+                                    clubErrorText(e.code, lang) + if (lang == "ru") "\nОтправь другое описание или /cancel." else "\nSend another description or /cancel.",
+                                    replyToMessageId = message.message_id,
+                                )
+                            }
+                        }
+                        ClubTextStep.MIN_WEIGHT -> {
+                            val value = trimmed.replace(',', '.').toDoubleOrNull()
+                            if (value == null) {
+                                val reply = if (lang == "ru") {
+                                    "Введите минимальный улов числом или /cancel."
+                                } else {
+                                    "Enter the minimum catch as a number or /cancel."
+                                }
+                                trySend(chatId, reply, replyToMessageId = message.message_id)
+                            } else {
+                                try {
+                                    clubs.updateClubSettings(clubStateUid, value, clubDraft.recruitingOpen)
+                                    clubStates.remove(userId)
+                                    logCommandMetric("club", mapOf("action" to "min_weight", "result" to "success"), commandSource)
+                                    val prefix = if (lang == "ru") {
+                                        "Минимальный улов для вступления обновлён."
+                                    } else {
+                                        "Minimum catch to join updated."
+                                    }
+                                    sendClubSettings(clubStateUid, chatId, lang, prefix, message.message_id)
+                                } catch (e: ClubService.ClubException) {
+                                    logCommandMetric(
+                                        "club",
+                                        mapOf("action" to "min_weight", "result" to "error", "reason" to e.code),
+                                        commandSource,
+                                    )
+                                    trySend(
+                                        chatId,
+                                        clubErrorText(e.code, lang) + if (lang == "ru") "\nОтправь другое число или /cancel." else "\nSend another number or /cancel.",
+                                        replyToMessageId = message.message_id,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    return@post call.respond(HttpStatusCode.OK)
+                }
+            }
 
             discountStates[userId]?.let { draft ->
                 if (text == "/cancel") {

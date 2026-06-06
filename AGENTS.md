@@ -43,6 +43,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - Scheduler: background jobs handle auto-fishing, stuck-cast cleanup, and prize/reward distribution.
 - Quests: `GET /api/quests` now returns personal `daily` / `weekly` lists plus a `club` section; club quests are shared across the whole club and are rendered in the bot, Mini App, and Android client.
 - Club chat: `/api/club/chat` stores messages and system events in `ClubChatMessages` and is rendered by the Mini App and Android club screens.
+- Bot club management: `/club` lets Telegram users create or find clubs, leave with confirmation, and lets presidents/heirs manage members and club settings through inline bot callbacks.
 - Android Assets: the mobile project bundles core gameplay assets locally as **WebP** files (converted from PNGs via `mobile/android-app/convert_assets.py`) to reduce traffic.
 - Observability: `/metrics` exposes Prometheus-style output from `Metrics.kt` and `UserMetrics.kt`.
 - Analytics: TG Analytics can be enabled through `TG_ANALYTICS_*` config values, and PlayDeck wrapper analytics are sent when the Mini App runs inside PlayDeck.
