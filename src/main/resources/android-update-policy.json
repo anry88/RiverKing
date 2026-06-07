@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 8,
-  "latestVersionName": "0.4.4",
+  "latestVersionCode": 9,
+  "latestVersionName": "0.4.5",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Reduced post-catch stalls in the Android client by avoiding a full profile reload after every catch.",
-      "Kept tournament and event board refreshes off the critical fishing flow."
+      "Fixed the event location catalog: past event locations now keep their images, while planned events stay hidden.",
+      "Locked catalog locations no longer reveal images, fish, or lure details before they are unlocked."
     ],
     "ru": [
-      "Уменьшены задержки после вылова в Android-клиенте: профиль больше не перезагружается полностью после каждой рыбы.",
-      "Обновление таблиц турниров и событий вынесено из критического пути рыбалки."
+      "Исправлен каталог ивентовых локаций: прошедшие события сохраняют картинки, а запланированные события не показываются заранее.",
+      "Заблокированные локации в каталоге больше не раскрывают картинки, рыб и наживки до открытия."
     ]
   }
 }
