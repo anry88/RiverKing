@@ -5,15 +5,17 @@ import db.ClubQuestMemberProgress
 import db.ClubQuestProgress
 import db.ClubQuestRewardRecipients
 import db.Users
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import util.Metrics
-import util.Rng
+import java.security.MessageDigest
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -67,6 +69,7 @@ class ClubQuestService {
 
     companion object {
         private const val CLUB_PERIOD = "club"
+        private const val QUESTS_PER_WEEK = 2
         private val CLUB_ZONE: ZoneId = ZoneId.of("Europe/Belgrade")
 
         private val definitions: List<QuestDefinition> = listOf(
@@ -197,7 +200,7 @@ class ClubQuestService {
                 (ClubQuestProgress.clubId eq clubId) and
                     (ClubQuestProgress.periodStart eq start)
             }
-            .orderBy(ClubQuestProgress.createdAt)
+            .orderBy(ClubQuestProgress.createdAt to SortOrder.ASC, ClubQuestProgress.code to SortOrder.ASC)
             .mapNotNull { row ->
                 val def = definitionFor(row[ClubQuestProgress.code]) ?: return@mapNotNull null
                 QuestService.QuestDTO(
@@ -245,7 +248,7 @@ class ClubQuestService {
                 (ClubQuestProgress.clubId eq clubId) and
                     (ClubQuestProgress.periodStart eq periodStart)
             }
-            .orderBy(ClubQuestProgress.createdAt)
+            .orderBy(ClubQuestProgress.createdAt to SortOrder.ASC, ClubQuestProgress.code to SortOrder.ASC)
             .mapNotNull { row ->
                 val def = definitionFor(row[ClubQuestProgress.code]) ?: return@mapNotNull null
                 val memberProgress = progressByCodeAndUser[def.code].orEmpty()
@@ -291,13 +294,7 @@ class ClubQuestService {
             ?: return@inTxn UpdateResult()
         val clubId = membership[ClubMembers.clubId].value
         val start = weekStart(ZonedDateTime.ofInstant(caughtAt, CLUB_ZONE).toLocalDate())
-        val existingCodes = ClubQuestProgress
-            .slice(ClubQuestProgress.code)
-            .select {
-                (ClubQuestProgress.clubId eq clubId) and
-                    (ClubQuestProgress.periodStart eq start)
-            }
-            .mapTo(mutableSetOf()) { it[ClubQuestProgress.code] }
+        val existingCodes = existingQuestCodes(clubId, start).toSet()
         val createdCodes = ensureCurrentQuests(clubId, start)
         val context = CatchContext(fishName = fishName, rarity = rarity)
         val now = Instant.now()
@@ -307,47 +304,49 @@ class ClubQuestService {
         ClubQuestProgress.select {
             (ClubQuestProgress.clubId eq clubId) and
                 (ClubQuestProgress.periodStart eq start)
-        }.forEach { row ->
-            val code = row[ClubQuestProgress.code]
-            val def = definitionFor(code) ?: return@forEach
-            val completedAt = row[ClubQuestProgress.completedAt]
-            if (code in createdCodes && code !in existingCodes) {
-                if (completedAt != null) {
-                    coinsAwardedToUser += grantReward(clubId, def.code, start, def.rewardCoins, userId, now)
-                }
-                return@forEach
-            }
-
-            val current = row[ClubQuestProgress.progress]
-            val updated = def.updatedProgress(current, context, clubId, start)
-            if (updated != current) {
-                progressChanged = true
-                ClubQuestProgress.update({
-                    (ClubQuestProgress.clubId eq clubId) and
-                        (ClubQuestProgress.code eq def.code) and
-                        (ClubQuestProgress.periodStart eq start)
-                }) {
-                    it[ClubQuestProgress.progress] = updated
-                    it[ClubQuestProgress.updatedAt] = now
-                }
-                incrementMemberProgress(clubId, def.code, start, userId, now)
-            }
-            if (updated >= def.target && completedAt == null) {
-                val marked = ClubQuestProgress.update({
-                    (ClubQuestProgress.clubId eq clubId) and
-                        (ClubQuestProgress.code eq def.code) and
-                        (ClubQuestProgress.periodStart eq start) and
-                        ClubQuestProgress.completedAt.isNull()
-                }) {
-                    it[ClubQuestProgress.completedAt] = now
-                    it[ClubQuestProgress.updatedAt] = now
-                }
-                if (marked > 0) {
-                    progressChanged = true
-                    coinsAwardedToUser += grantReward(clubId, def.code, start, def.rewardCoins, userId, now)
-                }
-            }
         }
+            .orderBy(ClubQuestProgress.createdAt to SortOrder.ASC, ClubQuestProgress.code to SortOrder.ASC)
+            .forEach { row ->
+                val code = row[ClubQuestProgress.code]
+                val def = definitionFor(code) ?: return@forEach
+                val completedAt = row[ClubQuestProgress.completedAt]
+                if (code in createdCodes && code !in existingCodes) {
+                    if (completedAt != null) {
+                        coinsAwardedToUser += grantReward(clubId, def.code, start, def.rewardCoins, userId, now)
+                    }
+                    return@forEach
+                }
+
+                val current = row[ClubQuestProgress.progress]
+                val updated = def.updatedProgress(current, context, clubId, start)
+                if (updated != current) {
+                    progressChanged = true
+                    ClubQuestProgress.update({
+                        (ClubQuestProgress.clubId eq clubId) and
+                            (ClubQuestProgress.code eq def.code) and
+                            (ClubQuestProgress.periodStart eq start)
+                    }) {
+                        it[ClubQuestProgress.progress] = updated
+                        it[ClubQuestProgress.updatedAt] = now
+                    }
+                    incrementMemberProgress(clubId, def.code, start, userId, now)
+                }
+                if (updated >= def.target && completedAt == null) {
+                    val marked = ClubQuestProgress.update({
+                        (ClubQuestProgress.clubId eq clubId) and
+                            (ClubQuestProgress.code eq def.code) and
+                            (ClubQuestProgress.periodStart eq start) and
+                            ClubQuestProgress.completedAt.isNull()
+                    }) {
+                        it[ClubQuestProgress.completedAt] = now
+                        it[ClubQuestProgress.updatedAt] = now
+                    }
+                    if (marked > 0) {
+                        progressChanged = true
+                        coinsAwardedToUser += grantReward(clubId, def.code, start, def.rewardCoins, userId, now)
+                    }
+                }
+            }
 
         UpdateResult(
             coinsAwardedToUser = coinsAwardedToUser,
@@ -358,19 +357,13 @@ class ClubQuestService {
     private fun definitionFor(code: String): QuestDefinition? = definitions.find { it.code == code }
 
     private fun ensureCurrentQuests(clubId: Long, periodStart: LocalDate): Set<String> {
-        val existing = ClubQuestProgress
-            .slice(ClubQuestProgress.code)
-            .select {
-                (ClubQuestProgress.clubId eq clubId) and
-                    (ClubQuestProgress.periodStart eq periodStart)
-            }
-            .mapTo(mutableSetOf()) { it[ClubQuestProgress.code] }
+        val existing = existingQuestCodes(clubId, periodStart)
         if (existing.isNotEmpty()) return emptySet()
 
-        val selected = definitions.shuffled(Rng.fast()).take(2)
+        val selected = selectedDefinitions(clubId, periodStart)
         val now = Instant.now()
         selected.forEach { def ->
-            ClubQuestProgress.insert {
+            ClubQuestProgress.insertIgnore {
                 it[ClubQuestProgress.clubId] = clubId
                 it[ClubQuestProgress.code] = def.code
                 it[ClubQuestProgress.periodStart] = periodStart
@@ -383,6 +376,35 @@ class ClubQuestService {
             }
         }
         return selected.mapTo(linkedSetOf()) { it.code }
+    }
+
+    private fun existingQuestCodes(clubId: Long, periodStart: LocalDate): List<String> =
+        ClubQuestProgress
+            .slice(ClubQuestProgress.code)
+            .select {
+                (ClubQuestProgress.clubId eq clubId) and
+                    (ClubQuestProgress.periodStart eq periodStart)
+            }
+            .orderBy(ClubQuestProgress.createdAt to SortOrder.ASC, ClubQuestProgress.code to SortOrder.ASC)
+            .map { it[ClubQuestProgress.code] }
+
+    private fun selectedDefinitions(clubId: Long, periodStart: LocalDate): List<QuestDefinition> =
+        definitions
+            .sortedWith(
+                compareBy<QuestDefinition> { selectionKey(clubId, periodStart, it.code) }
+                    .thenBy { it.code }
+            )
+            .take(QUESTS_PER_WEEK)
+
+    private fun selectionKey(clubId: Long, periodStart: LocalDate, code: String): Long {
+        val digest = MessageDigest
+            .getInstance("SHA-256")
+            .digest("$clubId:$periodStart:$code".toByteArray(Charsets.UTF_8))
+        var key = 0L
+        repeat(Long.SIZE_BYTES) { index ->
+            key = (key shl 8) or (digest[index].toLong() and 0xffL)
+        }
+        return key
     }
 
     private fun incrementMemberProgress(

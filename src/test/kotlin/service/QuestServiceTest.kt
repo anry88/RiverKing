@@ -2,6 +2,7 @@ package service
 
 import db.Catches
 import db.ClubMembers
+import db.ClubQuestProgress
 import db.ClubQuestRewardRecipients
 import db.DB
 import db.Fish
@@ -202,6 +203,71 @@ class QuestServiceTest {
         assertTrue(metrics.lineSequence().any { it.startsWith("club_quests_complete_total{code=\"${chosenQuest.code}\"} ") })
     }
 
+    @Test
+    fun `club quests keep existing overflow rows visible and updating`() {
+        DB.init(testEnv("club-quest-overflow"))
+
+        val fishing = FishingService()
+        val clubs = ClubService()
+        val clubQuests = ClubQuestService()
+
+        val presidentId = fishing.ensureUserByTgId(8_101L)
+        fishing.addCoins(presidentId, ClubService.CREATE_COST_COINS.toInt())
+        addProgressWeight(presidentId, ClubService.MIN_CREATE_WEIGHT_KG + 100.0)
+        clubs.createClub(presidentId, "Overflow Club")
+        val clubId = findClubId(presidentId)
+        val periodStart = currentClubWeekStart()
+        val assignedCodes = transaction {
+            ClubQuestProgress.select {
+                (ClubQuestProgress.clubId eq clubId) and
+                    (ClubQuestProgress.periodStart eq periodStart)
+            }
+                .orderBy(ClubQuestProgress.createdAt to SortOrder.ASC, ClubQuestProgress.code to SortOrder.ASC)
+                .map { it[ClubQuestProgress.code] }
+        }
+        assertEquals(2, assignedCodes.size)
+
+        val overflowCodes = allClubQuestCodes.filterNot { it in assignedCodes }.take(2)
+        val createdAt = Instant.now().plusSeconds(60)
+
+        transaction {
+            overflowCodes.forEachIndexed { index, code ->
+                val (target, rewardCoins) = clubQuestSpec(code)
+                ClubQuestProgress.insert {
+                    it[ClubQuestProgress.clubId] = clubId
+                    it[ClubQuestProgress.code] = code
+                    it[ClubQuestProgress.periodStart] = periodStart
+                    it[ClubQuestProgress.progress] = 0
+                    it[ClubQuestProgress.target] = target
+                    it[ClubQuestProgress.rewardCoins] = rewardCoins
+                    it[ClubQuestProgress.completedAt] = null
+                    it[ClubQuestProgress.createdAt] = createdAt.plusSeconds(index.toLong())
+                    it[ClubQuestProgress.updatedAt] = createdAt.plusSeconds(index.toLong())
+                }
+            }
+        }
+
+        val listed = clubQuests.list(presidentId, "ru")
+        assertEquals(assignedCodes + overflowCodes, listed.quests.map { it.code })
+
+        val overflowUpdate = recordClubCatch(
+            clubQuests,
+            presidentId,
+            questScenario(overflowCodes.first()),
+            currentClubWeekInstant(dayOffset = 1),
+        )
+
+        assertTrue(overflowUpdate.progressChanged)
+        val overflowProgress = transaction {
+            ClubQuestProgress.select {
+                (ClubQuestProgress.clubId eq clubId) and
+                    (ClubQuestProgress.periodStart eq periodStart) and
+                    (ClubQuestProgress.code eq overflowCodes.first())
+            }.single()[ClubQuestProgress.progress]
+        }
+        assertEquals(1, overflowProgress)
+    }
+
     private data class QuestScenario(
         val fishName: String,
         val rarity: String,
@@ -223,6 +289,20 @@ class QuestServiceTest {
         else -> error("Unexpected quest code: $code")
     }
 
+    private fun clubQuestSpec(code: String): Pair<Int, Int> = when (code) {
+        "club_epic_20" -> 20 to 5000
+        "club_common_200" -> 200 to 3000
+        "club_uncommon_100" -> 100 to 3500
+        "club_ruffe_40" -> 40 to 4000
+        "club_bream_30" -> 30 to 3500
+        "club_crucian_50" -> 50 to 3500
+        "club_roach_50" -> 50 to 3500
+        "club_rare_50" -> 50 to 5000
+        "club_perch_50" -> 50 to 3500
+        "club_herring_50" -> 50 to 4500
+        else -> error("Unexpected quest code: $code")
+    }
+
     private val allClubQuestCodes = listOf(
         "club_epic_20",
         "club_common_200",
@@ -238,13 +318,17 @@ class QuestServiceTest {
 
     private fun currentClubWeekInstant(dayOffset: Long = 0, secondOffset: Long = 0): Instant {
         val zone = ZoneId.of("Europe/Belgrade")
-        val weekStart = LocalDate.now(zone).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        return weekStart
+        return currentClubWeekStart()
             .plusDays(dayOffset)
             .atTime(12, 0)
             .atZone(zone)
             .toInstant()
             .plusSeconds(secondOffset)
+    }
+
+    private fun currentClubWeekStart(): LocalDate {
+        val zone = ZoneId.of("Europe/Belgrade")
+        return LocalDate.now(zone).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     }
 
     private fun recordCatchOnly(
