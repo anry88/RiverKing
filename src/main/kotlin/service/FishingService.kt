@@ -1064,7 +1064,8 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         }
 
         val pageLimit = limit.coerceIn(1, 10)
-        val events = SpecialEvents.selectAll()
+        val now = Instant.now(clock)
+        val events = SpecialEvents.select { SpecialEvents.startTime lessEq now }
             .orderBy(SpecialEvents.startTime to SortOrder.DESC, SpecialEvents.id to SortOrder.DESC)
             .limit(pageLimit + 1, offset.coerceAtLeast(0L))
             .toList()
