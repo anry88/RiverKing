@@ -500,6 +500,7 @@ class AuthRoutesTest {
         application { installAuthTestModule(env) }
         val registered = registerPasswordUser(client, "angler.event.location", "password123")
         val eventId = createCurrentSpecialEvent()
+        createFutureSpecialEvent()
 
         val withoutClub = client.get("/api/me") {
             bearerAuth(registered.accessToken)
@@ -932,6 +933,30 @@ class AuthRoutesTest {
             start = now.minusSeconds(3_600),
             end = now.plusSeconds(3_600),
             imagePath = "event-bay.webp",
+            castZone = CastZoneDTO(
+                points = listOf(
+                    CastZonePointDTO(0.12, 0.42),
+                    CastZonePointDTO(0.88, 0.42),
+                    CastZonePointDTO(0.88, 0.78),
+                    CastZonePointDTO(0.12, 0.78),
+                ),
+            ),
+            fish = listOf(SpecialEventFishSpec(fishId, 1.0)),
+            weightPrizes = SpecialEventPrizeConfig(0, "[]"),
+            countPrizes = SpecialEventPrizeConfig(0, "[]"),
+            fishPrizes = SpecialEventPrizeConfig(0, "[]"),
+        )
+    }
+
+    private fun createFutureSpecialEvent(): Long {
+        val fishId = transaction { Fish.select { Fish.name eq "Плотва" }.single()[Fish.id].value }
+        val now = Instant.now()
+        return SpecialEventService().createEvent(
+            nameRu = "Будущий остров",
+            nameEn = "Future Island",
+            start = now.plusSeconds(7_200),
+            end = now.plusSeconds(10_800),
+            imagePath = "future-island.webp",
             castZone = CastZoneDTO(
                 points = listOf(
                     CastZonePointDTO(0.12, 0.42),

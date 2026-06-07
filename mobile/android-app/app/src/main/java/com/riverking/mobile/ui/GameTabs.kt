@@ -5725,7 +5725,8 @@ private fun GuideLocationRow(
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            val backgroundModel = location.imageUrl ?: locationBackgroundAsset(location.name)
+            val locationUnlocked = location.isEvent || ownedLocation?.unlocked == true
+            val backgroundModel = if (locationUnlocked) location.imageUrl ?: locationBackgroundAsset(location.name) else null
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5738,7 +5739,11 @@ private fun GuideLocationRow(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
-                }
+                } ?: Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.35f))
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -5768,8 +5773,10 @@ private fun GuideLocationRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        CatchDetailChip(guideFishCountLabel(strings, location.fish.size))
-                        CatchDetailChip(guideLureCountLabel(strings, location.lures.size))
+                        if (locationUnlocked) {
+                            CatchDetailChip(guideFishCountLabel(strings, location.fish.size))
+                            CatchDetailChip(guideLureCountLabel(strings, location.lures.size))
+                        }
                         CatchDetailChip(
                             when {
                                 location.isEvent -> specialEventLocationLabel(strings)
@@ -5781,35 +5788,48 @@ private fun GuideLocationRow(
                     }
                 }
             }
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(strings.guideFish, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            if (locationUnlocked) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    location.fish.forEach { fish ->
-                        GuideBadge(
-                            label = fish.name,
-                            accent = rarityColor(fish.rarity),
-                        )
+                    Text(strings.guideFish, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        location.fish.forEach { fish ->
+                            GuideBadge(
+                                label = fish.name,
+                                accent = rarityColor(fish.rarity),
+                            )
+                        }
                     }
+                    Text(strings.guideLures, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        location.lures.forEach { lure ->
+                            GuideBadge(
+                                label = lure,
+                                accent = lureAccentColor(lure),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-                Text(strings.guideLures, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+            } else {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    location.lures.forEach { lure ->
-                        GuideBadge(
-                            label = lure,
-                            accent = lureAccentColor(lure),
-                        )
-                    }
+                    GuideBadge(
+                        label = ownedLocation?.let { requiresKgLabel(strings, it.unlockKg) } ?: strings.unavailable,
+                        accent = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-                Spacer(modifier = Modifier.height(12.dp))
             }
         }
     }
