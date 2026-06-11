@@ -887,6 +887,15 @@ object DB {
         val fLegendaryPredatorSaltTarpon   = upsertFish("Тарпон", "legendary", 25.0, 12.0, true, "salt")
         val fLegendaryPredatorSaltGiantKaranks = upsertFish("Каранкс гигантский", "legendary", 25.0, 10.0, true, "salt")
 
+        // --- Event-only fish: Афслёйтдейк / Vismigratierivier ---
+        upsertFish("Колюшка трёхиглая", "common", 0.006, 0.003, true, "fresh")
+        upsertFish("Камбала речная", "uncommon", 0.45, 0.20, true, "salt")
+        upsertFish("Финта", "rare", 0.8, 0.35, false, "salt")
+        upsertFish("Минога речная", "rare", 0.12, 0.05, true, "fresh")
+        upsertFish("Хоутинг", "epic", 1.2, 0.5, false, "fresh")
+        upsertFish("Минога морская", "mythic", 1.6, 0.7, true, "salt")
+        upsertFish("Алоза европейская", "legendary", 2.0, 0.8, false, "salt")
+
 
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)

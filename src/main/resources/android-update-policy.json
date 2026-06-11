@@ -1,16 +1,16 @@
 {
-  "latestVersionCode": 9,
-  "latestVersionName": "0.4.5",
+  "latestVersionCode": 10,
+  "latestVersionName": "0.4.6",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Fixed the event location catalog: past event locations now keep their images, while planned events stay hidden.",
-      "Locked catalog locations no longer reveal images, fish, or lure details before they are unlocked."
+      "Added bundled fish artwork for the Afsluitdijk event.",
+      "Added new event fish catalog entries for the Afsluitdijk fish pool."
     ],
     "ru": [
-      "Исправлен каталог ивентовых локаций: прошедшие события сохраняют картинки, а запланированные события не показываются заранее.",
-      "Заблокированные локации в каталоге больше не раскрывают картинки, рыб и наживки до открытия."
+      "Добавлены встроенные изображения рыб для ивента Афслёйтдейк.",
+      "Добавлены новые каталоговые рыбы для пула ивента Афслёйтдейк."
     ]
   }
 }
