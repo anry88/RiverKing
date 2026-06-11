@@ -245,6 +245,13 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Мандариновая рыба" to "webapp/assets/fish/mandarinivaya_ryba.png",
     "Крылатка зебровая" to "webapp/assets/fish/krylaka_zebrovaya.png",
     "Рыба-флейта" to "webapp/assets/fish/ryba-fleita.png",
+    "Колюшка трёхиглая" to "webapp/assets/fish/kolyushka_trehiglaya.png",
+    "Камбала речная" to "webapp/assets/fish/kambala_rechnaya.png",
+    "Финта" to "webapp/assets/fish/finta.png",
+    "Минога речная" to "webapp/assets/fish/rechnaya_minoga.png",
+    "Хоутинг" to "webapp/assets/fish/houting.png",
+    "Минога морская" to "webapp/assets/fish/morskaya_minoga.png",
+    "Алоза европейская" to "webapp/assets/fish/evropeiskaya_aloza.png",
 )
 
 private val LOCATION_BACKGROUNDS = run {

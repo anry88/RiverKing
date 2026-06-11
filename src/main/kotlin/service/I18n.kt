@@ -229,6 +229,13 @@ object I18n {
         "Мандариновая рыба" to "Mandarin Dragonet",
         "Крылатка зебровая" to "Zebra Lionfish",
         "Рыба-флейта" to "Trumpetfish",
+        "Колюшка трёхиглая" to "Three-spined Stickleback",
+        "Камбала речная" to "European Flounder",
+        "Финта" to "Twaite Shad",
+        "Минога речная" to "River Lamprey",
+        "Хоутинг" to "Houting",
+        "Минога морская" to "Sea Lamprey",
+        "Алоза европейская" to "Allis Shad",
     )
 
     private val locations = mapOf(

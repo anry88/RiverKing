@@ -765,6 +765,13 @@
     'Мандариновая рыба': { en: 'Mandarin Dragonet', asset: '/app/assets/fish/mandarinivaya_ryba.png' },
     'Крылатка зебровая': { en: 'Zebra Lionfish', asset: '/app/assets/fish/krylaka_zebrovaya.png' },
     'Рыба-флейта': { en: 'Trumpetfish', asset: '/app/assets/fish/ryba-fleita.png' },
+    'Колюшка трёхиглая': { en: 'Three-spined Stickleback', asset: '/app/assets/fish/kolyushka_trehiglaya.png' },
+    'Камбала речная': { en: 'European Flounder', asset: '/app/assets/fish/kambala_rechnaya.png' },
+    'Финта': { en: 'Twaite Shad', asset: '/app/assets/fish/finta.png' },
+    'Минога речная': { en: 'River Lamprey', asset: '/app/assets/fish/rechnaya_minoga.png' },
+    'Хоутинг': { en: 'Houting', asset: '/app/assets/fish/houting.png' },
+    'Минога морская': { en: 'Sea Lamprey', asset: '/app/assets/fish/morskaya_minoga.png' },
+    'Алоза европейская': { en: 'Allis Shad', asset: '/app/assets/fish/evropeiskaya_aloza.png' },
   };
   const FISH_TRANSLATIONS = {};
   const FISH_IMG = {};
