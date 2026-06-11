@@ -5,11 +5,12 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import service.*
 import java.time.*
-import kotlin.coroutines.coroutineContext
 import db.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
+
+private const val TELEGRAM_REMINDER_DELAY_MS = 1_000L
 
 object Scheduler {
     fun install(app: Application) {
@@ -42,30 +43,60 @@ object Scheduler {
         }
     }
 
-    private suspend fun startDailyJobs(notifications: NotificationService, fishing: FishingService) {
+    private suspend fun startDailyJobs(notifications: NotificationService, fishing: FishingService) = coroutineScope {
         val zone = ZoneId.of("Europe/Belgrade")
         val log = LoggerFactory.getLogger("DailyJobs")
 
         var lastSubReminderDate: LocalDate? = null
         var lastPrizeReminderDate: LocalDate? = null
+        var subscriptionReminderJob: Job? = null
+        var prizeReminderJob: Job? = null
 
-        while (coroutineContext.isActive) {
+        while (isActive) {
             try {
                 val now = ZonedDateTime.now(zone)
                 val today = now.toLocalDate()
 
                 // 12:00 - Subscription Reminders
-                if (now.hour == 12 && lastSubReminderDate != today) {
-                    log.info("Starting daily subscription reminders at $now")
-                    runSubscriptionReminders(notifications, fishing)
-                    lastSubReminderDate = today
+                if (now.hour == 12 && lastSubReminderDate != today && subscriptionReminderJob?.isActive != true) {
+                    val runDate = today
+                    val startedAt = now
+                    subscriptionReminderJob = launch {
+                        try {
+                            log.info(
+                                "Starting daily subscription reminders at {} delayMs={}",
+                                startedAt,
+                                TELEGRAM_REMINDER_DELAY_MS
+                            )
+                            runSubscriptionReminders(notifications, fishing)
+                            lastSubReminderDate = runDate
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            log.error("Error in subscription reminder job", e)
+                        }
+                    }
                 }
 
                 // 13:00 - Prize Reminders
-                if (now.hour == 13 && lastPrizeReminderDate != today) {
-                    log.info("Starting daily prize reminders at $now")
-                    runPrizeReminders(notifications, fishing)
-                    lastPrizeReminderDate = today
+                if (now.hour == 13 && lastPrizeReminderDate != today && prizeReminderJob?.isActive != true) {
+                    val runDate = today
+                    val startedAt = now
+                    prizeReminderJob = launch {
+                        try {
+                            log.info(
+                                "Starting daily prize reminders at {} delayMs={}",
+                                startedAt,
+                                TELEGRAM_REMINDER_DELAY_MS
+                            )
+                            runPrizeReminders(notifications, fishing)
+                            lastPrizeReminderDate = runDate
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            log.error("Error in prize reminder job", e)
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -136,7 +167,7 @@ object Scheduler {
                         }
                     }
                 }
-                delay(100) // Small delay to avoid hitting rate limits
+                delay(TELEGRAM_REMINDER_DELAY_MS)
             }
         }
     }
@@ -183,7 +214,7 @@ object Scheduler {
             val markup = kotlinx.serialization.json.Json.encodeToString(app.InlineKeyboardMarkup(buttons))
 
             notifications.sendNotification(uid, tgId, text, markup = markup)
-            delay(100)
+            delay(TELEGRAM_REMINDER_DELAY_MS)
         }
     }
 }

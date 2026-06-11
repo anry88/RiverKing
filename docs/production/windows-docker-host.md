@@ -76,6 +76,17 @@ For repeated deploys after the migration, use:
 scripts/deploy-hdc.sh --environment prod --database postgres
 ```
 
+The app container uses Hikari for PostgreSQL access. The deploy script writes conservative defaults to the environment file:
+
+```text
+DATABASE_MAX_POOL_SIZE=10
+DATABASE_MIN_IDLE=2
+DATABASE_CONNECTION_TIMEOUT_MS=3000
+DATABASE_DISPATCHER_THREADS=10
+```
+
+Keep `DATABASE_DISPATCHER_THREADS` at or below `DATABASE_MAX_POOL_SIZE` so request handlers do not queue more blocking database work than the pool can service.
+
 ## Runtime Layout
 
 ```text

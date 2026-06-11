@@ -80,7 +80,7 @@ This matters from a product-engineering perspective because monetization is not 
 - `Mini App frontend`: shipped from `src/main/resources/webapp`
 - `Ktor backend`: handles auth, profile, fishing actions, guide, ratings, shop, regular tournaments, special club events, clubs, personal quests, club quests, referrals, and mobile sessions
 - `Telegram bot layer`: handles commands, inline flows, admin actions, payment-support actions, and auto-casting
-- `Exposed + SQLite`: store users, catches, inventories, tournaments, special events, prizes, quests, achievements, clubs, referrals, and payments
+- `Exposed + Hikari + PostgreSQL/SQLite`: store users, catches, inventories, tournaments, special events, prizes, quests, achievements, clubs, referrals, and payments
 - `scheduler`: distributes rewards, restores state, runs auto-fishing, and keeps periodic systems moving
 - `metrics / analytics`: Prometheus-style `/metrics` plus optional TG Analytics and PlayDeck wrapper events in the Mini App
 

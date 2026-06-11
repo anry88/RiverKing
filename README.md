@@ -24,7 +24,7 @@ It is built as a working product rather than a thin game prototype: the reposito
 
 **Stack**
 
-`Kotlin` `Ktor` `Netty` `Exposed` `SQLite` `Telegram Mini App` `PlayDeck` `Telegram Bot API` `Android` `Jetpack Compose` `Admin API` `TG Analytics` `Gradle`
+`Kotlin` `Ktor` `Netty` `Exposed` `HikariCP` `PostgreSQL` `SQLite` `Telegram Mini App` `PlayDeck` `Telegram Bot API` `Android` `Jetpack Compose` `Admin API` `TG Analytics` `Gradle`
 
 **Quick links**
 
@@ -69,7 +69,7 @@ flowchart LR
     C --> D
     D --> E["Gameplay services"]
     D --> J["Account / session layer"]
-    E --> F["Exposed + SQLite"]
+    E --> F["Exposed + Hikari + PostgreSQL/SQLite"]
     D --> G["Metrics / analytics"]
     E --> H["Schedulers / reward distribution"]
 ```
@@ -198,6 +198,13 @@ Use [config.example.properties](config.example.properties) as the starting point
 - `DATABASE_URL`
 - `DATABASE_USER`
 - `DATABASE_PASSWORD`
+- `DATABASE_MAX_POOL_SIZE`
+- `DATABASE_MIN_IDLE`
+- `DATABASE_CONNECTION_TIMEOUT_MS`
+- `DATABASE_IDLE_TIMEOUT_MS`
+- `DATABASE_MAX_LIFETIME_MS`
+- `DATABASE_LEAK_DETECTION_THRESHOLD_MS`
+- `DATABASE_DISPATCHER_THREADS`
 - `PORT`
 - `DEV_MODE`
 - `ADMIN_TG_ID`

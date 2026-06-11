@@ -27,7 +27,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 ## Key Runtime Facts
 
 - Runtime stack: Kotlin + Ktor + Netty.
-- Persistence: Exposed over SQLite by default, with PostgreSQL-style connection config fields also supported.
+- Persistence: Exposed over a Hikari-backed JDBC pool. SQLite remains the local default, while production should use PostgreSQL. Ktor routes should run blocking Exposed work through the bounded DB dispatcher/helper in `db/DbExecution.kt`.
 - Mini App auth: `POST /api/auth/telegram` verifies Telegram `initData` before creating an app session, with a PlayDeck `initdata/check` fallback for wrapper launches that carry third-party-signed `tgWebAppData`.
 - Mobile auth: password, Google, and Telegram sign-in can create bearer tokens plus refresh sessions for the Android client, and an authenticated Android profile can link a Telegram account for shared progression across mobile and Telegram surfaces.
 - Account deletion: `POST /api/account/delete` deletes the authenticated profile, and the backend also serves public compliance pages at `/privacy`, `/terms`, `/support`, and `/account/delete`.

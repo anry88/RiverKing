@@ -1,11 +1,11 @@
 package service
 
+import db.DbExecution
 import db.Payments
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.transactions.transaction
 
 class PlayPurchaseService(
     private val fishing: FishingService,
@@ -29,7 +29,8 @@ class PlayPurchaseService(
         packageId: String,
         purchaseToken: String,
     ): CompletionResult {
-        val pack = fishing.findPack(packageId) ?: return CompletionResult.Failure("bad_package")
+        val pack = DbExecution.blocking { fishing.findPack(packageId) }
+            ?: return CompletionResult.Failure("bad_package")
         val purchaseVerifier = verifier ?: return CompletionResult.Failure("play_verification_unavailable")
         val verification = purchaseVerifier.verifyPurchase(purchaseToken)
         val verifiedPurchase = when (verification) {
@@ -55,35 +56,38 @@ class PlayPurchaseService(
         if (verifiedPurchase.obfuscatedAccountId != null && verifiedPurchase.obfuscatedAccountId != expectedAccountId) {
             return CompletionResult.Failure("purchase_user_mismatch")
         }
-        if (pack.rodCode != null && fishing.hasRod(userId, pack.rodCode)) {
+        if (pack.rodCode != null && DbExecution.blocking { fishing.hasRod(userId, pack.rodCode) }) {
             return CompletionResult.Failure("rod_unlocked")
         }
         val result = try {
-            fishing.buyPackage(userId, packageId)
+            DbExecution.blocking {
+                val purchaseResult = fishing.buyPackage(userId, packageId)
+                PayService.recordPayment(
+                    userId = userId,
+                    packageId = packageId,
+                    info = PayService.PaymentInfo(
+                        providerChargeId = purchaseToken,
+                        telegramChargeId = paymentChargeId,
+                        amount = pack.price,
+                        currency = "PLAY",
+                    )
+                )
+                ReferralService.onPurchase(userId, pack)
+                purchaseResult
+            }
         } catch (_: Exception) {
             return CompletionResult.Failure("bad_package")
         }
-        PayService.recordPayment(
-            userId = userId,
-            packageId = packageId,
-            info = PayService.PaymentInfo(
-                providerChargeId = purchaseToken,
-                telegramChargeId = paymentChargeId,
-                amount = pack.price,
-                currency = "PLAY",
-            )
-        )
-        ReferralService.onPurchase(userId, pack)
         return CompletionResult.Success(
             lures = result.first,
             currentLureId = result.second,
         )
     }
 
-    private fun hasDuplicatePurchase(
+    private suspend fun hasDuplicatePurchase(
         purchaseToken: String,
         paymentChargeId: String,
-    ): Boolean = transaction {
+    ): Boolean = DbExecution.transaction {
         !Payments.select {
             (((Payments.providerChargeId eq purchaseToken) or (Payments.telegramChargeId eq paymentChargeId)) and
                 (Payments.refunded eq false))

@@ -2,7 +2,7 @@
 
 Suggested repository description:
 
-`Telegram-first fishing game built with Kotlin, Ktor, Exposed and SQLite, featuring dynamic fishing challenges, shared backend auth, tournaments, quests, clubs, referrals, Stars/PlayDeck payments, bot automation, a nested Android client, and an internal Android admin app.`
+`Telegram-first fishing game built with Kotlin, Ktor, Exposed, HikariCP and PostgreSQL/SQLite, featuring dynamic fishing challenges, shared backend auth, tournaments, quests, clubs, referrals, Stars/PlayDeck payments, bot automation, a nested Android client, and an internal Android admin app.`
 
 Suggested topics:
 

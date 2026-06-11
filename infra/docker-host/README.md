@@ -8,6 +8,7 @@ The stack intentionally keeps runtime state outside Docker:
 - `riverking.db`, WAL files, logs, and event assets live under the host data directory mounted at `/data`.
 - PostgreSQL data lives under the host data directory at `postgres\` and is mounted into the PostgreSQL container.
 - The container working directory is `/data`, so legacy configs with `DATABASE_URL=jdbc:sqlite:riverking.db` still keep SQLite outside the container.
+- The app service uses a Hikari database pool and bounded DB dispatcher. Defaults are `DATABASE_MAX_POOL_SIZE=10`, `DATABASE_MIN_IDLE=2`, `DATABASE_CONNECTION_TIMEOUT_MS=3000`, and `DATABASE_DISPATCHER_THREADS=10`; override them in the environment file for load tuning.
 - Tracked files from `data/event-assets` are copied to the host data directory by `scripts/deploy-hdc.sh`.
 
 ## Files
