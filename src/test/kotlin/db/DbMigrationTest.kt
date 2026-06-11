@@ -5,7 +5,6 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import service.FishingService
 import support.testEnv
@@ -43,7 +42,7 @@ class DbMigrationTest {
             insertedUserId
         }
 
-        TransactionManager.defaultDatabase?.let { TransactionManager.closeAndUnregister(it) }
+        DB.close()
 
         DriverManager.getConnection(env.dbUrl).use { connection ->
             connection.createStatement().use { stmt ->

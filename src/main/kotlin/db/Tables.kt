@@ -1,6 +1,8 @@
 package db
 
 import app.Env
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.dao.id.LongIdTable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -17,8 +19,16 @@ import java.time.ZoneId
 import org.jetbrains.exposed.sql.SortOrder
 
 object DB {
+    private var dataSource: HikariDataSource? = null
+
+    @Synchronized
     fun init(env: Env) {
+        close()
         val isSqlite = isSqliteUrl(env.dbUrl)
+        val maxPoolSize = if (isSqlite) 1 else env.dbMaxPoolSize.coerceAtLeast(1)
+        val minIdle = if (isSqlite) 0 else env.dbMinIdle.coerceIn(0, maxPoolSize)
+        val dispatcherThreads = if (isSqlite) 1 else env.dbDispatcherThreads.coerceAtMost(maxPoolSize)
+        DbExecution.configure(dispatcherThreads)
         val databaseConfig = if (isSqlite) {
             DatabaseConfig {
                 defaultRepetitionAttempts = 10
@@ -28,12 +38,34 @@ object DB {
         } else {
             DatabaseConfig {}
         }
+
+        val hikariConfig = HikariConfig().apply {
+            poolName = "RiverKingDbPool"
+            jdbcUrl = env.dbUrl
+            driverClassName = jdbcDriver(env.dbUrl)
+            if (!isSqlite) {
+                username = env.dbUser
+                password = env.dbPass
+            }
+            maximumPoolSize = maxPoolSize
+            minimumIdle = minIdle
+            connectionTimeout = env.dbConnectionTimeoutMs
+            idleTimeout = env.dbIdleTimeoutMs
+            maxLifetime = env.dbMaxLifetimeMs
+            validationTimeout = env.dbConnectionTimeoutMs.coerceAtMost(5000L)
+            if (env.dbLeakDetectionThresholdMs > 0) {
+                leakDetectionThreshold = env.dbLeakDetectionThresholdMs
+            }
+            if (isSqlite) {
+                connectionInitSql = "PRAGMA busy_timeout=10000"
+            }
+        }
+        val pooledDataSource = HikariDataSource(hikariConfig)
+        dataSource = pooledDataSource
+
         // SQLite stays supported for local/test restores; production Docker can use PostgreSQL.
         Database.connect(
-            url = env.dbUrl,
-            driver = jdbcDriver(env.dbUrl),
-            user = if (isSqlite) "" else env.dbUser,
-            password = if (isSqlite) "" else env.dbPass,
+            pooledDataSource,
             setupConnection = { connection ->
                 if (isSqlite) {
                     connection.createStatement().use { stmt ->
@@ -103,6 +135,14 @@ object DB {
             sanitizeExistingNicknames()
             backfillTelegramIdentities()
         }
+    }
+
+    @Synchronized
+    fun close() {
+        TransactionManager.defaultDatabase?.let { TransactionManager.closeAndUnregister(it) }
+        dataSource?.close()
+        dataSource = null
+        DbExecution.close()
     }
 
     private fun isSqliteUrl(dbUrl: String): Boolean =

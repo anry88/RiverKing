@@ -13,6 +13,13 @@ data class Env(
     val dbUrl: String,
     val dbUser: String,
     val dbPass: String,
+    val dbMaxPoolSize: Int,
+    val dbMinIdle: Int,
+    val dbConnectionTimeoutMs: Long,
+    val dbIdleTimeoutMs: Long,
+    val dbMaxLifetimeMs: Long,
+    val dbLeakDetectionThresholdMs: Long,
+    val dbDispatcherThreads: Int,
     val port: Int,
     val devMode: Boolean,
     val adminTgId: Long,
@@ -79,6 +86,18 @@ data class Env(
                 dbUrl = environmentOverrideValue("DATABASE_URL") ?: "jdbc:sqlite:/data/riverking.db",
                 dbUser = environmentOverrideValue("DATABASE_USER") ?: "postgres",
                 dbPass = environmentOverrideValue("DATABASE_PASSWORD") ?: "postgres",
+                dbMaxPoolSize = environmentOverrideValue("DATABASE_MAX_POOL_SIZE")?.toIntOrNull()?.coerceAtLeast(1) ?: 10,
+                dbMinIdle = environmentOverrideValue("DATABASE_MIN_IDLE")?.toIntOrNull()?.coerceAtLeast(0) ?: 2,
+                dbConnectionTimeoutMs =
+                    environmentOverrideValue("DATABASE_CONNECTION_TIMEOUT_MS")?.toLongOrNull()?.coerceAtLeast(250L) ?: 3000L,
+                dbIdleTimeoutMs =
+                    environmentOverrideValue("DATABASE_IDLE_TIMEOUT_MS")?.toLongOrNull()?.coerceAtLeast(0L) ?: 600000L,
+                dbMaxLifetimeMs =
+                    environmentOverrideValue("DATABASE_MAX_LIFETIME_MS")?.toLongOrNull()?.coerceAtLeast(30000L) ?: 1800000L,
+                dbLeakDetectionThresholdMs =
+                    environmentOverrideValue("DATABASE_LEAK_DETECTION_THRESHOLD_MS")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L,
+                dbDispatcherThreads =
+                    environmentOverrideValue("DATABASE_DISPATCHER_THREADS")?.toIntOrNull()?.coerceAtLeast(1) ?: 10,
                 port = configuredValue("PORT")?.toIntOrNull() ?: 8080,
                 devMode = configuredValue("DEV_MODE")?.equals("true", ignoreCase = true) ?: false,
                 adminTgId = configuredValue("ADMIN_TG_ID")?.toLongOrNull() ?: 0L,

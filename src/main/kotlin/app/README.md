@@ -3,7 +3,7 @@
 This directory contains the entry points and Ktor HTTP routes. Use the file list below to understand request flow quickly.
 
 ## Server and plugins
-- **`Application.kt`** — the `main()` function loads `Env`, boots the Netty server, installs plugins (`ContentNegotiation`, `CORS`, `DoubleReceive`, sessions), initializes the database (`DB.init`), and registers routes through `apiRoutes` and `botRoutes`. It also exposes `/metrics` and `/health`, restores lost lures via `FishingService.restoreCastingLuresOnStartup()`, and schedules background jobs via `Scheduler.install()`.
+- **`Application.kt`** — the `main()` function loads `Env`, boots the Netty server, installs plugins (`ContentNegotiation`, `CORS`, `DoubleReceive`, sessions), initializes the Hikari-backed database layer (`DB.init`), and registers routes through `apiRoutes` and `botRoutes`. It also exposes `/metrics` and `/health`, restores lost lures via `FishingService.restoreCastingLuresOnStartup()`, and schedules background jobs via `Scheduler.install()`.
 - **`Env.kt`** — reads `config.properties` and builds the environment object: bot token, public URL, `RIVERKING_ITCH_PROJECT_URL` override for bot launch links (falling back to the official River King itch.io page), PlayDeck token/test-payment flags, port, development mode, and more.
 - **`Sessions.kt`** — configures the cookie session `AppSession` for the mini‑app, now keyed by shared `userId` rather than Telegram ID; `installSessions` installs the Ktor plugin.
 

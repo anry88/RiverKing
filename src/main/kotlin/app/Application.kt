@@ -1,6 +1,7 @@
 package app
 
 import db.DB
+import db.DbExecution
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -32,6 +33,9 @@ fun main() {
         install(DoubleReceive)
         installSessions(env)
         DB.init(env)
+        environment.monitor.subscribe(ApplicationStopped) {
+            DB.close()
+        }
 
         // API for Mini App
         apiRoutes(env)
@@ -112,8 +116,10 @@ fun main() {
                 val params = call.request.rawQueryParameters
                 params["tgId"]?.toLongOrNull()?.let { tgId ->
                     try {
-                        val uid = fishing.ensureUserByTgId(tgId)
-                        val lang = fishing.userLanguage(uid)
+                        val lang = DbExecution.blocking {
+                            val userId = fishing.ensureUserByTgId(tgId)
+                            fishing.userLanguage(userId)
+                        }
                         val text = if (lang == "ru") {
                             "Для лучшего опыта запускайте игру через кнопку меню \"Open app\"."
                         } else {
@@ -130,7 +136,7 @@ fun main() {
             }
             get("/health") { call.respondText("OK") }
             get("/metrics") {
-                UserMetrics.update()
+                DbExecution.blocking { UserMetrics.update() }
                 call.respondText(Metrics.dump(), ContentType.Text.Plain)
             }
         }

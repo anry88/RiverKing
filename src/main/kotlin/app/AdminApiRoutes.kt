@@ -1,5 +1,6 @@
 package app
 
+import db.DbExecution
 import db.Fish
 import db.Locations
 import db.SpecialEvents
@@ -23,7 +24,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import service.CastZoneCodec
 import service.CastZoneDTO
@@ -248,13 +248,16 @@ fun Application.adminApiRoutes(env: Env) {
     val events = SpecialEventService()
     val bot = TelegramBot(env.botToken)
 
+    suspend fun <T> onDb(block: () -> T): T = DbExecution.blocking(block)
+    suspend fun <T> onDbTransaction(block: () -> T): T = DbExecution.transaction(block)
+
     fun AdminSpecialEventReq.fishSpecs(): List<SpecialEventFishSpec> =
         fish.map { SpecialEventFishSpec(it.fishId, it.weight) }
 
     fun AdminEventPrizeReq.toConfig(): SpecialEventPrizeConfig =
         SpecialEventPrizeConfig(prizePlaces, prizesJson)
 
-    fun SpecialEvent.toAdminResp(): AdminSpecialEventResp =
+    suspend fun SpecialEvent.toAdminResp(): AdminSpecialEventResp =
         AdminSpecialEventResp(
             id = id,
             nameRu = nameRu,
@@ -263,7 +266,7 @@ fun Application.adminApiRoutes(env: Env) {
             endTime = endTime.toEpochMilli(),
             imagePath = imagePath,
             castZone = castZone,
-            fish = events.fishSpecs(id).map { AdminEventFishReq(it.fishId, it.weight) },
+            fish = onDb { events.fishSpecs(id) }.map { AdminEventFishReq(it.fishId, it.weight) },
             weightPrizes = AdminEventPrizeReq(weightPrizePlaces, weightPrizesJson),
             countPrizes = AdminEventPrizeReq(countPrizePlaces, countPrizesJson),
             fishPrizes = AdminEventPrizeReq(fishPrizePlaces, fishPrizesJson),
@@ -291,11 +294,13 @@ fun Application.adminApiRoutes(env: Env) {
             get("/tournaments") {
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 50)
-                val list = tournaments.listTournaments(
-                    limit = limit,
-                    offset = offset,
-                    newestFirst = true
-                ).map { t ->
+                val list = onDb {
+                    tournaments.listTournaments(
+                        limit = limit,
+                        offset = offset,
+                        newestFirst = true
+                    )
+                }.map { t ->
                     TournamentResp(
                         id = t.id,
                         nameRu = t.nameRu,
@@ -314,41 +319,45 @@ fun Application.adminApiRoutes(env: Env) {
 
             post("/tournaments") {
                 val req = call.receive<TournamentReq>()
-                val id = tournaments.createTournament(
-                    nameRu = req.nameRu,
-                    nameEn = req.nameEn,
-                    start = Instant.ofEpochMilli(req.startTime),
-                    end = Instant.ofEpochMilli(req.endTime),
-                    fish = req.fish,
-                    location = req.location,
-                    metric = req.metric,
-                    prizePlaces = req.prizePlaces,
-                    prizes = req.prizesJson
-                )
+                val id = onDb {
+                    tournaments.createTournament(
+                        nameRu = req.nameRu,
+                        nameEn = req.nameEn,
+                        start = Instant.ofEpochMilli(req.startTime),
+                        end = Instant.ofEpochMilli(req.endTime),
+                        fish = req.fish,
+                        location = req.location,
+                        metric = req.metric,
+                        prizePlaces = req.prizePlaces,
+                        prizes = req.prizesJson
+                    )
+                }
                 call.respond(HttpStatusCode.Created, mapOf("id" to id))
             }
 
             put("/tournaments/{id}") {
                 val id = call.parameters["id"]?.toLongOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
                 val req = call.receive<TournamentReq>()
-                tournaments.updateTournament(
-                    id = id,
-                    nameRu = req.nameRu,
-                    nameEn = req.nameEn,
-                    start = Instant.ofEpochMilli(req.startTime),
-                    end = Instant.ofEpochMilli(req.endTime),
-                    fish = req.fish,
-                    location = req.location,
-                    metric = req.metric,
-                    prizePlaces = req.prizePlaces,
-                    prizes = req.prizesJson
-                )
+                onDb {
+                    tournaments.updateTournament(
+                        id = id,
+                        nameRu = req.nameRu,
+                        nameEn = req.nameEn,
+                        start = Instant.ofEpochMilli(req.startTime),
+                        end = Instant.ofEpochMilli(req.endTime),
+                        fish = req.fish,
+                        location = req.location,
+                        metric = req.metric,
+                        prizePlaces = req.prizePlaces,
+                        prizes = req.prizesJson
+                    )
+                }
                 call.respond(HttpStatusCode.OK)
             }
 
             delete("/tournaments/{id}") {
                 val id = call.parameters["id"]?.toLongOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
-                tournaments.deleteTournament(id)
+                onDb { tournaments.deleteTournament(id) }
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -357,24 +366,26 @@ fun Application.adminApiRoutes(env: Env) {
             get("/events") {
                 val offset = call.request.queryParameters["offset"]?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 50)
-                call.respond(events.listEvents(limit = limit, offset = offset).map { it.toAdminResp() })
+                call.respond(onDb { events.listEvents(limit = limit, offset = offset) }.map { it.toAdminResp() })
             }
 
             post("/events") {
                 val req = call.receive<AdminSpecialEventReq>()
                 try {
-                    val id = events.createEvent(
-                        nameRu = req.nameRu,
-                        nameEn = req.nameEn,
-                        start = Instant.ofEpochMilli(req.startTime),
-                        end = Instant.ofEpochMilli(req.endTime),
-                        imagePath = req.imagePath,
-                        castZone = req.castZone,
-                        fish = req.fishSpecs(),
-                        weightPrizes = req.weightPrizes.toConfig(),
-                        countPrizes = req.countPrizes.toConfig(),
-                        fishPrizes = req.fishPrizes.toConfig(),
-                    )
+                    val id = onDb {
+                        events.createEvent(
+                            nameRu = req.nameRu,
+                            nameEn = req.nameEn,
+                            start = Instant.ofEpochMilli(req.startTime),
+                            end = Instant.ofEpochMilli(req.endTime),
+                            imagePath = req.imagePath,
+                            castZone = req.castZone,
+                            fish = req.fishSpecs(),
+                            weightPrizes = req.weightPrizes.toConfig(),
+                            countPrizes = req.countPrizes.toConfig(),
+                            fishPrizes = req.fishPrizes.toConfig(),
+                        )
+                    }
                     call.respond(HttpStatusCode.Created, mapOf("id" to id))
                 } catch (e: SpecialEventService.SpecialEventException) {
                     call.respondEventError(e)
@@ -385,19 +396,21 @@ fun Application.adminApiRoutes(env: Env) {
                 val id = call.parameters["id"]?.toLongOrNull() ?: return@put call.respond(HttpStatusCode.BadRequest)
                 val req = call.receive<AdminSpecialEventReq>()
                 try {
-                    events.updateEvent(
-                        id = id,
-                        nameRu = req.nameRu,
-                        nameEn = req.nameEn,
-                        start = Instant.ofEpochMilli(req.startTime),
-                        end = Instant.ofEpochMilli(req.endTime),
-                        imagePath = req.imagePath,
-                        castZone = req.castZone,
-                        fish = req.fishSpecs(),
-                        weightPrizes = req.weightPrizes.toConfig(),
-                        countPrizes = req.countPrizes.toConfig(),
-                        fishPrizes = req.fishPrizes.toConfig(),
-                    )
+                    onDb {
+                        events.updateEvent(
+                            id = id,
+                            nameRu = req.nameRu,
+                            nameEn = req.nameEn,
+                            start = Instant.ofEpochMilli(req.startTime),
+                            end = Instant.ofEpochMilli(req.endTime),
+                            imagePath = req.imagePath,
+                            castZone = req.castZone,
+                            fish = req.fishSpecs(),
+                            weightPrizes = req.weightPrizes.toConfig(),
+                            countPrizes = req.countPrizes.toConfig(),
+                            fishPrizes = req.fishPrizes.toConfig(),
+                        )
+                    }
                     call.respond(HttpStatusCode.OK)
                 } catch (e: SpecialEventService.SpecialEventException) {
                     call.respondEventError(e)
@@ -406,7 +419,7 @@ fun Application.adminApiRoutes(env: Env) {
 
             delete("/events/{id}") {
                 val id = call.parameters["id"]?.toLongOrNull() ?: return@delete call.respond(HttpStatusCode.BadRequest)
-                events.deleteEvent(id)
+                onDb { events.deleteEvent(id) }
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -447,7 +460,7 @@ fun Application.adminApiRoutes(env: Env) {
             // ── Cast zones ──
 
             get("/cast-zones") {
-                val locations = transaction {
+                val locations = onDbTransaction {
                     val eventImages = SpecialEvents
                         .slice(SpecialEvents.id, SpecialEvents.imagePath)
                         .selectAll()
@@ -496,7 +509,7 @@ fun Application.adminApiRoutes(env: Env) {
                 } catch (_: IllegalArgumentException) {
                     return@put call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_cast_zone"))
                 }
-                val updated = transaction {
+                val updated = onDbTransaction {
                     Locations.update({ Locations.id eq id }) {
                         it[castZoneJson] = encoded
                     }
@@ -511,7 +524,7 @@ fun Application.adminApiRoutes(env: Env) {
             // ── Discounts ──
 
             get("/discounts") {
-                val list = fishing.listDiscounts().map { d ->
+                val list = onDb { fishing.listDiscounts() }.map { d ->
                     DiscountResp(
                         packageId = d.packageId,
                         price = d.price,
@@ -526,13 +539,13 @@ fun Application.adminApiRoutes(env: Env) {
                 val req = call.receive<DiscountReq>()
                 val start = parseAdminDate(req.start)
                 val end = parseAdminDate(req.end)
-                fishing.setDiscount(req.packageId, req.price, start, end)
+                onDb { fishing.setDiscount(req.packageId, req.price, start, end) }
                 call.respond(HttpStatusCode.OK)
             }
 
             delete("/discounts/{packageId}") {
                 val packageId = call.parameters["packageId"] ?: return@delete call.respond(HttpStatusCode.BadRequest)
-                fishing.removeDiscount(packageId)
+                onDb { fishing.removeDiscount(packageId) }
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -553,7 +566,7 @@ fun Application.adminApiRoutes(env: Env) {
                     AdminCatalogOptionResp("mythic", "Редкость: mythic"),
                     AdminCatalogOptionResp("legendary", "Редкость: legendary"),
                 )
-                val fishOptions = transaction {
+                val fishOptions = onDbTransaction {
                     Fish.selectAll()
                         .orderBy(Fish.name, SortOrder.ASC)
                         .map { row ->
@@ -561,7 +574,7 @@ fun Application.adminApiRoutes(env: Env) {
                             AdminCatalogOptionResp(name, "$name (${row[Fish.rarity]})")
                         }
                 }
-                val eventFishOptions = transaction {
+                val eventFishOptions = onDbTransaction {
                     Fish.selectAll()
                         .orderBy(Fish.name, SortOrder.ASC)
                         .map { row ->
@@ -570,7 +583,7 @@ fun Application.adminApiRoutes(env: Env) {
                             AdminCatalogOptionResp(id.toString(), "$name (${row[Fish.rarity]})")
                         }
                 }
-                val locationOptions = transaction {
+                val locationOptions = onDbTransaction {
                     Locations.select { Locations.specialEventId.isNull() }
                         .orderBy(Locations.unlockKg, SortOrder.ASC)
                         .map { row ->
@@ -578,11 +591,11 @@ fun Application.adminApiRoutes(env: Env) {
                             AdminCatalogOptionResp(name, name)
                         }
                 }
-                val shop = fishing.listShop("ru")
-                val activeDiscounts = fishing.listDiscounts().associateBy { it.packageId }
+                val shop = onDb { fishing.listShop("ru") }
+                val activeDiscounts = onDb { fishing.listDiscounts() }.associateBy { it.packageId }
                 val discountPackages = shop.flatMap { category ->
                     category.packs.map { pack ->
-                        val basePrice = fishing.findPack(pack.id)?.price ?: pack.originalPrice ?: pack.price
+                        val basePrice = onDb { fishing.findPack(pack.id) }?.price ?: pack.originalPrice ?: pack.price
                         val activeDiscount = activeDiscounts[pack.id]
                         AdminDiscountPackageResp(
                             id = pack.id,
@@ -601,7 +614,7 @@ fun Application.adminApiRoutes(env: Env) {
                         .filter { it.rodCode == null && it.items.isNotEmpty() }
                         .map { pack -> AdminPrizeOptionResp(pack.id, pack.name, defaultQty = 1) }
                 }
-                val autofishMonth = fishing.findPack("autofish")?.let {
+                val autofishMonth = onDb { fishing.findPack("autofish") }?.let {
                     AdminPrizeOptionResp(it.id, "${it.name} (месяц)", defaultQty = 1)
                 } ?: AdminPrizeOptionResp("autofish", "Автоловля (месяц)", defaultQty = 1)
                 val prizeOptions = listOf(
@@ -627,7 +640,7 @@ fun Application.adminApiRoutes(env: Env) {
             post("/broadcast") {
                 val req = call.receive<BroadcastReq>()
                 val broadcastId = UUID.randomUUID().toString()
-                val users = transaction {
+                val users = onDbTransaction {
                     Users.select { Users.tgId.isNotNull() }.map {
                         AdminBroadcastRecipient(
                             userId = it[Users.id].value,
