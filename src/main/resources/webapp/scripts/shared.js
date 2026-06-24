@@ -206,6 +206,21 @@
   window.ensureAssetSrc = ensureAssetSrc;
   window.AssetImage = AssetImage;
 
+  function expandTelegramViewport() {
+    try {
+      const canRequestFullscreen = typeof tg?.requestFullscreen === 'function'
+        && (typeof tg?.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('8.0'));
+      if (canRequestFullscreen) {
+        tg.requestFullscreen();
+        return;
+      }
+    } catch (_) { }
+    try { tg?.expand?.(); }
+    catch (_) { }
+  }
+
+  window.expandTelegramViewport = expandTelegramViewport;
+
   function applyInsets() {
     const vh = tg?.viewportHeight || window.visualViewport?.height || window.innerHeight;
     document.documentElement.style.setProperty('--vh', vh + 'px');
@@ -235,8 +250,7 @@
       : 0;
     document.documentElement.style.setProperty('--tg-topbar', tgTopbarGuess + 'px');
 
-    if (typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
-    else if (typeof tg?.expand === 'function') tg.expand();
+    expandTelegramViewport();
   }
 
   tg?.ready?.();
