@@ -573,7 +573,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum by (source) (clamp_min(increase(user_registrations{job=~\"$job\",period=\"total\"}[$__rate_interval]), 0))",
+          "expr": "sum by (source) (increase(user_registration_total{job=~\"$job\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "{{source}}",

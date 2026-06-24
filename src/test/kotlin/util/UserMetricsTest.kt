@@ -49,5 +49,8 @@ class UserMetricsTest {
         val registrationLines = Metrics.dump().lineSequence().filter { it.startsWith("user_registrations") }.toSet()
         assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"tg-games\"} 1.0"))
         assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"telegram\"} 3.0"))
+        val registrationCounterLines = Metrics.dump().lineSequence().filter { it.startsWith("user_registration_total") }.toSet()
+        assertTrue(registrationCounterLines.contains("user_registration_total{source=\"tg-games\"} 1.0"))
+        assertTrue(registrationCounterLines.contains("user_registration_total{source=\"telegram\"} 3.0"))
     }
 }
