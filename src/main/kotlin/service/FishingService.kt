@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 import util.CoinCalculator
+import util.Metrics
 import util.Rng
 import util.sanitizeName
 import java.time.*
@@ -342,6 +343,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         if (refToken != null) {
             ReferralService.setReferrer(newId, refToken)
         }
+        Metrics.counter("user_registration_total", mapOf("source" to source))
         return newId
     }
 
