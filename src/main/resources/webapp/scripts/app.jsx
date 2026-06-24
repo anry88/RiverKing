@@ -326,7 +326,8 @@ function App(){
     const active = tab === 'fish';
     try{
       if(active){
-        if(typeof tg?.requestFullscreen === 'function') tg.requestFullscreen();
+        if (typeof window.expandTelegramViewport === 'function') window.expandTelegramViewport();
+        else if(typeof tg?.requestFullscreen === 'function' && (typeof tg?.isVersionAtLeast !== 'function' || tg.isVersionAtLeast('8.0'))) tg.requestFullscreen();
         else if(typeof tg?.expand === 'function') tg.expand();
         tg?.expand?.();
         tg?.disableVerticalSwipes?.();
