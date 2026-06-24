@@ -40,6 +40,9 @@ object TgWebAppAuth {
 
     fun extractUser(initData: String): TgUser = extractUser(parseParams(initData))
 
+    fun extractStartParam(initData: String): String? =
+        runCatching { parseParams(initData)["start_param"]?.takeIf { it.isNotBlank() } }.getOrNull()
+
     private fun parseParams(initData: String): Map<String, String> =
         initData.split("&")
             .filter { it.isNotBlank() }

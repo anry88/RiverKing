@@ -486,12 +486,112 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "#6ED0E0",
+                "value": 1
+              },
+              {
+                "color": "#1F78C1",
+                "value": 5
+              },
+              {
+                "color": "#EAB839",
+                "value": 10
+              },
+              {
+                "color": "#EF843C",
+                "value": 25
+              },
+              {
+                "color": "#E24D42",
+                "value": 50
+              }
+            ]
+          },
+          "unit": "locale"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 39,
+      "options": {
+        "displayMode": "gradient",
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "12.1.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum by (source) (user_registrations{job=~\"$job\",period=\"total\"})",
+          "format": "time_series",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "{{source}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Регистрации по источникам",
+      "type": "bargauge"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 34
       },
       "id": 19,
       "panels": [],
@@ -562,7 +662,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 27
+        "y": 35
       },
       "id": 1,
       "options": {
@@ -712,7 +812,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 27
+        "y": 35
       },
       "id": 31,
       "options": {
@@ -846,7 +946,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 35
+        "y": 43
       },
       "id": 2,
       "options": {
@@ -979,7 +1079,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 43
       },
       "id": 32,
       "options": {
@@ -1288,7 +1388,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 51
       },
       "id": 4,
       "options": {
@@ -1402,7 +1502,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 51
       },
       "id": 8,
       "options": {
@@ -1441,7 +1541,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 59
       },
       "id": 22,
       "panels": [],
@@ -1512,7 +1612,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 52
+        "y": 60
       },
       "id": 24,
       "options": {
@@ -1630,7 +1730,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 60
       },
       "id": 23,
       "options": {
@@ -1758,7 +1858,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 60
+        "y": 68
       },
       "id": 25,
       "options": {
@@ -1921,7 +2021,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 60
+        "y": 68
       },
       "id": 26,
       "options": {
@@ -1961,7 +2061,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 76
       },
       "id": 21,
       "panels": [],
@@ -2020,7 +2120,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 77
       },
       "id": 5,
       "options": {
@@ -2101,7 +2201,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 80
+        "y": 88
       },
       "id": 6,
       "options": {
@@ -2136,7 +2236,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 99
       },
       "id": 20,
       "panels": [],
@@ -2211,7 +2311,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 92
+        "y": 100
       },
       "id": 9,
       "options": {
@@ -2311,7 +2411,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 108
       },
       "id": 10,
       "options": {
@@ -2427,7 +2527,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 116
       },
       "id": 11,
       "options": {
@@ -2543,7 +2643,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 117
+        "y": 125
       },
       "id": 12,
       "options": {
@@ -2659,7 +2759,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 125
+        "y": 133
       },
       "id": 14,
       "options": {
@@ -2757,7 +2857,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 134
+        "y": 142
       },
       "id": 13,
       "options": {
@@ -2857,7 +2957,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 143
+        "y": 151
       },
       "id": 15,
       "options": {
@@ -2973,7 +3073,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 152
+        "y": 160
       },
       "id": 16,
       "options": {
@@ -3073,7 +3173,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 161
+        "y": 169
       },
       "id": 27,
       "options": {
@@ -3189,7 +3289,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 171
+        "y": 179
       },
       "id": 28,
       "options": {
@@ -3289,7 +3389,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 180
+        "y": 188
       },
       "id": 29,
       "options": {
@@ -3405,7 +3505,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 190
+        "y": 198
       },
       "id": 30,
       "options": {
@@ -3521,7 +3621,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 199
+        "y": 207
       },
       "id": 17,
       "options": {
@@ -3637,7 +3737,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 209
+        "y": 217
       },
       "id": 18,
       "options": {

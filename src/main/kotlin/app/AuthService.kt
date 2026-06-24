@@ -93,7 +93,11 @@ class AuthService(
                 .singleOrNull()
             if (existing != null) throw AuthException("login_taken")
 
-            val createdUserId = fishing.createUser(language = language, refToken = refToken)
+            val createdUserId = fishing.createUser(
+                language = language,
+                refToken = refToken,
+                registrationSource = refToken ?: "android_password",
+            )
             PasswordCredentials.insert {
                 it[PasswordCredentials.userId] = createdUserId
                 it[PasswordCredentials.login] = normalizedLogin
@@ -158,7 +162,11 @@ class AuthService(
             val resolvedUserId = if (identity != null) {
                 identity[AuthIdentities.userId].value
             } else {
-                val createdUserId = fishing.createUser(language = null, refToken = refToken)
+                val createdUserId = fishing.createUser(
+                    language = null,
+                    refToken = refToken,
+                    registrationSource = refToken ?: "android_google",
+                )
                 AuthIdentities.insert {
                     it[userId] = createdUserId
                     it[provider] = "google"

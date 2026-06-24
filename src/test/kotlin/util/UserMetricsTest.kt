@@ -30,7 +30,8 @@ class UserMetricsTest {
         val clock = MutableClock(now)
         val service = FishingService(clock)
 
-        listOf(101L, 102L, 103L, 104L).forEach { tgId -> service.ensureUserByTgId(tgId) }
+        service.ensureUserByTgId(101L, registrationSource = "tg-games")
+        listOf(102L, 103L, 104L).forEach { tgId -> service.ensureUserByTgId(tgId) }
 
         transaction {
             Users.update({ Users.tgId eq 102L }) { it[Users.lastSeenAt] = now.minus(3, ChronoUnit.DAYS) }
@@ -45,5 +46,8 @@ class UserMetricsTest {
         assertTrue(metricLines.contains("unique_users{period=\"week\"} 2.0"))
         assertTrue(metricLines.contains("unique_users{period=\"month\"} 3.0"))
         assertTrue(metricLines.contains("unique_users{period=\"total\"} 4.0"))
+        val registrationLines = Metrics.dump().lineSequence().filter { it.startsWith("user_registrations") }.toSet()
+        assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"tg-games\"} 1.0"))
+        assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"telegram\"} 3.0"))
     }
 }
