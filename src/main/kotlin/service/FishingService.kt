@@ -18,6 +18,7 @@ import util.sanitizeName
 import java.time.*
 import java.time.temporal.ChronoUnit
 import java.util.LinkedHashMap
+import java.util.Locale
 import org.jetbrains.exposed.sql.ResultRow
 
 @Serializable
@@ -206,6 +207,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         username: String? = null,
         language: String? = null,
         refToken: String? = null,
+        registrationSource: String? = null,
     ): Long = transaction {
         createUserInternal(
             tgId = tgId,
@@ -214,6 +216,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             username = username,
             language = language,
             refToken = refToken,
+            registrationSource = registrationSource,
         )
     }
 
@@ -240,6 +243,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         username: String? = null,
         language: String? = null,
         refToken: String? = null,
+        registrationSource: String? = null,
     ): Long = transaction {
         val existing = Users.selectAll().where { Users.tgId eq tgId }.singleOrNull()
         val userId = if (existing == null) {
@@ -250,6 +254,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
                 username = username,
                 language = language,
                 refToken = refToken,
+                registrationSource = registrationSource,
             )
         } else {
             val id = existing[Users.id].value
@@ -296,11 +301,15 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         username: String? = null,
         language: String? = null,
         refToken: String? = null,
+        registrationSource: String? = null,
     ): Long {
         val now = clock.instant()
         val freshId = Lures.select { Lures.name eq "Пресная мирная" }.single()[Lures.id].value
         val predId = Lures.select { Lures.name eq "Пресная хищная" }.single()[Lures.id].value
         val baseRodId = Rods.select { Rods.code eq DEFAULT_ROD_CODE }.single()[Rods.id].value
+        val source = normalizeRegistrationSource(
+            registrationSource ?: refToken ?: if (tgId != null) "telegram" else "direct"
+        )
         val newId = Users.insertAndGetId {
             it[Users.tgId] = tgId
             it[level] = 1
@@ -311,6 +320,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             it[Users.lastName] = lastName
             it[Users.username] = username
             it[Users.language] = if (language?.startsWith("ru") == true) "ru" else "en"
+            it[Users.registrationSource] = source
             it[currentLureId] = freshId
             it[currentRodId] = baseRodId
         }.value
@@ -333,6 +343,16 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
             ReferralService.setReferrer(newId, refToken)
         }
         return newId
+    }
+
+    private fun normalizeRegistrationSource(source: String?): String {
+        val normalized = source
+            ?.trim()
+            ?.lowercase(Locale.ROOT)
+            ?.replace(Regex("""[^a-z0-9._-]+"""), "_")
+            ?.trim('_', '.', '-')
+            ?.take(100)
+        return normalized?.takeIf { it.isNotBlank() } ?: "unknown"
     }
 
     private fun touchUser(row: ResultRow): Long {

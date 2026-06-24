@@ -813,7 +813,8 @@ fun Application.apiRoutes(
                     return@post call.respond(HttpStatusCode.Unauthorized, "bad initData")
                 }
             }
-            val ref = call.request.queryParameters["ref"]
+            val startParam = TgWebAppAuth.extractStartParam(initData)
+            val ref = call.request.queryParameters["ref"] ?: startParam
             val userId = onDb {
                 fishing.ensureUserByTgId(
                     tgUser.id,
@@ -822,6 +823,7 @@ fun Application.apiRoutes(
                     tgUser.username,
                     tgUser.languageCode,
                     ref,
+                    registrationSource = startParam ?: ref ?: "telegram",
                 )
             }
             call.sessions.set(AppSession(userId))

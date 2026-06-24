@@ -1620,6 +1620,7 @@ object Users : LongIdTable() {
     val username = varchar("username", 100).nullable()
     val nickname = varchar("nickname", 100).nullable()
     val language = varchar("language", 10).default("en")
+    val registrationSource = varchar("registration_source", 100).nullable()
     val level = integer("level")
     val xp = integer("xp")
     val coins = long("coins").default(0L)

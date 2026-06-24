@@ -433,14 +433,15 @@ fun Application.botRoutes(env: Env) {
                 Metrics.counter("bot_command_total", mapOf("command" to name, "source" to source) + params)
             }
 
-            fun ensureUserId(user: TgUser?): Long? {
+            fun ensureUserId(user: TgUser?, registrationSource: String? = null): Long? {
                 return user?.let {
                     fishing.ensureUserByTgId(
                         tgId = it.id,
                         firstName = it.first_name,
                         lastName = it.last_name,
                         username = it.username,
-                        language = it.language_code
+                        language = it.language_code,
+                        registrationSource = registrationSource,
                     )
                 }
             }
@@ -2419,7 +2420,7 @@ fun Application.botRoutes(env: Env) {
                 }
                 when (commandName) {
                     "/startapp" -> {
-                        val uid = ensureUserId(from) ?: return false
+                        val uid = ensureUserId(from, registrationSource = "telegram") ?: return false
                         val lang = fishing.userLanguage(uid)
                         logCommandMetric("startapp", source = source)
                         val link = "https://t.me/${env.botName}?startapp"
@@ -2453,7 +2454,7 @@ fun Application.botRoutes(env: Env) {
                             trySend(chatId, message, markup, replyTo)
                             return true
                         }
-                        val uid = ensureUserId(from) ?: return false
+                        val uid = ensureUserId(from, registrationSource = payload ?: "telegram") ?: return false
                         val lang = fishing.userLanguage(uid)
                         val androidLine = if (lang == "ru") {
                             if (env.itchProjectUrl.isNotBlank()) {
