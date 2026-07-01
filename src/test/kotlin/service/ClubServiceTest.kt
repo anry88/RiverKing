@@ -17,16 +17,60 @@ import java.time.temporal.TemporalAdjusters
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import support.testEnv
 
 class ClubServiceTest {
+    @Test
+    fun lastMemberLeavesAndClubRemainsEmpty() {
+        DB.init(testEnv("club-leave-empty"))
+
+        val fishing = FishingService()
+        val clubs = ClubService()
+        val presidentId = fishing.ensureUserByTgId(1_000L)
+        val (locationId, fishId) = transaction {
+            val location = Locations.selectAll()
+                .orderBy(Locations.id, SortOrder.ASC)
+                .limit(1)
+                .single()[Locations.id].value
+            val fish = Fish.selectAll()
+                .orderBy(Fish.id, SortOrder.ASC)
+                .limit(1)
+                .single()[Fish.id].value
+            location to fish
+        }
+
+        fishing.addCoins(presidentId, ClubService.CREATE_COST_COINS.toInt())
+        transaction {
+            Catches.insert {
+                it[userId] = presidentId
+                it[Catches.fishId] = fishId
+                it[weight] = ClubService.MIN_CREATE_WEIGHT_KG + 1.0
+                it[Catches.locationId] = locationId
+                it[createdAt] = java.time.Instant.now()
+                it[coins] = null
+            }
+        }
+        val clubId = clubs.createClub(presidentId, "Empty Club").id
+
+        clubs.leaveClub(presidentId)
+
+        assertNull(clubs.clubDetails(presidentId))
+        transaction {
+            assertTrue(ClubMembers.select { ClubMembers.clubId eq clubId }.empty())
+            val club = Clubs.select { Clubs.id eq clubId }.single()
+            assertEquals(false, club[Clubs.recruitingOpen])
+        }
+    }
+
     @Test
     fun previousWeekSnapshotAndRewardsStayBoundToPreviousRoster() {
         DB.init(testEnv("club-week-snapshot"))

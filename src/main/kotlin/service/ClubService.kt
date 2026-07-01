@@ -4,9 +4,6 @@ import db.Catches
 import db.Clubs
 import db.ClubChatMessages
 import db.ClubMembers
-import db.ClubQuestMemberProgress
-import db.ClubQuestProgress
-import db.ClubQuestRewardRecipients
 import db.ClubWeeklyContributions
 import db.ClubWeeklySnapshots
 import db.ClubWeeklyRewards
@@ -247,7 +244,6 @@ class ClubService {
     }
 
     fun leaveClub(userId: Long) {
-        var deleted = false
         transaction {
             val membership = ClubMembers.select { ClubMembers.userId eq userId }.singleOrNull()
                 ?: throw ClubException("not_in_club")
@@ -260,15 +256,7 @@ class ClubService {
             if (role == ROLE_PRESIDENT) {
                 val remaining = ClubMembers.select { ClubMembers.clubId eq clubId }.toList()
                 if (remaining.isEmpty()) {
-                    ClubQuestRewardRecipients.deleteWhere { ClubQuestRewardRecipients.clubId eq clubId }
-                    ClubQuestMemberProgress.deleteWhere { ClubQuestMemberProgress.clubId eq clubId }
-                    ClubQuestProgress.deleteWhere { ClubQuestProgress.clubId eq clubId }
-                    ClubWeeklyContributions.deleteWhere { ClubWeeklyContributions.clubId eq clubId }
-                    ClubWeeklySnapshots.deleteWhere { ClubWeeklySnapshots.clubId eq clubId }
-                    ClubWeeklyRewards.deleteWhere { ClubWeeklyRewards.clubId eq clubId }
-                    ClubChatMessages.deleteWhere { ClubChatMessages.clubId eq clubId }
-                    Clubs.deleteWhere { Clubs.id eq clubId }
-                    deleted = true
+                    Clubs.update({ Clubs.id eq clubId }) { it[recruitingOpen] = false }
                     return@transaction
                 }
                 val heirs = remaining.filter { it[ClubMembers.role] == ROLE_HEIR }
@@ -280,9 +268,6 @@ class ClubService {
                 }) { it[ClubMembers.role] = ROLE_PRESIDENT }
             }
             addChatMessageTx(clubId, chatPayload("clubChatMemberLeft", mapOf("name" to memberName)))
-        }
-        if (deleted) {
-            Metrics.counter("club_delete_total")
         }
     }
 
