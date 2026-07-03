@@ -1,16 +1,14 @@
 {
-  "latestVersionCode": 10,
-  "latestVersionName": "0.4.6",
+  "latestVersionCode": 11,
+  "latestVersionName": "0.4.7",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added bundled fish artwork for the Afsluitdijk event.",
-      "Added new event fish catalog entries for the Afsluitdijk fish pool."
+      "Updated 14 bundled Amazon Riverbed and Igapo fish illustrations for clearer, more accurate species artwork."
     ],
     "ru": [
-      "Добавлены встроенные изображения рыб для ивента Афслёйтдейк.",
-      "Добавлены новые каталоговые рыбы для пула ивента Афслёйтдейк."
+      "Обновлены 14 встроенных изображений рыб Русла Амазонки и Игапо: виды стали точнее и лучше читаются в игре."
     ]
   }
 }
