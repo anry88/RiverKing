@@ -51,7 +51,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 
 ## First Pass For Any Agent
 
-1. Before editing files, inspect the current branch, working tree, and upstream. Fetch the relevant remote and bring the working branch up to date before starting changes. If the branch has diverged, rebase or merge according to the repository flow first; never knowingly implement work on a stale branch. Preserve unrelated local changes and untracked files during synchronization.
+1. Before editing files, inspect the current branch, working tree, and upstream. Fetch the relevant remote, switch to `develop`, and bring local `develop` up to date with `origin/develop` before starting changes. If `develop` has diverged, rebase or merge according to the repository flow first; never knowingly implement work on a stale branch. Preserve unrelated local changes and untracked files during synchronization.
 2. Read [README.md](README.md) for product positioning and public claims.
 3. Read [AGENTS.md](AGENTS.md) and [DOCUMENTATION.md](DOCUMENTATION.md) for repo structure and runtime boundaries.
 4. Read the package README closest to the area you are about to change:
@@ -64,6 +64,15 @@ AI-oriented repository guide for coding assistants and code-review tools.
 7. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
 8. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
 9. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
+
+## Mandatory Git Workflow
+
+- All implementation work, commits, and pushes must happen on `develop`.
+- Before committing or pushing, verify that `git branch --show-current` returns exactly `develop`. If it does not, stop and switch or move the work to `develop`.
+- Push only with an explicit `git push origin develop`. Do not push the current branch implicitly.
+- Never push `main`, never use a refspec targeting `main`, and never bypass branch protection or required pull requests.
+- `main` may change only through the repository's `develop -> main` pull-request flow.
+- If work was accidentally started on `main`, move it to an up-to-date `develop` branch before making further edits or publishing commits.
 
 ## Token Discipline
 

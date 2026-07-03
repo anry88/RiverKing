@@ -1,14 +1,14 @@
 {
-  "latestVersionCode": 11,
-  "latestVersionName": "0.4.7",
+  "latestVersionCode": 12,
+  "latestVersionName": "0.4.8",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Updated 14 bundled Amazon Riverbed and Igapo fish illustrations for clearer, more accurate species artwork."
+      "Updated 14 bundled Mangrove Thickets and Coral Flats fish illustrations with clearer, species-accurate artwork."
     ],
     "ru": [
-      "Обновлены 14 встроенных изображений рыб Русла Амазонки и Игапо: виды стали точнее и лучше читаются в игре."
+      "Обновлены 14 встроенных изображений рыб Мангровых зарослей и Коралловых отмелей: виды стали точнее и лучше читаются в игре."
     ]
   }
 }
