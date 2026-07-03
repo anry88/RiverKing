@@ -51,18 +51,19 @@ AI-oriented repository guide for coding assistants and code-review tools.
 
 ## First Pass For Any Agent
 
-1. Read [README.md](README.md) for product positioning and public claims.
-2. Read [AGENTS.md](AGENTS.md) and [DOCUMENTATION.md](DOCUMENTATION.md) for repo structure and runtime boundaries.
-3. Read the package README closest to the area you are about to change:
+1. Before editing files, inspect the current branch, working tree, and upstream. Fetch the relevant remote and bring the working branch up to date before starting changes. If the branch has diverged, rebase or merge according to the repository flow first; never knowingly implement work on a stale branch. Preserve unrelated local changes and untracked files during synchronization.
+2. Read [README.md](README.md) for product positioning and public claims.
+3. Read [AGENTS.md](AGENTS.md) and [DOCUMENTATION.md](DOCUMENTATION.md) for repo structure and runtime boundaries.
+4. Read the package README closest to the area you are about to change:
    - [src/main/kotlin/app/README.md](src/main/kotlin/app/README.md)
    - [src/main/kotlin/service/README.md](src/main/kotlin/service/README.md)
    - [src/main/kotlin/db/README.md](src/main/kotlin/db/README.md)
    - [src/main/kotlin/util/README.md](src/main/kotlin/util/README.md)
-4. If the task touches the Android player client, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
-5. If the task touches the internal Android admin app, inspect `mobile/admin-app/README.md` plus the relevant files under `mobile/admin-app/app/src/main/`.
-6. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
-7. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
-8. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
+5. If the task touches the Android player client, inspect `mobile/android-app/README.md` plus the relevant files under `mobile/android-app/app/src/main/`.
+6. If the task touches the internal Android admin app, inspect `mobile/admin-app/README.md` plus the relevant files under `mobile/admin-app/app/src/main/`.
+7. If the task touches Android release/distribution, also inspect `docs/android-release.md`.
+8. If the task touches frontend behavior, inspect both `src/main/resources/webapp/scripts/app.jsx` and the relevant `tabs/*.js` file.
+9. If the task touches bot behavior, inspect both `BotRoutes.kt` and `TelegramBot.kt`.
 
 ## Token Discipline
 
