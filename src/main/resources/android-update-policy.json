@@ -1,14 +1,14 @@
 {
-  "latestVersionCode": 12,
-  "latestVersionName": "0.4.8",
+  "latestVersionCode": 13,
+  "latestVersionName": "0.4.9",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Updated 14 bundled Mangrove Thickets and Coral Flats fish illustrations with clearer, species-accurate artwork."
+      "Added bundled Columbia River Gorge event fish and location artwork."
     ],
     "ru": [
-      "Обновлены 14 встроенных изображений рыб Мангровых зарослей и Коралловых отмелей: виды стали точнее и лучше читаются в игре."
+      "Добавлены встроенные изображения рыб и фона для ивента «Ущелье реки Колумбия»."
     ]
   }
 }

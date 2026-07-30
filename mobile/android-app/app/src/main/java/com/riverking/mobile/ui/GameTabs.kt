@@ -8821,6 +8821,7 @@ private fun locationBackgroundAsset(location: String?): String? {
         "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> "backgrounds/flooded_forest.webp"
         "Мангровые заросли", "Mangroves" -> "backgrounds/mangroves.webp"
         "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
+        "Ущелье реки Колумбия", "Columbia River Gorge" -> "backgrounds/columbia_river_gorge_bonneville_dam.webp"
         else -> null
     }
     return path?.let(::localAsset)
@@ -9309,4 +9310,30 @@ private val FISH_ASSET_MAP = mapOf(
     "Sea Lamprey" to "fish/morskaya_minoga.webp",
     "Алоза европейская" to "fish/evropeiskaya_aloza.webp",
     "Allis Shad" to "fish/evropeiskaya_aloza.webp",
+    "Пикеминноу северный" to "fish/pikeminnou_severniy.webp",
+    "Northern Pikeminnow" to "fish/pikeminnou_severniy.webp",
+    "Чизелмаут" to "fish/chizelmaut.webp",
+    "Chiselmouth" to "fish/chizelmaut.webp",
+    "Пимут" to "fish/pimut.webp",
+    "Peamouth Chub" to "fish/pimut.webp",
+    "Окунь малоротый" to "fish/okun_malorotiy.webp",
+    "Smallmouth Bass" to "fish/okun_malorotiy.webp",
+    "Сомик канальный" to "fish/somik_kanalniy.webp",
+    "Channel Catfish" to "fish/somik_kanalniy.webp",
+    "Судак светлопёрый" to "fish/sudak_svetlopery.webp",
+    "Walleye" to "fish/sudak_svetlopery.webp",
+    "Алоза американская" to "fish/aloza_amerikanskaya.webp",
+    "American Shad" to "fish/aloza_amerikanskaya.webp",
+    "Кижуч" to "fish/kizhuch.webp",
+    "Coho Salmon" to "fish/kizhuch.webp",
+    "Нерка" to "fish/nerka.webp",
+    "Sockeye Salmon" to "fish/nerka.webp",
+    "Форель стальноголовая" to "fish/forel_stalnogolovaya.webp",
+    "Steelhead Trout" to "fish/forel_stalnogolovaya.webp",
+    "Минога тихоокеанская" to "fish/minoga_tihookeanskaya.webp",
+    "Pacific Lamprey" to "fish/minoga_tihookeanskaya.webp",
+    "Чавыча" to "fish/chavycha.webp",
+    "Chinook Salmon" to "fish/chavycha.webp",
+    "Осётр белый" to "fish/osetr_beliy.webp",
+    "White Sturgeon" to "fish/osetr_beliy.webp",
 )

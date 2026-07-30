@@ -252,6 +252,19 @@ private val FISH_IMAGE_PATHS = mapOf(
     "Хоутинг" to "webapp/assets/fish/houting.png",
     "Минога морская" to "webapp/assets/fish/morskaya_minoga.png",
     "Алоза европейская" to "webapp/assets/fish/evropeiskaya_aloza.png",
+    "Пикеминноу северный" to "webapp/assets/fish/pikeminnou_severniy.png",
+    "Чизелмаут" to "webapp/assets/fish/chizelmaut.png",
+    "Пимут" to "webapp/assets/fish/pimut.png",
+    "Окунь малоротый" to "webapp/assets/fish/okun_malorotiy.png",
+    "Сомик канальный" to "webapp/assets/fish/somik_kanalniy.png",
+    "Судак светлопёрый" to "webapp/assets/fish/sudak_svetlopery.png",
+    "Алоза американская" to "webapp/assets/fish/aloza_amerikanskaya.png",
+    "Кижуч" to "webapp/assets/fish/kizhuch.png",
+    "Нерка" to "webapp/assets/fish/nerka.png",
+    "Форель стальноголовая" to "webapp/assets/fish/forel_stalnogolovaya.png",
+    "Минога тихоокеанская" to "webapp/assets/fish/minoga_tihookeanskaya.png",
+    "Чавыча" to "webapp/assets/fish/chavycha.png",
+    "Осётр белый" to "webapp/assets/fish/osetr_beliy.png",
 )
 
 private val LOCATION_BACKGROUNDS = run {
@@ -270,6 +283,8 @@ private val LOCATION_BACKGROUNDS = run {
         "Игапо, затопленный лес" to "webapp/assets/originals/backgrounds/flooded_forest.png",
         "Мангровые заросли" to "webapp/assets/originals/backgrounds/mangroves.png",
         "Коралловые отмели" to "webapp/assets/originals/backgrounds/coral_flats.png",
+        "Ущелье реки Колумбия" to "webapp/assets/backgrounds/columbia_river_gorge_bonneville_dam.png",
+        "Columbia River Gorge" to "webapp/assets/backgrounds/columbia_river_gorge_bonneville_dam.png",
     )
     base + base.mapKeys { (name, _) -> I18n.location(name, "en") }
 }

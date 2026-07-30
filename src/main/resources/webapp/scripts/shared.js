@@ -442,6 +442,8 @@
       LOCATION_BG_BY_NAME[normalizedSlug] = url;
     }
   });
+  LOCATION_BG_BY_NAME[normalizeLocationName('Ущелье реки Колумбия')] = '/app/assets/backgrounds/columbia_river_gorge_bonneville_dam.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Columbia River Gorge')] = '/app/assets/backgrounds/columbia_river_gorge_bonneville_dam.png';
 
   const getLocationBackground = (id, name) => {
     if (name) {
@@ -786,6 +788,19 @@
     'Хоутинг': { en: 'Houting', asset: '/app/assets/fish/houting.png' },
     'Минога морская': { en: 'Sea Lamprey', asset: '/app/assets/fish/morskaya_minoga.png' },
     'Алоза европейская': { en: 'Allis Shad', asset: '/app/assets/fish/evropeiskaya_aloza.png' },
+    'Пикеминноу северный': { en: 'Northern Pikeminnow', asset: '/app/assets/fish/pikeminnou_severniy.png' },
+    'Чизелмаут': { en: 'Chiselmouth', asset: '/app/assets/fish/chizelmaut.png' },
+    'Пимут': { en: 'Peamouth Chub', asset: '/app/assets/fish/pimut.png' },
+    'Окунь малоротый': { en: 'Smallmouth Bass', asset: '/app/assets/fish/okun_malorotiy.png' },
+    'Сомик канальный': { en: 'Channel Catfish', asset: '/app/assets/fish/somik_kanalniy.png' },
+    'Судак светлопёрый': { en: 'Walleye', asset: '/app/assets/fish/sudak_svetlopery.png' },
+    'Алоза американская': { en: 'American Shad', asset: '/app/assets/fish/aloza_amerikanskaya.png' },
+    'Кижуч': { en: 'Coho Salmon', asset: '/app/assets/fish/kizhuch.png' },
+    'Нерка': { en: 'Sockeye Salmon', asset: '/app/assets/fish/nerka.png' },
+    'Форель стальноголовая': { en: 'Steelhead Trout', asset: '/app/assets/fish/forel_stalnogolovaya.png' },
+    'Минога тихоокеанская': { en: 'Pacific Lamprey', asset: '/app/assets/fish/minoga_tihookeanskaya.png' },
+    'Чавыча': { en: 'Chinook Salmon', asset: '/app/assets/fish/chavycha.png' },
+    'Осётр белый': { en: 'White Sturgeon', asset: '/app/assets/fish/osetr_beliy.png' },
   };
   const FISH_TRANSLATIONS = {};
   const FISH_IMG = {};
