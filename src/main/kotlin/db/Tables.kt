@@ -936,6 +936,21 @@ object DB {
         upsertFish("Минога морская", "mythic", 1.6, 0.7, true, "salt")
         upsertFish("Алоза европейская", "legendary", 2.0, 0.8, false, "salt")
 
+        // --- Event-only fish: Columbia River Gorge ---
+        upsertFish("Пикеминноу северный", "common", 0.6, 0.25, true, "fresh")
+        upsertFish("Чизелмаут", "common", 0.25, 0.10, false, "fresh")
+        upsertFish("Пимут", "common", 0.18, 0.08, false, "fresh")
+        upsertFish("Окунь малоротый", "uncommon", 0.6, 0.25, true, "fresh")
+        upsertFish("Сомик канальный", "uncommon", 1.5, 0.7, true, "fresh")
+        upsertFish("Судак светлопёрый", "rare", 1.5, 0.7, true, "fresh")
+        upsertFish("Алоза американская", "rare", 1.0, 0.4, false, "salt")
+        upsertFish("Кижуч", "rare", 4.0, 1.8, true, "salt")
+        upsertFish("Нерка", "rare", 2.5, 1.0, true, "salt")
+        upsertFish("Форель стальноголовая", "epic", 4.0, 1.8, true, "fresh")
+        upsertFish("Минога тихоокеанская", "mythic", 0.45, 0.20, true, "salt")
+        upsertFish("Чавыча", "mythic", 8.0, 3.5, true, "salt")
+        upsertFish("Осётр белый", "legendary", 25.0, 12.0, false, "fresh")
+
 
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)

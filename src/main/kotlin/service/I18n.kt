@@ -236,6 +236,19 @@ object I18n {
         "Хоутинг" to "Houting",
         "Минога морская" to "Sea Lamprey",
         "Алоза европейская" to "Allis Shad",
+        "Пикеминноу северный" to "Northern Pikeminnow",
+        "Чизелмаут" to "Chiselmouth",
+        "Пимут" to "Peamouth Chub",
+        "Окунь малоротый" to "Smallmouth Bass",
+        "Сомик канальный" to "Channel Catfish",
+        "Судак светлопёрый" to "Walleye",
+        "Алоза американская" to "American Shad",
+        "Кижуч" to "Coho Salmon",
+        "Нерка" to "Sockeye Salmon",
+        "Форель стальноголовая" to "Steelhead Trout",
+        "Минога тихоокеанская" to "Pacific Lamprey",
+        "Чавыча" to "Chinook Salmon",
+        "Осётр белый" to "White Sturgeon",
     )
 
     private val locations = mapOf(
@@ -253,6 +266,7 @@ object I18n {
         "Игапо, затопленный лес" to "Igapo Flooded Forest",
         "Мангровые заросли" to "Mangroves",
         "Коралловые отмели" to "Coral Flats",
+        "Ущелье реки Колумбия" to "Columbia River Gorge",
     )
 
     private data class LureTexts(
