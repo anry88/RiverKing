@@ -1,0 +1,43 @@
+{
+  "referenceEvent": "Ущелье реки Колумбия",
+  "referenceStart": "2026-08-01T03:00:00",
+  "calibration": "Preserve freshwater-adjusted historical weights per rarity AND predator/peaceful group. All three November legendary species are predators: their combined effective weight matches Columbia for a freshwater predator lure. The peaceful-lure legendary chance is lower because the historical pool included a peaceful sturgeon. Other rarity groups match for both freshwater lure types.",
+  "rarities": {
+    "common": {
+      "predatorLurebeforeBoostPercent": 45.87183442704158,
+      "predatorLurewithBoostPercent": 41.83713565620364,
+      "peacefulLurebeforeBoostPercent": 69.22854049727287,
+      "peacefulLurewithBoostPercent": 66.34145752886597
+    },
+    "uncommon": {
+      "predatorLurebeforeBoostPercent": 28.473246314130204,
+      "predatorLurewithBoostPercent": 25.635604312701375,
+      "peacefulLurebeforeBoostPercent": 17.04758623395804,
+      "peacefulLurewithBoostPercent": 16.194327053423336
+    },
+    "rare": {
+      "predatorLurebeforeBoostPercent": 23.082941628165024,
+      "predatorLurewithBoostPercent": 26.92506275209398,
+      "peacefulLurebeforeBoostPercent": 13.207528314642596,
+      "peacefulLurewithBoostPercent": 16.275461947578165
+    },
+    "epic": {
+      "predatorLurebeforeBoostPercent": 1.467686658691022,
+      "predatorLurewithBoostPercent": 2.6325382590208215,
+      "peacefulLurebeforeBoostPercent": 0.29438753477154633,
+      "peacefulLurewithBoostPercent": 0.5579404037881808
+    },
+    "mythic": {
+      "predatorLurebeforeBoostPercent": 1.0445209713839534,
+      "predatorLurewithBoostPercent": 2.8090425879481304,
+      "peacefulLurebeforeBoostPercent": 0.20990639569772307,
+      "peacefulLurewithBoostPercent": 0.5965787397331551
+    },
+    "legendary": {
+      "predatorLurebeforeBoostPercent": 0.059770000588206106,
+      "predatorLurewithBoostPercent": 0.16061643203205173,
+      "peacefulLurebeforeBoostPercent": 0.01205102365721407,
+      "peacefulLurewithBoostPercent": 0.03423432661119718
+    }
+  }
+}
