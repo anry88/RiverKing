@@ -135,6 +135,7 @@ Regular PRs should carry:
 - any scope labels that GitHub applies automatically from changed paths, such as `android`, `backend`, `webapp`, `docs`, or `ci`
 
 To make the rule actually blocking in GitHub, add the `PR Required Labels` workflow as a required status check in your branch protection rule or ruleset for `develop` and `main`.
+The check reads the PR's current labels from GitHub, so retrying a check after adding a label does not reuse the outdated labels from the original event.
 
 To let the release PR workflow create PRs with `GITHUB_TOKEN`, enable this repository setting:
 
