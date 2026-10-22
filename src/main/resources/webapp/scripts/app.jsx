@@ -3,7 +3,6 @@ console.log('initData length:', tg?.initData?.length || 0, 'platform:', tg?.plat
 const APP_CONFIG = window.APP_CONFIG || {};
 const APP_DEV_MODE = APP_CONFIG.devMode === true;
 const TELEGRAM_BOT_NAME = APP_CONFIG.botName || 'river_king_bot';
-const playDeck = window.PlayDeckBridge;
 
 const params = new URLSearchParams(window.location.search);
 const refToken = tg?.initDataUnsafe?.start_param
@@ -112,9 +111,6 @@ function App(){
     )
   ), []);
   const trackEvent = React.useCallback((eventName, params = {}) => {
-    if (playDeck?.track) {
-      playDeck.track(eventName, params);
-    }
     if (window.Analytics?.track) {
       window.Analytics.track(eventName, params);
     }
@@ -234,12 +230,6 @@ function App(){
   }, [t]);
 
   React.useEffect(() => {
-    playDeck?.sendAnalyticNewSession?.({
-      name: 'app_session',
-      type: 'session',
-      user_properties: {},
-      event_properties: { name: 'app_session' },
-    });
     trackEvent('app_open', buildAnalyticsParams({
       tab,
       ref_token: refToken,
@@ -247,12 +237,6 @@ function App(){
       start_param: tg?.initDataUnsafe?.start_param,
     }));
   }, [buildAnalyticsParams, trackEvent]);
-
-  React.useEffect(() => {
-    if (!loading) {
-      playDeck?.markLoaded?.();
-    }
-  }, [loading]);
 
   React.useEffect(() => {
     const prevTab = analyticsPrevTabRef.current;
@@ -811,73 +795,9 @@ function App(){
     }catch(err){}
   }
 
-  async function waitForPlayDeckPayment(externalId){
-    if(!playDeck?.getPaymentInfo || !externalId) return false;
-    for(let attempt = 0; attempt < 8; attempt += 1){
-      try{
-        const info = await playDeck.getPaymentInfo(externalId);
-        if(info?.paid) return true;
-      }catch(err){}
-      await new Promise(resolve => setTimeout(resolve, attempt < 2 ? 1000 : 2000));
-    }
-    return false;
-  }
-
-  function maybeShowPlayDeckAd(){
-    if(!playDeck?.isAvailable?.() || !playDeck?.showAd) return;
-    if(autoCastRef.current) return;
-    try{
-      const count = Number(localStorage.getItem('playDeckLoopCount') || '0') + 1;
-      localStorage.setItem('playDeckLoopCount', String(count));
-      if(count % 6 === 0){
-        playDeck.showAd().catch(()=>{});
-      }
-    }catch(err){}
-  }
-
-  async function buyPackWithPlayDeck(id){
-    const orderResp = await fetch('/api/playdeck/order',{
-      method:'POST',
-      credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({productId:id})
-    });
-    if(!orderResp.ok){
-      if(orderResp.status===401) throw new Error('unauthorized');
-      let data = null;
-      try{ data = await orderResp.json(); }catch(err){}
-      if(data?.error==='rod_unlocked') throw new Error('rod_unlocked');
-      throw new Error('purchase_failed');
-    }
-    const order = await orderResp.json();
-    const payment = await playDeck.requestPayment({
-      amount: order.amount,
-      description: order.description,
-      photoUrl: order.photoUrl || undefined,
-      externalId: order.externalId,
-      isTest: order.isTest === true,
-    });
-    if(payment?.url){
-      playDeck.openTelegramLink(payment.url);
-    }
-    let invoiceResult = null;
-    try{
-      invoiceResult = await playDeck.once('invoiceClosed', 90000);
-    }catch(err){}
-    if(invoiceResult && !['paid','pending'].includes(invoiceResult.status)){
-      throw new Error('purchase_failed');
-    }
-    await waitForPlayDeckPayment(order.externalId);
-    await refreshAfterPurchase();
-  }
-
   async function buyPack(id){
     setError(null);
     try{
-      if(playDeck?.isAvailable?.()){
-        await buyPackWithPlayDeck(id);
-        return;
-      }
       const initData = tg?.initData || tgParam;
       const r = await fetch('/api/create-invoice',{
         method:'POST',
@@ -903,9 +823,7 @@ function App(){
     }catch(e){
       setError(e.message==='unauthorized'
         ? t('authRequired')
-        : e.message==='rod_unlocked'
-          ? t('rodAlreadyUnlocked')
-          : t('purchaseFailed'));
+        : t('purchaseFailed'));
     }
   }
 
@@ -1128,7 +1046,6 @@ function App(){
         const questUpdates = Array.isArray(d.questUpdates) ? d.questUpdates : [];
         const questProgressChanged = d.questProgressChanged === true || questUpdates.length > 0;
         const animationId = ++catchAnimationIdRef.current;
-        const progressLevel = Math.max(1, (me.locations||[]).filter(l => l.unlocked).length);
         setResult({
           ...c,
           coins: typeof d.coins === 'number' ? d.coins : 0,
@@ -1158,15 +1075,6 @@ function App(){
         if(questProgressChanged){
           loadQuests();
         }
-        playDeck?.sendGameProgress?.(
-          achievementUnlocks.map(a => ({
-            name: a.name || a.code,
-            description: a.levelLabel || '',
-            value: a.newLevelIndex,
-            additional_data: { code: a.code },
-          })),
-          { level: progressLevel, xp: Math.round(newTotal) }
-        );
         refreshPostCatchBoards();
       } else {
         setError(t('fishEscaped'));
@@ -1181,8 +1089,6 @@ function App(){
       setCurrentCastSpot(null);
       startCastCooldown();
       resetTapState();
-      playDeck?.gameEnd?.();
-      maybeShowPlayDeckAd();
       if(caught && autoCastRef.current && autoFishActive){
         autoCastTimeoutRef.current = setTimeout(()=>cast(true), CAST_READY_DELAY_MS);
       }
