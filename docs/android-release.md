@@ -68,6 +68,7 @@ It runs in two modes:
 What it does:
 
 - checks out the pushed `main` commit
+- sets up Android command-line tools with `packages: 'platform-tools'`, then explicitly installs Android 35 and Build Tools 35.0.0; the action's default also requests the obsolete `tools` package and can fail before Gradle starts ([upstream package configuration](https://github.com/android-actions/setup-android/tree/v3#additional-packages))
 - reads the prod version from `mobile/android-app/version.properties`
 - validates `src/main/resources/android-update-policy.json` against that version
 - builds `--profile prod release-artifacts`
@@ -99,7 +100,7 @@ Policy fields:
 
 Normal release bump:
 
-1. Update `mobile/android-app/version.properties`.
+1. Update both `mobile/android-app/version.properties` and `mobile/admin-app/version.properties` to the same version name and code. Player and operator apps share one monotonic version line.
 2. Update `src/main/resources/android-update-policy.json` `latestVersionCode`, `latestVersionName`, and release notes.
 3. Keep `minSupportedVersionCode` unchanged unless older clients truly cannot keep using the backend.
 4. Run `python3 mobile/android-app/scripts/check-update-policy.py`.
