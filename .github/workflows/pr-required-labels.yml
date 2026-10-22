@@ -23,7 +23,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const labels = new Set((context.payload.pull_request.labels || []).map((label) => label.name));
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const labels = new Set(pullRequest.labels.map((label) => label.name));
             const required = ['feature', 'fix', 'docs', 'ci', 'chore', 'refactor', 'breaking-change', 'release'];
             const matched = required.filter((label) => labels.has(label));
 

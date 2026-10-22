@@ -1,14 +1,16 @@
 {
-  "latestVersionCode": 13,
-  "latestVersionName": "0.4.9",
+  "latestVersionCode": 14,
+  "latestVersionName": "0.4.10",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added bundled Columbia River Gorge event fish and location artwork."
+      "Added artwork for the November South American Rivers event: 37 fish species, including 7 new species, and a new location background.",
+      "Increased rare fish catch chances and reduced fish escape risk."
     ],
     "ru": [
-      "Добавлены встроенные изображения рыб и фона для ивента «Ущелье реки Колумбия»."
+      "Добавлено оформление ноябрьского ивента «Реки Южной Америки»: 37 видов рыб, включая 7 новых, и новый фон локации.",
+      "Повышены шансы вылова редких рыб и снижена вероятность схода."
     ]
   }
 }

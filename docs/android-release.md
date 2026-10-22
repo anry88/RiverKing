@@ -68,6 +68,7 @@ It runs in two modes:
 What it does:
 
 - checks out the pushed `main` commit
+- sets up Android command-line tools with `packages: 'platform-tools'`, then explicitly installs Android 35 and Build Tools 35.0.0; the action's default also requests the obsolete `tools` package and can fail before Gradle starts ([upstream package configuration](https://github.com/android-actions/setup-android/tree/v3#additional-packages))
 - reads the prod version from `mobile/android-app/version.properties`
 - validates `src/main/resources/android-update-policy.json` against that version
 - builds `--profile prod release-artifacts`
@@ -99,7 +100,7 @@ Policy fields:
 
 Normal release bump:
 
-1. Update `mobile/android-app/version.properties`.
+1. Update both `mobile/android-app/version.properties` and `mobile/admin-app/version.properties` to the same version name and code. Player and operator apps share one monotonic version line.
 2. Update `src/main/resources/android-update-policy.json` `latestVersionCode`, `latestVersionName`, and release notes.
 3. Keep `minSupportedVersionCode` unchanged unless older clients truly cannot keep using the backend.
 4. Run `python3 mobile/android-app/scripts/check-update-policy.py`.
@@ -134,6 +135,7 @@ Regular PRs should carry:
 - any scope labels that GitHub applies automatically from changed paths, such as `android`, `backend`, `webapp`, `docs`, or `ci`
 
 To make the rule actually blocking in GitHub, add the `PR Required Labels` workflow as a required status check in your branch protection rule or ruleset for `develop` and `main`.
+The check reads the PR's current labels from GitHub, so retrying a check after adding a label does not reuse the outdated labels from the original event.
 
 To let the release PR workflow create PRs with `GITHUB_TOKEN`, enable this repository setting:
 
