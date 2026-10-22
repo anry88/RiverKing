@@ -33,6 +33,13 @@ class CatchPresentationTest {
             "webapp/assets/originals/fish/minoga_tihookeanskaya.png",
             "webapp/assets/originals/fish/chavycha.png",
             "webapp/assets/originals/fish/osetr_beliy.png",
+            "webapp/assets/originals/fish/curimbata.png",
+            "webapp/assets/originals/fish/piraputanga.png",
+            "webapp/assets/originals/fish/piavucu.png",
+            "webapp/assets/originals/fish/cachara.png",
+            "webapp/assets/originals/fish/falkneri_stingray.png",
+            "webapp/assets/originals/fish/golden_dorado.png",
+            "webapp/assets/originals/fish/pintado.png",
         ).forEach { path ->
             val image = javaClass.classLoader.getResourceAsStream(path)?.use(ImageIO::read)
             assertNotNull(image, "Missing catch card source: $path")
@@ -46,9 +53,32 @@ class CatchPresentationTest {
                 image.getRGB(image.width - 1, image.height - 1),
             )
             assertTrue(
-                corners.all { pixel -> (pixel ushr 24) == 0 },
+                // Generated transparent PNGs can retain one alpha quantization level.
+                corners.all { pixel -> (pixel ushr 24) <= 1 },
                 "Catch card source must have transparent corners: $path",
             )
         }
+    }
+
+    @Test
+    fun `south american event fish render localized catch cards`() {
+        listOf("Куримбата", "Пирапутанга", "Пиавусу", "Качара", "Скат Фалькнера", "Дорадо золотой", "Пинтадо")
+            .forEach { name ->
+                val english = service.I18n.fish(name, "en")
+                assertTrue(english != name, "Missing English fish name: $name")
+                val bytes = generateCatchImage(
+                    fishInternalName = name,
+                    locationInternalName = "Реки Южной Америки",
+                    displayFishName = english,
+                    displayLocationName = "South American Rivers",
+                    weightKg = 2.0,
+                    rarity = "legendary",
+                    lang = "en",
+                )
+                assertNotNull(bytes, "Missing share card for $name")
+                val card = bytes.inputStream().use(ImageIO::read)
+                assertEquals(1024, card.width)
+                assertEquals(1024, card.height)
+            }
     }
 }

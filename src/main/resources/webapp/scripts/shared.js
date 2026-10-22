@@ -444,6 +444,8 @@
   });
   LOCATION_BG_BY_NAME[normalizeLocationName('Ущелье реки Колумбия')] = '/app/assets/backgrounds/columbia_river_gorge_bonneville_dam.png';
   LOCATION_BG_BY_NAME[normalizeLocationName('Columbia River Gorge')] = '/app/assets/backgrounds/columbia_river_gorge_bonneville_dam.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Реки Южной Америки')] = '/app/assets/backgrounds/south_american_rivers.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('South American Rivers')] = '/app/assets/backgrounds/south_american_rivers.png';
 
   const getLocationBackground = (id, name) => {
     if (name) {
@@ -642,6 +644,13 @@
     'Птеригоплихт парчовый': { en: 'Sailfin Pleco', asset: '/app/assets/fish/pterigopliht_parchoviy.png' },
     'Отоцинклюс широкополосый': { en: 'Banded Otocinclus', asset: '/app/assets/fish/otocinklyus.png' },
     'Карнегиелла мраморная': { en: 'Marbled Hatchetfish', asset: '/app/assets/fish/karnegiella_mramornaya.png' },
+    "Куримбата": { en: "Curimbata", asset: '/app/assets/fish/curimbata.png' },
+    "Пирапутанга": { en: "Piraputanga", asset: '/app/assets/fish/piraputanga.png' },
+    "Пиавусу": { en: "Piavucu", asset: '/app/assets/fish/piavucu.png' },
+    "Качара": { en: "Cachara", asset: '/app/assets/fish/cachara.png' },
+    "Скат Фалькнера": { en: "Falkner's Stingray", asset: '/app/assets/fish/falkneri_stingray.png' },
+    "Дорадо золотой": { en: "Golden Dorado", asset: '/app/assets/fish/golden_dorado.png' },
+    "Пинтадо": { en: "Pintado", asset: '/app/assets/fish/pintado.png' },
     'Тетра неоновая': { en: 'Neon Tetra', asset: '/app/assets/fish/tetra_neonovaya.png' },
     'Тернеция чёрная': { en: 'Black Skirt Tetra', asset: '/app/assets/fish/tetra_chernaya.png' },
     'Рыба-лист амазонская': { en: 'Amazon Leaf Fish', asset: '/app/assets/fish/ryba_list_amazonskaya.png' },

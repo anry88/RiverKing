@@ -73,6 +73,32 @@ class FishingServiceTest {
     }
 
     @Test
+    fun rarityWeightsKeepTrophiesScarceAndRewardImprovedLures() {
+        val svc = FishingService()
+        val pool = mapOf(
+            "common" to 100.0,
+            "uncommon" to 50.0,
+            "rare" to 10.0,
+            "epic" to 5.0,
+            "mythic" to 2.0,
+            "legendary" to 1.0,
+        )
+        fun probabilities(factor: Double): Map<String, Double> {
+            val weights = pool.mapValues { (rarity, weight) -> weight * svc.rarityModifier(rarity, factor) }
+            val total = weights.values.sum()
+            return weights.mapValues { (_, weight) -> weight / total }
+        }
+
+        val basic = probabilities(0.0)
+        val improved = probabilities(1.0)
+        assertEquals(0.0021881838, basic.getValue("legendary"), 0.0000001)
+        assertEquals(0.0087527352, basic.getValue("mythic") + basic.getValue("legendary"), 0.0000001)
+        assertEquals(0.0097402597, improved.getValue("legendary"), 0.0000001)
+        assertEquals(0.0357142857, improved.getValue("mythic") + improved.getValue("legendary"), 0.0000001)
+        assertEquals(0.1883116883, improved.filterKeys { it != "common" && it != "uncommon" }.values.sum(), 0.0000001)
+    }
+
+    @Test
     fun baseEscapeChanceProgressesByLocation() {
         val svc = newService("testdb_fish_escape")
         transaction {
@@ -90,7 +116,7 @@ class FishingServiceTest {
                 .map { it[Locations.id].value }
 
             idsByUnlock.forEachIndexed { idx, id ->
-                val expected = (0.05 * idx).coerceAtMost(0.5)
+                val expected = (0.02 * idx).coerceAtMost(0.5)
                 assertEquals(expected, svc.baseEscapeChance(id), 0.0000001)
             }
         }

@@ -7,6 +7,7 @@ Manages the player lifecycle and fishing process.
 - **Initialization and profile:** `createUser`, `ensureUserById`, and `ensureUserByTgId` manage shared player records; `setNickname`, `setLanguage`, `userLanguage`, and `displayName` update profile data.
 - **Inventory:** `listLures` and `listRods` return available lures and rods; `currentLureId`/`currentRodId` are read/updated inside `startCast` and `buyPackage`.
 - **Fishing:** `startCast`, `hook`, `catch` manage the cast→hook→catch flow; `hook` now stores the pending catch and returns the hooked fish plus tap goal, duration, and struggle intensity for both clients; `resetStaleCasting`, `resetCasting`, and `restoreCastingLuresOnStartup` clear stuck states without interrupting fresh active casts.
+- **Fishing balance:** regular and event fish pools use rarity weight boosts of `rare ×1.3`, `epic ×2`, `mythic ×3`, and `legendary ×3` before normalization, including auto-fishing. Base escape risk increases by `2` percentage points per regular location tier, capped at `50%`; matching rods halve that risk. Bot casts add `10` percentage points, or `5` with a matching rod. These server-side parameters preserve the existing fishing API and Android compatibility.
 - **Locations and progress:** `locations`, `unlockLocation`, `totalCaughtKg`, `todayCaughtKg`, and `recent` build stats and unlock zones; `locations` can prepend the active special-event location with lock metadata for users outside clubs; `userLanguage` drives localization.
 - **Daily rewards and auto‑fishing:** `dailyRewardSchedule`, `canClaimDaily`, `dailyReward` implement the reward chain; `autoFishUsers` and `applyAutoFishReward` grant scheduled automatic catches.
 - **Shop and monetization:** `listPackages`, `findPack`, `buyPackage`, `buyPackageWithCoins` handle purchases; `todayCoins` and `addCoins` track balances.
@@ -22,7 +23,6 @@ Manages the player lifecycle and fishing process.
 - **StarsPaymentService** creates invoices for Telegram Stars payments (`createInvoice`), validates amounts (`validatePayment`), and records completed payments (`completePayment`).
 - **PayService** tracks payment history and coin crediting: `recordPayment`, `listPayments`, plus duplicate checks.
 - **PlayPurchaseVerifier / PlayPurchaseService** verify Android `play` purchase tokens against Google Play, reject pending/cancelled/mismatched purchases, and only then grant entitlement plus record the payment.
-- **PlayDeckPaymentService** creates signed PlayDeck external order IDs, validates checkout/payment postback HMAC signatures with `PLAYDECK_GAME_TOKEN`, checks amount and Telegram identity consistency, and idempotently grants packages for successful wrapper Stars payments.
 
 ## Additional services
 - **I18n** — catalog of localized names for fish, locations, rods, and lures; functions like `fish(code, lang)` and `location(code, lang)` are used by the API for readable responses.

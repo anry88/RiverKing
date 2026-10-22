@@ -1,0 +1,59 @@
+{
+  "backgroundPrompt": "Use case: photorealistic-natural. Asset type: RiverKing immersive fishing scene background, wide 16:9 landscape. Reference image is ONLY a composition/style reference: near-bank viewpoint, open water in lower two thirds, realistic environment. Create a new South American Pantanal river landscape at warm dawn, broad slow brown-green river, lush tropical gallery forest and palms on low far banks, a few emergent wetland reeds on the far left bank, distant soft mist, subtle golden reflections. View from a low muddy grassy riverbank, all central and lower-right water unobstructed for a fishing bobber. Far shoreline around 35% from top, clear contiguous castable water rectangle from x14%-86% y47%-78%. No dam, no mountains, no people, no boats, no visible fish, no fishing rod, no bobber, no interface, no text or watermark. High quality realistic environment consistent with the reference, not a fantasy illustration.",
+  "piavucuRevisionPrompt": "Use case: precise-object-edit. Asset type: RiverKing fish sprite. Edit target: attached piavucu illustration. Correct this to an ADULT Megaleporinus macrocephalus (piavuçu): robust long silver-gray / muted olive back, pale silver belly, natural gray translucent fins, ONLY TWO subtle small dark flank spots instead of the present many vertical bars. Remove every large vertical stripe. Preserve the natural-history painterly game illustration quality, left-facing side view, full anatomical fish, single subject. Place the entire fish comfortably INSIDE the canvas with at least 10% transparent padding on ALL sides, including tail. Eliminate red/yellow edge fringe. Real transparent alpha background, no outline, no halo, no cast shadow, no text, no scenery. This is a non-destructive revised version.",
+  "mode": "built-in imagegen",
+  "useCase": "stylized-concept",
+  "commonBrief": "Single anatomically credible adult fish, detailed natural-history game illustration, transparent alpha, full body head left, clean silhouette, no text, scenery, glow or shadows.",
+  "fish": [
+    {
+      "nameRu": "Куримбата",
+      "nameEn": "Curimbata",
+      "species": "Prochilodus lineatus",
+      "asset": "src/main/resources/webapp/assets/fish/curimbata.png",
+      "subjectBrief": "Silver robust Prochilodus lineatus, small underslung fleshy mouth, no barbels."
+    },
+    {
+      "nameRu": "Пирапутанга",
+      "nameEn": "Piraputanga",
+      "species": "Brycon hilarii",
+      "asset": "src/main/resources/webapp/assets/fish/piraputanga.png",
+      "subjectBrief": "Brycon hilarii, silver-gold scales, orange fins, dark caudal peduncle stripe."
+    },
+    {
+      "nameRu": "Пиавусу",
+      "nameEn": "Piavucu",
+      "species": "Megaleporinus macrocephalus",
+      "asset": "src/main/resources/webapp/assets/fish/piavucu.png",
+      "subjectBrief": "Adult Megaleporinus macrocephalus, robust silver olive body, blunt head, subdued adult markings; revised to remove the original multiple vertical bars."
+    },
+    {
+      "nameRu": "Качара",
+      "nameEn": "Cachara",
+      "species": "Pseudoplatystoma reticulatum",
+      "asset": "src/main/resources/webapp/assets/fish/cachara.png",
+      "subjectBrief": "Gray-white Pseudoplatystoma reticulatum, black bars and reticulation, shovelnose head and barbels, not separate round spots."
+    },
+    {
+      "nameRu": "Скат Фалькнера",
+      "nameEn": "Falkner's Stingray",
+      "species": "Potamotrygon falkneri",
+      "asset": "src/main/resources/webapp/assets/fish/falkneri_stingray.png",
+      "subjectBrief": "Potamotrygon falkneri, dark brown disc, irregular cream worm-like markings, head left tail right, no motoro ocelli."
+    },
+    {
+      "nameRu": "Дорадо золотой",
+      "nameEn": "Golden Dorado",
+      "species": "Salminus brasiliensis",
+      "asset": "src/main/resources/webapp/assets/fish/golden_dorado.png",
+      "subjectBrief": "Salminus brasiliensis river predator, golden scales, dark horizontal scale rows, orange fins; not marine mahi-mahi."
+    },
+    {
+      "nameRu": "Пинтадо",
+      "nameEn": "Pintado",
+      "species": "Pseudoplatystoma corruscans",
+      "asset": "src/main/resources/webapp/assets/fish/pintado.png",
+      "subjectBrief": "Pseudoplatystoma corruscans, gray-white large catfish, separate round black spots, forked tail, shovelnose and barbels."
+    }
+  ],
+  "notes": "Normalized generation briefs; exact initial requests are retained in the chat tool history. Approved fish were downscaled to the repository 1024px sprite format, with original alpha preserved."
+}

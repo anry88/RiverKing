@@ -8821,6 +8821,7 @@ private fun locationBackgroundAsset(location: String?): String? {
         "Игапо, затопленный лес", "Igapo Flooded Forest", "Flooded Forest" -> "backgrounds/flooded_forest.webp"
         "Мангровые заросли", "Mangroves" -> "backgrounds/mangroves.webp"
         "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
+        "Реки Южной Америки", "South American Rivers" -> "backgrounds/south_american_rivers.webp"
         "Ущелье реки Колумбия", "Columbia River Gorge" -> "backgrounds/columbia_river_gorge_bonneville_dam.webp"
         else -> null
     }
@@ -9018,6 +9019,20 @@ private val FISH_ASSET_MAP = mapOf(
     "Banded Otocinclus" to "fish/otocinklyus.webp",
     "Карнегиелла мраморная" to "fish/karnegiella_mramornaya.webp",
     "Marbled Hatchetfish" to "fish/karnegiella_mramornaya.webp",
+    "Куримбата" to "fish/curimbata.webp",
+    "Curimbata" to "fish/curimbata.webp",
+    "Пирапутанга" to "fish/piraputanga.webp",
+    "Piraputanga" to "fish/piraputanga.webp",
+    "Пиавусу" to "fish/piavucu.webp",
+    "Piavucu" to "fish/piavucu.webp",
+    "Качара" to "fish/cachara.webp",
+    "Cachara" to "fish/cachara.webp",
+    "Скат Фалькнера" to "fish/falkneri_stingray.webp",
+    "Falkner's Stingray" to "fish/falkneri_stingray.webp",
+    "Дорадо золотой" to "fish/golden_dorado.webp",
+    "Golden Dorado" to "fish/golden_dorado.webp",
+    "Пинтадо" to "fish/pintado.webp",
+    "Pintado" to "fish/pintado.webp",
     "Тетра неоновая" to "fish/tetra_neonovaya.webp",
     "Neon Tetra" to "fish/tetra_neonovaya.webp",
     "Тернеция чёрная" to "fish/tetra_chernaya.webp",

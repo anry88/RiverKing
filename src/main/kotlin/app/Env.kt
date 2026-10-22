@@ -36,8 +36,6 @@ data class Env(
     val googlePlayPackageName: String,
     val googlePlayServiceAccountFile: String,
     val eventAssetsDir: String,
-    val playDeckGameToken: String,
-    val playDeckTestPayments: Boolean,
 ) {
     companion object {
         private const val DEFAULT_ITCH_PROJECT_URL = "https://anry88.itch.io/river-king"
@@ -116,9 +114,6 @@ data class Env(
                 googlePlayPackageName = configuredValue("GOOGLE_PLAY_PACKAGE_NAME") ?: "",
                 googlePlayServiceAccountFile = configuredValue("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE") ?: "",
                 eventAssetsDir = configuredValue("EVENT_ASSETS_DIR") ?: "data/event-assets",
-                playDeckGameToken = configuredValue("PLAYDECK_GAME_TOKEN") ?: "",
-                playDeckTestPayments =
-                    configuredValue("PLAYDECK_TEST_PAYMENTS")?.equals("true", ignoreCase = true) ?: false,
             )
         }
 

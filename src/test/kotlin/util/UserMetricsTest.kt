@@ -8,6 +8,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -29,6 +30,14 @@ class UserMetricsTest {
         val now = Instant.parse("2024-02-01T00:00:00Z")
         val clock = MutableClock(now)
         val service = FishingService(clock)
+        fun registrationCount(source: String): Double {
+            val prefix = "user_registration_total{source=\"$source\"} "
+            return Metrics.dump().lineSequence()
+                .firstOrNull { it.startsWith(prefix) }
+                ?.removePrefix(prefix)?.toDouble() ?: 0.0
+        }
+        val previousCatalogRegistrations = registrationCount("tg-games")
+        val previousTelegramRegistrations = registrationCount("telegram")
 
         service.ensureUserByTgId(101L, registrationSource = "tg-games")
         listOf(102L, 103L, 104L).forEach { tgId -> service.ensureUserByTgId(tgId) }
@@ -49,8 +58,7 @@ class UserMetricsTest {
         val registrationLines = Metrics.dump().lineSequence().filter { it.startsWith("user_registrations") }.toSet()
         assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"tg-games\"} 1.0"))
         assertTrue(registrationLines.contains("user_registrations{period=\"total\",source=\"telegram\"} 3.0"))
-        val registrationCounterLines = Metrics.dump().lineSequence().filter { it.startsWith("user_registration_total") }.toSet()
-        assertTrue(registrationCounterLines.contains("user_registration_total{source=\"tg-games\"} 1.0"))
-        assertTrue(registrationCounterLines.contains("user_registration_total{source=\"telegram\"} 3.0"))
+        assertEquals(previousCatalogRegistrations + 1.0, registrationCount("tg-games"))
+        assertEquals(previousTelegramRegistrations + 3.0, registrationCount("telegram"))
     }
 }

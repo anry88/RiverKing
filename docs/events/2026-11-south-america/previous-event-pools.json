@@ -1,0 +1,1253 @@
+[
+  {
+    "id": 1,
+    "name_ru": "Остров Зелёный",
+    "name_en": "Zelyony Island",
+    "start_time": "2026-05-01T03:00:00",
+    "end_time": "2026-06-01T03:00:00",
+    "fish": [
+      {
+        "name": "Ёрш",
+        "rarity": "common",
+        "weight": 0.25,
+        "meanKg": 0.08,
+        "varKg": 0.03,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Берш",
+        "rarity": "common",
+        "weight": 0.3,
+        "meanKg": 1.1,
+        "varKg": 0.5,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Бычок-кругляк",
+        "rarity": "common",
+        "weight": 0.65,
+        "meanKg": 0.12,
+        "varKg": 0.06,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Вобла",
+        "rarity": "common",
+        "weight": 0.55,
+        "meanKg": 0.35,
+        "varKg": 0.15,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Густера",
+        "rarity": "common",
+        "weight": 0.7,
+        "meanKg": 0.35,
+        "varKg": 0.12,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Карась",
+        "rarity": "common",
+        "weight": 0.7,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Краснопёрка",
+        "rarity": "common",
+        "weight": 0.4,
+        "meanKg": 0.15,
+        "varKg": 0.05,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Окунь",
+        "rarity": "common",
+        "weight": 0.5,
+        "meanKg": 0.25,
+        "varKg": 0.07,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Пескарь",
+        "rarity": "common",
+        "weight": 0.45,
+        "meanKg": 0.07,
+        "varKg": 0.03,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Плотва",
+        "rarity": "common",
+        "weight": 0.9,
+        "meanKg": 0.2,
+        "varKg": 0.05,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Сельдь",
+        "rarity": "common",
+        "weight": 0.55,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Тарань",
+        "rarity": "common",
+        "weight": 0.45,
+        "meanKg": 0.3,
+        "varKg": 0.12,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Уклейка",
+        "rarity": "common",
+        "weight": 0.6,
+        "meanKg": 0.05,
+        "varKg": 0.02,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Сом европейский",
+        "rarity": "epic",
+        "weight": 0.2,
+        "meanKg": 8,
+        "varKg": 4,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Стерлядь",
+        "rarity": "epic",
+        "weight": 0.09,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Угорь европейский",
+        "rarity": "epic",
+        "weight": 0.11,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Белуга",
+        "rarity": "legendary",
+        "weight": 0.06,
+        "meanKg": 40,
+        "varKg": 20,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Осётр европейский",
+        "rarity": "legendary",
+        "weight": 0.09,
+        "meanKg": 12,
+        "varKg": 6,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Амур чёрный",
+        "rarity": "mythic",
+        "weight": 0.07,
+        "meanKg": 12,
+        "varKg": 5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Амур белый",
+        "rarity": "rare",
+        "weight": 0.13,
+        "meanKg": 3.5,
+        "varKg": 1.5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Вырезуб",
+        "rarity": "rare",
+        "weight": 0.29,
+        "meanKg": 1.4,
+        "varKg": 0.6,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Жерех",
+        "rarity": "rare",
+        "weight": 0.24,
+        "meanKg": 2,
+        "varKg": 1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Карп",
+        "rarity": "rare",
+        "weight": 0.18,
+        "meanKg": 2.5,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Судак",
+        "rarity": "rare",
+        "weight": 0.26,
+        "meanKg": 2,
+        "varKg": 1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Толстолобик",
+        "rarity": "rare",
+        "weight": 0.17,
+        "meanKg": 4,
+        "varKg": 2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Щука",
+        "rarity": "rare",
+        "weight": 0.18,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Голавль",
+        "rarity": "uncommon",
+        "weight": 0.25,
+        "meanKg": 0.8,
+        "varKg": 0.4,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Лещ",
+        "rarity": "uncommon",
+        "weight": 0.5,
+        "meanKg": 0.8,
+        "varKg": 0.2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Линь",
+        "rarity": "uncommon",
+        "weight": 0.2,
+        "meanKg": 0.7,
+        "varKg": 0.3,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Чехонь",
+        "rarity": "uncommon",
+        "weight": 0.4,
+        "meanKg": 0.4,
+        "varKg": 0.15,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Язь",
+        "rarity": "uncommon",
+        "weight": 0.3,
+        "meanKg": 1.2,
+        "varKg": 0.5,
+        "predator": true,
+        "water": "fresh"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name_ru": "Озеро Поянху",
+    "name_en": "Poyang Lake",
+    "start_time": "2026-06-01T03:00:00",
+    "end_time": "2026-07-01T03:00:00",
+    "fish": [
+      {
+        "name": "Верхоплавка",
+        "rarity": "common",
+        "weight": 0.7,
+        "meanKg": 0.01,
+        "varKg": 0.005,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Вьюн",
+        "rarity": "common",
+        "weight": 0.6,
+        "meanKg": 0.12,
+        "varKg": 0.05,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Гольян",
+        "rarity": "common",
+        "weight": 0.45,
+        "meanKg": 0.02,
+        "varKg": 0.01,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Жёлтый сомик",
+        "rarity": "common",
+        "weight": 0.5,
+        "meanKg": 0.25,
+        "varKg": 0.1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Карась",
+        "rarity": "common",
+        "weight": 1.1,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Окунь",
+        "rarity": "common",
+        "weight": 0.3,
+        "meanKg": 0.25,
+        "varKg": 0.07,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Пескарь",
+        "rarity": "common",
+        "weight": 0.55,
+        "meanKg": 0.07,
+        "varKg": 0.03,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Ротан",
+        "rarity": "common",
+        "weight": 0.25,
+        "meanKg": 0.15,
+        "varKg": 0.05,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Желтощёк",
+        "rarity": "epic",
+        "weight": 0.055,
+        "meanKg": 8,
+        "varKg": 3.5,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Китайский чукучан",
+        "rarity": "epic",
+        "weight": 0.07,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Китайский веслонос",
+        "rarity": "legendary",
+        "weight": 0.004,
+        "meanKg": 60,
+        "varKg": 25,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Китайский осётр",
+        "rarity": "legendary",
+        "weight": 0.01,
+        "meanKg": 18,
+        "varKg": 8,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Янцзынский осётр",
+        "rarity": "legendary",
+        "weight": 0.018,
+        "meanKg": 10,
+        "varKg": 5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Амур чёрный",
+        "rarity": "mythic",
+        "weight": 0.09,
+        "meanKg": 12,
+        "varKg": 5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Змееголов северный",
+        "rarity": "mythic",
+        "weight": 0.06,
+        "meanKg": 4,
+        "varKg": 2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Щука амурская",
+        "rarity": "mythic",
+        "weight": 0.035,
+        "meanKg": 5,
+        "varKg": 2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Амур белый",
+        "rarity": "rare",
+        "weight": 0.75,
+        "meanKg": 3.5,
+        "varKg": 1.5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Ауха",
+        "rarity": "rare",
+        "weight": 0.18,
+        "meanKg": 1.4,
+        "varKg": 0.6,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Жерех",
+        "rarity": "rare",
+        "weight": 0.2,
+        "meanKg": 2,
+        "varKg": 1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Карп",
+        "rarity": "rare",
+        "weight": 0.9,
+        "meanKg": 2.5,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Судак",
+        "rarity": "rare",
+        "weight": 0.16,
+        "meanKg": 2,
+        "varKg": 1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Толстолобик",
+        "rarity": "rare",
+        "weight": 0.85,
+        "meanKg": 4,
+        "varKg": 2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Щука",
+        "rarity": "rare",
+        "weight": 0.12,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Амурский сом",
+        "rarity": "uncommon",
+        "weight": 0.28,
+        "meanKg": 2,
+        "varKg": 0.9,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Линь",
+        "rarity": "uncommon",
+        "weight": 0.35,
+        "meanKg": 0.7,
+        "varKg": 0.3,
+        "predator": false,
+        "water": "fresh"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name_ru": "Дамба Афслёйтдейк",
+    "name_en": "Afsluitdijk Dam",
+    "start_time": "2026-07-01T03:00:00",
+    "end_time": "2026-08-01T03:00:00",
+    "fish": [
+      {
+        "name": "Ёрш",
+        "rarity": "common",
+        "weight": 0.72,
+        "meanKg": 0.08,
+        "varKg": 0.03,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Анчоус европейский",
+        "rarity": "common",
+        "weight": 0.62,
+        "meanKg": 0.02,
+        "varKg": 0.01,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Бычок-кругляк",
+        "rarity": "common",
+        "weight": 0.78,
+        "meanKg": 0.12,
+        "varKg": 0.06,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Густера",
+        "rarity": "common",
+        "weight": 0.75,
+        "meanKg": 0.35,
+        "varKg": 0.12,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Килька",
+        "rarity": "common",
+        "weight": 0.78,
+        "meanKg": 0.03,
+        "varKg": 0.01,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Колюшка трёхиглая",
+        "rarity": "common",
+        "weight": 0.68,
+        "meanKg": 0.006,
+        "varKg": 0.003,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Корюшка",
+        "rarity": "common",
+        "weight": 0.92,
+        "meanKg": 0.06,
+        "varKg": 0.02,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Краснопёрка",
+        "rarity": "common",
+        "weight": 0.65,
+        "meanKg": 0.15,
+        "varKg": 0.05,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Окунь",
+        "rarity": "common",
+        "weight": 0.85,
+        "meanKg": 0.25,
+        "varKg": 0.07,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Плотва",
+        "rarity": "common",
+        "weight": 0.85,
+        "meanKg": 0.2,
+        "varKg": 0.05,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Сельдь",
+        "rarity": "common",
+        "weight": 0.9,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Лосось атлантический",
+        "rarity": "epic",
+        "weight": 0.11,
+        "meanKg": 6,
+        "varKg": 3,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Тюрбо",
+        "rarity": "epic",
+        "weight": 0.07,
+        "meanKg": 6,
+        "varKg": 3,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Угорь европейский",
+        "rarity": "epic",
+        "weight": 0.1,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Форель кумжа",
+        "rarity": "epic",
+        "weight": 0.07,
+        "meanKg": 4,
+        "varKg": 1.5,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Хоутинг",
+        "rarity": "epic",
+        "weight": 0.09,
+        "meanKg": 1.2,
+        "varKg": 0.5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Алоза европейская",
+        "rarity": "legendary",
+        "weight": 0.015,
+        "meanKg": 2,
+        "varKg": 0.8,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Осётр европейский",
+        "rarity": "legendary",
+        "weight": 0.018,
+        "meanKg": 12,
+        "varKg": 6,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Палтус",
+        "rarity": "legendary",
+        "weight": 0.02,
+        "meanKg": 20,
+        "varKg": 10,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Зубатка пятнистая",
+        "rarity": "mythic",
+        "weight": 0.05,
+        "meanKg": 8,
+        "varKg": 3,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Минога морская",
+        "rarity": "mythic",
+        "weight": 0.04,
+        "meanKg": 1.6,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Пеленгас",
+        "rarity": "mythic",
+        "weight": 0.035,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Вырезуб",
+        "rarity": "rare",
+        "weight": 0.16,
+        "meanKg": 1.4,
+        "varKg": 0.6,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Карп",
+        "rarity": "rare",
+        "weight": 0.28,
+        "meanKg": 2.5,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Минога речная",
+        "rarity": "rare",
+        "weight": 0.2,
+        "meanKg": 0.12,
+        "varKg": 0.05,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Муксун",
+        "rarity": "rare",
+        "weight": 0.18,
+        "meanKg": 2.2,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Судак",
+        "rarity": "rare",
+        "weight": 0.32,
+        "meanKg": 2,
+        "varKg": 1,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Треска",
+        "rarity": "rare",
+        "weight": 0.3,
+        "meanKg": 3,
+        "varKg": 1.5,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Финта",
+        "rarity": "rare",
+        "weight": 0.2,
+        "meanKg": 0.8,
+        "varKg": 0.35,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Форель морская",
+        "rarity": "rare",
+        "weight": 0.24,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Щука",
+        "rarity": "rare",
+        "weight": 0.27,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Голавль",
+        "rarity": "uncommon",
+        "weight": 0.38,
+        "meanKg": 0.8,
+        "varKg": 0.4,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Камбала морская",
+        "rarity": "uncommon",
+        "weight": 0.34,
+        "meanKg": 0.8,
+        "varKg": 0.4,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Камбала речная",
+        "rarity": "uncommon",
+        "weight": 0.42,
+        "meanKg": 0.45,
+        "varKg": 0.2,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Кефаль-лобан",
+        "rarity": "uncommon",
+        "weight": 0.45,
+        "meanKg": 1,
+        "varKg": 0.5,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Лещ",
+        "rarity": "uncommon",
+        "weight": 0.48,
+        "meanKg": 0.8,
+        "varKg": 0.2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Мерланг",
+        "rarity": "uncommon",
+        "weight": 0.48,
+        "meanKg": 0.9,
+        "varKg": 0.4,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Налим",
+        "rarity": "uncommon",
+        "weight": 0.48,
+        "meanKg": 1.5,
+        "varKg": 0.8,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Сайра",
+        "rarity": "uncommon",
+        "weight": 0.3,
+        "meanKg": 0.3,
+        "varKg": 0.15,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Сиг обыкновенный",
+        "rarity": "uncommon",
+        "weight": 0.36,
+        "meanKg": 1.2,
+        "varKg": 0.5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Скумбрия атлантическая",
+        "rarity": "uncommon",
+        "weight": 0.56,
+        "meanKg": 0.6,
+        "varKg": 0.25,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Чехонь",
+        "rarity": "uncommon",
+        "weight": 0.42,
+        "meanKg": 0.4,
+        "varKg": 0.15,
+        "predator": false,
+        "water": "fresh"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name_ru": "Ущелье реки Колумбия",
+    "name_en": "Columbia River Gorge",
+    "start_time": "2026-08-01T03:00:00",
+    "end_time": "2026-09-01T03:00:00",
+    "fish": [
+      {
+        "name": "Гольян",
+        "rarity": "common",
+        "weight": 0.68,
+        "meanKg": 0.02,
+        "varKg": 0.01,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Карась",
+        "rarity": "common",
+        "weight": 0.86,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Килька",
+        "rarity": "common",
+        "weight": 0.48,
+        "meanKg": 0.03,
+        "varKg": 0.01,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Корюшка",
+        "rarity": "common",
+        "weight": 0.9,
+        "meanKg": 0.06,
+        "varKg": 0.02,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Окунь",
+        "rarity": "common",
+        "weight": 0.88,
+        "meanKg": 0.25,
+        "varKg": 0.07,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Пескарь",
+        "rarity": "common",
+        "weight": 0.76,
+        "meanKg": 0.07,
+        "varKg": 0.03,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Пикеминноу северный",
+        "rarity": "common",
+        "weight": 0.78,
+        "meanKg": 0.6,
+        "varKg": 0.25,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Пимут",
+        "rarity": "common",
+        "weight": 0.5,
+        "meanKg": 0.18,
+        "varKg": 0.08,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Сельдь",
+        "rarity": "common",
+        "weight": 0.62,
+        "meanKg": 0.3,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Сельдь тихоокеанская",
+        "rarity": "common",
+        "weight": 0.78,
+        "meanKg": 0.35,
+        "varKg": 0.12,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Тихоокеанский клювач",
+        "rarity": "common",
+        "weight": 0.62,
+        "meanKg": 1.6,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Чизелмаут",
+        "rarity": "common",
+        "weight": 0.58,
+        "meanKg": 0.25,
+        "varKg": 0.1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Голец арктический",
+        "rarity": "epic",
+        "weight": 0.14,
+        "meanKg": 2.8,
+        "varKg": 1.2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Форель стальноголовая",
+        "rarity": "epic",
+        "weight": 0.06,
+        "meanKg": 4,
+        "varKg": 1.8,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Осётр белый",
+        "rarity": "legendary",
+        "weight": 0.014,
+        "meanKg": 25,
+        "varKg": 12,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Палтус",
+        "rarity": "legendary",
+        "weight": 0.018,
+        "meanKg": 20,
+        "varKg": 10,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Кристивомер",
+        "rarity": "mythic",
+        "weight": 0.09,
+        "meanKg": 10,
+        "varKg": 5,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Минога тихоокеанская",
+        "rarity": "mythic",
+        "weight": 0.04,
+        "meanKg": 0.45,
+        "varKg": 0.2,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Чавыча",
+        "rarity": "mythic",
+        "weight": 0.1,
+        "meanKg": 8,
+        "varKg": 3.5,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Алоза американская",
+        "rarity": "rare",
+        "weight": 0.28,
+        "meanKg": 1,
+        "varKg": 0.4,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Альбакор",
+        "rarity": "rare",
+        "weight": 0.035,
+        "meanKg": 18,
+        "varKg": 7,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Горбуша",
+        "rarity": "rare",
+        "weight": 0.44,
+        "meanKg": 1.8,
+        "varKg": 0.8,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Карп",
+        "rarity": "rare",
+        "weight": 0.42,
+        "meanKg": 2.5,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Кета",
+        "rarity": "rare",
+        "weight": 0.52,
+        "meanKg": 4.5,
+        "varKg": 2,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Кижуч",
+        "rarity": "rare",
+        "weight": 0.34,
+        "meanKg": 4,
+        "varKg": 1.8,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Муксун",
+        "rarity": "rare",
+        "weight": 0.16,
+        "meanKg": 2.2,
+        "varKg": 1,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Нерка",
+        "rarity": "rare",
+        "weight": 0.26,
+        "meanKg": 2.5,
+        "varKg": 1,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Судак светлопёрый",
+        "rarity": "rare",
+        "weight": 0.3,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Форель морская",
+        "rarity": "rare",
+        "weight": 0.2,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "salt"
+      },
+      {
+        "name": "Форель ручьевая",
+        "rarity": "rare",
+        "weight": 0.38,
+        "meanKg": 1.2,
+        "varKg": 0.6,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Щука",
+        "rarity": "rare",
+        "weight": 0.22,
+        "meanKg": 3,
+        "varKg": 1.2,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Камбала морская",
+        "rarity": "uncommon",
+        "weight": 0.14,
+        "meanKg": 0.8,
+        "varKg": 0.4,
+        "predator": false,
+        "water": "salt"
+      },
+      {
+        "name": "Лещ",
+        "rarity": "uncommon",
+        "weight": 0.26,
+        "meanKg": 0.8,
+        "varKg": 0.2,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Налим",
+        "rarity": "uncommon",
+        "weight": 0.46,
+        "meanKg": 1.5,
+        "varKg": 0.8,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Окунь малоротый",
+        "rarity": "uncommon",
+        "weight": 0.68,
+        "meanKg": 0.6,
+        "varKg": 0.25,
+        "predator": true,
+        "water": "fresh"
+      },
+      {
+        "name": "Сиг обыкновенный",
+        "rarity": "uncommon",
+        "weight": 0.34,
+        "meanKg": 1.2,
+        "varKg": 0.5,
+        "predator": false,
+        "water": "fresh"
+      },
+      {
+        "name": "Сомик канальный",
+        "rarity": "uncommon",
+        "weight": 0.56,
+        "meanKg": 1.5,
+        "varKg": 0.7,
+        "predator": true,
+        "water": "fresh"
+      }
+    ]
+  }
+]
