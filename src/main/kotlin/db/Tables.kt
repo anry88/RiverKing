@@ -652,6 +652,15 @@ object DB {
         val fjord       = upsertLocation("Фьорд",           2600.0, 3.4)
         val openOcean   = upsertLocation("Открытый океан",  5000.0, 4.2)
 
+        // November 2026 South America event fish; regular location pools are unchanged.
+        upsertFish("Куримбата", "common", 1.2, 0.5, false, "fresh")
+        upsertFish("Пирапутанга", "uncommon", 1.0, 0.4, false, "fresh")
+        upsertFish("Пиавусу", "rare", 3.0, 1.0, false, "fresh")
+        upsertFish("Качара", "epic", 8.0, 3.0, true, "fresh")
+        upsertFish("Скат Фалькнера", "mythic", 8.0, 3.0, true, "fresh")
+        upsertFish("Дорадо золотой", "legendary", 10.0, 4.0, true, "fresh")
+        upsertFish("Пинтадо", "legendary", 25.0, 10.0, true, "fresh")
+
         // --- Fish: common пресные мирные---
         val fCommonPeaceFreshPlotva  = upsertFish("Плотва", "common", 0.2, 0.05, false, "fresh")
         val fCommonPeaceFreshKaras  = upsertFish("Карась", "common", 0.3, 0.1, false, "fresh")

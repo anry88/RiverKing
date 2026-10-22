@@ -90,6 +90,13 @@ object I18n {
         "Птеригоплихт парчовый" to "Sailfin Pleco",
         "Отоцинклюс широкополосый" to "Banded Otocinclus",
         "Карнегиелла мраморная" to "Marbled Hatchetfish",
+        "Куримбата" to "Curimbata",
+        "Пирапутанга" to "Piraputanga",
+        "Пиавусу" to "Piavucu",
+        "Качара" to "Cachara",
+        "Скат Фалькнера" to "Falkner's Stingray",
+        "Дорадо золотой" to "Golden Dorado",
+        "Пинтадо" to "Pintado",
         "Тетра неоновая" to "Neon Tetra",
         "Тернеция чёрная" to "Black Skirt Tetra",
         "Рыба-лист амазонская" to "Amazon Leaf Fish",
@@ -266,6 +273,7 @@ object I18n {
         "Игапо, затопленный лес" to "Igapo Flooded Forest",
         "Мангровые заросли" to "Mangroves",
         "Коралловые отмели" to "Coral Flats",
+        "Реки Южной Америки" to "South American Rivers",
         "Ущелье реки Колумбия" to "Columbia River Gorge",
     )
 
