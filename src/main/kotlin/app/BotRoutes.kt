@@ -758,7 +758,7 @@ fun Application.botRoutes(env: Env) {
                     delay(waitSeconds * 1000L)
                     try {
                         val escapeInfo = fishing.locationEscapeChance(uid)
-                        val extraEscapeChance = if (escapeInfo.rodBonusMultiplier < 1.0) 0.15 else 0.30
+                        val extraEscapeChance = if (escapeInfo.rodBonusMultiplier < 1.0) 0.05 else 0.10
                         val hookRes = fishing.hook(uid, waitSeconds, 0.0, extraEscapeChance)
                         if (!hookRes.success) {
                             val escapedText = if (lang == "ru") "Рыба сорвалась!" else "The fish got away!"

@@ -1961,13 +1961,13 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
         val questProgressChanged: Boolean = false,
     )
 
-    private fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
+    internal fun rarityModifier(rarity: String, factor: Double): Double = when (rarity) {
         "common" -> 1.0 - 0.7 * factor
         "uncommon" -> 0.6 + 0.3 * factor
-        "rare" -> 0.3 + 0.4 * factor
-        "epic" -> 0.2 + 0.3 * factor
-        "mythic" -> 0.15 + 0.25 * factor
-        "legendary" -> 0.1 + 0.2 * factor
+        "rare" -> 1.3 * (0.3 + 0.4 * factor)
+        "epic" -> 2.0 * (0.2 + 0.3 * factor)
+        "mythic" -> 3.0 * (0.15 + 0.25 * factor)
+        "legendary" -> 3.0 * (0.1 + 0.2 * factor)
         else -> 1.0
     }
 
@@ -1989,7 +1989,7 @@ class FishingService(private val clock: Clock = Clock.systemUTC()) {
 
     internal fun baseEscapeChance(locId: Long): Double {
         val tier = locationTier(locId)
-        return (0.05 * tier).coerceAtMost(0.5)
+        return (0.02 * tier).coerceAtMost(0.5)
     }
 
     private fun coinsEarnedBetween(userId: Long, start: Instant, end: Instant): Long {

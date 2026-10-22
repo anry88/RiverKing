@@ -417,10 +417,13 @@ class AuthRoutesTest {
         }
         assertEquals(HttpStatusCode.OK, directUpdate.status)
         val directBody = json.decodeFromString<UpdateResponse>(directUpdate.bodyAsText())
+        val policy = json.parseToJsonElement(
+            checkNotNull(javaClass.classLoader.getResource("android-update-policy.json")).readText()
+        ).jsonObject
         assertEquals(AndroidUpdateService.STATUS_UPDATE_REQUIRED, directBody.status)
         assertEquals(true, directBody.mandatory)
-        assertEquals(10, directBody.latestVersionCode)
-        assertEquals("0.4.6", directBody.latestVersionName)
+        assertEquals(policy.getValue("latestVersionCode").jsonPrimitive.content.toInt(), directBody.latestVersionCode)
+        assertEquals(policy.getValue("latestVersionName").jsonPrimitive.content, directBody.latestVersionName)
         assertEquals(4, directBody.minSupportedVersionCode)
         assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
         assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
