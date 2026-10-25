@@ -11,6 +11,17 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 
+def event_dates(event):
+    start = datetime.fromisoformat(event["start"].replace("Z", "+00:00"))
+    end = datetime.fromisoformat(event["end"].replace("Z", "+00:00"))
+    if start.tzinfo is None or end.tzinfo is None or end <= start:
+        raise ValueError("Invalid event dates")
+    for date in (start, end):
+        if date.utcoffset().total_seconds() != 0 or any((date.hour, date.minute, date.second, date.microsecond)):
+            raise ValueError("Event dates must be 00:00:00 UTC; use YYYY-MM-DDT00:00:00Z")
+    return start, end
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
@@ -28,6 +39,7 @@ def main():
         parser.error("Set ADMIN_API_TOKEN in the environment")
     policy = json.loads((Path(__file__).resolve().parents[1] / "src/main/resources/android-update-policy.json").read_text())
     headers = {
+        "User-Agent": "RiverKing-Admin-CLI/" + policy["latestVersionName"],
         "Authorization": "Bearer " + token,
         "X-RiverKing-App-Version-Code": str(policy["latestVersionCode"]),
         "X-RiverKing-App-Version-Name": policy["latestVersionName"],
@@ -42,12 +54,14 @@ def main():
 
     def check_image(path):
         # Public assets do not need the admin credential.
-        with urlopen(base + path, timeout=30) as response:
+        req = Request(base + path, headers={"User-Agent": headers["User-Agent"]})
+        with urlopen(req, timeout=30) as response:
             if not response.headers.get_content_type().startswith("image/"):
                 raise ValueError("Missing image: " + path)
             response.read(16)
 
     event = json.loads(args.manifest.read_text())
+    start, end = event_dates(event)
     catalog = request("/api/admin/catalog")
     fish_by_name = {}
     for fish in catalog["eventFish"]:
@@ -70,10 +84,6 @@ def main():
         selected.append({"fishId": fish_id, "weight": fish["weight"]})
     if not selected:
         raise ValueError("Empty fish pool")
-    start = datetime.fromisoformat(event["start"].replace("Z", "+00:00"))
-    end = datetime.fromisoformat(event["end"].replace("Z", "+00:00"))
-    if start.tzinfo is None or end.tzinfo is None or end <= start:
-        raise ValueError("Invalid event dates")
     payload = {key: event[key] for key in ("nameRu", "nameEn", "imagePath", "castZone")}
     payload.update(startTime=int(start.timestamp() * 1000), endTime=int(end.timestamp() * 1000), fish=selected)
     for category in ("weightPrizes", "countPrizes", "fishPrizes"):

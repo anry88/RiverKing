@@ -16,6 +16,7 @@ Manages the player lifecycle and fishing process.
 ## TournamentService, SpecialEventService, PrizeService, RatingPrizeService
 - **TournamentService** stores tournament parameters: `createTournament`, `updateTournament`, paged/sorted `listTournaments`, `currentTournament`, `upcomingTournaments`, `pastTournaments`. Leaderboards are built via `leaderboard`, which aggregates catches in the required metric.
 - **SpecialEventService** manages temporary club events: non-overlapping event CRUD, event fish pools/manual weights, active event locations, club total-weight and total-count leaderboards, personal rarest/largest fish leaderboards, progress subtraction on club exit, and event prize distribution.
+- Event creation and rescheduling follow [the UTC scheduling rules](../../../../docs/events/README.md): both date boundaries are 00:00 UTC. Admin API timestamps are epoch milliseconds; manifests use explicit UTC offsets rather than timezone-less historical SQL values.
 - **PrizeService** issues and records rewards: `pendingPrizes`, `grantPrizes`, `userPrizes`, and `applyPrize` (used by the scheduler and API), including `PrizeSource.EVENT` prizes when an event service is wired in.
 - **RatingPrizeService** helps compute rating prizes after tournaments and prepares `PrizeSpec` for delivery.
 

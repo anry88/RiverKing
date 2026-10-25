@@ -9,12 +9,25 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import support.testEnv
 import java.io.File
 import java.time.Instant
+import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.test.*
 
 class November2026EventTest {
     private val directory = File("docs/events/2026-11-south-america")
     private val manifest = Json.parseToJsonElement(File(directory, "event.json").readText()).jsonObject
+
+    @Test
+    fun eventDatesFollowAdminUtcMidnightRule() {
+        val start = Instant.parse(manifest.getValue("start").jsonPrimitive.content)
+        val end = Instant.parse(manifest.getValue("end").jsonPrimitive.content)
+        assertEquals(Instant.parse("2026-11-01T00:00:00Z"), start)
+        assertEquals(Instant.parse("2026-12-01T00:00:00Z"), end)
+        val belgrade = ZoneId.of("Europe/Belgrade")
+        assertEquals(1, start.atZone(belgrade).hour)
+        assertEquals(1, end.atZone(belgrade).hour)
+        assertEquals(2, Instant.parse("2026-05-01T00:00:00Z").atZone(belgrade).hour)
+    }
 
     @Test
     fun approvedPoolCreatesCompleteFutureEventWithoutChangingRegularLocations() {

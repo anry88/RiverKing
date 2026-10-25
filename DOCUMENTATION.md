@@ -8,6 +8,7 @@ This document explains how the RiverKing backend and adjacent client projects ar
 - [Utilities (`src/main/kotlin/util`)](src/main/kotlin/util/README.md)
 - [Android player client (`mobile/android-app`)](mobile/android-app/README.md)
 - [Android admin app (`mobile/admin-app`)](mobile/admin-app/README.md)
+- [Event creation and UTC scheduling rules](docs/events/README.md)
 
 ## Overview
 
