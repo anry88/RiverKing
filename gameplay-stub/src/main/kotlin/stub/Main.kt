@@ -10,12 +10,10 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.random.Random
 
-data class WorkerConfig(val intervalSeconds: Long = 300, val staggerSeconds: Long = 2) {
+data class WorkerConfig(val accountPauseSeconds: Long = 10) {
     init {
-        require(intervalSeconds in 30..86_400) { "STUB_INTERVAL_SECONDS must be 30..86400" }
-        require(staggerSeconds in 0..60) { "STUB_STAGGER_SECONDS must be 0..60" }
+        require(accountPauseSeconds in 1..3_600) { "STUB_ACCOUNT_PAUSE_SECONDS must be 1..3600" }
     }
 }
 
@@ -28,8 +26,7 @@ fun main(args: Array<String>) {
     }
     require(args.all { it == "--once" || it == "--provision-only" }) { "Options: --once, --provision-only, --health" }
     val config = WorkerConfig(
-        intervalSeconds = System.getenv("STUB_INTERVAL_SECONDS")?.toLong() ?: 300,
-        staggerSeconds = System.getenv("STUB_STAGGER_SECONDS")?.toLong() ?: 2,
+        accountPauseSeconds = System.getenv("STUB_ACCOUNT_PAUSE_SECONDS")?.toLong() ?: 10,
     )
     val env = Env.fromConfig()
     val log = LoggerFactory.getLogger("GameplayStub")
@@ -42,7 +39,7 @@ fun main(args: Array<String>) {
                 Runtime.getRuntime().addShutdownHook(shutdown)
                 try {
                     val ids = DbExecution.blocking { Roster.provision(service.FishingService()) }
-                    log.info("Roster ready accounts={} russian=25 english=25 source=bot intervalSeconds={}", ids.size, config.intervalSeconds)
+                    log.info("Roster ready accounts={} russian=25 english=25 source=bot accountPauseSeconds={}", ids.size, config.accountPauseSeconds)
                     if ("--provision-only" in args) return@runBlocking
                     val stateDir = Path.of(System.getenv("STUB_STATE_DIR") ?: "/data/gameplay-stub")
                     Files.createDirectories(stateDir)
@@ -59,29 +56,21 @@ fun main(args: Array<String>) {
                         }
                     }
                     try {
-                        coroutineScope {
-                            ids.mapIndexed { index, uid ->
-                                launch {
-                                    delay(index * config.staggerSeconds * 1_000)
-                                    val cycle = GameCycle()
-                                    do {
-                                        try {
-                                            val result = cycle.run(uid)
-                                            if (result == GameCycle.Result.CAUGHT) caught.incrementAndGet()
-                                            completed.incrementAndGet()
-                                            log.info("Cycle complete userId={} result={}", uid, result)
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        } catch (e: Exception) {
-                                            failed.incrementAndGet()
-                                            log.error("Cycle failed userId={}; retrying next interval", uid, e)
-                                        }
-                                        if ("--once" in args) break
-                                        // Keep accounts spread out after restarts and avoid synchronized database bursts.
-                                        delay(config.intervalSeconds * 1_000 + Random.nextLong(0, 15_001))
-                                    } while (isActive)
-                                }
-                            }.joinAll()
+                        val cycle = GameCycle()
+                        runSequentially(
+                            ids,
+                            once = "--once" in args,
+                            pauseMillis = config.accountPauseSeconds * 1_000,
+                            onError = { uid, e ->
+                                failed.incrementAndGet()
+                                log.error("Cycle failed userId={}; continuing with next account after pause", uid, e)
+                            },
+                        ) { uid ->
+                            log.info("Cycle started userId={}", uid)
+                            val result = cycle.run(uid)
+                            if (result == GameCycle.Result.CAUGHT) caught.incrementAndGet()
+                            completed.incrementAndGet()
+                            log.info("Cycle complete userId={} result={}", uid, result)
                         }
                     } finally {
                         heartbeat.cancelAndJoin()

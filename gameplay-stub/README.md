@@ -6,7 +6,7 @@ Standalone Gradle worker that drives 50 persistent RiverKing profiles to compete
 
 `Roster.kt` contains 25 Russian and 25 English conversational nicknames. Profiles have `registration_source=bot`, no Telegram identity and notifications disabled. Stable `AuthIdentities(provider=gameplay-stub, subject=v1-01…v1-50)` entries provide ownership across restarts; other profiles with source `bot` are not adopted. Profile, inventory and identity creation is atomic. A PostgreSQL advisory lock permits only one active worker per database.
 
-Each account independently repeats:
+Accounts run strictly in sequence: finish one account's entire cycle, pause 10 seconds, then process the next account. After account 50, pause 10 seconds and return to account 1. There are no parallel account cycles or extra pauses between rounds. Each cycle:
 
 1. Keep its existing club, or join a club permitted by normal recruitment, capacity and minimum-weight rules.
 2. Claim tournament, rating, event, club and referral prizes, the daily bait reward and achievement rewards. Quest coins are granted automatically by normal catches.
@@ -31,8 +31,7 @@ Configuration uses backend `CONFIG_PATH` and `DATABASE_*` settings. Additional s
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `STUB_INTERVAL_SECONDS` | `300` | Delay after each account's cycle; 30–86400 seconds, plus 0–15 seconds jitter |
-| `STUB_STAGGER_SECONDS` | `2` | Initial spacing between accounts; 0–60 seconds |
+| `STUB_ACCOUNT_PAUSE_SECONDS` | `10` | Delay between the completed cycle and the next account; 1–3600 seconds |
 | `STUB_STATE_DIR` | `/data/gameplay-stub` | Heartbeat with aggregate cycle/catch/error counts |
 
 The Docker worker uses two pool connections and one separate advisory-lock connection. Logs go to stdout with Docker rotation. A heartbeat every 15 seconds is checked by the container healthcheck. Stop via Compose; profiles and progression remain in PostgreSQL.

@@ -6,7 +6,7 @@ COPY src/main/kotlin ./src/main/kotlin
 COPY src/main/resources/profanity.txt ./src/main/resources/profanity.txt
 COPY gameplay-stub/build.gradle.kts ./gameplay-stub/build.gradle.kts
 COPY gameplay-stub/src/main ./gameplay-stub/src/main
-RUN chmod +x gradlew && ./gradlew --no-daemon jar :gameplay-stub:jar
+RUN --mount=type=cache,target=/root/.gradle chmod +x gradlew && ./gradlew --no-daemon jar :gameplay-stub:jar
 
 FROM eclipse-temurin:17-jre-jammy
 RUN groupadd --system riverking && useradd --system --gid riverking riverking \
