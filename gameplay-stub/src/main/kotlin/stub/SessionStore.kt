@@ -21,11 +21,21 @@ class SessionStore(private val file: Path) {
             sessions.map { it.userId }.distinct().size == 50) { "Expected 50 unique account sessions" }
         require(sessions.count { it.language == "ru" } == 25 && sessions.count { it.language == "en" } == 25)
     }
-    fun accounts(): List<AccountSession> = sessions.toList()
+    // Alternate languages so both halves participate from the start of each round.
+    fun accounts(): List<AccountSession> = sessions.filter { it.language == "ru" }
+        .zip(sessions.filter { it.language == "en" }) { russian, english -> listOf(russian, english) }.flatten()
     fun get(userId: Long): AccountSession = sessions.single { it.userId == userId }
     fun update(userId: Long, tokens: JsonObject) {
         val index = sessions.indexOfFirst { it.userId == userId }
         sessions[index] = sessions[index].copy(accessToken = tokens.string("accessToken"), refreshToken = tokens.string("refreshToken"))
+        persist()
+    }
+    fun updateNickname(userId: Long, nickname: String) {
+        val index = sessions.indexOfFirst { it.userId == userId }
+        sessions[index] = sessions[index].copy(nickname = nickname)
+        persist()
+    }
+    private fun persist() {
         val json = JsonArray(sessions.map { s -> buildJsonObject {
             put("slot", s.slot); put("userId", s.userId); put("nickname", s.nickname); put("language", s.language)
             put("accessToken", s.accessToken); put("refreshToken", s.refreshToken)

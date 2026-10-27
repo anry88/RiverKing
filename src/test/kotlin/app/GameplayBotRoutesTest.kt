@@ -72,11 +72,54 @@ class GameplayBotRoutesTest {
         val file = java.nio.file.Files.createTempFile("riverking-bot-sessions-", ".json")
         try {
             java.nio.file.Files.writeString(file, accounts.toString())
-            stub.GameServer("http://localhost", stub.SessionStore(file), client).use { game ->
+            val store = stub.SessionStore(file)
+            stub.GameServer("http://localhost", store, client).use { game ->
                 game.initialize()
+                stub.BotNicknames.synchronize(game, store)
+                assertEquals(25, stub.BotNicknames.russian.size)
+                assertEquals(25, stub.BotNicknames.english.size)
+                assertEquals(50, store.accounts().map { it.nickname }.distinct().size)
+                for (account in store.accounts()) {
+                    assertEquals(stub.BotNicknames.forSlot(account.slot), fishing.displayName(account.userId))
+                }
+                val nicknameMetric = Metrics.dump().lineSequence().first {
+                    it.startsWith("api_call_total") && it.contains("path=\"/api/nickname\"")
+                }
+                stub.BotNicknames.synchronize(game, store)
+                assertTrue(Metrics.dump().lineSequence().any { it == nicknameMetric }, "Unchanged names must not be written again")
                 assertEquals(stub.GameCycle.Result.CAUGHT, stub.GameCycle(game.forAccount(ids[1])).run())
+                // Unlock the test profile, then cross the actual fresh/salt boundary through HTTP.
+                val uid = ids[1]
+                transaction { Users.update({ Users.id eq uid }) { it[totalCaughtKg] = 1_000_000.0 } }
+                val regular = fishing.locations(uid).filterNot { it.isEvent }
+                val saltLocations = transaction {
+                    (LocationFishWeights innerJoin Fish).selectAll()
+                        .groupBy { it[LocationFishWeights.locationId].value }
+                        .filterValues { fish -> fish.all { it[Fish.water] == "salt" } }.keys
+                }
+                val saltIndex = regular.indexOfFirst { it.id in saltLocations }
+                assertTrue(saltIndex > 0)
+                val saltLocation = regular[saltIndex].id
+                val saltLure = transaction {
+                    val fish = (LocationFishWeights innerJoin Fish).select {
+                        (LocationFishWeights.locationId eq saltLocation) and (Fish.water eq "salt")
+                    }.first()
+                    Lures.select { (Lures.water eq "salt") and (Lures.predator eq fish[Fish.predator]) }.first()[Lures.id].value
+                }
+                fishing.addLures(uid, listOf(saltLure to 3))
+                fishing.setLocation(uid, regular[saltIndex - 1].id)
+                fishing.setLure(uid, fishing.listLures(uid).first { it.water == "fresh" && it.qty > 0 }.id)
+                assertEquals(stub.GameCycle.Result.CAUGHT, stub.GameCycle(game.forAccount(uid)).run())
+                fun currentWater() = transaction {
+                    val lure = Users.select { Users.id eq uid }.single()[Users.currentLureId]!!.value
+                    Lures.select { Lures.id eq lure }.single()[Lures.water]
+                }
+                assertEquals("salt", currentWater())
+                fishing.setLocation(uid, regular.last().id)
+                assertEquals(stub.GameCycle.Result.CAUGHT, stub.GameCycle(game.forAccount(uid)).run())
+                assertEquals("fresh", currentWater())
             }
-            transaction { assertEquals(1L, Catches.select { Catches.userId eq ids[1] }.count()) }
+            transaction { assertEquals(3L, Catches.select { Catches.userId eq ids[1] }.count()) }
         } finally {
             java.nio.file.Files.deleteIfExists(file)
         }
