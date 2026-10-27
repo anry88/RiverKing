@@ -1,14 +1,13 @@
-package stub
+package service
 
 import db.AuthIdentities
 import db.Users
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
-import service.FishingService
 
 data class StubAccount(val slot: String, val nickname: String, val language: String)
 
-object Roster {
+object GameplayBotAccounts {
     const val PROVIDER = "gameplay-stub"
     private val russian = listOf(
         "Лёха с берега", "Санёк на рыбалке", "Дядя Вова", "Серёга без клёва", "Димон у воды",
@@ -29,7 +28,8 @@ object Roster {
             StubAccount("v1-${(index + 1).toString().padStart(2, '0')}", name, lang)
         }
 
-    /** Caller holds the worker lease; each identity and its initial inventory commit atomically. */
+    /** Server-owned provisioning; existing identities keep their profile and progression. */
+    @Synchronized
     fun provision(fishing: FishingService): List<Long> = accounts.map { account ->
         transaction {
             val existing = AuthIdentities.select {

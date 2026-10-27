@@ -58,6 +58,7 @@ import java.time.ZoneId
 fun Application.apiRoutes(
     env: Env,
     playPurchaseVerifier: PlayPurchaseVerifier? = null,
+    botCasts: service.BotCastService = service.BotCastService(),
 ) {
     val fishing = FishingService()
     val auth = AuthService(env, fishing)
@@ -105,7 +106,7 @@ fun Application.apiRoutes(
     // that are served before the Sessions plugin runs.
     suspend fun ApplicationCall.requestBodyForLog(path: String): String {
         if (request.httpMethod !in listOf(HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch)) return ""
-        if (path == "/bot") {
+        if (path == "/bot" || path.startsWith("/api/auth/")) {
             val length = request.headers[HttpHeaders.ContentLength]
             return if (length == null) "<redacted>" else "<redacted:${length}b>"
         }
@@ -1947,6 +1948,26 @@ fun Application.apiRoutes(
                 call.respond(HttpStatusCode.Forbidden, mapOf("error" to (e.message ?: "locked")))
             } catch (e: IllegalStateException) {
                 call.respond(HttpStatusCode.NotFound, mapOf("error" to (e.message ?: "bad location")))
+            }
+        }
+
+        // Automated command-style cast is available only to the operator-provisioned bot roster.
+        post("/api/bot/cast") {
+            val uid = call.requireUserId() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+            val isBot = onDbTransaction {
+                AuthIdentities.select {
+                    (AuthIdentities.userId eq uid) and (AuthIdentities.provider eq service.GameplayBotAccounts.PROVIDER)
+                }.any() && Users.select { Users.id eq uid }.single()[Users.registrationSource] == "bot"
+            }
+            if (!isBot) return@post call.respond(HttpStatusCode.Forbidden)
+            try {
+                call.respond(botCasts.cast(uid))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = e.message ?: "cast_failed"
+                Metrics.counter("bot_cast_failed_total", mapOf("reason" to error))
+                call.respond(HttpStatusCode.Conflict, mapOf("error" to error))
             }
         }
 

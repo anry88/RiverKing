@@ -83,7 +83,7 @@ This matters from a product-engineering perspective because monetization is not 
 
 ## Operating Model
 
-An independently deployed `gameplay-stub` worker drives 50 persistent profiles registered with source `bot` to provide tournament and club-event competition. These profiles follow ordinary club eligibility, daily/prize rewards, location unlocks, bait inventory and coin-shop rules, and produce catches through the same services as Telegram `/cast`. The roster uses 25 Russian and 25 English conversational nicknames. Operators can stop the worker without deleting the profiles or restarting the backend.
+An independently deployed `gameplay-stub` worker drives 50 persistent profiles registered with source `bot` to provide tournament and club-event competition. These profiles follow ordinary club eligibility, daily/prize rewards, location unlocks, bait inventory and coin-shop rules, and communicate exclusively with the game server HTTP API. A bot-only server endpoint executes the Telegram `/cast` behavior and records catches. The roster uses 25 Russian and 25 English conversational nicknames. Operators can stop the worker without deleting the profiles or restarting the backend.
 
 RiverKing runs as a product backend, not only as an on-demand API:
 

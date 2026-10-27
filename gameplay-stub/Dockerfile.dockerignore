@@ -1,16 +1,10 @@
-# The worker needs gameplay code and profanity rules, not the 900 MB Mini App asset bundle.
+# HTTP client build context: never include backend sources, assets, configs or databases.
 **
 !gradlew
 !settings.gradle.kts
 !build.gradle.kts
 !gradle/
 !gradle/**
-!src/
-!src/main/
-!src/main/kotlin/
-!src/main/kotlin/**
-!src/main/resources/
-!src/main/resources/profanity.txt
 !gameplay-stub/
 !gameplay-stub/build.gradle.kts
 !gameplay-stub/logback.xml

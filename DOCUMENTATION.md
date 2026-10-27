@@ -13,7 +13,7 @@ This document explains how the RiverKing backend and adjacent client projects ar
 
 ## Overview
 
-`gameplay-stub/` is an independent Gradle application for 50 persistent profiles registered with source `bot`. It uses the shared services and an already initialized PostgreSQL database, joining clubs, collecting rewards, changing locations, buying bait with earned coins and performing the Telegram `/cast` sequence. Normal catches contribute to tournaments and club events. Its separate HDC Compose project can be deployed and stopped independently of the backend.
+`gameplay-stub/` is an independent Gradle application for 50 persistent profiles registered with source `bot`. It communicates exclusively through the server HTTP API to join clubs, collect rewards, change locations and buy bait. The bot-only `/api/bot/cast` endpoint performs the automatic cast on the server. The module has no backend dependency, SQL or database credentials; the protected admin sessions endpoint provisions or reuses its roster. Normal catches contribute to tournaments and club events. Its separate HDC Compose project can be deployed and stopped independently of the backend.
 
 The server starts from `main()` in `Application.kt`: it loads the configuration, configures Ktor plugins, initializes the database, and registers HTTP routes for both the API and the Telegram bot. The `resources/webapp` directory contains the static mini‑app client that is served by the same server.
 
