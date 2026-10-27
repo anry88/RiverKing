@@ -10,20 +10,10 @@ services:
     init: true
     stop_grace_period: 40s
     environment:
-      CONFIG_PATH: /config/config.properties
-      DATABASE_URL: ${DATABASE_URL:?Use the existing backend environment file}
-      DATABASE_USER: ${DATABASE_USER:?DATABASE_USER is required}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
-      DATABASE_MAX_POOL_SIZE: "2"
-      DATABASE_MIN_IDLE: "1"
-      DATABASE_DISPATCHER_THREADS: "2"
+      STUB_SERVER_URL: ${STUB_SERVER_URL:-http://app:5005}
       STUB_ACCOUNT_PAUSE_SECONDS: ${STUB_ACCOUNT_PAUSE_SECONDS:-10}
       STUB_STATE_DIR: /data/gameplay-stub
     volumes:
-      - type: bind
-        source: ${RIVERKING_CONFIG_FILE:?RIVERKING_CONFIG_FILE is required}
-        target: /config/config.properties
-        read_only: true
       - type: bind
         source: ${RIVERKING_DATA_DIR:?RIVERKING_DATA_DIR is required}/gameplay-stub
         target: /data/gameplay-stub

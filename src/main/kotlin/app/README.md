@@ -39,3 +39,5 @@ This directory contains the entry points and Ktor HTTP routes. Use the file list
 
 ### Function navigation
 For detailed behavior of individual handlers, see comments and calls inside `ApiRoutes.kt` — all routes are grouped in one place, which makes it easy to search by endpoint name or service function.
+
+- **Bot client HTTP boundary:** protected `POST /api/admin/gameplay-bots/sessions` provisions/reuses the fixed 50-account roster and issues ordinary player sessions. `POST /api/bot/cast` requires an authenticated, server-owned `gameplay-stub` identity plus source `bot`; it executes the command-style cast on the server and records normal gameplay/request metrics. Ordinary players and spoofed client headers are rejected. Other bot actions use existing player endpoints.

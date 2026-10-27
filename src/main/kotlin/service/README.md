@@ -34,3 +34,8 @@ Manages the player lifecycle and fishing process.
 - **ClubQuestService** — manages shared weekly club quests: assigns `2` quests from the club pool each week, tracks pooled catch progress for the whole club, persists per-member quest contribution snapshots for each week, and splits completion rewards across the active roster at completion time.
 - **AchievementService** — tracks the full achievement catalog and player progress: rarity ladders, koi collection, location completion, traveler/trophy milestones, tournament prize placements, special-event prize placements, and daily-rating stars. Rewards and claim status are persisted in `AchievementProgress` and surfaced through the API and bot.
 - **QuestService** — assigns daily/weekly personal quests, filters fish-specific quests by actually unlocked fish via `LocationFishWeights`, tracks progress based on catches, awards coin rewards on completion, and powers the `daily` / `weekly` parts of `/api/quests` plus the `/quests` bot command.
+
+## Gameplay bot server support
+
+- **GameplayBotAccounts** owns the fixed bilingual 50-profile roster, source `bot` and stable technical identities. Only protected server provisioning uses it; existing profiles and progression are retained.
+- **BotCastService** executes the server-side `/cast` wait/hook/catch sequence and emits the normal catch metrics plus `bot_cast_total`. Access is restricted in the HTTP route to authenticated provisioned bots. The separate client module does not depend on this package.

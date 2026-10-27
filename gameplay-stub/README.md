@@ -1,55 +1,57 @@
-# Gameplay stub
+# Gameplay bot HTTP client
 
-Standalone Gradle worker that drives 50 persistent RiverKing profiles to compete in tournaments and club events. It calls shared gameplay services against the existing PostgreSQL database. No HTTP server or Telegram messages are started by this module.
+Independent Gradle application that controls 50 persistent player accounts exclusively through the RiverKing server HTTP API. The module has no backend project dependency, game services, SQL/JDBC drivers, database credentials or Telegram/admin token at runtime.
 
-## Accounts and behavior
+## Server boundary and authorization
 
-`Roster.kt` contains 25 Russian and 25 English conversational nicknames. Profiles have `registration_source=bot`, no Telegram identity and notifications disabled. Stable `AuthIdentities(provider=gameplay-stub, subject=v1-01…v1-50)` entries provide ownership across restarts; other profiles with source `bot` are not adopted. Profile, inventory and identity creation is atomic. A PostgreSQL advisory lock permits only one active worker per database.
+The backend owns `service/GameplayBotAccounts.kt`: 25 Russian and 25 English conversational nicknames, `registration_source=bot`, and stable `AuthIdentities(provider=gameplay-stub, subject=v1-01…v1-50)` entries. The protected operator endpoint `POST /api/admin/gameplay-bots/sessions` creates missing profiles or reuses existing ones with all progression intact, then issues ordinary access/refresh sessions. Only the deploy operator calls it; the client receives just those sessions in `accounts.json`.
 
-Accounts run strictly in sequence: finish one account's entire cycle, pause 10 seconds, then process the next account. After account 50, pause 10 seconds and return to account 1. There are no parallel account cycles or extra pauses between rounds. Each cycle:
+`POST /api/bot/cast` requires an authenticated player with both the server-owned `gameplay-stub` identity and registration source `bot`. Anonymous callers, ordinary player sessions, admin tokens and spoofed client headers do not grant access. The server executes the Telegram `/cast` behavior: consumes bait, waits 5–30 seconds, applies the normal hook/escape rules and finalizes the catch. The client does not call hook/finalize endpoints or simulate taps. Existing Android, Mini App and Telegram contracts remain unchanged.
 
-1. Keep its existing club, or join a club permitted by normal recruitment, capacity and minimum-weight rules.
-2. Claim tournament, rating, event, club and referral prizes, the daily bait reward and achievement rewards. Quest coins are granted automatically by normal catches.
-3. Advance in `FishingService.locations` order: active event first, then regular locations by unlock weight. If next is missing/locked, return to the first accessible entry. Outside a club the event is locked, so fallback is the first regular location. Expired events disappear from the list.
-4. Select compatible owned bait. If none remains, buy the cheapest compatible coin pack affordable with the actual balance through `buyPackageWithCoins`. Skip the cast if unaffordable. No Stars purchases or injected balances; prize and achievement packages follow their normal reward rules.
-5. Repeat the bot `/cast` flow: consume bait, wait 5–30 seconds, hook with reaction time 0 and the bot extra escape chance (0.05 with a matching rod, otherwise 0.10), then finalize a successful hook. No client taps or mini-game actions. The standard service records catches, progression, quests and event standings; tournament boards query those same catches.
+All HTTP requests pass through the main server metrics. Casts increment `cast_total`, `hook_total`, `fish_caught_total`, `catch_weight_kg` and `bot_cast_total`. New paths appear in `api_call_total` and request status/duration metrics. Registration gauges show source `bot`.
 
-Fresh active casts are left alone; stale interrupted casts are recovered only for the processed account. One account's failure does not stop the rest. A lost worker lease stops the process.
+## Cycle
 
-## Run and test
+Strictly one account at a time: finish the full cycle, pause 10 seconds, then start the next account. After account 50, pause 10 seconds and return to account 1. Failures also pause before moving on.
 
-Initialize the database with the backend first. The worker uses `DB.init(initializeSchema=false)` and does not seed or migrate production data.
+1. Read `/api/club`; if absent, search and join an eligible existing club.
+2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
+3. Read `/api/me` and move to the next location in server order (active event first, then regular locations). Missing/locked next location wraps to the first accessible location. Expired/locked events fall back through the updated server list.
+4. Select owned bait compatible with fish at that location, using `/api/guide`. If none is available, buy the cheapest compatible coin pack affordable with the actual balance through `/api/shop/{id}/coins`. No Stars purchases or free shop grants.
+5. Make one `POST /api/bot/cast` request and wait for the server result. Busy casts and unaffordable bait skip the attempt. Catches contribute to normal tournament and club-event standings.
 
-```bash
-./gradlew :gameplay-stub:test
-CONFIG_PATH=/path/to/config.properties ./gradlew :gameplay-stub:run
-CONFIG_PATH=/path/to/config.properties ./gradlew :gameplay-stub:run --args='--provision-only'
-CONFIG_PATH=/path/to/config.properties ./gradlew :gameplay-stub:run --args='--once'
-```
+The client refreshes expired access tokens through `/api/auth/refresh` and atomically saves rotated sessions. Mutation requests are not retried after ambiguous transport failures. It reads the server compatibility policy and supplies the required API version header. A file lock in the persistent state directory prevents concurrent clients using the same state.
 
-Configuration uses backend `CONFIG_PATH` and `DATABASE_*` settings. Additional settings:
+## Configuration and run
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `STUB_ACCOUNT_PAUSE_SECONDS` | `10` | Delay between the completed cycle and the next account; 1–3600 seconds |
-| `STUB_STATE_DIR` | `/data/gameplay-stub` | Heartbeat with aggregate cycle/catch/error counts |
+| `STUB_SERVER_URL` | required | Game server URL; HDC uses `http://app:5005` on the backend network |
+| `STUB_ACCOUNT_PAUSE_SECONDS` | `10` | Pause after each completed/failed cycle, 1–3600 seconds |
+| `STUB_STATE_DIR` | `/data/gameplay-stub` | `accounts.json`, process lock and heartbeat |
 
-The Docker worker uses two pool connections and one separate advisory-lock connection. Logs go to stdout with Docker rotation. A heartbeat every 15 seconds is checked by the container healthcheck. Stop via Compose; profiles and progression remain in PostgreSQL.
+Keep `accounts.json` private: it contains player sessions. No admin token is needed by the running client. If refresh sessions expire, stop the client, remove/securely archive the old session file and provision new sessions via the deployment script; this reuses the same 50 profiles.
 
-## HDC
+```bash
+./gradlew :gameplay-stub:test
+STUB_SERVER_URL=https://riverking.tg-games.com STUB_STATE_DIR=/path/to/state ./gradlew :gameplay-stub:run
+# --once processes the roster once; --health checks the heartbeat.
+```
 
-From `develop`, deploy the independent worker alongside the existing PostgreSQL backend:
+## HDC rollout
+
+Release the backend through the normal `develop -> main` PR flow first, so the two new endpoints are available. Then, from `develop`:
 
 ```bash
 scripts/deploy-gameplay-stub-hdc.sh
 scripts/deploy-gameplay-stub-hdc.sh --stop
 ```
 
-The script builds `gameplay-stub/Dockerfile` on the `hdc` Docker context, reads the existing `D:\Apps\RiverKing\env\prod.env`, and starts only the `riverking-prod-stub` Compose project on `riverking-prod_default`. It does not rewrite the backend env or replace its image. Heartbeat state lives in `D:\Apps\RiverKing\state\prod\gameplay-stub`. `--environment test` selects the corresponding test layout. `HDC_REMOTE_HOST`, `HDC_DOCKER_CONTEXT` and `HDC_RIVERKING_ROOT` override host defaults.
+The deploy script builds the independent HTTP-client image, creates `D:\Apps\RiverKing\state\prod\gameplay-stub`, and, if `accounts.json` does not yet exist, calls the protected server provisioning endpoint using the operator's existing host config. Tokens are written directly to the private state file and are not printed. The runtime container mounts only its state, not the backend config or database. A separate Compose project joins `riverking-prod_default` and calls `http://app:5005`.
+
+`--environment test` uses the test environment. `HDC_REMOTE_HOST`, `HDC_DOCKER_CONTEXT` and `HDC_RIVERKING_ROOT` override host defaults. Logs go to stdout with Docker rotation; a 15-second heartbeat reports completed cycles/catches/errors.
 
 ```bash
 docker --context hdc ps --filter name=riverking-prod-stub
 docker --context hdc logs --tail 100 riverking-prod-stub-gameplay-stub-1
 ```
-
-Android, Mini App and Telegram remain compatible: no API payload or Android version-policy changes. Deploying/stopping the module requires no client updates.

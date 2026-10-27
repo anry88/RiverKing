@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy only the standalone worker. Existing backend env, database, image and services stay managed separately.
+# Deploy the HTTP client; provision ordinary bot sessions through the protected server API.
 environment="prod"
 remote="${HDC_REMOTE_HOST:-hdc}"
 context="${HDC_DOCKER_CONTEXT:-hdc}"
@@ -34,8 +34,27 @@ cat > "$tmp_dir/deploy.ps1" <<'PS'
 param([string]$EnvFile, [string]$ComposeFile, [string]$Image, [string]$Environment, [string]$Action)
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path -LiteralPath $EnvFile)) { throw "Backend environment file not found" }
-$url = Get-Content -LiteralPath $EnvFile | Where-Object { $_ -match '^DATABASE_URL=' } | Select-Object -Last 1
-if ($url -notmatch '^DATABASE_URL=jdbc:postgresql:') { throw "Worker requires the existing PostgreSQL backend" }
+function Read-Value([string]$Path, [string]$Key) {
+    $line = Get-Content -LiteralPath $Path | Where-Object { $_ -match ("^" + [regex]::Escape($Key) + "=") } | Select-Object -Last 1
+    if (-not $line) { throw "Missing setting: $Key" }
+    return $line.Substring($Key.Length + 1).Trim()
+}
+if ($Action -ne 'stop') {
+    $dataDir = Read-Value $EnvFile 'RIVERKING_DATA_DIR'
+    $sessionsFile = Join-Path $dataDir 'gameplay-stub\accounts.json'
+    if (-not (Test-Path -LiteralPath $sessionsFile)) {
+        $configFile = Read-Value $EnvFile 'RIVERKING_CONFIG_FILE'
+        $baseUrl = (Read-Value $configFile 'PUBLIC_BASE_URL').TrimEnd('/')
+        $adminToken = Read-Value $configFile 'ADMIN_API_TOKEN'
+        $policy = Invoke-RestMethod -Uri "$baseUrl/api/mobile/update" -TimeoutSec 30
+        $headers = @{ Authorization = "Bearer $adminToken"; 'X-RiverKing-App-Version-Code' = [string]$policy.latestVersionCode }
+        $sessions = Invoke-RestMethod -Uri "$baseUrl/api/admin/gameplay-bots/sessions" -Method Post -Headers $headers -TimeoutSec 90
+        if (@($sessions).Count -ne 50) { throw "Expected 50 bot sessions" }
+        $json = ConvertTo-Json -InputObject @($sessions) -Depth 10 -Compress
+        [System.IO.File]::WriteAllText($sessionsFile, $json, [System.Text.UTF8Encoding]::new($false))
+        Write-Host 'Provisioned 50 account sessions through server API.'
+    }
+}
 $env:STUB_IMAGE = $Image
 $env:STUB_COMPOSE_PROJECT_NAME = "riverking-$Environment-stub"
 $env:STUB_BACKEND_NETWORK = "riverking-${Environment}_default"

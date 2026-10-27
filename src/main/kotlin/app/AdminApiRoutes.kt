@@ -47,6 +47,16 @@ private val adminBroadcastLog = LoggerFactory.getLogger("AdminBroadcast")
 private val adminDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 private const val ADMIN_BROADCAST_DELAY_MS = 1_000L
 
+@Serializable
+data class GameplayBotSessionDTO(
+    val slot: String,
+    val userId: Long,
+    val nickname: String,
+    val language: String,
+    val accessToken: String,
+    val refreshToken: String,
+)
+
 private data class AdminBroadcastRecipient(
     val userId: Long,
     val tgId: Long,
@@ -287,6 +297,20 @@ fun Application.adminApiRoutes(env: Env) {
                     call.respond(HttpStatusCode.Unauthorized)
                     finish()
                 }
+            }
+
+            // Provision/reuse the fixed roster and issue ordinary player sessions to an operator.
+            post("/gameplay-bots/sessions") {
+                val auth = AuthService(env, fishing)
+                val sessions = onDb {
+                    val ids = service.GameplayBotAccounts.provision(fishing)
+                    service.GameplayBotAccounts.accounts.zip(ids).map { (account, uid) ->
+                        val token = auth.issueTokens(uid, "gameplay-stub")
+                        GameplayBotSessionDTO(account.slot, uid, account.nickname, account.language,
+                            token.accessToken, token.refreshToken)
+                    }
+                }
+                call.respond(sessions)
             }
 
             // ── Tournaments ──
