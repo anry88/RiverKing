@@ -60,7 +60,9 @@ class GameCycle(private val api: GameApi) {
         }
         fun compatible(lure: JsonObject) = allowed == null ||
             (lure["displayName"] ?: lure["name"])?.jsonPrimitive?.content in allowed
-        var owned = profile.items("lures").firstOrNull { it.long("qty") > 0 && compatible(it) }
+        val currentId = profile["currentLureId"]?.jsonPrimitive?.longOrNull
+        val available = profile.items("lures").filter { it.long("qty") > 0 && compatible(it) }
+        var owned = available.firstOrNull { it.long("id") == currentId } ?: available.firstOrNull()
         if (owned == null) {
             val pack = api.get("/api/shop").jsonArray.flatMap { it.jsonObject.items("packs") }
                 .filter { it["coinPrice"] != null && it["coinPrice"] != JsonNull && it.long("coinPrice") <= profile.long("coins") }
@@ -69,7 +71,7 @@ class GameCycle(private val api: GameApi) {
             val purchase = api.post("/api/shop/${pack.string("id")}/coins").jsonObject
             owned = purchase.items("lures").firstOrNull { it.long("qty") > 0 && compatible(it) } ?: return false
         }
-        api.post("/api/lure/${owned.long("id")}")
+        if (owned.long("id") != currentId) api.post("/api/lure/${owned.long("id")}")
         return true
     }
 }
