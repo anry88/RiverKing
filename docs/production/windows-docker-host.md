@@ -89,6 +89,8 @@ Keep `DATABASE_DISPATCHER_THREADS` at or below `DATABASE_MAX_POOL_SIZE` so reque
 
 ## Runtime Layout
 
+The independent 50-account gameplay worker is deployed from `develop` with `scripts/deploy-gameplay-stub-hdc.sh` after the backend is running on PostgreSQL. It uses a separate Compose project and reuses the existing backend environment and network without replacing the backend image. See [the module guide](../../gameplay-stub/README.md) for its behavior, configuration, health checks and stop command.
+
 ```text
 D:\Apps\RiverKing\env\prod.env
 D:\Apps\RiverKing\config\prod\config.properties

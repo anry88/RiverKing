@@ -6,6 +6,7 @@ WORKDIR /app
 
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
+COPY gameplay-stub/build.gradle.kts ./gameplay-stub/build.gradle.kts
 RUN chmod +x ./gradlew
 
 COPY src ./src

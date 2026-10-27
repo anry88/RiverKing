@@ -1,8 +1,8 @@
 {
   "nameRu": "Реки Южной Америки",
   "nameEn": "South American Rivers",
-  "start": "2026-11-01T03:00:00Z",
-  "end": "2026-12-01T03:00:00Z",
+  "start": "2026-11-01T00:00:00Z",
+  "end": "2026-12-01T00:00:00Z",
   "imagePath": "south_american_rivers.png",
   "castZone": {
     "points": [

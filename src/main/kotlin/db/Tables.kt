@@ -22,7 +22,7 @@ object DB {
     private var dataSource: HikariDataSource? = null
 
     @Synchronized
-    fun init(env: Env) {
+    fun init(env: Env, initializeSchema: Boolean = true) {
         close()
         val isSqlite = isSqliteUrl(env.dbUrl)
         val maxPoolSize = if (isSqlite) 1 else env.dbMaxPoolSize.coerceAtLeast(1)
@@ -77,6 +77,8 @@ object DB {
             },
             databaseConfig = databaseConfig,
         )
+        // Standalone gameplay workers attach to an already initialized server database.
+        if (!initializeSchema) return
         transaction {
             ensureUsersTableAllowsNullableTelegramId(env)
             ensureRodCodeColumn(env)

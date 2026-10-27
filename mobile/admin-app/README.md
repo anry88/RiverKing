@@ -59,7 +59,7 @@ Key endpoints:
 - `DELETE /api/admin/discounts/{packageId}`
 - `POST /api/admin/broadcast`
 
-Tournament date fields are entered in the UI as `dd.MM.yyyy` and converted to UTC start-of-day epoch milliseconds before the request. Discount dates are entered as `dd.MM.yyyy`; the backend accepts that format and ISO `yyyy-MM-dd` for compatibility.
+Tournament and special-event date fields are entered in the UI as `dd.MM.yyyy` and converted to **00:00 UTC** epoch milliseconds before the request, independently of the phone or server time zone. Event creation outside the app must follow the same [UTC scheduling rules](../../docs/events/README.md); Belgrade displays these boundaries at 02:00 in summer and 01:00 in winter. Discount dates are entered as `dd.MM.yyyy`; the backend accepts that format and ISO `yyyy-MM-dd` for compatibility.
 
 ## Local Setup
 
