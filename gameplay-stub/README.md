@@ -6,18 +6,20 @@ Independent Gradle application that controls 50 persistent player accounts exclu
 
 The backend owns `service/GameplayBotAccounts.kt`: 25 Russian and 25 English conversational nicknames, `registration_source=bot`, and stable `AuthIdentities(provider=gameplay-stub, subject=v1-01…v1-50)` entries. The protected operator endpoint `POST /api/admin/gameplay-bots/sessions` creates missing profiles or reuses existing ones with all progression intact, then issues ordinary access/refresh sessions. Only the deploy operator calls it; the client receives just those sessions in `accounts.json`.
 
+The client applies the varied nickname catalog in `BotNicknames.kt` through `/api/nickname`: 25 Russian and 25 English handles, short phrases, nicknames and emoji combinations. This setup pass updates all existing profiles before fishing starts and saves successful changes, so restarts do not repeat the renames. Profile IDs, languages and progression stay intact. For example: `🎣 Лёха`, `поплавОК`, `Не клюёт 😅`, `mikey.exe`, `404 Fish Not Found`, `🦆 QuackAttack`.
+
 `POST /api/bot/cast` requires an authenticated player with both the server-owned `gameplay-stub` identity and registration source `bot`. Anonymous callers, ordinary player sessions, admin tokens and spoofed client headers do not grant access. The server executes the Telegram `/cast` behavior: consumes bait, waits 5–30 seconds, applies the normal hook/escape rules and finalizes the catch. The client does not call hook/finalize endpoints or simulate taps. Existing Android, Mini App and Telegram contracts remain unchanged.
 
 All HTTP requests pass through the main server metrics. Casts increment `cast_total`, `hook_total`, `fish_caught_total`, `catch_weight_kg` and `bot_cast_total`. New paths appear in `api_call_total` and request status/duration metrics. Registration gauges show source `bot`.
 
 ## Cycle
 
-Strictly one account at a time: finish the full cycle, pause 10 seconds, then start the next account. After account 50, pause 10 seconds and return to account 1. Failures also pause before moving on.
+Strictly one account at a time, alternating Russian and English profiles (RU → EN → RU → EN): finish the full cycle, pause 10 seconds, then start the next account. After account 50, pause 10 seconds and return to account 1. Failures also pause before moving on. All 50 existing profiles are reused; alternating the processing order does not rename or recreate accounts.
 
 1. Read `/api/club`; if absent, search and join an eligible existing club.
 2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
 3. Read `/api/me` and move to the next location in server order (active event first, then regular locations). Missing/locked next location wraps to the first accessible location. Expired/locked events fall back through the updated server list.
-4. Select owned bait compatible with fish at that location, using `/api/guide`. If none is available, buy the cheapest compatible coin pack affordable with the actual balance through `/api/shop/{id}/coins`. No Stars purchases or free shop grants.
+4. After changing location, check bait compatibility with its fish using `/api/guide` (water type and predator type). Keep the current bait if compatible and in stock; otherwise switch through `/api/lure/{id}` before casting, including fresh-to-salt and salt-to-fresh transitions. If no compatible bait is available, buy the cheapest compatible coin pack affordable with the actual balance through `/api/shop/{id}/coins`; insufficient coins skip the cast. Event locations follow their server-supported mixed-bait rules. No Stars purchases or free shop grants.
 5. Make one `POST /api/bot/cast` request and wait for the server result. Busy casts and unaffordable bait skip the attempt. Catches contribute to normal tournament and club-event standings.
 
 The client refreshes expired access tokens through `/api/auth/refresh` and atomically saves rotated sessions. Mutation requests are not retried after ambiguous transport failures. It reads the server compatibility policy and supplies the required API version header. A file lock in the persistent state directory prevents concurrent clients using the same state.

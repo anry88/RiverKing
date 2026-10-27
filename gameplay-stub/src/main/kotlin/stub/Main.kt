@@ -38,6 +38,7 @@ fun main(args: Array<String>) {
                         Runtime.getRuntime().addShutdownHook(shutdown)
                         try {
                             server.initialize()
+                            BotNicknames.synchronize(server, store)
                             val ids = store.accounts().map { it.userId }
                             log.info("HTTP client ready accounts=50 server={} accountPauseSeconds={}", baseUrl, pauseSeconds)
                             val completed = AtomicLong()
@@ -55,7 +56,8 @@ fun main(args: Array<String>) {
                                 runSequentially(ids, once = "--once" in args, pauseMillis = pauseSeconds * 1_000,
                                     onError = { uid, e -> failed.incrementAndGet(); log.error("Cycle failed userId={}", uid, e) },
                                 ) { uid ->
-                                    log.info("Cycle started userId={}", uid)
+                                    val account = store.get(uid)
+                                    log.info("Cycle started userId={} nickname={} language={}", uid, account.nickname, account.language)
                                     val result = GameCycle(server.forAccount(uid)).run()
                                     if (result == GameCycle.Result.CAUGHT) caught.incrementAndGet()
                                     completed.incrementAndGet()
