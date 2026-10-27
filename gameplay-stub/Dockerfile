@@ -2,8 +2,10 @@ FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /build
 COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
-COPY src ./src
-COPY gameplay-stub ./gameplay-stub
+COPY src/main/kotlin ./src/main/kotlin
+COPY src/main/resources/profanity.txt ./src/main/resources/profanity.txt
+COPY gameplay-stub/build.gradle.kts ./gameplay-stub/build.gradle.kts
+COPY gameplay-stub/src/main ./gameplay-stub/src/main
 RUN chmod +x gradlew && ./gradlew --no-daemon jar :gameplay-stub:jar
 
 FROM eclipse-temurin:17-jre-jammy
