@@ -228,6 +228,8 @@ Windows Docker-host deployment files live in [infra/docker-host](infra/docker-ho
 
 See [docs/production/windows-docker-host.md](docs/production/windows-docker-host.md) for the `develop` -> `main` release flow and first restore from a VDS backup.
 
+The separate [gameplay-stub module](gameplay-stub/README.md) runs 50 persistent profiles registered with source `bot` to participate in tournaments and club events through the shared gameplay services. It has an independent HDC deployment script and lifecycle.
+
 ## Checks
 
 Build the application classes:

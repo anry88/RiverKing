@@ -21,6 +21,7 @@ AI-oriented repository guide for coding assistants and code-review tools.
 - `src/main/resources/webapp/`: Telegram Mini App frontend and shipped game assets.
 - `mobile/android-app/`: nested Android project with its own Gradle setup, mobile auth flows, and shared-backend client shell.
 - `mobile/admin-app/`: nested internal Android admin project with saved server profiles, admin API access, tournaments, special events, discounts, and broadcasts.
+- `gameplay-stub/`: standalone Gradle worker for 50 persistent `bot` profiles using shared gameplay services; read its README before changing the roster, cycle or HDC deployment.
 - `src/test/kotlin/`: service and route tests.
 - `docs/`: product-facing repository materials and showcase assets.
 

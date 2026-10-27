@@ -6,6 +6,7 @@
 .kotlin
 .vscode
 build
+gameplay-stub/build
 logs
 *.db
 *.log
