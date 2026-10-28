@@ -1,0 +1,456 @@
+{
+  "status": "name-and-background-approved-six-new-fish-awaiting-approval",
+  "prepared": "2026-10-28",
+  "nameRu": "Порту-Амолар",
+  "nameEn": "Porto Amolar",
+  "place": "Rio Paraguai at Porto Amolar, Serra do Amolar, Pantanal, Mato Grosso do Sul, Brazil",
+  "mapUrl": "https://www.google.com/maps/search/?api=1&query=Porto+Amolar+Corumba+Brazil",
+  "scope": "A game pool inspired by the Pantanal and South American freshwater fish. Existing catalog fish retain their names and their own images. Exact co-occurrence of all species at Porto Amolar is not required or claimed.",
+  "background": {
+    "path": "background.png",
+    "status": "approved",
+    "mode": "built-in imagegen",
+    "prompt": "Use case: photorealistic-natural. Asset type: RiverKing fishing-game location background, wide 16:9 landscape, 1792x1024 or closest supported landscape. Primary request: a geographically grounded scenic view of the real Rio Paraguai beside Serra do Amolar, Pantanal, Mato Grosso do Sul, Brazil, seen by an angler from a low natural bank. Recognizable landscape: an isolated rugged ridge of ancient dark rock, green wooded slopes with exposed reddish-brown rock shoulders, rising abruptly above an otherwise flat immense floodplain, not Andean or alpine mountains. The ridge is across the far bank in the central and right upper third; a lower distant ridge recedes left. A broad slow muddy olive-brown Paraguay River occupies the lower 60 percent, subtle realistic small ripples, gently reflecting the ridge. Narrow gallery forest at water level, floodplain grasses at the outer edges, only a small patch of muddy grass bank at the bottom-left corner. Natural early-morning light, blue sky, soft scattered warm clouds, restrained golden side light, clear visibility and plausible Brazilian Pantanal vegetation. Realistic detailed photographic game environment, no fantasy scenery. Composition must remain useful on narrow mobile crops: distinctive ridge in central upper area, center water fully unobstructed, horizon around 38 percent from top. Contiguous open castable water x=16%-88%, y=48%-80%. No people, boats, houses, landmarks from other regions, fishing rods, bobbers, visible fish, text, UI, logos or watermarks. This is a new image based on the actual topography, not an edit of the earlier generic river."
+  },
+  "fish": [
+    {
+      "nameRu": "Куримбата",
+      "rarity": "common",
+      "weight": 0.6421395349,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Куримбата",
+      "imagePath": "src/main/resources/webapp/assets/fish/curimbata.png"
+    },
+    {
+      "nameRu": "Прохилодус красноштриховый",
+      "rarity": "common",
+      "weight": 0.5707906976,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Прохилодус красноштриховый",
+      "imagePath": "src/main/resources/webapp/assets/fish/prohilodus.png"
+    },
+    {
+      "nameRu": "Отоцинклюс широкополосый",
+      "rarity": "common",
+      "weight": 0.4280930233,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Отоцинклюс широкополосый",
+      "imagePath": "src/main/resources/webapp/assets/fish/otocinklyus.png"
+    },
+    {
+      "nameRu": "Тетра неоновая",
+      "rarity": "common",
+      "weight": 0.5707906976,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Тетра неоновая",
+      "imagePath": "src/main/resources/webapp/assets/fish/tetra_neonovaya.png"
+    },
+    {
+      "nameRu": "Чёрный фантом",
+      "rarity": "common",
+      "weight": 0.535116279,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/black_phantom_tetra.png",
+      "species": "Hyphessobrycon megalopterus",
+      "replaces": "Тетра кардинальная"
+    },
+    {
+      "nameRu": "Тетра родостомус",
+      "rarity": "common",
+      "weight": 0.4637674419,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Тетра родостомус",
+      "imagePath": "src/main/resources/webapp/assets/fish/tetra_rodostomus.png"
+    },
+    {
+      "nameRu": "Тетра лимонная",
+      "rarity": "common",
+      "weight": 0.4637674419,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Тетра лимонная",
+      "imagePath": "src/main/resources/webapp/assets/fish/tetra_limonnaya.png"
+    },
+    {
+      "nameRu": "Тетра чёрный неон",
+      "rarity": "common",
+      "weight": 0.4994418605,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Тетра чёрный неон",
+      "imagePath": "src/main/resources/webapp/assets/fish/tetra_black_neon.png"
+    },
+    {
+      "nameRu": "Нанностомус трифасциатус",
+      "rarity": "common",
+      "weight": 0.4280930233,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Нанностомус трифасциатус",
+      "imagePath": "src/main/resources/webapp/assets/fish/nannostomus.png"
+    },
+    {
+      "nameRu": "Мечерот обыкновенный",
+      "rarity": "common",
+      "weight": 1.324,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Мечерот обыкновенный",
+      "imagePath": "src/main/resources/webapp/assets/fish/mecherot_common.png"
+    },
+    {
+      "nameRu": "Цихлазома мезонаута",
+      "rarity": "common",
+      "weight": 1.324,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Цихлазома мезонаута",
+      "imagePath": "src/main/resources/webapp/assets/fish/cihlazoma_mezonauta.png"
+    },
+    {
+      "nameRu": "Пирапутанга",
+      "rarity": "uncommon",
+      "weight": 0.1328846154,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Пирапутанга",
+      "imagePath": "src/main/resources/webapp/assets/fish/piraputanga.png"
+    },
+    {
+      "nameRu": "Анциструс обыкновенный",
+      "rarity": "uncommon",
+      "weight": 0.1116230769,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Анциструс обыкновенный",
+      "imagePath": "src/main/resources/webapp/assets/fish/ancistrus.png"
+    },
+    {
+      "nameRu": "Тернеция чёрная",
+      "rarity": "uncommon",
+      "weight": 0.1116230769,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Тернеция чёрная",
+      "imagePath": "src/main/resources/webapp/assets/fish/tetra_chernaya.png",
+      "replaces": "Скалярия обыкновенная"
+    },
+    {
+      "nameRu": "Торакатум",
+      "rarity": "uncommon",
+      "weight": 0.1116230769,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Торакатум",
+      "imagePath": "src/main/resources/webapp/assets/fish/torakatum.png",
+      "replaces": "Апистограмма Агассиза"
+    },
+    {
+      "nameRu": "Коридорас Штерба",
+      "rarity": "uncommon",
+      "weight": 0.1116230769,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Коридорас Штерба",
+      "imagePath": "src/main/resources/webapp/assets/fish/koridoras_shterba.png"
+    },
+    {
+      "nameRu": "Лепоринус полосатый",
+      "rarity": "uncommon",
+      "weight": 0.1116230769,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Лепоринус полосатый",
+      "imagePath": "src/main/resources/webapp/assets/fish/leporinus_polosatiy.png"
+    },
+    {
+      "nameRu": "Пиранья краснобрюхая",
+      "rarity": "uncommon",
+      "weight": 1.7,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Пиранья краснобрюхая",
+      "imagePath": "src/main/resources/webapp/assets/fish/piranya_krasnopuzaya.png"
+    },
+    {
+      "nameRu": "Пиавусу",
+      "rarity": "rare",
+      "weight": 0.394137931,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Пиавусу",
+      "imagePath": "src/main/resources/webapp/assets/fish/piavucu.png"
+    },
+    {
+      "nameRu": "Паку краснобрюхий",
+      "rarity": "rare",
+      "weight": 0.367862069,
+      "gameplayPredator": false,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Паку краснобрюхий",
+      "imagePath": "src/main/resources/webapp/assets/fish/paku_krasnobryuhiy.png"
+    },
+    {
+      "nameRu": "Бикуда",
+      "rarity": "rare",
+      "weight": 0.41335,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Бикуда",
+      "imagePath": "src/main/resources/webapp/assets/fish/bikuda.png"
+    },
+    {
+      "nameRu": "Пиранья чёрная",
+      "rarity": "rare",
+      "weight": 0.41335,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Пиранья чёрная",
+      "imagePath": "src/main/resources/webapp/assets/fish/piranya_chernaya.png"
+    },
+    {
+      "nameRu": "Щучья цихлида",
+      "rarity": "rare",
+      "weight": 0.41335,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Щучья цихлида",
+      "imagePath": "src/main/resources/webapp/assets/fish/schuchya_cihlida.png"
+    },
+    {
+      "nameRu": "Рыба-лист амазонская",
+      "rarity": "rare",
+      "weight": 0.41335,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Рыба-лист амазонская",
+      "imagePath": "src/main/resources/webapp/assets/fish/ryba_list_amazonskaya.png"
+    },
+    {
+      "nameRu": "Мечерот пятнистый",
+      "rarity": "rare",
+      "weight": 0.41335,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Мечерот пятнистый",
+      "imagePath": "src/main/resources/webapp/assets/fish/mecherot_pyatnistiy.png"
+    },
+    {
+      "nameRu": "Качара",
+      "rarity": "epic",
+      "weight": 0.0476190476,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Качара",
+      "imagePath": "src/main/resources/webapp/assets/fish/cachara.png"
+    },
+    {
+      "nameRu": "Журупока",
+      "rarity": "epic",
+      "weight": 0.0380952381,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/jurupoca.png",
+      "species": "Hemisorubim platyrhynchos",
+      "replaces": "Угорь электрический"
+    },
+    {
+      "nameRu": "Пальмито",
+      "rarity": "epic",
+      "weight": 0.0380952381,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/palmito.png",
+      "species": "Ageneiosus inermis",
+      "replaces": "Сом краснохвостый"
+    },
+    {
+      "nameRu": "Сом веслоносый",
+      "rarity": "epic",
+      "weight": 0.0380952381,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Сом веслоносый",
+      "imagePath": "src/main/resources/webapp/assets/fish/som_veslonosiy.png",
+      "replaces": "Аймара"
+    },
+    {
+      "nameRu": "Павлиний окунь",
+      "rarity": "epic",
+      "weight": 0.0380952381,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Павлиний окунь",
+      "imagePath": "src/main/resources/webapp/assets/fish/pavliniy_okun.png"
+    },
+    {
+      "nameRu": "Скат Фалькнера",
+      "rarity": "mythic",
+      "weight": 0.0499310345,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Скат Фалькнера",
+      "imagePath": "src/main/resources/webapp/assets/fish/falkneri_stingray.png"
+    },
+    {
+      "nameRu": "Барбадо",
+      "rarity": "mythic",
+      "weight": 0.0436896552,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/barbado.png",
+      "species": "Pinirampus pirinampu",
+      "replaces": "Зунгаро"
+    },
+    {
+      "nameRu": "Скат моторо",
+      "rarity": "mythic",
+      "weight": 0.0436896552,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "existing",
+      "catalogName": "Скат моторо",
+      "imagePath": "src/main/resources/webapp/assets/fish/skat_motoro.png"
+    },
+    {
+      "nameRu": "Пати",
+      "rarity": "mythic",
+      "weight": 0.0436896552,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/pati.png",
+      "species": "Luciopimelodus pati",
+      "replaces": "Паяра"
+    },
+    {
+      "nameRu": "Дорадо золотой",
+      "rarity": "legendary",
+      "weight": 0.0052666667,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Дорадо золотой",
+      "imagePath": "src/main/resources/webapp/assets/fish/golden_dorado.png"
+    },
+    {
+      "nameRu": "Пинтадо",
+      "rarity": "legendary",
+      "weight": 0.0052666667,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "november-ready",
+      "catalogName": "Пинтадо",
+      "imagePath": "src/main/resources/webapp/assets/fish/pintado.png"
+    },
+    {
+      "nameRu": "Жау",
+      "rarity": "legendary",
+      "weight": 0.0036866667,
+      "gameplayPredator": true,
+      "water": "fresh",
+      "cohort": "new-preview",
+      "catalogName": null,
+      "imagePath": "fish/jau.png",
+      "species": "Zungaro jahu",
+      "replaces": "Арапайма"
+    }
+  ],
+  "balance": "Preserve exact prior slot weights and each replacement's rarity, freshwater status and predator/peaceful bait group. Historical Columbia baseline and global rarity multipliers unchanged.",
+  "start": "2026-11-01T00:00:00Z",
+  "end": "2026-12-01T00:00:00Z",
+  "sources": [
+    {
+      "url": "https://ecoa.org.br/serra-do-amolar-uma-das-mais-belas-paisagens-pantaneiras/",
+      "role": "Place and landscape"
+    },
+    {
+      "url": "https://doi.org/10.1590/1678-4766e2017151",
+      "role": "Primary fish checklist; use Paraguai column and historical synonyms"
+    },
+    {
+      "url": "https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/1053104/1/DOC138.pdf",
+      "role": "Regional floodplain and fish evidence; not a Porto Amolar point survey"
+    },
+    {
+      "url": "https://www.abc.org.br/wp-content/uploads/2019/11/Livro-Biomas-e-Agricultura-Site.pdf",
+      "role": "Commercial fishes of the Upper Paraguay basin"
+    },
+    {
+      "url": "https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/948598/1/BP118.pdf",
+      "role": "Regional fishery records including barbado, pati, jurupoca and jau"
+    },
+    {
+      "url": "https://neotropical.pensoft.net/article/53383/zoom/fig/12/",
+      "role": "Primary specimen photograph for palmito"
+    },
+    {
+      "url": "https://sib.gob.ar/especies/luciopimelodus-pati",
+      "role": "Pati reference"
+    },
+    {
+      "url": "https://sib.gob.ar/especies/hemisorubim-platyrhynchos",
+      "role": "Jurupoca reference"
+    }
+  ],
+  "updated": "2026-10-28",
+  "approval": {
+    "name": "approved 2026-10-28",
+    "background": "approved 2026-10-28",
+    "firstSevenFish": "approved 2026-10-22",
+    "additionalSixFish": "pending",
+    "completeRevisedPool": "pending"
+  },
+  "counts": {
+    "total": 37,
+    "newForNovember": 13,
+    "firstSevenReady": 7,
+    "newDrawings": 6,
+    "existing": 24
+  },
+  "imageRule": "One species, one dedicated image. Reuse an existing catalog fish as a whole, with its own name and image. Never relabel another fish's image as a new species.",
+  "newArtPrompts": "fish-prompts.json"
+}

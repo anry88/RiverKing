@@ -1,0 +1,318 @@
+{
+  "nameRu": "Порту-Амолар",
+  "nameEn": "Porto Amolar",
+  "start": "2026-11-01T00:00:00Z",
+  "end": "2026-12-01T00:00:00Z",
+  "imagePath": "porto_amolar.png",
+  "castZone": {
+    "points": [
+      {
+        "x": 0.18,
+        "y": 0.48
+      },
+      {
+        "x": 0.86,
+        "y": 0.48
+      },
+      {
+        "x": 0.86,
+        "y": 0.72
+      },
+      {
+        "x": 0.38,
+        "y": 0.72
+      }
+    ]
+  },
+  "fish": [
+    {
+      "name": "Куримбата",
+      "rarity": "common",
+      "weight": 0.6421395349
+    },
+    {
+      "name": "Прохилодус красноштриховый",
+      "rarity": "common",
+      "weight": 0.5707906976
+    },
+    {
+      "name": "Отоцинклюс широкополосый",
+      "rarity": "common",
+      "weight": 0.4280930233
+    },
+    {
+      "name": "Тетра неоновая",
+      "rarity": "common",
+      "weight": 0.5707906976
+    },
+    {
+      "name": "Чёрный фантом",
+      "rarity": "common",
+      "weight": 0.535116279
+    },
+    {
+      "name": "Тетра родостомус",
+      "rarity": "common",
+      "weight": 0.4637674419
+    },
+    {
+      "name": "Тетра лимонная",
+      "rarity": "common",
+      "weight": 0.4637674419
+    },
+    {
+      "name": "Тетра чёрный неон",
+      "rarity": "common",
+      "weight": 0.4994418605
+    },
+    {
+      "name": "Нанностомус трифасциатус",
+      "rarity": "common",
+      "weight": 0.4280930233
+    },
+    {
+      "name": "Мечерот обыкновенный",
+      "rarity": "common",
+      "weight": 1.324
+    },
+    {
+      "name": "Цихлазома мезонаута",
+      "rarity": "common",
+      "weight": 1.324
+    },
+    {
+      "name": "Пирапутанга",
+      "rarity": "uncommon",
+      "weight": 0.1328846154
+    },
+    {
+      "name": "Анциструс обыкновенный",
+      "rarity": "uncommon",
+      "weight": 0.1116230769
+    },
+    {
+      "name": "Тернеция чёрная",
+      "rarity": "uncommon",
+      "weight": 0.1116230769
+    },
+    {
+      "name": "Торакатум",
+      "rarity": "uncommon",
+      "weight": 0.1116230769
+    },
+    {
+      "name": "Коридорас Штерба",
+      "rarity": "uncommon",
+      "weight": 0.1116230769
+    },
+    {
+      "name": "Лепоринус полосатый",
+      "rarity": "uncommon",
+      "weight": 0.1116230769
+    },
+    {
+      "name": "Пиранья краснобрюхая",
+      "rarity": "uncommon",
+      "weight": 1.7
+    },
+    {
+      "name": "Пиавусу",
+      "rarity": "rare",
+      "weight": 0.394137931
+    },
+    {
+      "name": "Паку краснобрюхий",
+      "rarity": "rare",
+      "weight": 0.367862069
+    },
+    {
+      "name": "Бикуда",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Пиранья чёрная",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Щучья цихлида",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Рыба-лист амазонская",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Мечерот пятнистый",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Качара",
+      "rarity": "epic",
+      "weight": 0.0476190476
+    },
+    {
+      "name": "Журупока",
+      "rarity": "epic",
+      "weight": 0.0380952381
+    },
+    {
+      "name": "Пальмито",
+      "rarity": "epic",
+      "weight": 0.0380952381
+    },
+    {
+      "name": "Сом веслоносый",
+      "rarity": "epic",
+      "weight": 0.0380952381
+    },
+    {
+      "name": "Павлиний окунь",
+      "rarity": "epic",
+      "weight": 0.0380952381
+    },
+    {
+      "name": "Скат Фалькнера",
+      "rarity": "mythic",
+      "weight": 0.0499310345
+    },
+    {
+      "name": "Барбадо",
+      "rarity": "mythic",
+      "weight": 0.0436896552
+    },
+    {
+      "name": "Скат моторо",
+      "rarity": "mythic",
+      "weight": 0.0436896552
+    },
+    {
+      "name": "Пати",
+      "rarity": "mythic",
+      "weight": 0.0436896552
+    },
+    {
+      "name": "Дорадо золотой",
+      "rarity": "legendary",
+      "weight": 0.0052666667
+    },
+    {
+      "name": "Пинтадо",
+      "rarity": "legendary",
+      "weight": 0.0052666667
+    },
+    {
+      "name": "Жау",
+      "rarity": "legendary",
+      "weight": 0.0036866667
+    }
+  ],
+  "weightPrizes": {
+    "prizePlaces": 3,
+    "prizes": [
+      {
+        "pack": "autofish",
+        "qty": 1
+      },
+      {
+        "pack": "autofish_week",
+        "qty": 2
+      },
+      {
+        "pack": "autofish_week",
+        "qty": 1
+      }
+    ]
+  },
+  "countPrizes": {
+    "prizePlaces": 3,
+    "prizes": [
+      {
+        "pack": "bundle_whale",
+        "qty": 3
+      },
+      {
+        "pack": "bundle_whale",
+        "qty": 2
+      },
+      {
+        "pack": "bundle_whale",
+        "qty": 1
+      }
+    ]
+  },
+  "fishPrizes": {
+    "prizePlaces": 10,
+    "prizes": [
+      {
+        "pack": "coins",
+        "qty": 10000,
+        "coins": 10000
+      },
+      {
+        "pack": "coins",
+        "qty": 9000,
+        "coins": 9000
+      },
+      {
+        "pack": "coins",
+        "qty": 8000,
+        "coins": 8000
+      },
+      {
+        "pack": "coins",
+        "qty": 7000,
+        "coins": 7000
+      },
+      {
+        "pack": "coins",
+        "qty": 6000,
+        "coins": 6000
+      },
+      {
+        "pack": "coins",
+        "qty": 5000,
+        "coins": 5000
+      },
+      {
+        "pack": "coins",
+        "qty": 4000,
+        "coins": 4000
+      },
+      {
+        "pack": "coins",
+        "qty": 3000,
+        "coins": 3000
+      },
+      {
+        "pack": "coins",
+        "qty": 2000,
+        "coins": 2000
+      },
+      {
+        "pack": "coins",
+        "qty": 1000,
+        "coins": 1000
+      }
+    ]
+  },
+  "requiredFishAssets": [
+    "curimbata",
+    "piraputanga",
+    "piavucu",
+    "cachara",
+    "falkneri_stingray",
+    "golden_dorado",
+    "pintado",
+    "black_phantom_tetra",
+    "jurupoca",
+    "palmito",
+    "barbado",
+    "pati",
+    "jau"
+  ]
+}
