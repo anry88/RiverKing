@@ -30,3 +30,15 @@ tasks.named<Jar>("jar") {
     manifest { attributes["Main-Class"] = "stub.MainKt" }
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
 }
+
+// Server integration tests need client classes, not an executable JAR that also embeds dependencies.
+val testApiJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("test-api")
+    from(sourceSets.main.get().output)
+}
+configurations.create("testApiElements") {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    extendsFrom(configurations.getByName("implementation"))
+    outgoing.artifact(testApiJar)
+}
