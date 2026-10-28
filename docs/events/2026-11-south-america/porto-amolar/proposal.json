@@ -1,0 +1,335 @@
+{
+  "status": "proposal-awaiting-approval",
+  "prepared": "2026-10-28",
+  "nameRu": "Порту-Амолар",
+  "nameEn": "Porto Amolar",
+  "place": "Rio Paraguai at Porto Amolar, Serra do Amolar, Pantanal, Mato Grosso do Sul, Brazil",
+  "mapUrl": "https://www.google.com/maps/search/?api=1&query=Porto+Amolar+Corumba+Brazil",
+  "scope": "Species supported for the Paraguay basin and connected Pantanal floodplain; not a claim of 37 species observed at one bank.",
+  "background": {
+    "path": "background.png",
+    "status": "proposal",
+    "mode": "built-in imagegen",
+    "prompt": "Use case: photorealistic-natural. Asset type: RiverKing fishing-game location background, wide 16:9 landscape, 1792x1024 or closest supported landscape. Primary request: a geographically grounded scenic view of the real Rio Paraguai beside Serra do Amolar, Pantanal, Mato Grosso do Sul, Brazil, seen by an angler from a low natural bank. Recognizable landscape: an isolated rugged ridge of ancient dark rock, green wooded slopes with exposed reddish-brown rock shoulders, rising abruptly above an otherwise flat immense floodplain, not Andean or alpine mountains. The ridge is across the far bank in the central and right upper third; a lower distant ridge recedes left. A broad slow muddy olive-brown Paraguay River occupies the lower 60 percent, subtle realistic small ripples, gently reflecting the ridge. Narrow gallery forest at water level, floodplain grasses at the outer edges, only a small patch of muddy grass bank at the bottom-left corner. Natural early-morning light, blue sky, soft scattered warm clouds, restrained golden side light, clear visibility and plausible Brazilian Pantanal vegetation. Realistic detailed photographic game environment, no fantasy scenery. Composition must remain useful on narrow mobile crops: distinctive ridge in central upper area, center water fully unobstructed, horizon around 38 percent from top. Contiguous open castable water x=16%-88%, y=48%-80%. No people, boats, houses, landmarks from other regions, fishing rods, bobbers, visible fish, text, UI, logos or watermarks. This is a new image based on the actual topography, not an edit of the earlier generic river."
+  },
+  "fish": [
+    {
+      "nameRu": "Куримбата",
+      "species": "Prochilodus lineatus",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": "Куримбата",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Тетра чёрный неон",
+      "species": "Hyphessobrycon herbertaxelrodi",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": "Тетра чёрный неон",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Тетра минор",
+      "species": "Hyphessobrycon eques",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Афиохаракс Анизица",
+      "species": "Aphyocharax anisitsi",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Тетрагоноптерус серебристый",
+      "species": "Tetragonopterus argenteus",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Моэнкаузия дихроура",
+      "species": "Moenkhausia dichroura",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Чёрный фантом",
+      "species": "Hyphessobrycon megalopterus",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Хемиграммус Ульрея",
+      "species": "Hemigrammus ulreyi",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пиррулина южная",
+      "species": "Pyrrhulina australis",
+      "rarity": "common",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Цихлазома мезонаута",
+      "species": "Mesonauta festivus",
+      "rarity": "common",
+      "gameplayPredator": true,
+      "catalogName": "Цихлазома мезонаута",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Сайканга Кинкейда",
+      "species": "Cynopotamus kincaidi",
+      "rarity": "common",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пирапутанга",
+      "species": "Brycon hilarii",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": "Пирапутанга",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Тернеция чёрная",
+      "species": "Gymnocorymbus ternetzi",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": "Тернеция чёрная",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Филомена",
+      "species": "Moenkhausia sanctaefilomenae",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Прионобрама парагвайская",
+      "species": "Prionobrama paraguayensis",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Метиннис мола",
+      "species": "Metynnis mola",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Лепоринус трёхпятнистый",
+      "species": "Leporinus friderici",
+      "rarity": "uncommon",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пиранья краснобрюхая",
+      "species": "Pygocentrus nattereri",
+      "rarity": "uncommon",
+      "gameplayPredator": true,
+      "catalogName": "Пиранья краснобрюхая",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Пиавусу",
+      "species": "Megaleporinus macrocephalus",
+      "rarity": "rare",
+      "gameplayPredator": false,
+      "catalogName": "Пиавусу",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Паку пантанальский",
+      "species": "Piaractus mesopotamicus",
+      "rarity": "rare",
+      "gameplayPredator": false,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Ацестроринх Пантанала",
+      "species": "Acestrorhynchus pantaneiro",
+      "rarity": "rare",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Креницихла ленточная",
+      "species": "Crenicichla vittata",
+      "rarity": "rare",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пиранья окаймлённая",
+      "species": "Serrasalmus marginatus",
+      "rarity": "rare",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пиранья пятнистая",
+      "species": "Serrasalmus maculatus",
+      "rarity": "rare",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Траира",
+      "species": "Hoplias malabaricus",
+      "rarity": "rare",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Качара",
+      "species": "Pseudoplatystoma reticulatum",
+      "rarity": "epic",
+      "gameplayPredator": true,
+      "catalogName": "Качара",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Сом веслоносый",
+      "species": "Sorubim lima",
+      "rarity": "epic",
+      "gameplayPredator": true,
+      "catalogName": "Сом веслоносый",
+      "assetStatus": "verify-species-and-reuse"
+    },
+    {
+      "nameRu": "Журупока",
+      "species": "Hemisorubim platyrhynchos",
+      "rarity": "epic",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пальмито",
+      "species": "Ageneiosus inermis",
+      "rarity": "epic",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пимелодус украшенный",
+      "species": "Pimelodus ornatus",
+      "rarity": "epic",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Скат Фалькнера",
+      "species": "Potamotrygon falkneri",
+      "rarity": "mythic",
+      "gameplayPredator": true,
+      "catalogName": "Скат Фалькнера",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Скат моторо",
+      "species": "Potamotrygon motoro",
+      "rarity": "mythic",
+      "gameplayPredator": true,
+      "catalogName": "Скат моторо",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Барбадо",
+      "species": "Pinirampus pirinampu",
+      "rarity": "mythic",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Пати",
+      "species": "Luciopimelodus pati",
+      "rarity": "mythic",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    },
+    {
+      "nameRu": "Дорадо золотой",
+      "species": "Salminus brasiliensis",
+      "rarity": "legendary",
+      "gameplayPredator": true,
+      "catalogName": "Дорадо золотой",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Пинтадо",
+      "species": "Pseudoplatystoma corruscans",
+      "rarity": "legendary",
+      "gameplayPredator": true,
+      "catalogName": "Пинтадо",
+      "assetStatus": "reuse-candidate"
+    },
+    {
+      "nameRu": "Жау",
+      "species": "Zungaro jahu",
+      "rarity": "legendary",
+      "gameplayPredator": true,
+      "catalogName": null,
+      "assetStatus": "new-art-required"
+    }
+  ],
+  "requiredNewFishArt": 24,
+  "balance": "Preserve approved summed base weights per rarity and gameplay bait group. No numerical weights assigned before content approval; global rarity multipliers remain the only easing.",
+  "start": "2026-11-01T00:00:00Z",
+  "end": "2026-12-01T00:00:00Z",
+  "sources": [
+    {
+      "url": "https://ecoa.org.br/serra-do-amolar-uma-das-mais-belas-paisagens-pantaneiras/",
+      "role": "Place and landscape"
+    },
+    {
+      "url": "https://doi.org/10.1590/1678-4766e2017151",
+      "role": "Primary fish checklist; use Paraguai column and historical synonyms"
+    },
+    {
+      "url": "https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/1053104/1/DOC138.pdf",
+      "role": "Regional floodplain and fish evidence; not a Porto Amolar point survey"
+    },
+    {
+      "url": "https://www.abc.org.br/wp-content/uploads/2019/11/Livro-Biomas-e-Agricultura-Site.pdf",
+      "role": "Commercial fishes of the Upper Paraguay basin"
+    }
+  ]
+}
