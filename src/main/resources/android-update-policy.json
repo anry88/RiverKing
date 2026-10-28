@@ -1,16 +1,18 @@
 {
-  "latestVersionCode": 14,
-  "latestVersionName": "0.4.10",
+  "latestVersionCode": 15,
+  "latestVersionName": "0.4.11",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added artwork for the November South American Rivers event: 37 fish species, including 7 new species, and a new location background.",
-      "Increased rare fish catch chances and reduced fish escape risk."
+      "The November event is now Porto Amolar, with a new Paraguay River background inspired by Serra do Amolar.",
+      "Added six more fish illustrations: Black Phantom Tetra, Jurupoca, Palmito, Barbado, Pati and Jau. The event has 37 fish, including 13 new for November.",
+      "The legendary fish are Golden Dorado, Pintado and Jau. Catch chances and rewards are unchanged."
     ],
     "ru": [
-      "Добавлено оформление ноябрьского ивента «Реки Южной Америки»: 37 видов рыб, включая 7 новых, и новый фон локации.",
-      "Повышены шансы вылова редких рыб и снижена вероятность схода."
+      "Ноябрьский ивент теперь называется «Порту-Амолар»: новый фон реки Парагвай у Серра-ду-Амолар.",
+      "Добавлены ещё шесть изображений рыб: чёрный фантом, журупока, пальмито, барбадо, пати и жау. В ивенте 37 рыб, включая 13 новых для ноября.",
+      "Легендарные рыбы — дорадо золотой, пинтадо и жау. Шансы вылова и награды сохранены."
     ]
   }
 }
