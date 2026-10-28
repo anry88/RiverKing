@@ -1,5 +1,5 @@
 {
-  "status": "name-and-background-approved-six-new-fish-awaiting-approval",
+  "status": "approved-and-integrated-in-develop",
   "prepared": "2026-10-28",
   "nameRu": "Порту-Амолар",
   "nameEn": "Porto Amolar",
@@ -59,11 +59,12 @@
       "weight": 0.535116279,
       "gameplayPredator": false,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/black_phantom_tetra.png",
+      "cohort": "november-added",
+      "catalogName": "Чёрный фантом",
+      "imagePath": "src/main/resources/webapp/assets/fish/black_phantom_tetra.png",
       "species": "Hyphessobrycon megalopterus",
-      "replaces": "Тетра кардинальная"
+      "replaces": "Тетра кардинальная",
+      "approvalImagePath": "fish/black_phantom_tetra.png"
     },
     {
       "nameRu": "Тетра родостомус",
@@ -283,11 +284,12 @@
       "weight": 0.0380952381,
       "gameplayPredator": true,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/jurupoca.png",
+      "cohort": "november-added",
+      "catalogName": "Журупока",
+      "imagePath": "src/main/resources/webapp/assets/fish/jurupoca.png",
       "species": "Hemisorubim platyrhynchos",
-      "replaces": "Угорь электрический"
+      "replaces": "Угорь электрический",
+      "approvalImagePath": "fish/jurupoca.png"
     },
     {
       "nameRu": "Пальмито",
@@ -295,11 +297,12 @@
       "weight": 0.0380952381,
       "gameplayPredator": true,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/palmito.png",
+      "cohort": "november-added",
+      "catalogName": "Пальмито",
+      "imagePath": "src/main/resources/webapp/assets/fish/palmito.png",
       "species": "Ageneiosus inermis",
-      "replaces": "Сом краснохвостый"
+      "replaces": "Сом краснохвостый",
+      "approvalImagePath": "fish/palmito.png"
     },
     {
       "nameRu": "Сом веслоносый",
@@ -338,11 +341,12 @@
       "weight": 0.0436896552,
       "gameplayPredator": true,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/barbado.png",
+      "cohort": "november-added",
+      "catalogName": "Барбадо",
+      "imagePath": "src/main/resources/webapp/assets/fish/barbado.png",
       "species": "Pinirampus pirinampu",
-      "replaces": "Зунгаро"
+      "replaces": "Зунгаро",
+      "approvalImagePath": "fish/barbado.png"
     },
     {
       "nameRu": "Скат моторо",
@@ -360,11 +364,12 @@
       "weight": 0.0436896552,
       "gameplayPredator": true,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/pati.png",
+      "cohort": "november-added",
+      "catalogName": "Пати",
+      "imagePath": "src/main/resources/webapp/assets/fish/pati.png",
       "species": "Luciopimelodus pati",
-      "replaces": "Паяра"
+      "replaces": "Паяра",
+      "approvalImagePath": "fish/pati.png"
     },
     {
       "nameRu": "Дорадо золотой",
@@ -392,11 +397,12 @@
       "weight": 0.0036866667,
       "gameplayPredator": true,
       "water": "fresh",
-      "cohort": "new-preview",
-      "catalogName": null,
-      "imagePath": "fish/jau.png",
+      "cohort": "november-added",
+      "catalogName": "Жау",
+      "imagePath": "src/main/resources/webapp/assets/fish/jau.png",
       "species": "Zungaro jahu",
-      "replaces": "Арапайма"
+      "replaces": "Арапайма",
+      "approvalImagePath": "fish/jau.png"
     }
   ],
   "balance": "Preserve exact prior slot weights and each replacement's rarity, freshwater status and predator/peaceful bait group. Historical Columbia baseline and global rarity multipliers unchanged.",
@@ -441,8 +447,8 @@
     "name": "approved 2026-10-28",
     "background": "approved 2026-10-28",
     "firstSevenFish": "approved 2026-10-22",
-    "additionalSixFish": "pending",
-    "completeRevisedPool": "pending"
+    "additionalSixFish": "approved 2026-10-28",
+    "completeRevisedPool": "approved 2026-10-28"
   },
   "counts": {
     "total": 37,
@@ -452,5 +458,6 @@
     "existing": 24
   },
   "imageRule": "One species, one dedicated image. Reuse an existing catalog fish as a whole, with its own name and image. Never relabel another fish's image as a new species.",
-  "newArtPrompts": "fish-prompts.json"
+  "newArtPrompts": "fish-prompts.json",
+  "publication": "Content integrated in develop; production ID 5 must be updated after develop -> main release and deployment."
 }

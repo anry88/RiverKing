@@ -39,7 +39,7 @@ Nested Android project for the RiverKing mobile client.
   - Core gameplay assets (rods, fish, locations, shop icons, achievement badges) are bundled locally in the APK to reduce network traffic and enable offline-ready UI.
   - All PNG assets from the webapp are converted to **WebP** format for the Android build to minimize APK size (e.g., 60MB PNG -> ~22MB WebP).
   - Achievement badges are synced from the shared webapp assets into `android_asset/achievements`, so the Achievements tab no longer depends on per-open network fetches.
-  - November 2026 South American fish and the event background have bundled WebP assets and Russian/English name mappings. Older released clients keep API compatibility but need the updated APK to show the new local fish sprites.
+  - The November 2026 Porto Amolar event has bundled WebP artwork and Russian/English mappings for thirteen new fish and its approved real-place background. Older released clients keep API compatibility but need the updated APK to show the new local fish sprites.
 - Debug builds currently verified for both `direct` and `play` flavors.
 
 ## Local setup

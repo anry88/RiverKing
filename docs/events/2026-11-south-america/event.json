@@ -1,9 +1,9 @@
 {
-  "nameRu": "Реки Южной Америки",
-  "nameEn": "South American Rivers",
+  "nameRu": "Порту-Амолар",
+  "nameEn": "Porto Amolar",
   "start": "2026-11-01T00:00:00Z",
   "end": "2026-12-01T00:00:00Z",
-  "imagePath": "south_american_rivers.png",
+  "imagePath": "porto_amolar.png",
   "castZone": {
     "points": [
       {
@@ -46,7 +46,7 @@
       "weight": 0.5707906976
     },
     {
-      "name": "Тетра кардинальная",
+      "name": "Чёрный фантом",
       "rarity": "common",
       "weight": 0.535116279
     },
@@ -91,12 +91,12 @@
       "weight": 0.1116230769
     },
     {
-      "name": "Скалярия обыкновенная",
+      "name": "Тернеция чёрная",
       "rarity": "uncommon",
       "weight": 0.1116230769
     },
     {
-      "name": "Апистограмма Агассиза",
+      "name": "Торакатум",
       "rarity": "uncommon",
       "weight": 0.1116230769
     },
@@ -156,17 +156,17 @@
       "weight": 0.0476190476
     },
     {
-      "name": "Угорь электрический",
+      "name": "Журупока",
       "rarity": "epic",
       "weight": 0.0380952381
     },
     {
-      "name": "Сом краснохвостый",
+      "name": "Пальмито",
       "rarity": "epic",
       "weight": 0.0380952381
     },
     {
-      "name": "Аймара",
+      "name": "Сом веслоносый",
       "rarity": "epic",
       "weight": 0.0380952381
     },
@@ -181,7 +181,7 @@
       "weight": 0.0499310345
     },
     {
-      "name": "Зунгаро",
+      "name": "Барбадо",
       "rarity": "mythic",
       "weight": 0.0436896552
     },
@@ -191,7 +191,7 @@
       "weight": 0.0436896552
     },
     {
-      "name": "Паяра",
+      "name": "Пати",
       "rarity": "mythic",
       "weight": 0.0436896552
     },
@@ -206,7 +206,7 @@
       "weight": 0.0052666667
     },
     {
-      "name": "Арапайма",
+      "name": "Жау",
       "rarity": "legendary",
       "weight": 0.0036866667
     }
@@ -307,6 +307,12 @@
     "cachara",
     "falkneri_stingray",
     "golden_dorado",
-    "pintado"
+    "pintado",
+    "black_phantom_tetra",
+    "jurupoca",
+    "palmito",
+    "barbado",
+    "pati",
+    "jau"
   ]
 }

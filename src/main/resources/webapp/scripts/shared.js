@@ -446,6 +446,8 @@
   LOCATION_BG_BY_NAME[normalizeLocationName('Columbia River Gorge')] = '/app/assets/backgrounds/columbia_river_gorge_bonneville_dam.png';
   LOCATION_BG_BY_NAME[normalizeLocationName('Реки Южной Америки')] = '/app/assets/backgrounds/south_american_rivers.png';
   LOCATION_BG_BY_NAME[normalizeLocationName('South American Rivers')] = '/app/assets/backgrounds/south_american_rivers.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Порту-Амолар')] = '/app/assets/backgrounds/porto_amolar.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Porto Amolar')] = '/app/assets/backgrounds/porto_amolar.png';
 
   const getLocationBackground = (id, name) => {
     if (name) {
@@ -651,6 +653,12 @@
     "Скат Фалькнера": { en: "Falkner's Stingray", asset: '/app/assets/fish/falkneri_stingray.png' },
     "Дорадо золотой": { en: "Golden Dorado", asset: '/app/assets/fish/golden_dorado.png' },
     "Пинтадо": { en: "Pintado", asset: '/app/assets/fish/pintado.png' },
+    'Чёрный фантом': { en: 'Black Phantom Tetra', asset: '/app/assets/fish/black_phantom_tetra.png' },
+    'Журупока': { en: 'Jurupoca', asset: '/app/assets/fish/jurupoca.png' },
+    'Пальмито': { en: 'Palmito', asset: '/app/assets/fish/palmito.png' },
+    'Барбадо': { en: 'Barbado', asset: '/app/assets/fish/barbado.png' },
+    'Пати': { en: 'Pati', asset: '/app/assets/fish/pati.png' },
+    'Жау': { en: 'Jau', asset: '/app/assets/fish/jau.png' },
     'Тетра неоновая': { en: 'Neon Tetra', asset: '/app/assets/fish/tetra_neonovaya.png' },
     'Тернеция чёрная': { en: 'Black Skirt Tetra', asset: '/app/assets/fish/tetra_chernaya.png' },
     'Рыба-лист амазонская': { en: 'Amazon Leaf Fish', asset: '/app/assets/fish/ryba_list_amazonskaya.png' },
