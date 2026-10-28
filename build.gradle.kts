@@ -53,7 +53,7 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
-    testImplementation(project(":gameplay-stub"))
+    testImplementation(project(path = ":gameplay-stub", configuration = "testApiElements"))
 }
 
 application {

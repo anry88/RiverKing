@@ -40,6 +40,12 @@ class CatchPresentationTest {
             "webapp/assets/originals/fish/falkneri_stingray.png",
             "webapp/assets/originals/fish/golden_dorado.png",
             "webapp/assets/originals/fish/pintado.png",
+            "webapp/assets/originals/fish/black_phantom_tetra.png",
+            "webapp/assets/originals/fish/jurupoca.png",
+            "webapp/assets/originals/fish/palmito.png",
+            "webapp/assets/originals/fish/barbado.png",
+            "webapp/assets/originals/fish/pati.png",
+            "webapp/assets/originals/fish/jau.png",
         ).forEach { path ->
             val image = javaClass.classLoader.getResourceAsStream(path)?.use(ImageIO::read)
             assertNotNull(image, "Missing catch card source: $path")
@@ -61,16 +67,18 @@ class CatchPresentationTest {
     }
 
     @Test
-    fun `south american event fish render localized catch cards`() {
-        listOf("Куримбата", "Пирапутанга", "Пиавусу", "Качара", "Скат Фалькнера", "Дорадо золотой", "Пинтадо")
+    fun `porto amolar event fish render localized catch cards`() {
+        assertEquals("Porto Amolar", service.I18n.location("Порту-Амолар", "en"))
+        listOf("Куримбата", "Пирапутанга", "Пиавусу", "Качара", "Скат Фалькнера", "Дорадо золотой", "Пинтадо",
+            "Чёрный фантом", "Журупока", "Пальмито", "Барбадо", "Пати", "Жау")
             .forEach { name ->
                 val english = service.I18n.fish(name, "en")
                 assertTrue(english != name, "Missing English fish name: $name")
                 val bytes = generateCatchImage(
                     fishInternalName = name,
-                    locationInternalName = "Реки Южной Америки",
+                    locationInternalName = "Порту-Амолар",
                     displayFishName = english,
-                    displayLocationName = "South American Rivers",
+                    displayLocationName = "Porto Amolar",
                     weightKg = 2.0,
                     rarity = "legendary",
                     lang = "en",

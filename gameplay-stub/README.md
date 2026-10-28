@@ -2,6 +2,8 @@
 
 Independent Gradle application that controls 50 persistent player accounts exclusively through the RiverKing server HTTP API. The module has no backend project dependency, game services, SQL/JDBC drivers, database credentials or Telegram/admin token at runtime.
 
+Server integration tests consume the thin `testApiElements` / `test-api` JAR. The normal executable `jar` still bundles the HTTP client's runtime dependencies for deployment. Do not put that executable JAR on the server test classpath: its embedded libraries lack their original manifest metadata and break Kotlin serialization compilation.
+
 ## Server boundary and authorization
 
 The backend owns `service/GameplayBotAccounts.kt`: 25 Russian and 25 English conversational nicknames, `registration_source=bot`, and stable `AuthIdentities(provider=gameplay-stub, subject=v1-01…v1-50)` entries. The protected operator endpoint `POST /api/admin/gameplay-bots/sessions` creates missing profiles or reuses existing ones with all progression intact, then issues ordinary access/refresh sessions. Only the deploy operator calls it; the client receives just those sessions in `accounts.json`.

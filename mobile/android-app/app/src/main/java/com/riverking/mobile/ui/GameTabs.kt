@@ -8822,6 +8822,7 @@ private fun locationBackgroundAsset(location: String?): String? {
         "Мангровые заросли", "Mangroves" -> "backgrounds/mangroves.webp"
         "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
         "Реки Южной Америки", "South American Rivers" -> "backgrounds/south_american_rivers.webp"
+        "Порту-Амолар", "Porto Amolar" -> "backgrounds/porto_amolar.webp"
         "Ущелье реки Колумбия", "Columbia River Gorge" -> "backgrounds/columbia_river_gorge_bonneville_dam.webp"
         else -> null
     }
@@ -9033,6 +9034,18 @@ private val FISH_ASSET_MAP = mapOf(
     "Golden Dorado" to "fish/golden_dorado.webp",
     "Пинтадо" to "fish/pintado.webp",
     "Pintado" to "fish/pintado.webp",
+    "Чёрный фантом" to "fish/black_phantom_tetra.webp",
+    "Black Phantom Tetra" to "fish/black_phantom_tetra.webp",
+    "Журупока" to "fish/jurupoca.webp",
+    "Jurupoca" to "fish/jurupoca.webp",
+    "Пальмито" to "fish/palmito.webp",
+    "Palmito" to "fish/palmito.webp",
+    "Барбадо" to "fish/barbado.webp",
+    "Barbado" to "fish/barbado.webp",
+    "Пати" to "fish/pati.webp",
+    "Pati" to "fish/pati.webp",
+    "Жау" to "fish/jau.webp",
+    "Jau" to "fish/jau.webp",
     "Тетра неоновая" to "fish/tetra_neonovaya.webp",
     "Neon Tetra" to "fish/tetra_neonovaya.webp",
     "Тернеция чёрная" to "fish/tetra_chernaya.webp",

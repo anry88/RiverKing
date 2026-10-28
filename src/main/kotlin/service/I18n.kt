@@ -97,6 +97,12 @@ object I18n {
         "Скат Фалькнера" to "Falkner's Stingray",
         "Дорадо золотой" to "Golden Dorado",
         "Пинтадо" to "Pintado",
+        "Чёрный фантом" to "Black Phantom Tetra",
+        "Журупока" to "Jurupoca",
+        "Пальмито" to "Palmito",
+        "Барбадо" to "Barbado",
+        "Пати" to "Pati",
+        "Жау" to "Jau",
         "Тетра неоновая" to "Neon Tetra",
         "Тернеция чёрная" to "Black Skirt Tetra",
         "Рыба-лист амазонская" to "Amazon Leaf Fish",
@@ -274,6 +280,7 @@ object I18n {
         "Мангровые заросли" to "Mangroves",
         "Коралловые отмели" to "Coral Flats",
         "Реки Южной Америки" to "South American Rivers",
+        "Порту-Амолар" to "Porto Amolar",
         "Ущелье реки Колумбия" to "Columbia River Gorge",
     )
 

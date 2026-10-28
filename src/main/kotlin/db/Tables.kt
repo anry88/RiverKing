@@ -660,6 +660,12 @@ object DB {
         upsertFish("Скат Фалькнера", "mythic", 8.0, 3.0, true, "fresh")
         upsertFish("Дорадо золотой", "legendary", 10.0, 4.0, true, "fresh")
         upsertFish("Пинтадо", "legendary", 25.0, 10.0, true, "fresh")
+        upsertFish("Чёрный фантом", "common", 0.004, 0.002, false, "fresh")
+        upsertFish("Журупока", "epic", 3.0, 1.2, true, "fresh")
+        upsertFish("Пальмито", "epic", 4.0, 1.5, true, "fresh")
+        upsertFish("Барбадо", "mythic", 12.0, 5.0, true, "fresh")
+        upsertFish("Пати", "mythic", 18.0, 7.0, true, "fresh")
+        upsertFish("Жау", "legendary", 35.0, 15.0, true, "fresh")
 
         // --- Fish: common пресные мирные---
         val fCommonPeaceFreshPlotva  = upsertFish("Плотва", "common", 0.2, 0.05, false, "fresh")

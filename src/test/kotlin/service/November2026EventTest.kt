@@ -34,8 +34,15 @@ class November2026EventTest {
         DB.init(testEnv("november-2026"))
         val catalog = transaction { Fish.selectAll().associateBy { it[Fish.name] } }
         val pool = manifest.getValue("fish").jsonArray
+        assertEquals("Порту-Амолар", manifest.getValue("nameRu").jsonPrimitive.content)
+        assertEquals("Porto Amolar", manifest.getValue("nameEn").jsonPrimitive.content)
+        assertEquals("porto_amolar.png", manifest.getValue("imagePath").jsonPrimitive.content)
         assertEquals(37, pool.size)
         assertEquals(37, pool.map { it.jsonObject.getValue("name").jsonPrimitive.content }.toSet().size)
+        assertFalse(pool.any { it.jsonObject.getValue("name").jsonPrimitive.content == "Арапайма" })
+        assertEquals(setOf("Дорадо золотой", "Пинтадо", "Жау"), pool.filter {
+            it.jsonObject.getValue("rarity").jsonPrimitive.content == "legendary"
+        }.map { it.jsonObject.getValue("name").jsonPrimitive.content }.toSet())
         pool.forEach { entry ->
             val fish = entry.jsonObject
             val name = fish.getValue("name").jsonPrimitive.content
