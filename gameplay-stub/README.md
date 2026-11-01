@@ -16,7 +16,7 @@ All HTTP requests pass through the main server metrics. Casts increment `cast_to
 
 ## Cycle
 
-Strictly one account at a time, alternating Russian and English profiles (RU → EN → RU → EN): finish the full cycle, pause 10 seconds, then start the next account. After account 50, pause 10 seconds and return to account 1. Failures also pause before moving on. All 50 existing profiles are reused; alternating the processing order does not rename or recreate accounts.
+Strictly one account at a time, alternating Russian and English profiles (RU → EN → RU → EN): finish the full cycle, pause 5 seconds, then start the next account. After account 50, pause 5 seconds and return to account 1. Failures also pause before moving on. All 50 existing profiles are reused; alternating the processing order does not rename or recreate accounts.
 
 1. Read `/api/club`; if absent, search and join an eligible existing club.
 2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
@@ -31,7 +31,7 @@ The client refreshes expired access tokens through `/api/auth/refresh` and atomi
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `STUB_SERVER_URL` | required | Game server URL; HDC uses `http://app:5005` on the backend network |
-| `STUB_ACCOUNT_PAUSE_SECONDS` | `10` | Pause after each completed/failed cycle, 1–3600 seconds |
+| `STUB_ACCOUNT_PAUSE_SECONDS` | `5` | Pause after each completed/failed cycle, 1–3600 seconds |
 | `STUB_STATE_DIR` | `/data/gameplay-stub` | `accounts.json`, process lock and heartbeat |
 
 Keep `accounts.json` private: it contains player sessions. No admin token is needed by the running client. If refresh sessions expire, stop the client, remove/securely archive the old session file and provision new sessions via the deployment script; this reuses the same 50 profiles.

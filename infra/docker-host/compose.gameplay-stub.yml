@@ -11,7 +11,7 @@ services:
     stop_grace_period: 40s
     environment:
       STUB_SERVER_URL: ${STUB_SERVER_URL:-http://app:5005}
-      STUB_ACCOUNT_PAUSE_SECONDS: ${STUB_ACCOUNT_PAUSE_SECONDS:-10}
+      STUB_ACCOUNT_PAUSE_SECONDS: ${STUB_ACCOUNT_PAUSE_SECONDS:-5}
       STUB_STATE_DIR: /data/gameplay-stub
     volumes:
       - type: bind
