@@ -9,7 +9,7 @@ import kotlinx.coroutines.ensureActive
 suspend fun runSequentially(
     ids: List<Long>,
     once: Boolean = false,
-    pauseMillis: Long = 5_000,
+    pauseMillis: Long = 0,
     awaitNext: suspend (Long) -> Unit = { delay(it) },
     onError: (Long, Exception) -> Unit,
     cycle: suspend (Long) -> Unit,

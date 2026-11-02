@@ -19,8 +19,8 @@ fun main(args: Array<String>) {
         return
     }
     require(args.all { it == "--once" }) { "Options: --once, --health" }
-    val pauseSeconds = System.getenv("STUB_ACCOUNT_PAUSE_SECONDS")?.toLong() ?: 5L
-    require(pauseSeconds in 1..3_600)
+    val pauseSeconds = System.getenv("STUB_ACCOUNT_PAUSE_SECONDS")?.toLong() ?: 0L
+    require(pauseSeconds in 0..3_600)
     val baseUrl = System.getenv("STUB_SERVER_URL") ?: error("STUB_SERVER_URL is required")
     val uri = java.net.URI(baseUrl)
     require(uri.scheme in listOf("http", "https") && uri.host != null && uri.userInfo == null)

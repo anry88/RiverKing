@@ -8,7 +8,7 @@ import kotlin.test.assertFailsWith
 
 class SequentialRunnerTest {
     @Test
-    fun completesEachAccountBeforeFiveSecondPauseAndNextAccount() = runBlocking {
+    fun completesEachAccountBeforeNextAccountWithoutPause() = runBlocking {
         val events = mutableListOf<String>()
         runSequentially(listOf(1, 2, 3), once = true,
             awaitNext = { events += "pause:$it" },
@@ -17,11 +17,11 @@ class SequentialRunnerTest {
             events += "start:$uid"
             events += "done:$uid"
         }
-        assertEquals(listOf("start:1", "done:1", "pause:5000", "start:2", "done:2", "pause:5000", "start:3", "done:3"), events)
+        assertEquals(listOf("start:1", "done:1", "pause:0", "start:2", "done:2", "pause:0", "start:3", "done:3"), events)
     }
 
     @Test
-    fun failureStillPausesBeforeNextAccountAndWrapsToFirst() = runBlocking {
+    fun failureContinuesToNextAccountAndWrapsToFirstWithoutPause() = runBlocking {
         val events = mutableListOf<String>()
         var attempts = 0
         assertFailsWith<CancellationException> {
@@ -34,6 +34,6 @@ class SequentialRunnerTest {
                 if (attempts == 1) error("one account failed")
             }
         }
-        assertEquals(listOf("cycle:1", "error:1", "pause:5000", "cycle:2", "pause:5000", "cycle:1", "pause:5000"), events)
+        assertEquals(listOf("cycle:1", "error:1", "pause:0", "cycle:2", "pause:0", "cycle:1", "pause:0"), events)
     }
 }
