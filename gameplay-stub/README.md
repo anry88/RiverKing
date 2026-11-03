@@ -24,10 +24,10 @@ Strictly one account at a time in the existing alternating Russian/English roste
 | --- | --- | --- |
 | 1–5 | 5 | 24/7 |
 | 6–20 | 15 | 09:00–17:00 |
-| 21–35 | 15 | 16:00–01:00 |
+| 21–35 | 15 | 17:00–01:00 |
 | 36–50 | 15 | 01:00–09:00 |
 
-Start times are inclusive and end times exclusive. The evening window is deliberately nine hours and overlaps the day group from 16:00 to 17:00: 35 accounts are eligible during that hour and 20 otherwise. Membership survives restarts and reordered session files. The worker checks the current time before every account; inactive accounts make no cycle HTTP calls and incur no pause. An already started cycle finishes after its window closes. `--once` visits eligible accounts once. Group membership is logged at startup; cycle logs include the group and the heartbeat includes the active-account count.
+Start times are inclusive and end times exclusive. All three shifts are eight hours, with no gaps or overlaps: exactly 20 accounts are eligible at any time (five permanent and fifteen on shift). Membership survives restarts and reordered session files. The worker checks the current time before every account; inactive accounts make no cycle HTTP calls and incur no pause. An already started cycle finishes after its window closes. `--once` visits eligible accounts once. Group membership is logged at startup; cycle logs include the group and the heartbeat includes the active-account count.
 
 HDC's game backend and worker use UTC. `STUB_SCHEDULE_TIME_ZONE` explicitly defaults to UTC; if the game server's time zone changes, update this setting to match it.
 

@@ -27,7 +27,7 @@ class BotScheduleTest {
     }
 
     @Test
-    fun exactShiftBoundariesMidnightAndOverlapUseInclusiveStartAndExclusiveEnd() {
+    fun exactShiftBoundariesAndMidnightUseInclusiveStartAndExclusiveEnd() {
         val cases = mapOf(
             "00:00" to setOf(BotShift.EVENING),
             "00:59:59.999999999" to setOf(BotShift.EVENING),
@@ -35,8 +35,8 @@ class BotScheduleTest {
             "08:59:59.999999999" to setOf(BotShift.NIGHT),
             "09:00" to setOf(BotShift.DAY),
             "15:59:59.999999999" to setOf(BotShift.DAY),
-            "16:00" to setOf(BotShift.DAY, BotShift.EVENING),
-            "16:59:59.999999999" to setOf(BotShift.DAY, BotShift.EVENING),
+            "16:00" to setOf(BotShift.DAY),
+            "16:59:59.999999999" to setOf(BotShift.DAY),
             "17:00" to setOf(BotShift.EVENING),
             "23:59:59.999999999" to setOf(BotShift.EVENING),
         )
@@ -47,11 +47,11 @@ class BotScheduleTest {
     }
 
     @Test
-    fun allDayHasTwentyEligibleBotsExceptTheOneHourOverlapWithThirtyFive() {
+    fun allDayHasTwentyEligibleBotsWithNoGapsOrOverlappingShifts() {
         for (hour in 0..23) {
             val clock = Clock.fixed(Instant.parse("2026-11-03T${hour.toString().padStart(2, '0')}:00:00Z"), ZoneOffset.UTC)
             val schedule = BotSchedule(accounts, clock)
-            assertEquals(if (hour == 16) 35 else 20, accounts.count { schedule.isActive(it.userId) }, "hour=$hour")
+            assertEquals(20, accounts.count { schedule.isActive(it.userId) }, "hour=$hour")
         }
     }
 

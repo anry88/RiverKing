@@ -4,13 +4,13 @@ import java.time.Clock
 import java.time.LocalTime
 
 enum class BotShift(val window: String) {
-    ALWAYS("24/7"), DAY("09:00-17:00"), EVENING("16:00-01:00"), NIGHT("01:00-09:00");
+    ALWAYS("24/7"), DAY("09:00-17:00"), EVENING("17:00-01:00"), NIGHT("01:00-09:00");
 
     // Start is inclusive, end is exclusive; the evening shift crosses midnight.
     fun isActive(time: LocalTime): Boolean = when (this) {
         ALWAYS -> true
         DAY -> time.hour in 9..16
-        EVENING -> time.hour >= 16 || time.hour < 1
+        EVENING -> time.hour >= 17 || time.hour < 1
         NIGHT -> time.hour in 1..8
     }
 }
