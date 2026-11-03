@@ -16,12 +16,25 @@ All HTTP requests pass through the main server metrics. Casts increment `cast_to
 
 ## Cycle
 
-Strictly one account at a time, alternating Russian and English profiles (RU → EN → RU → EN): finish the full cycle, pause 10 seconds, then start the next account. After account 50, pause 10 seconds and return to account 1. Failures also pause before moving on. All 50 existing profiles are reused; alternating the processing order does not rename or recreate accounts.
+Strictly one account at a time in the existing alternating Russian/English roster order: finish the full cycle, including the server's 5–30-second cast wait, then immediately move to the next eligible account. After the roster ends, return to its beginning. Failed cycles also move on without an additional pause. Operators can configure an optional pause with `STUB_ACCOUNT_PAUSE_SECONDS`. All 50 existing profiles are reused.
+
+`BotSchedule.kt` assigns fixed shifts by stable slot order, alternating Russian and English profiles before partitioning:
+
+| Positions in alternating roster | Accounts | Daily window (server time) |
+| --- | --- | --- |
+| 1–5 | 5 | 24/7 |
+| 6–20 | 15 | 09:00–17:00 |
+| 21–35 | 15 | 17:00–01:00 |
+| 36–50 | 15 | 01:00–09:00 |
+
+Start times are inclusive and end times exclusive. All three shifts are eight hours, with no gaps or overlaps: exactly 20 accounts are eligible at any time (five permanent and fifteen on shift). Membership survives restarts and reordered session files. The worker checks the current time before every account; inactive accounts make no cycle HTTP calls and incur no pause. An already started cycle finishes after its window closes. `--once` visits eligible accounts once. Group membership is logged at startup; cycle logs include the group and the heartbeat includes the active-account count.
+
+HDC's game backend and worker use UTC. `STUB_SCHEDULE_TIME_ZONE` explicitly defaults to UTC; if the game server's time zone changes, update this setting to match it.
 
 1. Read `/api/club`; if absent, search and join an eligible existing club.
 2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
 3. Read `/api/me` and move to the next location in server order (active event first, then regular locations). Missing/locked next location wraps to the first accessible location. Expired/locked events fall back through the updated server list.
-4. After changing location, check bait compatibility with its fish using `/api/guide` (water type and predator type). Keep the current bait if compatible and in stock; otherwise switch through `/api/lure/{id}` before casting, including fresh-to-salt and salt-to-fresh transitions. If no compatible bait is available, buy the cheapest compatible coin pack affordable with the actual balance through `/api/shop/{id}/coins`; insufficient coins skip the cast. Event locations follow their server-supported mixed-bait rules. No Stars purchases or free shop grants.
+4. After changing location, check bait compatibility with its fish using `/api/guide` (water type and predator type; event locations support all bait types). Randomly select one compatible bait available in the player's inventory (`qty > 0`), including fresh, salt, and boosted (`+`) variants, and switch to it through `/api/lure/{id}` if different from the currently selected lure. If no compatible bait is in stock, buy the cheapest compatible coin pack affordable with the actual balance through `/api/shop/{id}/coins` and randomly select among the acquired compatible lures; insufficient coins skip the cast. No Stars purchases or free shop grants.
 5. Make one `POST /api/bot/cast` request and wait for the server result. Busy casts and unaffordable bait skip the attempt. Catches contribute to normal tournament and club-event standings.
 
 The client refreshes expired access tokens through `/api/auth/refresh` and atomically saves rotated sessions. Mutation requests are not retried after ambiguous transport failures. It reads the server compatibility policy and supplies the required API version header. A file lock in the persistent state directory prevents concurrent clients using the same state.
@@ -31,7 +44,8 @@ The client refreshes expired access tokens through `/api/auth/refresh` and atomi
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `STUB_SERVER_URL` | required | Game server URL; HDC uses `http://app:5005` on the backend network |
-| `STUB_ACCOUNT_PAUSE_SECONDS` | `10` | Pause after each completed/failed cycle, 1–3600 seconds |
+| `STUB_ACCOUNT_PAUSE_SECONDS` | `0` | Pause after each completed/failed cycle, 0–3600 seconds; 0 disables the pause |
+| `STUB_SCHEDULE_TIME_ZONE` | `UTC` | IANA time zone for daily shifts; must match the game server's time zone |
 | `STUB_STATE_DIR` | `/data/gameplay-stub` | `accounts.json`, process lock and heartbeat |
 
 Keep `accounts.json` private: it contains player sessions. No admin token is needed by the running client. If refresh sessions expire, stop the client, remove/securely archive the old session file and provision new sessions via the deployment script; this reuses the same 50 profiles.
