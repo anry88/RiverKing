@@ -12,6 +12,7 @@ services:
     environment:
       STUB_SERVER_URL: ${STUB_SERVER_URL:-http://app:5005}
       STUB_ACCOUNT_PAUSE_SECONDS: ${STUB_ACCOUNT_PAUSE_SECONDS:-0}
+      STUB_SCHEDULE_TIME_ZONE: ${STUB_SCHEDULE_TIME_ZONE:-UTC}
       STUB_STATE_DIR: /data/gameplay-stub
     volumes:
       - type: bind

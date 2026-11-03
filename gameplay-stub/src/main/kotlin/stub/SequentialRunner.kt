@@ -11,6 +11,7 @@ suspend fun runSequentially(
     once: Boolean = false,
     pauseMillis: Long = 0,
     awaitNext: suspend (Long) -> Unit = { delay(it) },
+    canStart: (Long) -> Boolean = { true },
     onError: (Long, Exception) -> Unit,
     cycle: suspend (Long) -> Unit,
 ) {
@@ -18,6 +19,7 @@ suspend fun runSequentially(
     do {
         for ((index, uid) in ids.withIndex()) {
             currentCoroutineContext().ensureActive()
+            if (!canStart(uid)) continue
             try {
                 cycle(uid)
             } catch (e: CancellationException) {

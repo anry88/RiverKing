@@ -8,6 +8,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.time.Instant
+import java.time.Clock
+import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 
 fun main(args: Array<String>) {
@@ -21,6 +23,7 @@ fun main(args: Array<String>) {
     require(args.all { it == "--once" }) { "Options: --once, --health" }
     val pauseSeconds = System.getenv("STUB_ACCOUNT_PAUSE_SECONDS")?.toLong() ?: 0L
     require(pauseSeconds in 0..3_600)
+    val scheduleZone = ZoneId.of(System.getenv("STUB_SCHEDULE_TIME_ZONE") ?: "UTC")
     val baseUrl = System.getenv("STUB_SERVER_URL") ?: error("STUB_SERVER_URL is required")
     val uri = java.net.URI(baseUrl)
     require(uri.scheme in listOf("http", "https") && uri.host != null && uri.userInfo == null)
@@ -40,24 +43,31 @@ fun main(args: Array<String>) {
                             server.initialize()
                             BotNicknames.synchronize(server, store)
                             val ids = store.accounts().map { it.userId }
-                            log.info("HTTP client ready accounts=50 server={} accountPauseSeconds={}", baseUrl, pauseSeconds)
+                            val schedule = BotSchedule(store.accounts(), Clock.system(scheduleZone))
+                            log.info("HTTP client ready accounts=50 server={} accountPauseSeconds={} scheduleTimeZone={} activeAccounts={}",
+                                baseUrl, pauseSeconds, scheduleZone, ids.count(schedule::isActive))
+                            BotShift.values().forEach { shift ->
+                                log.info("Schedule group={} window={} userIds={}", shift, shift.window,
+                                    ids.filter { schedule.shift(it) == shift }.joinToString(","))
+                            }
                             val completed = AtomicLong()
                             val caught = AtomicLong()
                             val failed = AtomicLong()
                             val heartbeat = launch(Dispatchers.IO) {
                                 while (isActive) {
                                     val tmp = state.resolve("heartbeat.tmp")
-                                    Files.writeString(tmp, "at=${Instant.now()} accounts=50 cycles=${completed.get()} caught=${caught.get()} errors=${failed.get()}\n")
+                                    Files.writeString(tmp, "at=${Instant.now()} accounts=50 activeAccounts=${ids.count(schedule::isActive)} scheduleTimeZone=$scheduleZone cycles=${completed.get()} caught=${caught.get()} errors=${failed.get()}\n")
                                     Files.move(tmp, state.resolve("heartbeat"), StandardCopyOption.REPLACE_EXISTING)
                                     delay(15_000)
                                 }
                             }
                             try {
                                 runSequentially(ids, once = "--once" in args, pauseMillis = pauseSeconds * 1_000,
+                                    canStart = schedule::isActive,
                                     onError = { uid, e -> failed.incrementAndGet(); log.error("Cycle failed userId={}", uid, e) },
                                 ) { uid ->
                                     val account = store.get(uid)
-                                    log.info("Cycle started userId={} nickname={} language={}", uid, account.nickname, account.language)
+                                    log.info("Cycle started userId={} nickname={} language={} group={}", uid, account.nickname, account.language, schedule.shift(uid))
                                     val result = GameCycle(server.forAccount(uid)).run()
                                     if (result == GameCycle.Result.CAUGHT) caught.incrementAndGet()
                                     completed.incrementAndGet()

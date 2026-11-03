@@ -8,6 +8,21 @@ import kotlin.test.assertFailsWith
 
 class SequentialRunnerTest {
     @Test
+    fun skipsInactiveAccountsWithoutDelayAndRechecksEligibilityAfterEachCompletedCycle() = runBlocking {
+        val events = mutableListOf<String>()
+        var active = setOf(1L, 2L)
+        runSequentially(listOf(1, 2, 3), once = true, pauseMillis = 25,
+            canStart = { it in active },
+            awaitNext = { events += "pause:$it" },
+            onError = { _, e -> throw e },
+        ) { uid ->
+            events += "cycle:$uid"
+            active = setOf(1L, 3L)
+        }
+        assertEquals(listOf("cycle:1", "pause:25", "cycle:3"), events)
+    }
+
+    @Test
     fun completesEachAccountBeforeNextAccountWithoutPause() = runBlocking {
         val events = mutableListOf<String>()
         runSequentially(listOf(1, 2, 3), once = true,

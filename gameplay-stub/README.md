@@ -16,7 +16,20 @@ All HTTP requests pass through the main server metrics. Casts increment `cast_to
 
 ## Cycle
 
-Strictly one account at a time, alternating Russian and English profiles (RU → EN → RU → EN): finish the full cycle, including the server's 5–30-second cast wait, then immediately start the next account. After account 50, immediately return to account 1. Failed cycles also move on without an additional pause. Operators can configure an optional pause with `STUB_ACCOUNT_PAUSE_SECONDS`. All 50 existing profiles are reused; alternating the processing order does not rename or recreate accounts.
+Strictly one account at a time in the existing alternating Russian/English roster order: finish the full cycle, including the server's 5–30-second cast wait, then immediately move to the next eligible account. After the roster ends, return to its beginning. Failed cycles also move on without an additional pause. Operators can configure an optional pause with `STUB_ACCOUNT_PAUSE_SECONDS`. All 50 existing profiles are reused.
+
+`BotSchedule.kt` assigns fixed shifts by stable slot order, alternating Russian and English profiles before partitioning:
+
+| Positions in alternating roster | Accounts | Daily window (server time) |
+| --- | --- | --- |
+| 1–5 | 5 | 24/7 |
+| 6–20 | 15 | 09:00–17:00 |
+| 21–35 | 15 | 16:00–01:00 |
+| 36–50 | 15 | 01:00–09:00 |
+
+Start times are inclusive and end times exclusive. The evening window is deliberately nine hours and overlaps the day group from 16:00 to 17:00: 35 accounts are eligible during that hour and 20 otherwise. Membership survives restarts and reordered session files. The worker checks the current time before every account; inactive accounts make no cycle HTTP calls and incur no pause. An already started cycle finishes after its window closes. `--once` visits eligible accounts once. Group membership is logged at startup; cycle logs include the group and the heartbeat includes the active-account count.
+
+HDC's game backend and worker use UTC. `STUB_SCHEDULE_TIME_ZONE` explicitly defaults to UTC; if the game server's time zone changes, update this setting to match it.
 
 1. Read `/api/club`; if absent, search and join an eligible existing club.
 2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
@@ -32,6 +45,7 @@ The client refreshes expired access tokens through `/api/auth/refresh` and atomi
 | --- | --- | --- |
 | `STUB_SERVER_URL` | required | Game server URL; HDC uses `http://app:5005` on the backend network |
 | `STUB_ACCOUNT_PAUSE_SECONDS` | `0` | Pause after each completed/failed cycle, 0–3600 seconds; 0 disables the pause |
+| `STUB_SCHEDULE_TIME_ZONE` | `UTC` | IANA time zone for daily shifts; must match the game server's time zone |
 | `STUB_STATE_DIR` | `/data/gameplay-stub` | `accounts.json`, process lock and heartbeat |
 
 Keep `accounts.json` private: it contains player sessions. No admin token is needed by the running client. If refresh sessions expire, stop the client, remove/securely archive the old session file and provision new sessions via the deployment script; this reuses the same 50 profiles.
