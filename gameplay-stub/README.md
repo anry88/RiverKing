@@ -29,7 +29,7 @@ Strictly one account at a time in the existing alternating Russian/English roste
 
 Start times are inclusive and end times exclusive. All three shifts are eight hours, with no gaps or overlaps: exactly 20 accounts are eligible at any time (five permanent and fifteen on shift). Membership survives restarts and reordered session files. The worker checks the current time before every account; inactive accounts make no cycle HTTP calls and incur no pause. An already started cycle finishes after its window closes. `--once` visits eligible accounts once. Group membership is logged at startup; cycle logs include the group and the heartbeat includes the active-account count.
 
-HDC's game backend and worker use UTC. `STUB_SCHEDULE_TIME_ZONE` explicitly defaults to UTC; if the game server's time zone changes, update this setting to match it.
+`STUB_SCHEDULE_TIME_ZONE` explicitly defaults to UTC; if the game server's time zone changes, update this setting to match it.
 
 1. Read `/api/club`; if absent, search and join an eligible existing club.
 2. Claim prizes, referral rewards, daily bait and available achievements through ordinary player endpoints; load quests (their rewards are automatic).
@@ -43,7 +43,7 @@ The client refreshes expired access tokens through `/api/auth/refresh` and atomi
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `STUB_SERVER_URL` | required | Game server URL; HDC uses `http://app:5005` on the backend network |
+| `STUB_SERVER_URL` | required | Game server URL |
 | `STUB_ACCOUNT_PAUSE_SECONDS` | `0` | Pause after each completed/failed cycle, 0–3600 seconds; 0 disables the pause |
 | `STUB_SCHEDULE_TIME_ZONE` | `UTC` | IANA time zone for daily shifts; must match the game server's time zone |
 | `STUB_STATE_DIR` | `/data/gameplay-stub` | `accounts.json`, process lock and heartbeat |
@@ -54,22 +54,4 @@ Keep `accounts.json` private: it contains player sessions. No admin token is nee
 ./gradlew :gameplay-stub:test
 STUB_SERVER_URL=https://riverking.tg-games.com STUB_STATE_DIR=/path/to/state ./gradlew :gameplay-stub:run
 # --once processes the roster once; --health checks the heartbeat.
-```
-
-## HDC rollout
-
-Release the backend through the normal `develop -> main` PR flow first, so the two new endpoints are available. Then, from `develop`:
-
-```bash
-scripts/deploy-gameplay-stub-hdc.sh
-scripts/deploy-gameplay-stub-hdc.sh --stop
-```
-
-The deploy script builds the independent HTTP-client image, creates `D:\Apps\RiverKing\state\prod\gameplay-stub`, and, if `accounts.json` does not yet exist, calls the protected server provisioning endpoint using the operator's existing host config. Tokens are written directly to the private state file and are not printed. The runtime container mounts only its state, not the backend config or database. A separate Compose project joins `riverking-prod_default` and calls `http://app:5005`.
-
-`--environment test` uses the test environment. `HDC_REMOTE_HOST`, `HDC_DOCKER_CONTEXT` and `HDC_RIVERKING_ROOT` override host defaults. Logs go to stdout with Docker rotation; a 15-second heartbeat reports completed cycles/catches/errors.
-
-```bash
-docker --context hdc ps --filter name=riverking-prod-stub
-docker --context hdc logs --tail 100 riverking-prod-stub-gameplay-stub-1
 ```
