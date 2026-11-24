@@ -121,16 +121,15 @@
       "image": "../../../../src/main/resources/webapp/assets/fish/karanks_polosatiy.png"
     },
     {
-      "name": "Масаба",
+      "name": "Японская скумбрия",
       "rarity": "common",
       "predator": true,
       "water": "salt",
       "weight": 0.5296,
-      "nameEn": "Masaba",
-      "nameJa": "マサバ",
+      "nameEn": "Chub Mackerel",
       "species": "Scomber japonicus",
       "source": "new",
-      "image": "fish/masaba.png"
+      "image": "fish/chub_mackerel.png"
     },
     {
       "name": "Кефаль-лобан",
@@ -213,16 +212,15 @@
       "image": "../../../../src/main/resources/webapp/assets/fish/grupper_leopardoviy_koralloviy.png"
     },
     {
-      "name": "Мадай",
+      "name": "Красный пагр",
       "rarity": "uncommon",
       "predator": true,
       "water": "salt",
       "weight": 0.5666666666,
-      "nameEn": "Madai",
-      "nameJa": "マダイ",
+      "nameEn": "Red Seabream",
       "species": "Pagrus major",
       "source": "new",
-      "image": "fish/madai.png"
+      "image": "fish/red_seabream.png"
     },
     {
       "name": "Сиган золотистый",
@@ -275,28 +273,26 @@
       "image": "../../../../src/main/resources/webapp/assets/fish/dorado.png"
     },
     {
-      "name": "Татиуо",
+      "name": "Японская сабля-рыба",
       "rarity": "rare",
       "predator": true,
       "water": "salt",
       "weight": 0.41335,
-      "nameEn": "Tachiuo",
-      "nameJa": "タチウオ",
+      "nameEn": "Japanese Cutlassfish",
       "species": "Trichiurus japonicus",
       "source": "new",
-      "image": "fish/tachiuo.png"
+      "image": "fish/japanese_cutlassfish.png"
     },
     {
-      "name": "Исидай",
+      "name": "Полосатый ножезуб",
       "rarity": "rare",
       "predator": true,
       "water": "salt",
       "weight": 0.41335,
-      "nameEn": "Ishidai",
-      "nameJa": "イシダイ",
+      "nameEn": "Barred Knifejaw",
       "species": "Oplegnathus fasciatus",
       "source": "new",
-      "image": "fish/ishidai.png"
+      "image": "fish/barred_knifejaw.png"
     },
     {
       "name": "Каранкс голубой",
@@ -349,23 +345,22 @@
       "image": "../../../../src/main/resources/webapp/assets/fish/akula_mako.png"
     },
     {
-      "name": "Бури",
+      "name": "Жёлтохвостая лакедра",
       "rarity": "epic",
       "predator": true,
       "water": "salt",
       "weight": 0.0333333335,
-      "nameEn": "Buri",
-      "nameJa": "ブリ",
+      "nameEn": "Japanese Amberjack",
       "species": "Seriola quinqueradiata",
       "source": "new",
-      "image": "fish/buri.png"
+      "image": "fish/japanese_amberjack.png"
     },
     {
       "name": "Тунец желтоперый",
       "rarity": "mythic",
       "predator": true,
       "water": "salt",
-      "weight": 0.0603333334,
+      "weight": 0.04525,
       "nameEn": "Yellowfin Tuna",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/tunec_zeltoperiy.png"
@@ -375,7 +370,7 @@
       "rarity": "mythic",
       "predator": true,
       "water": "salt",
-      "weight": 0.0603333334,
+      "weight": 0.04525,
       "nameEn": "Conger Eel",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/konger.png"
@@ -385,17 +380,28 @@
       "rarity": "mythic",
       "predator": true,
       "water": "salt",
-      "weight": 0.0603333333,
+      "weight": 0.04525,
       "nameEn": "Giant Moray",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/murena_gigantskaya.png"
+    },
+    {
+      "name": "Длиннозубый групер",
+      "rarity": "mythic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0452500001,
+      "nameEn": "Longtooth Grouper",
+      "species": "Epinephelus bruneus",
+      "source": "new",
+      "image": "fish/longtooth_grouper.png"
     },
     {
       "name": "Тунец синеперый",
       "rarity": "legendary",
       "predator": true,
       "water": "salt",
-      "weight": 0.00474,
+      "weight": 0.003555,
       "nameEn": "Bluefin Tuna",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/tunets_sineperiy.png"
@@ -405,7 +411,7 @@
       "rarity": "legendary",
       "predator": true,
       "water": "salt",
-      "weight": 0.00474,
+      "weight": 0.003555,
       "nameEn": "Giant Trevally",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/gigantskiy_karanks.png"
@@ -415,10 +421,21 @@
       "rarity": "legendary",
       "predator": true,
       "water": "salt",
-      "weight": 0.0047400001,
+      "weight": 0.003555,
       "nameEn": "Blue Marlin",
       "source": "catalog",
       "image": "../../../../src/main/resources/webapp/assets/fish/marlin_siniy.png"
+    },
+    {
+      "name": "Японский латес",
+      "rarity": "legendary",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0035550001,
+      "nameEn": "Japanese Lates",
+      "species": "Lates japonicus",
+      "source": "new",
+      "image": "fish/japanese_lates.png"
     }
   ]
 }
