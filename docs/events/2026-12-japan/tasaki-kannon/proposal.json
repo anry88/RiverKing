@@ -1,0 +1,424 @@
+{
+  "task": "RIV-1",
+  "status": "proposed",
+  "nameRu": "Тасаки-Каннон",
+  "nameEn": "Tasaki Kannon",
+  "nameJa": "太崎観音",
+  "placeJa": "太崎観音崎",
+  "start": "2026-12-01T00:00:00Z",
+  "end": "2027-01-01T00:00:00Z",
+  "background": "background.png",
+  "weightReference": "../../2026-11-south-america/event.json",
+  "fish": [
+    {
+      "name": "Сардина",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Sardine",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/sardina.png"
+    },
+    {
+      "name": "Кефаль пятнистая",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Spotted Mullet",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/kefal_pyatnistaya.png"
+    },
+    {
+      "name": "Анчоус тропический",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Tropical Anchovy",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/anchous_tropicheskiy.png"
+    },
+    {
+      "name": "Сельдь тихоокеанская",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Pacific Herring",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/seld_tihookeanskaya.png"
+    },
+    {
+      "name": "Хромис рифовый",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Reef Chromis",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/hromis_rifoviy.png"
+    },
+    {
+      "name": "Фузилёр жёлтохвостый",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285714,
+      "nameEn": "Yellowtail Fusilier",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/fuziler_zheltohvostiy.png"
+    },
+    {
+      "name": "Морской конёк",
+      "rarity": "common",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.6574285716,
+      "nameEn": "Seahorse",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/morskoy_konek.png"
+    },
+    {
+      "name": "Ставрида",
+      "rarity": "common",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5296,
+      "nameEn": "Horse Mackerel",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/stavrida.png"
+    },
+    {
+      "name": "Скорпена бородатая",
+      "rarity": "common",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5296,
+      "nameEn": "Bearded Scorpionfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/skorpena_borodataya.png"
+    },
+    {
+      "name": "Барракуда полосатая",
+      "rarity": "common",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5296,
+      "nameEn": "Striped Barracuda",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/barrakuda_polosataya.png"
+    },
+    {
+      "name": "Каранкс шестиполосый",
+      "rarity": "common",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5296,
+      "nameEn": "Sixband Trevally",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/karanks_polosatiy.png"
+    },
+    {
+      "name": "Масаба",
+      "rarity": "common",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5296,
+      "nameEn": "Masaba",
+      "nameJa": "マサバ",
+      "species": "Scomber japonicus",
+      "source": "new",
+      "image": "fish/masaba.png"
+    },
+    {
+      "name": "Кефаль-лобан",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666666,
+      "nameEn": "Flathead Grey Mullet",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/kefal.png"
+    },
+    {
+      "name": "Сайра",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666666,
+      "nameEn": "Pacific Saury",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/sayra.png"
+    },
+    {
+      "name": "Летучая рыба",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666666,
+      "nameEn": "Flying Fish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/letuchaya_ryba.png"
+    },
+    {
+      "name": "Барабулька тропическая",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666666,
+      "nameEn": "Tropical Goatfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/barabulka_tropicheskaya.png"
+    },
+    {
+      "name": "Рыба-бабочка полосатая",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666666,
+      "nameEn": "Striped Butterflyfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/ryba_babochka_polosataya.png"
+    },
+    {
+      "name": "Губан-чистильщик",
+      "rarity": "uncommon",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.1151666669,
+      "nameEn": "Cleaner Wrasse",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/guban-chistilschik.png"
+    },
+    {
+      "name": "Иглорыл-агухон",
+      "rarity": "uncommon",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5666666667,
+      "nameEn": "Agujon Needlefish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/igloryl-aguhon.png"
+    },
+    {
+      "name": "Группер леопардовый коралловый",
+      "rarity": "uncommon",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5666666667,
+      "nameEn": "Leopard Coral Grouper",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/grupper_leopardoviy_koralloviy.png"
+    },
+    {
+      "name": "Мадай",
+      "rarity": "uncommon",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.5666666666,
+      "nameEn": "Madai",
+      "nameJa": "マダイ",
+      "species": "Pagrus major",
+      "source": "new",
+      "image": "fish/madai.png"
+    },
+    {
+      "name": "Сиган золотистый",
+      "rarity": "rare",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.381,
+      "nameEn": "Golden Rabbitfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/zolotistiy_shiponog.png"
+    },
+    {
+      "name": "Сиган коричневопятнистый",
+      "rarity": "rare",
+      "predator": false,
+      "water": "salt",
+      "weight": 0.381,
+      "nameEn": "Brown-spotted Rabbitfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/sigan_korichnevopyatnistiy.png"
+    },
+    {
+      "name": "Альбула",
+      "rarity": "rare",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.41335,
+      "nameEn": "Bonefish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/kostlyavaya_ryba.png"
+    },
+    {
+      "name": "Альбакор",
+      "rarity": "rare",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.41335,
+      "nameEn": "Albacore",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/albakor.png"
+    },
+    {
+      "name": "Дорадо",
+      "rarity": "rare",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.41335,
+      "nameEn": "Dorado",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/dorado.png"
+    },
+    {
+      "name": "Татиуо",
+      "rarity": "rare",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.41335,
+      "nameEn": "Tachiuo",
+      "nameJa": "タチウオ",
+      "species": "Trichiurus japonicus",
+      "source": "new",
+      "image": "fish/tachiuo.png"
+    },
+    {
+      "name": "Исидай",
+      "rarity": "rare",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.41335,
+      "nameEn": "Ishidai",
+      "nameJa": "イシダイ",
+      "species": "Oplegnathus fasciatus",
+      "source": "new",
+      "image": "fish/ishidai.png"
+    },
+    {
+      "name": "Каранкс голубой",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333333,
+      "nameEn": "Blue Trevally",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/goluboy_trevalli.png"
+    },
+    {
+      "name": "Рыба-меч",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333333,
+      "nameEn": "Swordfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/ryba_mech.png"
+    },
+    {
+      "name": "Барракуда большая",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333333,
+      "nameEn": "Great Barracuda",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/barrakuda_bolschaya.png"
+    },
+    {
+      "name": "Парусник",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333333,
+      "nameEn": "Sailfish",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/parusnik.png"
+    },
+    {
+      "name": "Акула мако",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333333,
+      "nameEn": "Mako Shark",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/akula_mako.png"
+    },
+    {
+      "name": "Бури",
+      "rarity": "epic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0333333335,
+      "nameEn": "Buri",
+      "nameJa": "ブリ",
+      "species": "Seriola quinqueradiata",
+      "source": "new",
+      "image": "fish/buri.png"
+    },
+    {
+      "name": "Тунец желтоперый",
+      "rarity": "mythic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0603333334,
+      "nameEn": "Yellowfin Tuna",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/tunec_zeltoperiy.png"
+    },
+    {
+      "name": "Конгер",
+      "rarity": "mythic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0603333334,
+      "nameEn": "Conger Eel",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/konger.png"
+    },
+    {
+      "name": "Мурена гигантская",
+      "rarity": "mythic",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0603333333,
+      "nameEn": "Giant Moray",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/murena_gigantskaya.png"
+    },
+    {
+      "name": "Тунец синеперый",
+      "rarity": "legendary",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.00474,
+      "nameEn": "Bluefin Tuna",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/tunets_sineperiy.png"
+    },
+    {
+      "name": "Каранкс гигантский",
+      "rarity": "legendary",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.00474,
+      "nameEn": "Giant Trevally",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/gigantskiy_karanks.png"
+    },
+    {
+      "name": "Марлин синий",
+      "rarity": "legendary",
+      "predator": true,
+      "water": "salt",
+      "weight": 0.0047400001,
+      "nameEn": "Blue Marlin",
+      "source": "catalog",
+      "image": "../../../../src/main/resources/webapp/assets/fish/marlin_siniy.png"
+    }
+  ]
+}
