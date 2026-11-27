@@ -84,7 +84,8 @@ def main():
         selected.append({"fishId": fish_id, "weight": fish["weight"]})
     if not selected:
         raise ValueError("Empty fish pool")
-    payload = {key: event[key] for key in ("nameRu", "nameEn", "imagePath", "castZone")}
+    payload = {key: event[key] for key in ("nameRu", "nameEn", "imagePath")}
+    payload["castZone"] = event.get("castZone")
     payload.update(startTime=int(start.timestamp() * 1000), endTime=int(end.timestamp() * 1000), fish=selected)
     for category in ("weightPrizes", "countPrizes", "fishPrizes"):
         config = event[category]
@@ -96,7 +97,10 @@ def main():
         check_image("/app/assets/fish/" + asset + ".png")
     existing = request("/api/admin/events")
     def canonical(value):
-        value = json.loads(json.dumps({key: value[key] for key in payload}))
+        optional = ("imagePath", "castZone")
+        value = json.loads(json.dumps({
+            key: value.get(key) if key in optional else value[key] for key in payload
+        }))
         value["fish"] = sorted(value["fish"], key=lambda fish: fish["fishId"])
         for category in ("weightPrizes", "countPrizes", "fishPrizes"):
             value[category]["prizesJson"] = json.loads(value[category]["prizesJson"])

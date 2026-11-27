@@ -1,0 +1,318 @@
+{
+  "nameRu": "Тасаки-Каннон",
+  "nameEn": "Tasaki Kannon",
+  "start": "2026-12-01T00:00:00Z",
+  "end": "2027-01-01T00:00:00Z",
+  "imagePath": "tasaki_kannon.png",
+  "castZone": null,
+  "fish": [
+    {
+      "name": "Сардина",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Кефаль пятнистая",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Анчоус тропический",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Сельдь тихоокеанская",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Хромис рифовый",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Фузилёр жёлтохвостый",
+      "rarity": "common",
+      "weight": 0.6574285714
+    },
+    {
+      "name": "Морской конёк",
+      "rarity": "common",
+      "weight": 0.6574285716
+    },
+    {
+      "name": "Ставрида",
+      "rarity": "common",
+      "weight": 0.5296
+    },
+    {
+      "name": "Скорпена бородатая",
+      "rarity": "common",
+      "weight": 0.5296
+    },
+    {
+      "name": "Барракуда полосатая",
+      "rarity": "common",
+      "weight": 0.5296
+    },
+    {
+      "name": "Каранкс шестиполосый",
+      "rarity": "common",
+      "weight": 0.5296
+    },
+    {
+      "name": "Японская скумбрия",
+      "rarity": "common",
+      "weight": 0.5296
+    },
+    {
+      "name": "Кефаль-лобан",
+      "rarity": "uncommon",
+      "weight": 0.1151666666
+    },
+    {
+      "name": "Сайра",
+      "rarity": "uncommon",
+      "weight": 0.1151666666
+    },
+    {
+      "name": "Летучая рыба",
+      "rarity": "uncommon",
+      "weight": 0.1151666666
+    },
+    {
+      "name": "Барабулька тропическая",
+      "rarity": "uncommon",
+      "weight": 0.1151666666
+    },
+    {
+      "name": "Рыба-бабочка полосатая",
+      "rarity": "uncommon",
+      "weight": 0.1151666666
+    },
+    {
+      "name": "Губан-чистильщик",
+      "rarity": "uncommon",
+      "weight": 0.1151666669
+    },
+    {
+      "name": "Иглорыл-агухон",
+      "rarity": "uncommon",
+      "weight": 0.5666666667
+    },
+    {
+      "name": "Группер леопардовый коралловый",
+      "rarity": "uncommon",
+      "weight": 0.5666666667
+    },
+    {
+      "name": "Красный пагр",
+      "rarity": "uncommon",
+      "weight": 0.5666666666
+    },
+    {
+      "name": "Сиган золотистый",
+      "rarity": "rare",
+      "weight": 0.381
+    },
+    {
+      "name": "Сиган коричневопятнистый",
+      "rarity": "rare",
+      "weight": 0.381
+    },
+    {
+      "name": "Альбула",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Альбакор",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Дорадо",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Японская сабля-рыба",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Полосатый ножезуб",
+      "rarity": "rare",
+      "weight": 0.41335
+    },
+    {
+      "name": "Каранкс голубой",
+      "rarity": "epic",
+      "weight": 0.0333333333
+    },
+    {
+      "name": "Рыба-меч",
+      "rarity": "epic",
+      "weight": 0.0333333333
+    },
+    {
+      "name": "Барракуда большая",
+      "rarity": "epic",
+      "weight": 0.0333333333
+    },
+    {
+      "name": "Парусник",
+      "rarity": "epic",
+      "weight": 0.0333333333
+    },
+    {
+      "name": "Акула мако",
+      "rarity": "epic",
+      "weight": 0.0333333333
+    },
+    {
+      "name": "Жёлтохвостая лакедра",
+      "rarity": "epic",
+      "weight": 0.0333333335
+    },
+    {
+      "name": "Тунец желтоперый",
+      "rarity": "mythic",
+      "weight": 0.04525
+    },
+    {
+      "name": "Конгер",
+      "rarity": "mythic",
+      "weight": 0.04525
+    },
+    {
+      "name": "Мурена гигантская",
+      "rarity": "mythic",
+      "weight": 0.04525
+    },
+    {
+      "name": "Длиннозубый групер",
+      "rarity": "mythic",
+      "weight": 0.0452500001
+    },
+    {
+      "name": "Тунец синеперый",
+      "rarity": "legendary",
+      "weight": 0.003555
+    },
+    {
+      "name": "Каранкс гигантский",
+      "rarity": "legendary",
+      "weight": 0.003555
+    },
+    {
+      "name": "Марлин синий",
+      "rarity": "legendary",
+      "weight": 0.003555
+    },
+    {
+      "name": "Японский латес",
+      "rarity": "legendary",
+      "weight": 0.0035550001
+    }
+  ],
+  "requiredFishAssets": [
+    "chub_mackerel",
+    "red_seabream",
+    "japanese_cutlassfish",
+    "barred_knifejaw",
+    "japanese_amberjack",
+    "longtooth_grouper",
+    "japanese_lates"
+  ],
+  "weightPrizes": {
+    "prizePlaces": 3,
+    "prizes": [
+      {
+        "pack": "autofish",
+        "qty": 1
+      },
+      {
+        "pack": "autofish_week",
+        "qty": 2
+      },
+      {
+        "pack": "autofish_week",
+        "qty": 1
+      }
+    ]
+  },
+  "countPrizes": {
+    "prizePlaces": 3,
+    "prizes": [
+      {
+        "pack": "bundle_whale",
+        "qty": 3
+      },
+      {
+        "pack": "bundle_whale",
+        "qty": 2
+      },
+      {
+        "pack": "bundle_whale",
+        "qty": 1
+      }
+    ]
+  },
+  "fishPrizes": {
+    "prizePlaces": 10,
+    "prizes": [
+      {
+        "pack": "coins",
+        "qty": 10000,
+        "coins": 10000
+      },
+      {
+        "pack": "coins",
+        "qty": 9000,
+        "coins": 9000
+      },
+      {
+        "pack": "coins",
+        "qty": 8000,
+        "coins": 8000
+      },
+      {
+        "pack": "coins",
+        "qty": 7000,
+        "coins": 7000
+      },
+      {
+        "pack": "coins",
+        "qty": 6000,
+        "coins": 6000
+      },
+      {
+        "pack": "coins",
+        "qty": 5000,
+        "coins": 5000
+      },
+      {
+        "pack": "coins",
+        "qty": 4000,
+        "coins": 4000
+      },
+      {
+        "pack": "coins",
+        "qty": 3000,
+        "coins": 3000
+      },
+      {
+        "pack": "coins",
+        "qty": 2000,
+        "coins": 2000
+      },
+      {
+        "pack": "coins",
+        "qty": 1000,
+        "coins": 1000
+      }
+    ]
+  }
+}

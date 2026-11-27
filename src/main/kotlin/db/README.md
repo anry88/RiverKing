@@ -6,5 +6,6 @@ The data layer defines Exposed tables and handles connection initialization.
 - **`DB`** (inside `Tables.kt`) provides `init(env: Env)`, which opens the SQLite/PostgreSQL Hikari connection pool, applies schema creation and SQLite-specific migrations, seeds reference data, and backfills Telegram identities. Database access belongs to the server; the gameplay bot module is an HTTP client.
 - **`DbExecution.kt`** provides the bounded coroutine dispatcher and helper functions used by Ktor routes for blocking Exposed work, keeping JDBC waits off Ktor request threads.
 - The reference fish seed includes thirteen South American species for November 2026. They are not added to regular location pools; the dated event is configured separately from `docs/events/2026-11-south-america/event.json` through the admin API.
+- The seed also includes seven marine fish for December 2026. The admin API configures their event pool from `docs/events/2026-12-japan/tasaki-kannon/event.json`.
 
 Use these models when adding new columns: services depend on the column names and types defined here.

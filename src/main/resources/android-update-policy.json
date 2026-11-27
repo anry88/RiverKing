@@ -1,14 +1,14 @@
 {
-  "latestVersionCode": 16,
-  "latestVersionName": "0.4.12",
+  "latestVersionCode": 17,
+  "latestVersionName": "0.4.13",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Android maintenance update."
+      "Added the Tasaki Kannon background and seven new fish illustrations for the December event."
     ],
     "ru": [
-      "Техническое обновление Android-приложения."
+      "Добавили фон Тасаки-Каннон и иллюстрации семи новых рыб декабрьского ивента."
     ]
   }
 }

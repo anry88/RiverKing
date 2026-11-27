@@ -740,13 +740,21 @@ fun Application.apiRoutes(
             }
             val root = File(env.eventAssetsDir).canonicalFile
             val file = File(root, fileName).canonicalFile
-            if (!file.path.startsWith(root.path) || !file.isFile) {
+            if (!file.path.startsWith(root.path + File.separator)) {
                 return@get call.respond(HttpStatusCode.NotFound)
             }
-            val contentType = ContentType.fromFilePath(file.name).firstOrNull()
+            val bytes = withContext(Dispatchers.IO) {
+                if (file.isFile) {
+                    file.readBytes()
+                } else {
+                    call.application.environment.classLoader
+                        .getResourceAsStream("webapp/assets/backgrounds/$fileName")
+                        ?.use { it.readBytes() }
+                }
+            } ?: return@get call.respond(HttpStatusCode.NotFound)
+            val contentType = ContentType.fromFilePath(fileName).firstOrNull()
                 ?: ContentType.Application.OctetStream
             call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
-            val bytes = withContext(Dispatchers.IO) { file.readBytes() }
             call.respondBytes(bytes, contentType)
         }
 
