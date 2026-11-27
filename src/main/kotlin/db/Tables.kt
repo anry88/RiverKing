@@ -966,6 +966,15 @@ object DB {
         upsertFish("Чавыча", "mythic", 8.0, 3.5, true, "salt")
         upsertFish("Осётр белый", "legendary", 25.0, 12.0, false, "fresh")
 
+        // December 2026 Tasaki Kannon event fish.
+        upsertFish("Японская скумбрия", "common", 0.45, 0.2, true, "salt")
+        upsertFish("Красный пагр", "uncommon", 2.0, 0.9, true, "salt")
+        upsertFish("Японская сабля-рыба", "rare", 1.4, 0.6, true, "salt")
+        upsertFish("Полосатый ножезуб", "rare", 2.2, 0.9, true, "salt")
+        upsertFish("Жёлтохвостая лакедра", "epic", 6.0, 2.5, true, "salt")
+        upsertFish("Длиннозубый групер", "mythic", 13.0, 5.0, true, "salt")
+        upsertFish("Японский латес", "legendary", 16.0, 7.0, true, "salt")
+
 
         // --- Rods ---
         upsertRod("spark", "Искра", 0.0, null, null)

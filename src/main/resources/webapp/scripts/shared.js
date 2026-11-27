@@ -448,6 +448,8 @@
   LOCATION_BG_BY_NAME[normalizeLocationName('South American Rivers')] = '/app/assets/backgrounds/south_american_rivers.png';
   LOCATION_BG_BY_NAME[normalizeLocationName('Порту-Амолар')] = '/app/assets/backgrounds/porto_amolar.png';
   LOCATION_BG_BY_NAME[normalizeLocationName('Porto Amolar')] = '/app/assets/backgrounds/porto_amolar.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Тасаки-Каннон')] = '/app/assets/backgrounds/tasaki_kannon.png';
+  LOCATION_BG_BY_NAME[normalizeLocationName('Tasaki Kannon')] = '/app/assets/backgrounds/tasaki_kannon.png';
 
   const getLocationBackground = (id, name) => {
     if (name) {
@@ -659,6 +661,13 @@
     'Барбадо': { en: 'Barbado', asset: '/app/assets/fish/barbado.png' },
     'Пати': { en: 'Pati', asset: '/app/assets/fish/pati.png' },
     'Жау': { en: 'Jau', asset: '/app/assets/fish/jau.png' },
+    'Японская скумбрия': { en: 'Chub Mackerel', asset: '/app/assets/fish/chub_mackerel.png' },
+    'Красный пагр': { en: 'Red Seabream', asset: '/app/assets/fish/red_seabream.png' },
+    'Японская сабля-рыба': { en: 'Japanese Cutlassfish', asset: '/app/assets/fish/japanese_cutlassfish.png' },
+    'Полосатый ножезуб': { en: 'Barred Knifejaw', asset: '/app/assets/fish/barred_knifejaw.png' },
+    'Жёлтохвостая лакедра': { en: 'Japanese Amberjack', asset: '/app/assets/fish/japanese_amberjack.png' },
+    'Длиннозубый групер': { en: 'Longtooth Grouper', asset: '/app/assets/fish/longtooth_grouper.png' },
+    'Японский латес': { en: 'Japanese Lates', asset: '/app/assets/fish/japanese_lates.png' },
     'Тетра неоновая': { en: 'Neon Tetra', asset: '/app/assets/fish/tetra_neonovaya.png' },
     'Тернеция чёрная': { en: 'Black Skirt Tetra', asset: '/app/assets/fish/tetra_chernaya.png' },
     'Рыба-лист амазонская': { en: 'Amazon Leaf Fish', asset: '/app/assets/fish/ryba_list_amazonskaya.png' },

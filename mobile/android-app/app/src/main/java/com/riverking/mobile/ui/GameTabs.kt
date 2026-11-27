@@ -8823,6 +8823,7 @@ private fun locationBackgroundAsset(location: String?): String? {
         "Коралловые отмели", "Coral Flats" -> "backgrounds/coral_flats.webp"
         "Реки Южной Америки", "South American Rivers" -> "backgrounds/south_american_rivers.webp"
         "Порту-Амолар", "Porto Amolar" -> "backgrounds/porto_amolar.webp"
+        "Тасаки-Каннон", "Tasaki Kannon" -> "backgrounds/tasaki_kannon.webp"
         "Ущелье реки Колумбия", "Columbia River Gorge" -> "backgrounds/columbia_river_gorge_bonneville_dam.webp"
         else -> null
     }
@@ -9046,6 +9047,20 @@ private val FISH_ASSET_MAP = mapOf(
     "Pati" to "fish/pati.webp",
     "Жау" to "fish/jau.webp",
     "Jau" to "fish/jau.webp",
+    "Японская скумбрия" to "fish/chub_mackerel.webp",
+    "Chub Mackerel" to "fish/chub_mackerel.webp",
+    "Красный пагр" to "fish/red_seabream.webp",
+    "Red Seabream" to "fish/red_seabream.webp",
+    "Японская сабля-рыба" to "fish/japanese_cutlassfish.webp",
+    "Japanese Cutlassfish" to "fish/japanese_cutlassfish.webp",
+    "Полосатый ножезуб" to "fish/barred_knifejaw.webp",
+    "Barred Knifejaw" to "fish/barred_knifejaw.webp",
+    "Жёлтохвостая лакедра" to "fish/japanese_amberjack.webp",
+    "Japanese Amberjack" to "fish/japanese_amberjack.webp",
+    "Длиннозубый групер" to "fish/longtooth_grouper.webp",
+    "Longtooth Grouper" to "fish/longtooth_grouper.webp",
+    "Японский латес" to "fish/japanese_lates.webp",
+    "Japanese Lates" to "fish/japanese_lates.webp",
     "Тетра неоновая" to "fish/tetra_neonovaya.webp",
     "Neon Tetra" to "fish/tetra_neonovaya.webp",
     "Тернеция чёрная" to "fish/tetra_chernaya.webp",

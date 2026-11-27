@@ -103,6 +103,13 @@ object I18n {
         "Барбадо" to "Barbado",
         "Пати" to "Pati",
         "Жау" to "Jau",
+        "Японская скумбрия" to "Chub Mackerel",
+        "Красный пагр" to "Red Seabream",
+        "Японская сабля-рыба" to "Japanese Cutlassfish",
+        "Полосатый ножезуб" to "Barred Knifejaw",
+        "Жёлтохвостая лакедра" to "Japanese Amberjack",
+        "Длиннозубый групер" to "Longtooth Grouper",
+        "Японский латес" to "Japanese Lates",
         "Тетра неоновая" to "Neon Tetra",
         "Тернеция чёрная" to "Black Skirt Tetra",
         "Рыба-лист амазонская" to "Amazon Leaf Fish",
@@ -281,6 +288,7 @@ object I18n {
         "Коралловые отмели" to "Coral Flats",
         "Реки Южной Америки" to "South American Rivers",
         "Порту-Амолар" to "Porto Amolar",
+        "Тасаки-Каннон" to "Tasaki Kannon",
         "Ущелье реки Колумбия" to "Columbia River Gorge",
     )
 
