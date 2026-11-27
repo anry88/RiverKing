@@ -30,3 +30,5 @@ docs/branding
 *.tar.gz
 *.rar
 *.DS_Store
+
+.private/

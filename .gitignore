@@ -48,3 +48,6 @@ build/
 docs/raw-screens/
 
 /.gradle-home/wrapper/
+
+# Private local files
+/.private/

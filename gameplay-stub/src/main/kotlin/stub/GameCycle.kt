@@ -2,7 +2,10 @@ package stub
 
 import kotlinx.serialization.json.*
 
-class GameCycle(private val api: GameApi) {
+class GameCycle(
+    private val api: GameApi,
+    private val chooseLure: (List<JsonObject>) -> JsonObject = { it.random() },
+) {
     enum class Result { CAUGHT, ESCAPED, BUSY, NO_BAIT }
 
     suspend fun run(): Result = try {
@@ -62,14 +65,17 @@ class GameCycle(private val api: GameApi) {
             (lure["displayName"] ?: lure["name"])?.jsonPrimitive?.content in allowed
         val currentId = profile["currentLureId"]?.jsonPrimitive?.longOrNull
         val available = profile.items("lures").filter { it.long("qty") > 0 && compatible(it) }
-        var owned = available.firstOrNull { it.long("id") == currentId } ?: available.firstOrNull()
-        if (owned == null) {
+        val owned = if (available.isNotEmpty()) {
+            chooseLure(available)
+        } else {
             val pack = api.get("/api/shop").jsonArray.flatMap { it.jsonObject.items("packs") }
                 .filter { it["coinPrice"] != null && it["coinPrice"] != JsonNull && it.long("coinPrice") <= profile.long("coins") }
                 .filter { it.items("items").any { item -> item.long("qty") > 0 && (allowed == null || item.string("name") in allowed) } }
                 .minWithOrNull(compareBy<JsonObject> { it.long("coinPrice") }.thenBy { it.string("id") }) ?: return false
             val purchase = api.post("/api/shop/${pack.string("id")}/coins").jsonObject
-            owned = purchase.items("lures").firstOrNull { it.long("qty") > 0 && compatible(it) } ?: return false
+            val availableAfterPurchase = purchase.items("lures").filter { it.long("qty") > 0 && compatible(it) }
+            if (availableAfterPurchase.isEmpty()) return false
+            chooseLure(availableAfterPurchase)
         }
         if (owned.long("id") != currentId) api.post("/api/lure/${owned.long("id")}")
         return true

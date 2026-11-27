@@ -222,13 +222,9 @@ Use [config.example.properties](config.example.properties) as the starting point
 
 `CONFIG_PATH` is supported for Docker and host-managed deployments where secrets must stay outside the repository.
 
-## Docker Host Deployment
+## Gameplay Stub
 
-Windows Docker-host deployment files live in [infra/docker-host](infra/docker-host). The stack mounts `config.properties`, app state, event assets, and PostgreSQL data from the host so runtime state is not stored inside Docker.
-
-See [docs/production/windows-docker-host.md](docs/production/windows-docker-host.md) for the `develop` -> `main` release flow and first restore from a VDS backup.
-
-The separate [gameplay-stub module](gameplay-stub/README.md) runs 50 persistent profiles registered with source `bot` to participate in tournaments and club events exclusively through the game server HTTP API. It has an independent HDC deployment script and lifecycle.
+The [gameplay-stub module](gameplay-stub/README.md) runs 50 persistent profiles registered with source `bot` to participate in tournaments and club events through the game server HTTP API.
 
 ## Checks
 
