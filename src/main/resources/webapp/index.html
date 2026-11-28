@@ -35,6 +35,11 @@
       --safe-bottom-max: max(env(safe-area-inset-bottom, 0px), var(--safe-bottom-fb));
       --safe-top-ui: calc(var(--safe-top-max) + var(--tg-topbar));
       --safe-top-overlay: calc(var(--safe-top-max) + var(--tg-topbar));
+      --footer-inset: max(
+        var(--safe-bottom-max),
+        var(--bottom-gap),
+        calc(var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px))
+      );
     }
 
     /* старый iOS (constant) — на всякий случай */
@@ -59,7 +64,7 @@
     #root {
       height: 100%;
       box-sizing: border-box;
-      overflow: auto;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
@@ -269,17 +274,13 @@
     }
 
     .app-footer {
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
+      flex-shrink: 0;
+      height: calc(64px * var(--ui-scale) + var(--footer-inset) + var(--overlay-shift) + 5px);
       box-sizing: border-box;
-      padding: 5px calc(16px * var(--ui-scale)) calc(max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
+      padding: 5px calc(16px * var(--ui-scale)) calc(var(--footer-inset) + var(--overlay-shift) + 5px);
       display: flex;
       align-items: stretch;
       gap: 12px;
-    }
-
-    .app-footer-placeholder {
-      height: calc(64px * var(--ui-scale) + max(var(--safe-bottom-max), var(--bottom-gap)) + var(--overlay-shift) + 5px);
-      background: var(--tg-bg);
     }
 
     .app-content {
@@ -348,8 +349,8 @@
 <body>
   <div id="root"></div>
 
-  <script type="text/babel" data-presets="env,react" src="/app/scripts/shared.js"></script>
-  <script type="text/babel" data-presets="env,react" src="/app/scripts/components.js"></script>
+  <script type="text/babel" data-presets="env,react" src="/app/scripts/shared.js?v=rods-2"></script>
+  <script type="text/babel" data-presets="env,react" src="/app/scripts/components.js?v=footer-2"></script>
   <script type="text/babel" data-presets="env,react" src="/app/scripts/tabs/fishing.js"></script>
   <script type="text/babel" data-presets="env,react" src="/app/scripts/tabs/tournaments.js"></script>
   <script type="text/babel" data-presets="env,react" src="/app/scripts/tabs/ratings.js"></script>
@@ -357,7 +358,7 @@
   <script type="text/babel" data-presets="env,react" src="/app/scripts/tabs/shop.js"></script>
   <script src="/app/config.js"></script>
   <script type="text/babel" data-presets="env,react" src="/app/scripts/analytics.js"></script>
-  <script type="text/babel" data-presets="env,react" src="/app/scripts/app.jsx"></script>
+  <script type="text/babel" data-presets="env,react" src="/app/scripts/app.jsx?v=footer-2"></script>
 </body>
 
 </html>

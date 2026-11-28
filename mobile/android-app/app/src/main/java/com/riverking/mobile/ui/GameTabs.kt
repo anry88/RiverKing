@@ -3547,7 +3547,7 @@ private fun FishingStageScene(
 
             val currentRodCode = state.me?.rods?.firstOrNull { it.id == state.me?.currentRodId }?.code
             val rodUrl = rodAsset(currentRodCode)
-            val rodTipAnchor = rodTipAnchorPercentage(currentRodCode)
+            val rodTipAnchor = fishingRodTipAnchor
 
             // --- Rod sizing matching the TG webapp ---
             // ROD_IMG_SIZE = 1536 x 1024
@@ -3717,7 +3717,7 @@ private fun FishingStageScene(
                 )
 
                 // Rod line points
-                val rodLinePoints = rodLinePointsPercentage(currentRodCode).map {
+                val rodLinePoints = fishingRodLinePoints.map {
                     Offset(
                         x = rodLeftDp.toPx() + rodWidthDp.toPx() * it.x,
                         y = rodTopDp.toPx() + rodHeightDp.toPx() * it.y,
@@ -3887,7 +3887,7 @@ private fun FishingStageScene(
                 contentScale = ContentScale.FillBounds
             )
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val rodLinePoints = rodLinePointsPercentage(currentRodCode).map {
+                val rodLinePoints = fishingRodLinePoints.map {
                     Offset(
                         x = rodLeftDp.toPx() + rodWidthDp.toPx() * it.x,
                         y = rodTopDp.toPx() + rodHeightDp.toPx() * it.y,
@@ -8741,69 +8741,17 @@ private fun localizedAppError(strings: RiverStrings, message: String): String {
     }
 }
 
-private fun rodTipAnchorPercentage(code: String?): androidx.compose.ui.geometry.Offset {
-    return when (code) {
-        "spark" -> androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
-        "dew" -> androidx.compose.ui.geometry.Offset(0.13607f, 0.06641f)
-        "stream" -> androidx.compose.ui.geometry.Offset(0.155f, 0.07422f)
-        "abyss" -> androidx.compose.ui.geometry.Offset(0.14844f, 0.04688f)
-        "storm" -> androidx.compose.ui.geometry.Offset(0.125f, 0.07520f)
-        else -> androidx.compose.ui.geometry.Offset(0.07878f, 0.04785f)
-    }
-}
+private val fishingRodTipAnchor = Offset(117f / 1536f, 55f / 1024f)
 
-private fun rodLinePointsPercentage(code: String?): List<androidx.compose.ui.geometry.Offset> {
-    return when (code) {
-        "spark" -> listOf(
-            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
-            androidx.compose.ui.geometry.Offset(0.635f, 0.80f),
-            androidx.compose.ui.geometry.Offset(0.495f, 0.61f),
-            androidx.compose.ui.geometry.Offset(0.355f, 0.42f),
-            androidx.compose.ui.geometry.Offset(0.215f, 0.23f),
-            androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
-        )
-        "dew" -> listOf(
-            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
-            androidx.compose.ui.geometry.Offset(0.639f, 0.797f),
-            androidx.compose.ui.geometry.Offset(0.513f, 0.614f),
-            androidx.compose.ui.geometry.Offset(0.388f, 0.432f),
-            androidx.compose.ui.geometry.Offset(0.262f, 0.249f),
-            androidx.compose.ui.geometry.Offset(0.13607f, 0.06641f)
-        )
-        "stream" -> listOf(
-            androidx.compose.ui.geometry.Offset(0.72f, 1.1f),
-            androidx.compose.ui.geometry.Offset(0.609f, 0.895f),
-            androidx.compose.ui.geometry.Offset(0.497f, 0.690f),
-            androidx.compose.ui.geometry.Offset(0.386f, 0.485f),
-            androidx.compose.ui.geometry.Offset(0.274f, 0.279f),
-            androidx.compose.ui.geometry.Offset(0.155f, 0.07422f)
-        )
-        "abyss" -> listOf(
-            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
-            androidx.compose.ui.geometry.Offset(0.642f, 0.793f),
-            androidx.compose.ui.geometry.Offset(0.518f, 0.607f),
-            androidx.compose.ui.geometry.Offset(0.395f, 0.420f),
-            androidx.compose.ui.geometry.Offset(0.272f, 0.234f),
-            androidx.compose.ui.geometry.Offset(0.14844f, 0.04688f)
-        )
-        "storm" -> listOf(
-            androidx.compose.ui.geometry.Offset(0.72f, 1.1f),
-            androidx.compose.ui.geometry.Offset(0.603f, 0.895f),
-            androidx.compose.ui.geometry.Offset(0.486f, 0.690f),
-            androidx.compose.ui.geometry.Offset(0.369f, 0.485f),
-            androidx.compose.ui.geometry.Offset(0.251f, 0.280f),
-            androidx.compose.ui.geometry.Offset(0.125f, 0.07520f)
-        )
-        else -> listOf(
-            androidx.compose.ui.geometry.Offset(0.765f, 0.98f),
-            androidx.compose.ui.geometry.Offset(0.635f, 0.80f),
-            androidx.compose.ui.geometry.Offset(0.495f, 0.61f),
-            androidx.compose.ui.geometry.Offset(0.355f, 0.42f),
-            androidx.compose.ui.geometry.Offset(0.215f, 0.23f),
-            androidx.compose.ui.geometry.Offset(0.078f, 0.048f)
-        )
-    }
-}
+// From the reel spool through the lower inside edge of each guide on the 1536×1024 sprite.
+private val fishingRodLinePoints = listOf(
+    Offset(749f / 1536f, 699f / 1024f),
+    Offset(590f / 1536f, 462f / 1024f),
+    Offset(385f / 1536f, 278f / 1024f),
+    Offset(258f / 1536f, 167f / 1024f),
+    Offset(179f / 1536f, 104f / 1024f),
+    fishingRodTipAnchor,
+)
 
 private fun locationBackgroundAsset(location: String?): String? {
     val path = when (location) {

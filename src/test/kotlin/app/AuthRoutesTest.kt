@@ -364,7 +364,8 @@ class AuthRoutesTest {
         assertEquals(AndroidUpdateService.INSTALL_MODE_DOWNLOAD_APK, directBody.installMode)
         assertEquals("https://itch.example/downloads/riverking.apk", directBody.installUrl)
         assertEquals("https://itch.example/riverking", directBody.fallbackUrl)
-        assertEquals(true, directBody.releaseNotes.any { it.contains("рыб", ignoreCase = true) })
+        val russianReleaseNotes = policy.getValue("releaseNotes").jsonObject.getValue("ru").jsonArray
+        assertEquals(russianReleaseNotes.map { it.jsonPrimitive.content }, directBody.releaseNotes)
 
         val playUpdate = client.get("/api/mobile/update") {
             androidClientHeaders(versionCode = 0, channel = AndroidUpdateService.CHANNEL_PLAY)

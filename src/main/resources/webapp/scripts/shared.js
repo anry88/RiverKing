@@ -78,7 +78,9 @@
     if (cached) return cached;
     const requestPath = info.requestPath;
     if (!requestPath) return Promise.reject(new Error('invalid asset path'));
-    const inflight = fetch(`/api/assets/${requestPath}`, { credentials: 'include' })
+    // Rod images are served with immutable caching, so pair the new artwork with the new guide points.
+    const assetVersion = requestPath.startsWith('rods/') ? '?v=2' : '';
+    const inflight = fetch(`/api/assets/${requestPath}${assetVersion}`, { credentials: 'include' })
       .then(resp => {
         if (!resp.ok) {
           const err = new Error(`asset ${resp.status}`);
@@ -470,80 +472,23 @@
     }
     return null;
   };
-  const ROD_TIP_ANCHOR_DEFAULT = { x: 0.07878, y: 0.04785 };
+  const ROD_TIP_ANCHOR_DEFAULT = { x: 117 / 1536, y: 55 / 1024 };
+  // From the reel spool through the lower inside edge of each guide on the 1536×1024 sprite.
+  const ROD_GUIDE_POINTS = [
+    { x: 749 / 1536, y: 699 / 1024 },
+    { x: 590 / 1536, y: 462 / 1024 },
+    { x: 385 / 1536, y: 278 / 1024 },
+    { x: 258 / 1536, y: 167 / 1024 },
+    { x: 179 / 1536, y: 104 / 1024 },
+    ROD_TIP_ANCHOR_DEFAULT
+  ];
   const ROD_CONFIG = {
-    spark: {
-      image: '/app/assets/rods/yellow_rod.png',
-      tipAnchor: { x: 0.078, y: 0.048 },
-      linePoints: [
-        { x: 0.765, y: 0.98 },
-        { x: 0.635, y: 0.80 },
-        { x: 0.495, y: 0.61 },
-        { x: 0.355, y: 0.42 },
-        { x: 0.215, y: 0.23 },
-        { x: 0.078, y: 0.048 }
-      ]
-    },
-    dew: {
-      image: '/app/assets/rods/green_rod.png',
-      tipAnchor: { x: 0.13607, y: 0.06641 },
-      linePoints: [
-        { x: 0.765, y: 0.98 },
-        { x: 0.639, y: 0.797 },
-        { x: 0.513, y: 0.614 },
-        { x: 0.388, y: 0.432 },
-        { x: 0.262, y: 0.249 },
-        { x: 0.13607, y: 0.06641 }
-      ]
-    },
-    stream: {
-      image: '/app/assets/rods/blue_rod.png',
-      tipAnchor: { x: 0.155, y: 0.07422 },
-      linePoints: [
-        { x: 0.72, y: 1.1 },
-        { x: 0.609, y: 0.895 },
-        { x: 0.497, y: 0.690 },
-        { x: 0.386, y: 0.485 },
-        { x: 0.274, y: 0.279 },
-        { x: 0.155, y: 0.07422 }
-      ]
-    },
-    abyss: {
-      image: '/app/assets/rods/black_rod.png',
-      tipAnchor: { x: 0.14844, y: 0.04688 },
-      linePoints: [
-        { x: 0.765, y: 0.98 },
-        { x: 0.642, y: 0.793 },
-        { x: 0.518, y: 0.607 },
-        { x: 0.395, y: 0.420 },
-        { x: 0.272, y: 0.234 },
-        { x: 0.14844, y: 0.04688 }
-      ]
-    },
-    storm: {
-      image: '/app/assets/rods/silver_rod.png',
-      tipAnchor: { x: 0.125, y: 0.07520 },
-      linePoints: [
-        { x: 0.72, y: 1.1 },
-        { x: 0.603, y: 0.895 },
-        { x: 0.486, y: 0.690 },
-        { x: 0.369, y: 0.485 },
-        { x: 0.251, y: 0.280 },
-        { x: 0.125, y: 0.07520 }
-      ]
-    },
-    default: {
-      image: '/app/assets/rods/yellow_rod.png',
-      tipAnchor: ROD_TIP_ANCHOR_DEFAULT,
-      linePoints: [
-        { x: 0.765, y: 0.98 },
-        { x: 0.635, y: 0.80 },
-        { x: 0.495, y: 0.61 },
-        { x: 0.355, y: 0.42 },
-        { x: 0.215, y: 0.23 },
-        { x: 0.078, y: 0.048 }
-      ]
-    },
+    spark: { image: '/app/assets/rods/yellow_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS },
+    dew: { image: '/app/assets/rods/green_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS },
+    stream: { image: '/app/assets/rods/blue_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS },
+    abyss: { image: '/app/assets/rods/black_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS },
+    storm: { image: '/app/assets/rods/silver_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS },
+    default: { image: '/app/assets/rods/yellow_rod.png', tipAnchor: ROD_TIP_ANCHOR_DEFAULT, linePoints: ROD_GUIDE_POINTS }
   };
   const ROD_IMAGES = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.image]));
   const ROD_TIP_ANCHORS = Object.fromEntries(Object.entries(ROD_CONFIG).map(([code, cfg]) => [code, cfg.tipAnchor]));

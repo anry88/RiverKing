@@ -1,14 +1,14 @@
 {
-  "latestVersionCode": 17,
-  "latestVersionName": "0.4.13",
+  "latestVersionCode": 18,
+  "latestVersionName": "0.4.14",
   "minSupportedVersionCode": 4,
   "requireVersionHeaders": true,
   "releaseNotes": {
     "en": [
-      "Added the Tasaki Kannon background and seven new fish illustrations for the December event."
+      "Redesigned all five fishing rods with reels and adjusted the fishing line to follow the rod guides."
     ],
     "ru": [
-      "Добавили фон Тасаки-Каннон и иллюстрации семи новых рыб декабрьского ивента."
+      "Перерисовали все пять удочек, добавили катушки и выровняли леску по кольцам."
     ]
   }
 }
