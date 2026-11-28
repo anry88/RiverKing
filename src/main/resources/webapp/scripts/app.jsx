@@ -1311,7 +1311,7 @@ function App(){
     );
   }
 
-  return (
+  return (<>
     <div
       className="app-content w-full px-4 flex justify-center"
       onClick={()=>setPrizeHint(null)}
@@ -1553,15 +1553,6 @@ function App(){
           )}
         </div>
 
-        {tab !== 'club' && (
-          <BottomNav
-            tab={tab}
-            setTab={setTab}
-            dailyAvailable={me.dailyAvailable}
-            achievementsAvailable={achievementsClaimable}
-          />
-        )}
-
         <QuestsDrawer
           open={questsOpen}
           onClose={()=>setQuestsOpen(false)}
@@ -1612,7 +1603,18 @@ function App(){
         />
       </div>
     </div>
-  );
+    {tab !== 'club' && (
+      <BottomNav
+        tab={tab}
+        setTab={nextTab=>{
+          setPrizeHint(null);
+          setTab(nextTab);
+        }}
+        dailyAvailable={me.dailyAvailable}
+        achievementsAvailable={achievementsClaimable}
+      />
+    )}
+  </>);
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
